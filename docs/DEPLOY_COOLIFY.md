@@ -4,7 +4,7 @@ This project ships two Compose files:
 
 | File | Use |
 |------|-----|
-| `docker-compose.yml` | Local development (hot reload, dev Dockerfiles). |
+| `docker-compose.yml` | Local development (hot reload, `Dockerfile.development`). |
 | `docker-compose.prod.yml` | Production on a server or Coolify. |
 
 Repository: [https://github.com/wastwagon/kqsoftwaresolutions](https://github.com/wastwagon/kqsoftwaresolutions)
@@ -36,7 +36,15 @@ Do not commit `.env` files; configure secrets in Coolify.
 1. **New resource** → **Docker Compose** (or your Coolify version’s equivalent).
 2. **Repository:** `wastwagon/kqsoftwaresolutions` (or full Git URL).
 3. **Branch:** `main`.
-4. **Compose file path:** `docker-compose.prod.yml` (not the default `docker-compose.yml`).
+4. **Compose file path:** `docker-compose.prod.yml` (not `docker-compose.yml` and not a non-existent `docker-compose.yaml`).
+
+### Coolify restarts / “Prisma schema not found” / “package.json ENOENT”
+
+Coolify **v4** may auto-detect `**/Dockerfile.dev` and inject build args into **that** file instead of the `Dockerfile` referenced in compose. That uses the **dev** image (no production build) and breaks Prisma paths.
+
+This repo uses **`Dockerfile.development`** for local dev (see `docker-compose.yml`) so Coolify uses **`api/Dockerfile`** and **`web/Dockerfile`** from `docker-compose.prod.yml` only.
+
+After pulling the fix, **redeploy** with compose path **`/docker-compose.prod.yml`**.
 
 ## 3. Required environment variables
 
