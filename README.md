@@ -36,7 +36,7 @@ docker compose up -d
 
 Then restart with the same `-f docker-compose.development.yml` you used to start.
 
-**Production (VPS / Coolify):** default **`docker-compose.yml`** includes the production stack; you can also set Coolify to **`docker-compose.prod.yml`**. Step-by-step: **[docs/DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md)** (includes GitHub remote `wastwagon/kqsoftwaresolutions`).
+**Production (VPS / Coolify):** **`docker-compose.yml`** is the production stack (same as **`docker-compose.prod.yml`**). Step-by-step: **[docs/DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md)** (includes GitHub remote `wastwagon/kqsoftwaresolutions`).
 
 ---
 
@@ -294,8 +294,8 @@ Use a real admin account and one test org.
 ```
 ├── api/          # Backend (Node.js + Express + Prisma)
 ├── web/          # Frontend (React + TypeScript + Tailwind)
-├── docker-compose.yml              # default: includes production stack
-├── docker-compose.prod.yml         # production services (included above)
+├── docker-compose.yml              # production (Coolify default)
+├── docker-compose.prod.yml         # production (same stack; keep in sync)
 ├── docker-compose.development.yml  # local hot reload
 └── .env
 ```

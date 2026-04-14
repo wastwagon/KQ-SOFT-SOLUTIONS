@@ -4,8 +4,8 @@ This project ships these Compose files:
 
 | File | Use |
 |------|-----|
-| `docker-compose.yml` | **Default / Coolify:** includes `docker-compose.prod.yml` (production images). |
-| `docker-compose.prod.yml` | Production stack definition (same services as default compose). |
+| `docker-compose.yml` | **Default / Coolify:** production stack (inline; no `include` — works on all Compose versions). |
+| `docker-compose.prod.yml` | Same production stack (explicit filename); keep in sync with `docker-compose.yml`. |
 | `docker-compose.development.yml` | Local development (hot reload, `Dockerfile.development`). |
 
 Repository: [https://github.com/wastwagon/kqsoftwaresolutions](https://github.com/wastwagon/kqsoftwaresolutions)
@@ -37,15 +37,13 @@ Do not commit `.env` files; configure secrets in Coolify.
 1. **New resource** → **Docker Compose** (or your Coolify version’s equivalent).
 2. **Repository:** `wastwagon/kqsoftwaresolutions` (or full Git URL).
 3. **Branch:** `main`.
-4. **Compose file path:** `docker-compose.yml` **or** `docker-compose.prod.yml` (both are the **production** stack). Do **not** point Coolify at `docker-compose.development.yml`.
-
-Requires **Docker Compose v2.20+** (`include` support). If your server is older, set the path to **`docker-compose.prod.yml`** only.
+4. **Compose file path:** `docker-compose.yml` **or** `docker-compose.prod.yml` (both define the same **production** stack). Do **not** point Coolify at `docker-compose.development.yml`.
 
 ### Coolify restarts / dev images / “Prisma schema not found”
 
 If Coolify builds **`Dockerfile.development`** (log shows `load build definition from Dockerfile.development`), the resource is using the **development** compose file, or an old checkout where `docker-compose.yml` was dev-only.
 
-**Fix:** Use compose file **`docker-compose.yml`** (current default includes production) or **`docker-compose.prod.yml`** directly, then redeploy.
+**Fix:** Use compose file **`docker-compose.yml`** or **`docker-compose.prod.yml`** (both are the production stack), then redeploy.
 
 Coolify may still inject build `ARG`s into Dockerfiles; that is fine as long as **`build.dockerfile`** in compose is **`Dockerfile`** (production) for `api` and `web`.
 

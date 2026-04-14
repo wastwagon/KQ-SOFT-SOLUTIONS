@@ -1,4 +1,5 @@
 # Production stack for VPS / Coolify (Docker Compose)
+# Same services as docker-compose.yml — keep both files in sync when editing.
 # Set env in Coolify UI or a .env file next to this compose file.
 #
 # Required:
