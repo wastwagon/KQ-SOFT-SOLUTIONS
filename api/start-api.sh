@@ -1,21 +1,21 @@
 #!/bin/sh
 # Run Prisma migrations, then start the API.
 #
-# 1) P3009 (failed migration): optional auto resolve --rolled-back + retry (PRISMA_AUTO_RESOLVE_MIGRATIONS).
-# 2) Empty DB: incremental migrations assume tables already exist; there is no baseline migration in git.
-#    If Postgres reports relation "projects" does not exist, we db push from schema.prisma, clear
-#    _prisma_migrations, mark all local migrations as applied, then migrate deploy (no-op).
+# Recovery loop (max 8 rounds):
+# 1) If log shows missing "projects" table (P3018 / 42P01): db push + mark all migrations applied.
+# 2) Else if P3009 for a configured migration: migrate resolve --rolled-back, retry deploy.
+#
+# Order matters: first failure is often P3009 only (no SQL yet), so no "projects" line — we resolve
+# first; the next deploy then hits P3018 and we bootstrap. Previously bootstrap ran only after the
+# first failure, so P3009-only logs never triggered it.
 #
 # Disable bootstrap: PRISMA_BOOTSTRAP_EMPTY_DB=0
-# Disable: PRISMA_AUTO_RESOLVE_MIGRATIONS="" (empty)
-#
-# (Named start-api.sh — not docker-entrypoint.sh — so logs are not confused with nginx's
-# /docker-entrypoint.sh on the web container.)
+# Disable P3009 auto-resolve: PRISMA_AUTO_RESOLVE_MIGRATIONS="" (empty)
 
 set -eu
 SCHEMA="./prisma/schema.prisma"
+MAX_ROUNDS=8
 
-# Fail before migrations so Coolify "api" logs show this first (not only after Prisma runs).
 if [ "${NODE_ENV:-}" = "production" ]; then
   if [ -z "${JWT_SECRET:-}" ] || [ "$JWT_SECRET" = "dev-secret" ]; then
     echo "start-api: FATAL — JWT_SECRET is missing, empty, or still \"dev-secret\"." >&2
@@ -28,22 +28,15 @@ run_migrate() {
   npx prisma migrate deploy --schema="$SCHEMA"
 }
 
-LOG=$(mktemp)
-trap 'rm -f "$LOG"' EXIT
+# Prisma / Postgres wording varies slightly; keep patterns tight enough to avoid false positives.
+log_suggests_missing_projects_table() {
+  grep -qF 'relation "projects" does not exist' "$LOG" 2>/dev/null \
+    || grep -qE 'relation[[:space:]]+"projects"[[:space:]]+does not exist' "$LOG" 2>/dev/null
+}
 
-if run_migrate >"$LOG" 2>&1; then
-  rm -f "$LOG"
-  trap - EXIT
-  echo "start-api: prisma migrate deploy OK — starting Node on port ${PORT:-9001}" >&2
-  exec node dist/index.js
-fi
-
-cat "$LOG" >&2
-
-# Fresh Docker volume: no tables yet; repo migrations start with ALTER on "projects".
-if [ "${PRISMA_BOOTSTRAP_EMPTY_DB:-1}" != "0" ] && grep -q 'relation "projects" does not exist' "$LOG"; then
-  echo "start-api: empty database (no projects table) — syncing schema with prisma db push, then marking migrations applied." >&2
-  echo "start-api: disable this with PRISMA_BOOTSTRAP_EMPTY_DB=0 if you manage SQL by hand." >&2
+bootstrap_empty_schema() {
+  echo "start-api: empty database (no projects table) — prisma db push + migrate resolve --applied (all)" >&2
+  echo "start-api: set PRISMA_BOOTSTRAP_EMPTY_DB=0 to disable. Do not use on DBs with real data you need." >&2
   printf '%s\n' 'DELETE FROM "_prisma_migrations";' | npx prisma db execute --stdin --schema="$SCHEMA" >&2 || true
   npx prisma db push --schema="$SCHEMA" --skip-generate >&2
   for name in $(ls -1 prisma/migrations 2>/dev/null | LC_ALL=C sort); do
@@ -54,45 +47,58 @@ if [ "${PRISMA_BOOTSTRAP_EMPTY_DB:-1}" != "0" ] && grep -q 'relation "projects" 
     echo "start-api: migrate resolve --applied $name" >&2
     npx prisma migrate resolve --applied "$name" --schema="$SCHEMA" >&2
   done
-  if run_migrate >"$LOG" 2>&1; then
-    rm -f "$LOG"
-    trap - EXIT
-    echo "start-api: prisma migrate deploy OK (after bootstrap) — starting Node on port ${PORT:-9001}" >&2
-    exec node dist/index.js
-  fi
-  cat "$LOG" >&2
-  echo "start-api: migrate deploy failed after bootstrap" >&2
-  exit 1
-fi
+}
 
-MIGS="${PRISMA_AUTO_RESOLVE_MIGRATIONS-20250228140000_add_project_slug}"
-
-if [ -n "$MIGS" ] && grep -q "P3009" "$LOG"; then
+try_p3009_rolled_back() {
+  MIGS="${PRISMA_AUTO_RESOLVE_MIGRATIONS-20250228140000_add_project_slug}"
+  [ -n "$MIGS" ] || return 1
+  grep -q "P3009" "$LOG" 2>/dev/null || return 1
   resolved_any=0
   OLDIFS=$IFS
   IFS=','
   for m in $MIGS; do
-    IFS=$OLDIFS
     m=$(printf '%s' "$m" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [ -z "$m" ] && continue
-    if grep -q "$m" "$LOG"; then
+    if grep -q "$m" "$LOG" 2>/dev/null; then
       echo "start-api: P3009 mentions $m — prisma migrate resolve --rolled-back" >&2
       npx prisma migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2
       resolved_any=1
     fi
   done
   IFS=$OLDIFS
+  [ "$resolved_any" -eq 1 ]
+}
 
-  if [ "$resolved_any" -eq 1 ]; then
-    if run_migrate >"$LOG" 2>&1; then
-      rm -f "$LOG"
-      trap - EXIT
-      echo "start-api: prisma migrate deploy OK (after resolve) — starting Node on port ${PORT:-9001}" >&2
-      exec node dist/index.js
-    fi
-    cat "$LOG" >&2
-    echo "start-api: migrate deploy still failing after auto-resolve" >&2
+LOG=$(mktemp)
+trap 'rm -f "$LOG"' EXIT
+
+round=0
+while [ "$round" -lt "$MAX_ROUNDS" ]; do
+  if run_migrate >"$LOG" 2>&1; then
+    rm -f "$LOG"
+    trap - EXIT
+    echo "start-api: prisma migrate deploy OK — starting Node on port ${PORT:-9001}" >&2
+    exec node dist/index.js
   fi
-fi
 
+  cat "$LOG" >&2
+
+  progressed=0
+
+  if [ "${PRISMA_BOOTSTRAP_EMPTY_DB:-1}" != "0" ] && log_suggests_missing_projects_table; then
+    bootstrap_empty_schema
+    progressed=1
+  elif try_p3009_rolled_back; then
+    progressed=1
+  fi
+
+  if [ "$progressed" -eq 0 ]; then
+    echo "start-api: no automatic recovery applied; fix DB/migrations or env and redeploy." >&2
+    exit 1
+  fi
+
+  round=$((round + 1))
+done
+
+echo "start-api: migration recovery exceeded $MAX_ROUNDS rounds" >&2
 exit 1
