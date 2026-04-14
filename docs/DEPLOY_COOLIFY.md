@@ -59,6 +59,13 @@ docker compose run --rm --no-deps api npx prisma migrate resolve --rolled-back <
 
 **Dev-only / empty data:** remove the Postgres volume and redeploy (destructive).
 
+### “Restarting” / many restarts while deploy shows Finished
+
+`docker compose up` succeeding only means containers **started**. The **`api`** process can exit immediately (Docker restarts it) if env is invalid — most often **`JWT_SECRET`** missing, empty, or still `dev-secret`.
+
+1. In Coolify, open **Logs** for the **`api`** service (not **web**).
+2. If you see **`start-api: FATAL — JWT_SECRET`** or **`FATAL: JWT_SECRET must be set`**, set **`JWT_SECRET`** in the resource environment to a **strong random string** (32+ characters), redeploy, and confirm it is passed to the **`api`** service (not only as a build argument).
+
 ### Coolify restarts / dev images / “Prisma schema not found”
 
 If Coolify builds **`Dockerfile.development`** (log shows `load build definition from Dockerfile.development`), the resource is using the **development** compose file, or an old checkout where `docker-compose.yml` was dev-only.

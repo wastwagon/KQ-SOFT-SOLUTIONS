@@ -12,6 +12,15 @@
 set -eu
 SCHEMA="./prisma/schema.prisma"
 
+# Fail before migrations so Coolify "api" logs show this first (not only after Prisma runs).
+if [ "${NODE_ENV:-}" = "production" ]; then
+  if [ -z "${JWT_SECRET:-}" ] || [ "$JWT_SECRET" = "dev-secret" ]; then
+    echo "start-api: FATAL — JWT_SECRET is missing, empty, or still \"dev-secret\"." >&2
+    echo "start-api: In Coolify → this resource → Environment, set JWT_SECRET (32+ random characters), then redeploy." >&2
+    exit 1
+  fi
+fi
+
 run_migrate() {
   npx prisma migrate deploy --schema="$SCHEMA"
 }
@@ -22,6 +31,7 @@ trap 'rm -f "$LOG"' EXIT
 if run_migrate >"$LOG" 2>&1; then
   rm -f "$LOG"
   trap - EXIT
+  echo "start-api: prisma migrate deploy OK — starting Node on port ${PORT:-9001}" >&2
   exec node dist/index.js
 fi
 
@@ -49,6 +59,7 @@ if [ -n "$MIGS" ] && grep -q "P3009" "$LOG"; then
     if run_migrate; then
       rm -f "$LOG"
       trap - EXIT
+      echo "start-api: prisma migrate deploy OK (after resolve) — starting Node on port ${PORT:-9001}" >&2
       exec node dist/index.js
     fi
     echo "start-api: migrate deploy still failing after auto-resolve" >&2
