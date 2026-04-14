@@ -45,18 +45,17 @@ The production compose file **does not publish** `web` or `api` to the host. Coo
 
 ### API restarts / `P3009` / failed migration `20250228140000_add_project_slug`
 
-Older migration SQL used quoted table names `"Project"` / `"User"` while the real tables are **`projects`** / **`users`** (`@@map`). That migration failed once; Prisma then refuses further deploys until the failure is cleared.
+Older migration SQL used `"Project"` / `"User"` while the real tables are **`projects`** / **`users`**. That is **fixed in the repo**; the production image runs **`api/docker-entrypoint.sh`**, which on **`P3009`** mentioning `20250228140000_add_project_slug` automatically runs `prisma migrate resolve --rolled-back` for that migration and **retries** `migrate deploy` once. A normal redeploy after pull should recover without manual steps.
 
-1. **Pull** the repo version that contains the **corrected** `api/prisma/migrations/20250228140000_add_project_slug/migration.sql` (and `20250228160000_…`, which had the same issue).
-2. **Mark the failed migration as rolled back** (one time), from the same machine/network as the stack, with `DATABASE_URL` pointing at this Postgres — e.g. Coolify **Terminal** in the app directory, using the same Compose project name Coolify uses:
+- **Turn off** auto-recovery: set env `PRISMA_AUTO_RESOLVE_MIGRATIONS=` (empty) on the `api` service.
+- **Extra migration names** (comma-separated): `PRISMA_AUTO_RESOLVE_MIGRATIONS=name1,name2`
+- If deploy still fails after auto-resolve, fix the underlying error or use **Coolify Terminal**:
 
 ```bash
-docker compose run --rm --no-deps api npx prisma migrate resolve --rolled-back 20250228140000_add_project_slug --schema=./prisma/schema.prisma
+docker compose run --rm --no-deps api npx prisma migrate resolve --rolled-back <migration_name> --schema=./prisma/schema.prisma
 ```
 
-3. **Redeploy** (or `docker compose up -d` / restart the `api` service) so `prisma migrate deploy` runs again.
-
-**Dev-only / empty data:** you can instead remove the Postgres volume and redeploy for a clean database (destructive).
+**Dev-only / empty data:** remove the Postgres volume and redeploy (destructive).
 
 ### Coolify restarts / dev images / “Prisma schema not found”
 

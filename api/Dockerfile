@@ -18,5 +18,7 @@ RUN npm ci --omit=dev && npm install prisma@5.22.0 --no-save
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY docker-entrypoint.sh ./
+RUN chmod +x ./docker-entrypoint.sh
 EXPOSE 9001
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./prisma/schema.prisma && node dist/index.js"]
+CMD ["./docker-entrypoint.sh"]
