@@ -45,7 +45,9 @@ The production compose file **does not publish** `web` or `api` to the host. Coo
 
 ### API restarts / `P3009` / failed migration `20250228140000_add_project_slug`
 
-Older migration SQL used `"Project"` / `"User"` while the real tables are **`projects`** / **`users`**. That is **fixed in the repo**; the production image runs **`api/docker-entrypoint.sh`**, which on **`P3009`** mentioning `20250228140000_add_project_slug` automatically runs `prisma migrate resolve --rolled-back` for that migration and **retries** `migrate deploy` once. A normal redeploy after pull should recover without manual steps.
+Older migration SQL used `"Project"` / `"User"` while the real tables are **`projects`** / **`users`**. That is **fixed in the repo**; the production **API** image runs **`api/start-api.sh`** (not nginx’s `/docker-entrypoint.sh` on the **web** container). On **`P3009`** mentioning `20250228140000_add_project_slug` it runs `prisma migrate resolve --rolled-back` and **retries** `migrate deploy` once. A normal redeploy after pull should recover without manual steps.
+
+**Logs:** Prisma / `start-api:` lines appear under the **`api`** service. Lines like `/docker-entrypoint.sh` and `nginx/1.x` are the **`web`** (nginx) service only.
 
 - **Turn off** auto-recovery: set env `PRISMA_AUTO_RESOLVE_MIGRATIONS=` (empty) on the `api` service.
 - **Extra migration names** (comma-separated): `PRISMA_AUTO_RESOLVE_MIGRATIONS=name1,name2`

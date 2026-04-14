@@ -3,6 +3,9 @@
 # historically-broken migration (wrong table names in SQL), mark it rolled back once
 # and retry — avoids manual `migrate resolve` on Coolify after fixing migration files.
 #
+# (Named start-api.sh — not docker-entrypoint.sh — so logs are not confused with nginx's
+# /docker-entrypoint.sh on the web container.)
+#
 # Disable: PRISMA_AUTO_RESOLVE_MIGRATIONS="" (empty)
 # Extend:  PRISMA_AUTO_RESOLVE_MIGRATIONS="name1,name2"
 
@@ -35,7 +38,7 @@ if [ -n "$MIGS" ] && grep -q "P3009" "$LOG"; then
     m=$(printf '%s' "$m" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [ -z "$m" ] && continue
     if grep -q "$m" "$LOG"; then
-      echo "docker-entrypoint: P3009 mentions $m — prisma migrate resolve --rolled-back" >&2
+      echo "start-api: P3009 mentions $m — prisma migrate resolve --rolled-back" >&2
       npx prisma migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2
       resolved_any=1
     fi
@@ -48,7 +51,7 @@ if [ -n "$MIGS" ] && grep -q "P3009" "$LOG"; then
       trap - EXIT
       exec node dist/index.js
     fi
-    echo "docker-entrypoint: migrate deploy still failing after auto-resolve" >&2
+    echo "start-api: migrate deploy still failing after auto-resolve" >&2
   fi
 fi
 

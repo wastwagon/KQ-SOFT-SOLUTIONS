@@ -18,7 +18,7 @@ RUN npm ci --omit=dev && npm install prisma@5.22.0 --no-save
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY docker-entrypoint.sh ./
-RUN chmod +x ./docker-entrypoint.sh
+COPY start-api.sh ./
+RUN chmod +x ./start-api.sh
 EXPOSE 9001
-CMD ["./docker-entrypoint.sh"]
+CMD ["./start-api.sh"]
