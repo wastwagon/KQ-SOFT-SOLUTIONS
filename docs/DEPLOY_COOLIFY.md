@@ -39,9 +39,9 @@ Do not commit `.env` files; configure secrets in Coolify.
 3. **Branch:** `main`.
 4. **Compose file path:** `docker-compose.yml` **or** `docker-compose.prod.yml` (both define the same **production** stack). Do **not** point Coolify at `docker-compose.development.yml`.
 
-### `Bind for 0.0.0.0:80 failed: port is already allocated`
+### `Bind for 0.0.0.0:… failed: port is already allocated`
 
-Coolify (or another reverse proxy) usually owns host port **80**. The stack defaults to publishing the web UI on host **8080** (`WEB_PORT` → container **80**). Do not set `WEB_PORT=80` unless that port is free on the host.
+The production compose file **does not publish** `web` or `api` to the host. Coolify reaches them on the **Docker network** (container ports **80** and **9001**). If you still see this error, Coolify may be merging an old env or custom compose snippet that adds `ports:` — remove duplicate port mappings there.
 
 ### Coolify restarts / dev images / “Prisma schema not found”
 
@@ -63,8 +63,8 @@ Set these in Coolify for the **stack** (or per-service, depending on Coolify):
 
 ## 4. Domains and ports
 
-- **Web** listens on **80** inside the container. Published host port defaults to **8080** (`WEB_PORT`, maps host → 80) so deploys do not fight Coolify or other proxies for host **:80**. In Coolify, point the domain at container port **80**. For a bare VPS with nothing on host 80, set `WEB_PORT=80` in the stack env.
-- **API** listens on **9001** (`API_PORT` default `9001`).
+- **Web** listens on **80** inside the container (no default host `ports:` mapping — avoids conflicts with Coolify on **80**, **8080**, **9001**, etc.).
+- **API** listens on **9001** inside the container (same: no host publish by default).
 
 In Coolify, attach:
 

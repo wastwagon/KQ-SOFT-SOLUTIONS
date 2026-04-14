@@ -6,6 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local compose port mappings (copy from docker-compose.override.example.yml)
+docker-compose.override.yml
+
 # Build
 dist/
 build/

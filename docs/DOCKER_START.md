@@ -15,13 +15,13 @@ This will:
 3. **API** – dev server on **9101** (or `API_PORT` from `.env`)
 4. **Web** – Vite dev server on **9100** (or `WEB_PORT` from `.env`)
 
-**Production-style stack** (multi-stage build; nginx on **80** inside web, published on host **8080** by default; API **9001**):
+**Production-style stack** (multi-stage build; **no host ports** — same as Coolify):
 
 ```bash
 docker compose up -d
 ```
 
-Open **http://localhost:8080** (or set `WEB_PORT=80` if host port 80 is free).
+For a **local browser**, add ports: `cp docker-compose.override.example.yml docker-compose.override.yml` then `docker compose up -d` → **http://localhost:8080** and **http://localhost:9001**.
 
 ## Open the app (development compose)
 

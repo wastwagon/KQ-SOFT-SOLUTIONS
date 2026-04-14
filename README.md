@@ -16,14 +16,21 @@ docker compose -f docker-compose.development.yml up -d
 - **Web:** http://localhost:9100
 - **API:** http://localhost:9101
 
-**Production-style stack** (same as Coolify default: multi-stage builds; nginx on **80** inside the web container, published on host **8080** by default; API **9001**):
+**Production-style stack** (same as Coolify: multi-stage builds; **no host port publish** — Coolify reaches containers on the Docker network):
 
 ```bash
 cp .env.example .env   # Set JWT_SECRET, VITE_API_URL, CORS_ORIGIN for a real run
 docker compose up -d
 ```
 
-Then open **http://localhost:8080** (or set `WEB_PORT=80` in `.env` if host port 80 is free).
+To open the app in a **local browser** without Coolify, publish ports:
+
+```bash
+cp docker-compose.override.example.yml docker-compose.override.yml
+docker compose up -d
+```
+
+Then use **http://localhost:8080** (web) and **http://localhost:9001** (API), or change `WEB_PORT` / `API_PORT` inside the override file.
 
 **User manual:** See **[USER_MANUAL.pdf](USER_MANUAL.pdf)** for a comprehensive client handover guide (features, workflows, troubleshooting). Source: `USER_MANUAL.md`. To regenerate: `npm run manual:pdf` (requires Chrome).
 
@@ -296,8 +303,9 @@ Use a real admin account and one test org.
 ```
 ├── api/          # Backend (Node.js + Express + Prisma)
 ├── web/          # Frontend (React + TypeScript + Tailwind)
-├── docker-compose.yml              # production (Coolify default)
-├── docker-compose.prod.yml         # production (same stack; keep in sync)
-├── docker-compose.development.yml  # local hot reload
+├── docker-compose.yml                    # production (Coolify default; no host ports)
+├── docker-compose.prod.yml               # production (keep in sync)
+├── docker-compose.development.yml        # local hot reload
+├── docker-compose.override.example.yml   # optional: copy → docker-compose.override.yml for local ports
 └── .env
 ```
