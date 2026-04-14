@@ -1,78 +1,9 @@
-# Bank Reconciliation SaaS - Development
-# Q-SOFT SOLUTIONS LIMITED
+# Default stack: production (Coolify / VPS use this file by default).
+# Local development with hot reload:
+#   docker compose -f docker-compose.development.yml up
+#
+# You can still point Coolify at docker-compose.prod.yml explicitly; both resolve
+# to the same services.
 
-services:
-  api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile.development
-    ports:
-      - "${API_PORT:-9001}:9001"
-    tty: true
-    stdin_open: true
-    environment:
-      - NODE_ENV=development
-      - PORT=9001
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/brs_db
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
-      - UPLOAD_DIR=/app/uploads
-    volumes:
-      - ./api:/app
-      - api_node_modules:/app/node_modules
-      - uploads_data:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    # Regenerate Prisma client, run migrations, then start dev server.
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile.development
-    ports:
-      - "${WEB_PORT:-9100}:9100"
-    tty: true
-    stdin_open: true
-    environment:
-      - VITE_API_URL=http://localhost:9101
-      - VITE_API_PROXY_TARGET=http://api:9001
-    volumes:
-      - ./web:/app
-      - /app/node_modules
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    ports:
-      - "15432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=brs_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "16379:6379"
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
-  uploads_data:
-  api_node_modules:
+include:
+  - path: docker-compose.prod.yml

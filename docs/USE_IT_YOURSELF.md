@@ -12,7 +12,7 @@ From the project root:
 
 ```bash
 cp .env.example .env
-docker compose up -d
+docker compose -f docker-compose.development.yml up -d
 ```
 
 Wait ~30 seconds for Postgres to become healthy and the API to run. Then open:
@@ -20,12 +20,12 @@ Wait ~30 seconds for Postgres to become healthy and the API to run. Then open:
 - **Web UI:** http://localhost:9100  
 - (API: http://localhost:9101)
 
-If you use different ports (e.g. 9000/9001), set `WEB_PORT` and `API_PORT` in `.env` and run `docker compose up -d` again.
+If you use different ports (e.g. 9000/9001), set `WEB_PORT` and `API_PORT` in `.env` and run the same command again.
 
 ### Option B — Postgres + Redis in Docker, API + Web on your machine
 
 ```bash
-docker compose up -d postgres redis
+docker compose -f docker-compose.development.yml up -d postgres redis
 ```
 
 Then:

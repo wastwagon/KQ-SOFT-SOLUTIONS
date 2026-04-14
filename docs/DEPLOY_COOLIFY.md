@@ -1,11 +1,12 @@
 # Deploy on a VPS with Coolify (Docker Compose)
 
-This project ships two Compose files:
+This project ships these Compose files:
 
 | File | Use |
 |------|-----|
-| `docker-compose.yml` | Local development (hot reload, `Dockerfile.development`). |
-| `docker-compose.prod.yml` | Production on a server or Coolify. |
+| `docker-compose.yml` | **Default / Coolify:** includes `docker-compose.prod.yml` (production images). |
+| `docker-compose.prod.yml` | Production stack definition (same services as default compose). |
+| `docker-compose.development.yml` | Local development (hot reload, `Dockerfile.development`). |
 
 Repository: [https://github.com/wastwagon/kqsoftwaresolutions](https://github.com/wastwagon/kqsoftwaresolutions)
 
@@ -36,15 +37,17 @@ Do not commit `.env` files; configure secrets in Coolify.
 1. **New resource** → **Docker Compose** (or your Coolify version’s equivalent).
 2. **Repository:** `wastwagon/kqsoftwaresolutions` (or full Git URL).
 3. **Branch:** `main`.
-4. **Compose file path:** `docker-compose.prod.yml` (not `docker-compose.yml` and not a non-existent `docker-compose.yaml`).
+4. **Compose file path:** `docker-compose.yml` **or** `docker-compose.prod.yml` (both are the **production** stack). Do **not** point Coolify at `docker-compose.development.yml`.
 
-### Coolify restarts / “Prisma schema not found” / “package.json ENOENT”
+Requires **Docker Compose v2.20+** (`include` support). If your server is older, set the path to **`docker-compose.prod.yml`** only.
 
-Coolify **v4** may auto-detect `**/Dockerfile.dev` and inject build args into **that** file instead of the `Dockerfile` referenced in compose. That uses the **dev** image (no production build) and breaks Prisma paths.
+### Coolify restarts / dev images / “Prisma schema not found”
 
-This repo uses **`Dockerfile.development`** for local dev (see `docker-compose.yml`) so Coolify uses **`api/Dockerfile`** and **`web/Dockerfile`** from `docker-compose.prod.yml` only.
+If Coolify builds **`Dockerfile.development`** (log shows `load build definition from Dockerfile.development`), the resource is using the **development** compose file, or an old checkout where `docker-compose.yml` was dev-only.
 
-After pulling the fix, **redeploy** with compose path **`/docker-compose.prod.yml`**.
+**Fix:** Use compose file **`docker-compose.yml`** (current default includes production) or **`docker-compose.prod.yml`** directly, then redeploy.
+
+Coolify may still inject build `ARG`s into Dockerfiles; that is fine as long as **`build.dockerfile`** in compose is **`Dockerfile`** (production) for `api` and `web`.
 
 ## 3. Required environment variables
 

@@ -6,15 +6,22 @@
 
 ## Docker — Quick Start
 
+**Local development** (hot reload, Vite + API dev servers; ports **9100** / **9101**):
+
 ```bash
 cp .env.example .env   # Edit if needed
-docker compose up -d
+docker compose -f docker-compose.development.yml up -d
 ```
-
-**Current setup** (ports 9100/9101 avoid conflicts with other Docker services):
 
 - **Web:** http://localhost:9100
 - **API:** http://localhost:9101
+
+**Production-style stack** (same as Coolify default: multi-stage builds, web on **80**, API **9001**):
+
+```bash
+cp .env.example .env   # Set JWT_SECRET, VITE_API_URL, CORS_ORIGIN for a real run
+docker compose up -d
+```
 
 **User manual:** See **[USER_MANUAL.pdf](USER_MANUAL.pdf)** for a comprehensive client handover guide (features, workflows, troubleshooting). Source: `USER_MANUAL.md`. To regenerate: `npm run manual:pdf` (requires Chrome).
 
@@ -27,9 +34,9 @@ docker compose up -d
 # API_PORT=9101
 ```
 
-Then restart: `docker compose up -d`
+Then restart with the same `-f docker-compose.development.yml` you used to start.
 
-**Production (VPS / Coolify):** use `docker-compose.prod.yml` with production Dockerfiles (`api/Dockerfile`, `web/Dockerfile`). Step-by-step: **[docs/DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md)** (includes GitHub remote `wastwagon/kqsoftwaresolutions`).
+**Production (VPS / Coolify):** default **`docker-compose.yml`** includes the production stack; you can also set Coolify to **`docker-compose.prod.yml`**. Step-by-step: **[docs/DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md)** (includes GitHub remote `wastwagon/kqsoftwaresolutions`).
 
 ---
 
@@ -47,8 +54,8 @@ Then restart: `docker compose up -d`
 ## Local Dev (Without Docker)
 
 ```bash
-# 1. Start only Postgres and Redis
-docker compose up -d postgres redis
+# 1. Start only Postgres and Redis (dev compose exposes 15432 / 16379 on the host)
+docker compose -f docker-compose.development.yml up -d postgres redis
 
 # 2. API
 cd api && npm install && npm run dev   # → http://localhost:9001
@@ -287,6 +294,8 @@ Use a real admin account and one test org.
 ```
 ├── api/          # Backend (Node.js + Express + Prisma)
 ├── web/          # Frontend (React + TypeScript + Tailwind)
-├── docker-compose.yml
+├── docker-compose.yml              # default: includes production stack
+├── docker-compose.prod.yml         # production services (included above)
+├── docker-compose.development.yml  # local hot reload
 └── .env
 ```

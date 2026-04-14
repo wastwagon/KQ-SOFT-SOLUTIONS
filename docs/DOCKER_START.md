@@ -1,58 +1,69 @@
 # Start BRS with Docker Desktop
 
-## Start everything
+## Development stack (hot reload, default ports 9100 / 9101)
 
 From the project root:
+
+```bash
+docker compose -f docker-compose.development.yml up -d
+```
+
+This will:
+
+1. **Postgres** – host port `15432` → container `5432`
+2. **Redis** – host port `16379` → container `6379`
+3. **API** – dev server on **9101** (or `API_PORT` from `.env`)
+4. **Web** – Vite dev server on **9100** (or `WEB_PORT` from `.env`)
+
+**Production-style stack** (multi-stage build, nginx on **80**, API **9001** — same as Coolify when it uses root `docker-compose.yml`):
 
 ```bash
 docker compose up -d
 ```
 
-This will:
-
-1. **Postgres** – start on port `15432`
-2. **Redis** – start on port `16379`
-3. **API** – run `prisma db push` (sync schema; avoids P3005 on existing DB), then start on port `9101` (or `9001` if `API_PORT` not set)
-4. **Web** – start on port `9100` (or `9000` if `WEB_PORT` not set)
-
-**Default ports (see `.env.example`):** Web 9100, API 9101 — to avoid conflicts with other Docker services.
-
-## Open the app
+## Open the app (development compose)
 
 - Web UI: http://localhost:9100
 - API: http://localhost:9101
 
 ## Restart after code changes
 
+Development:
+
+```bash
+docker compose -f docker-compose.development.yml down
+docker compose -f docker-compose.development.yml up -d --build
+```
+
+Production-style:
+
 ```bash
 docker compose down
 docker compose up -d --build
 ```
 
-`--build` rebuilds images so code changes are picked up.
-
 ## View logs
 
 ```bash
-docker compose logs -f
+docker compose -f docker-compose.development.yml logs -f
 ```
 
 Or per service:
 
 ```bash
-docker compose logs -f api
-docker compose logs -f web
-docker compose logs -f postgres
+docker compose -f docker-compose.development.yml logs -f api
+docker compose -f docker-compose.development.yml logs -f web
+docker compose -f docker-compose.development.yml logs -f postgres
 ```
 
-## Stop everything
+## Stop and remove
 
 ```bash
-docker compose down
+docker compose -f docker-compose.development.yml down
 ```
 
-To also remove data volumes (e.g. database):
+To also remove volumes (database data):
 
 ```bash
-docker compose down -v
+docker compose -f docker-compose.development.yml down -v
 ```
