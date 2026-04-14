@@ -1,0 +1,1363 @@
+import { Router } from 'express'
+import { formatAmountForReport } from '../lib/currency.js'
+import { getPlatformDefaults } from '../lib/platformDefaults.js'
+import * as XLSX from 'xlsx'
+import PDFDocument from 'pdfkit'
+import path from 'path'
+import fs from 'fs'
+import { prisma } from '../lib/prisma.js'
+import { resolveProjectId } from '../lib/project-resolve.js'
+import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
+import { canExportReport } from '../lib/permissions.js'
+import { hasPlanFeature } from '../config/planFeatures.js'
+import { logAudit } from '../services/audit.js'
+import { summarizeSignBuckets } from '../services/signClassifier.js'
+
+const router = Router()
+router.use(authMiddleware)
+
+interface TxLike {
+  id: string
+  date: Date | string | null
+  name: string | null
+  details: string | null
+  chqNo?: string | null
+  docRef?: string | null
+  amount: number
+}
+
+function toNumOrNull(v: unknown): number | null {
+  if (v == null) return null
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'object' && v !== null && 'toString' in v) return Number(String((v as { toString: () => string }).toString()))
+  return Number.isFinite(Number(v)) ? Number(v) : null
+}
+
+function toTx(t: { id: string; date: Date | null; name: string | null; details: string | null; chqNo?: string | null; docRef?: string | null; amount: unknown }): TxLike {
+  return {
+    id: t.id,
+    date: t.date,
+    name: t.name,
+    details: t.details,
+    chqNo: t.chqNo,
+    docRef: t.docRef,
+    amount: Number(t.amount),
+  }
+}
+
+function formatGeneratedAt(date: Date): string {
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Accra',
+  })
+}
+
+function detectReversalCandidates(
+  receipts: TxLike[],
+  payments: TxLike[],
+  credits: TxLike[],
+  debits: TxLike[]
+) {
+  type Candidate = {
+    key: string
+    incoming: TxLike
+    outgoing: TxLike
+    stream: 'cash_book' | 'bank'
+    dayDiff: number
+  }
+  const candidates: Candidate[] = []
+  const keyFor = (t: TxLike) => {
+    const ref = (t.docRef || '').trim()
+    if (ref) return `ref:${ref.toLowerCase()}`
+    const chq = (t.chqNo || '').trim()
+    if (chq) return `chq:${chq.toLowerCase()}`
+    const desc = (t.details || t.name || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 24)
+    return desc ? `desc:${desc}` : ''
+  }
+  const collectPairs = (
+    incoming: TxLike[],
+    outgoing: TxLike[],
+    stream: 'cash_book' | 'bank'
+  ) => {
+    const outSorted = [...outgoing].sort((a, b) => {
+      const ad = a.date ? new Date(a.date).getTime() : 0
+      const bd = b.date ? new Date(b.date).getTime() : 0
+      return ad - bd
+    })
+    for (const inc of incoming) {
+      const keyInc = keyFor(inc)
+      if (!keyInc || Math.abs(inc.amount) <= 0) continue
+      for (const out of outSorted) {
+        const keyOut = keyFor(out)
+        if (keyInc !== keyOut || Math.abs(out.amount) <= 0) continue
+        if (Math.abs(Math.abs(inc.amount) - Math.abs(out.amount)) > 0.01) continue
+        const da = inc.date ? new Date(inc.date) : null
+        const db = out.date ? new Date(out.date) : null
+        const dayDiff = da && db ? Math.abs((da.getTime() - db.getTime()) / (1000 * 60 * 60 * 24)) : 0
+        if (dayDiff > 31) continue
+        candidates.push({ key: keyInc, incoming: inc, outgoing: out, stream, dayDiff })
+        break
+      }
+    }
+  }
+  collectPairs(receipts, payments, 'cash_book')
+  collectPairs(credits, debits, 'bank')
+  return candidates.slice(0, 100).map((c) => ({
+    reference: c.key,
+    stream: c.stream,
+    amount: Math.abs(c.incoming.amount),
+    incomingDate: c.incoming.date ? new Date(c.incoming.date).toISOString() : null,
+    outgoingDate: c.outgoing.date ? new Date(c.outgoing.date).toISOString() : null,
+    incomingNarration: c.incoming.details || c.incoming.name || '',
+    outgoingNarration: c.outgoing.details || c.outgoing.name || '',
+    dayDiff: Math.round(c.dayDiff),
+  }))
+}
+
+function resolveBrandingLogoPath(logoUrl: unknown): string | null {
+  if (!logoUrl || typeof logoUrl !== 'string') return null
+  const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
+  let filename = ''
+  try {
+    const parsed = new URL(logoUrl)
+    filename = path.basename(parsed.pathname)
+  } catch {
+    filename = path.basename(logoUrl)
+  }
+  if (!filename) return null
+  const localPath = path.join(uploadDir, 'branding', filename)
+  return fs.existsSync(localPath) ? localPath : null
+}
+
+router.get('/:projectId', async (req: AuthRequest, res) => {
+  const orgId = req.auth!.orgId
+  const projectId = await resolveProjectId(req.params.projectId, orgId)
+  if (!projectId) return res.status(404).json({ error: 'Project not found' })
+  const bankAccountId = (req.query.bankAccountId as string) || undefined
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId },
+    include: {
+      organization: true,
+      bankAccounts: true,
+      rollForwardFrom: { select: { id: true, name: true } },
+      documents: { include: { transactions: true, bankAccount: true } },
+      matches: { include: { matchItems: true } },
+      preparedBy: { select: { id: true, name: true, email: true } },
+      reviewedBy: { select: { id: true, name: true, email: true } },
+      approvedBy: { select: { id: true, name: true, email: true } },
+    },
+  })
+  if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  let broughtForwardItems: { date: string; name: string; chqNo: string | null; amount: number; fromProject: string }[] = []
+  let broughtForwardLodgments: { date: string; name: string; docRef: string | null; amount: number; fromProject: string; source: 'cash_book_receipts' | 'bank_credits' }[] = []
+  if (project.rollForwardFromProjectId && project.rollForwardFrom) {
+    const prevProject = await prisma.project.findFirst({
+      where: { id: project.rollForwardFromProjectId, organizationId: orgId },
+      include: {
+        documents: { include: { transactions: true } },
+        matches: { include: { matchItems: true } },
+      },
+    })
+    if (prevProject) {
+      const prevPaymentsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_payments')
+      const prevReceiptsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_receipts')
+      const prevCreditsDocs = prevProject.documents.filter(
+        (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+      )
+      const prevDebitsDocs = prevProject.documents.filter(
+        (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+      )
+      const prevReceipts = prevReceiptsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
+      const prevPayments = prevPaymentsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
+      const prevCredits = prevCreditsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
+      const prevMatchedCbIds = new Set<string>()
+      const prevMatchedBankIds = new Set<string>()
+      for (const m of prevProject.matches) {
+        for (const mi of m.matchItems) {
+          if (mi.side === 'cash_book') prevMatchedCbIds.add(mi.transactionId)
+          else prevMatchedBankIds.add(mi.transactionId)
+        }
+      }
+      const prevUnmatchedPayments = prevPayments.filter((t) => !prevMatchedCbIds.has(t.id))
+      const prevUnmatchedReceipts = prevReceipts.filter((t) => !prevMatchedCbIds.has(t.id))
+      const prevUnmatchedCredits = prevCredits.filter((t) => !prevMatchedBankIds.has(t.id))
+      const prevFmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
+      broughtForwardItems = prevUnmatchedPayments.map((t) => ({
+        date: prevFmt(t.date),
+        name: t.name || t.details || '—',
+        chqNo: t.chqNo || null,
+        amount: t.amount,
+        fromProject: prevProject.name,
+      }))
+      broughtForwardLodgments = [
+        ...prevUnmatchedReceipts.map((t) => ({
+          date: prevFmt(t.date),
+          name: t.name || t.details || '—',
+          docRef: t.docRef || null,
+          amount: t.amount,
+          fromProject: prevProject.name,
+          source: 'cash_book_receipts' as const,
+        })),
+        ...prevUnmatchedCredits.map((t) => ({
+          date: prevFmt(t.date),
+          name: t.name || t.details || '—',
+          docRef: t.docRef || null,
+          amount: t.amount,
+          fromProject: prevProject.name,
+          source: 'bank_credits' as const,
+        })),
+      ]
+    }
+  }
+
+  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
+  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
+  const creditsDocs = project.documents.filter(
+    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+  const debitsDocs = project.documents.filter(
+    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+
+  const receipts = receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const payments = paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const credits = creditsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const debits = debitsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const reversalCandidates = detectReversalCandidates(receipts, payments, credits, debits)
+
+  const matchedCbIds = new Set<string>()
+  const matchedBankIds = new Set<string>()
+  const matchPairs: { cb: TxLike; bank: TxLike }[] = []
+  const allTxs = receipts.concat(payments).concat(credits).concat(debits)
+
+  for (const m of project.matches) {
+    const cbIds: string[] = []
+    const bankIds: string[] = []
+    for (const mi of m.matchItems) {
+      const tx = allTxs.find((t: TxLike) => t.id === mi.transactionId)
+      if (!tx) continue
+      if (mi.side === 'cash_book') {
+        matchedCbIds.add(tx.id)
+        cbIds.push(tx.id)
+      } else {
+        matchedBankIds.add(tx.id)
+        bankIds.push(tx.id)
+      }
+    }
+    const cbTxs = cbIds.map((id) => allTxs.find((t: TxLike) => t.id === id)).filter(Boolean) as TxLike[]
+    const bankTxs = bankIds.map((id) => allTxs.find((t: TxLike) => t.id === id)).filter(Boolean) as TxLike[]
+    if (cbTxs.length === 0 || bankTxs.length === 0) continue
+    if (cbTxs.length === 1 && bankTxs.length >= 1) {
+      bankTxs.forEach((bt) => matchPairs.push({ cb: cbTxs[0]!, bank: bt }))
+    } else if (cbTxs.length >= 1 && bankTxs.length === 1) {
+      cbTxs.forEach((ct) => matchPairs.push({ cb: ct, bank: bankTxs[0]! }))
+    } else if (cbTxs.length === 1 && bankTxs.length === 1) {
+      matchPairs.push({ cb: cbTxs[0]!, bank: bankTxs[0]! })
+    } else {
+      const n = Math.max(cbTxs.length, bankTxs.length)
+      for (let i = 0; i < n; i++) {
+        matchPairs.push({ cb: cbTxs[i % cbTxs.length]!, bank: bankTxs[i % bankTxs.length]! })
+      }
+    }
+  }
+
+  const unmatchedReceipts = receipts.filter((t) => !matchedCbIds.has(t.id))
+  const unmatchedCredits = credits.filter((t) => !matchedBankIds.has(t.id))
+  const unmatchedPayments = payments.filter((t) => !matchedCbIds.has(t.id))
+  const unmatchedDebits = debits.filter((t) => !matchedBankIds.has(t.id))
+  const sourceFilterLogic = {
+    cashBookReceipts: summarizeSignBuckets('cash_book_receipts', receipts.map((t) => t.amount)),
+    cashBookPayments: summarizeSignBuckets('cash_book_payments', payments.map((t) => t.amount)),
+    bankStatementDebits: summarizeSignBuckets('bank_debits', debits.map((t) => t.amount)),
+    bankStatementCredits: summarizeSignBuckets('bank_credits', credits.map((t) => t.amount)),
+  }
+  const receiptIds = new Set(receipts.map((t) => t.id))
+  const matchedReceiptsVsCredits = matchPairs.filter((p) => receiptIds.has(p.cb.id))
+  const matchedPaymentsVsDebits = matchPairs.filter((p) => !receiptIds.has(p.cb.id))
+
+  const fmt = (d: Date | string | null) =>
+    d ? new Date(d).toISOString().slice(0, 10) : ''
+
+  // Phase 6: Missing Cheques Report with ageing (0–30, 31–60, 61–90, 90+ days)
+  const refDate = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
+  const allUnpresented = [
+    ...unmatchedPayments.map((t) => ({ ...t, fromProject: project.name })),
+    ...broughtForwardItems.map((t) => ({ date: t.date, name: t.name, chqNo: t.chqNo, amount: t.amount, fromProject: t.fromProject })),
+  ]
+  const missingChequesWithAgeing = allUnpresented.map((t) => {
+    const txDate = t.date ? new Date(t.date) : refDate
+    const daysOutstanding = Math.floor((refDate.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24))
+    let ageingBand: string
+    if (daysOutstanding <= 30) ageingBand = '0–30'
+    else if (daysOutstanding <= 60) ageingBand = '31–60'
+    else if (daysOutstanding <= 90) ageingBand = '61–90'
+    else ageingBand = '90+'
+    return {
+      date: fmt(t.date),
+      name: t.name || '—',
+      chqNo: t.chqNo ?? null,
+      amount: t.amount,
+      daysOutstanding,
+      ageingBand,
+      fromProject: (t as { fromProject?: string }).fromProject,
+    }
+  })
+  const missingChequesAgeingSummary = {
+    band0_30: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').reduce((s, x) => s + x.amount, 0) },
+    band31_60: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').reduce((s, x) => s + x.amount, 0) },
+    band61_90: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').reduce((s, x) => s + x.amount, 0) },
+    band90_plus: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').reduce((s, x) => s + x.amount, 0) },
+  }
+
+  const receiptIdsForDisc = new Set(receipts.map((t) => t.id))
+  // Phase 6: Reconciliation Discrepancy Report — summary by variance band
+  const discList = matchPairs.filter((p) => {
+    const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
+    const cbDate = p.cb.date ? new Date(p.cb.date) : null
+    const bankDate = p.bank.date ? new Date(p.bank.date) : null
+    const dateDiffDays = cbDate && bankDate ? Math.abs((cbDate.getTime() - bankDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    return amountDiff > 0.01 || dateDiffDays > 0
+  }).map((p) => {
+    const amountVariance = Math.abs(p.cb.amount - p.bank.amount)
+    const dateVarianceDays = p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0
+    const isReceipt = receiptIdsForDisc.has(p.cb.id)
+    return {
+      cbDate: fmt(p.cb.date),
+      cbName: p.cb.name || p.cb.details || '—',
+      cbChqNo: p.cb.chqNo || null,
+      cbDocRef: p.cb.docRef || null,
+      cbAmount: p.cb.amount,
+      cbAmountReceived: isReceipt ? p.cb.amount : null,
+      cbAmountPaid: !isReceipt ? p.cb.amount : null,
+      bankDate: fmt(p.bank.date),
+      bankDescription: p.bank.name || p.bank.details || '—',
+      bankChqNo: p.bank.chqNo || null,
+      bankDocRef: p.bank.docRef || null,
+      bankAmount: p.bank.amount,
+      amountVariance,
+      dateVarianceDays,
+      amountVarianceBand: amountVariance <= 1 ? '0–1' : amountVariance <= 100 ? '1–100' : amountVariance <= 500 ? '100–500' : '500+',
+      dateVarianceBand: dateVarianceDays <= 7 ? '0–7 days' : dateVarianceDays <= 30 ? '7–30 days' : '30+ days',
+    }
+  })
+  // Paid-out explicit classification from matched payment/debit pairs:
+  // - more_in_cb_than_bs: cash book payment amount > bank debit amount
+  // - more_in_bs_than_cb: bank debit amount > cash book payment amount
+  const paidOutVarianceRows = matchPairs.map((p) => {
+    const isReceipt = receiptIdsForDisc.has(p.cb.id)
+    const cbAmount = p.cb.amount
+    const bankAmount = p.bank.amount
+    const variance = cbAmount - bankAmount
+    return {
+      isReceipt,
+      cbDate: fmt(p.cb.date),
+      cbName: p.cb.name || p.cb.details || '—',
+      cbChqNo: p.cb.chqNo || null,
+      cbDocRef: p.cb.docRef || null,
+      cbAmount,
+      bankDate: fmt(p.bank.date),
+      bankDescription: p.bank.name || p.bank.details || '—',
+      bankChqNo: p.bank.chqNo || null,
+      bankDocRef: p.bank.docRef || null,
+      bankAmount,
+      variance,
+      absoluteVariance: Math.abs(variance),
+    }
+  }).filter((r) => !r.isReceipt && Math.abs(r.variance) > 0.01)
+  const paidOutVarianceBreakdown = {
+    moreInCbThanBs: paidOutVarianceRows.filter((r) => r.variance > 0),
+    moreInBsThanCb: paidOutVarianceRows.filter((r) => r.variance < 0),
+  }
+  const hasDiscrepancyReport = hasPlanFeature(project.organization.plan, 'discrepancy_report')
+  const hasMissingChequesReport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
+
+  const discrepancySummary = hasDiscrepancyReport ? {
+    byAmountBand: [
+      { band: '0–1', count: discList.filter((d) => d.amountVarianceBand === '0–1').length, totalVariance: discList.filter((d) => d.amountVarianceBand === '0–1').reduce((s, d) => s + d.amountVariance, 0) },
+      { band: '1–100', count: discList.filter((d) => d.amountVarianceBand === '1–100').length, totalVariance: discList.filter((d) => d.amountVarianceBand === '1–100').reduce((s, d) => s + d.amountVariance, 0) },
+      { band: '100–500', count: discList.filter((d) => d.amountVarianceBand === '100–500').length, totalVariance: discList.filter((d) => d.amountVarianceBand === '100–500').reduce((s, d) => s + d.amountVariance, 0) },
+      { band: '500+', count: discList.filter((d) => d.amountVarianceBand === '500+').length, totalVariance: discList.filter((d) => d.amountVarianceBand === '500+').reduce((s, d) => s + d.amountVariance, 0) },
+    ].filter((r) => r.count > 0),
+    byDateBand: [
+      { band: '0–7 days', count: discList.filter((d) => d.dateVarianceBand === '0–7 days').length },
+      { band: '7–30 days', count: discList.filter((d) => d.dateVarianceBand === '7–30 days').length },
+      { band: '30+ days', count: discList.filter((d) => d.dateVarianceBand === '30+ days').length },
+    ].filter((r) => r.count > 0),
+  } : null
+
+  const effectiveDiscList = hasDiscrepancyReport ? discList : []
+  const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
+  const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
+
+  // Legacy Ghana BRS statement block used by current UI consumers.
+  // Note: "uncredited lodgments" here includes unmatched bank credits for backward compatibility.
+  // Unpresented cheques = unmatched payments (cheques not in bank) + brought forward
+  const balancePerCashBook = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
+  const unmatchedReceiptsTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0)
+  const unmatchedCreditsTotal = unmatchedCredits.reduce((s, t) => s + t.amount, 0)
+  const broughtForwardLodgmentsTotal = broughtForwardLodgments.reduce((s, t) => s + t.amount, 0)
+  const broughtForwardReceiptLodgmentsTotal = broughtForwardLodgments
+    .filter((t) => t.source === 'cash_book_receipts')
+    .reduce((s, t) => s + t.amount, 0)
+  const broughtForwardBankCreditsTotal = broughtForwardLodgments
+    .filter((t) => t.source === 'bank_credits')
+    .reduce((s, t) => s + t.amount, 0)
+  const uncreditedLodgmentsTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal + broughtForwardLodgmentsTotal
+  const uncreditedLodgmentsTimingTotal = unmatchedReceiptsTotal + broughtForwardReceiptLodgmentsTotal
+  const unmatchedPaymentsTotal = unmatchedPayments.reduce((s, t) => s + t.amount, 0)
+  const broughtForwardTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
+  const unpresentedChequesTotal = unmatchedPaymentsTotal + broughtForwardTotal
+  const unmatchedDebitsTotal = unmatchedDebits.reduce((s, t) => s + t.amount, 0)
+  const asAtUncreditedTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal
+  const asAtUnpresentedTotal = unmatchedPaymentsTotal + unmatchedDebitsTotal
+  const bankOnlyCreditsNotInCashBookTotal = unmatchedCreditsTotal + broughtForwardBankCreditsTotal
+  const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal
+  const bankOnlyReconcilingNet = bankOnlyCreditsNotInCashBookTotal - bankOnlyDebitsNotInCashBookTotal
+  // Bank + Uncredited lodgments − Unpresented cheques = Balance per cash book
+  const bankClosingBalance = balancePerCashBook - uncreditedLodgmentsTotal + unpresentedChequesTotal
+  // Ghana-style explicit decomposition:
+  // Bank = Cash book - timing lodgments + unpresented cheques + bank-only credits - bank-only debits
+  const bankClosingBalanceGhanaStyle =
+    balancePerCashBook -
+    uncreditedLodgmentsTimingTotal +
+    unpresentedChequesTotal +
+    bankOnlyReconcilingNet
+  const selectedBankAccount =
+    bankAccountId && project.bankAccounts?.length
+      ? project.bankAccounts.find((a: { id: string }) => a.id === bankAccountId)
+      : null
+
+  // Status is set to 'completed' only when the project is approved (see projects approve handler)
+  await logAudit({
+    organizationId: orgId,
+    userId: req.auth!.userId,
+    projectId,
+    action: 'report_generated',
+  })
+
+  const branding = (project.organization.branding as Record<string, unknown>) || {}
+  const curr = project.currency || 'GHS'
+  const fmtAmt = (n: number) => formatAmountForReport(n, curr)
+  const defaultNarrative =
+    project.reportNarrative ||
+    `This reconciliation shows ${matchPairs.length} matched transaction(s). Unpresented cheques total ${fmtAmt(unpresentedChequesTotal)}; uncredited lodgments total ${fmtAmt(uncreditedLodgmentsTotal)}.`
+  const reportLanguageProfile = {
+    code: 'GHANA_BRS_V1',
+    label: 'Ghana BRS language profile',
+    signedAmountSupport: true,
+    asAtAndPostPeriodMovement: true,
+    labels: {
+      openingBankStatementBalance: 'Opening bank statement balance',
+      closingBankStatementBalance: 'Closing bank statement balance',
+      addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
+      addBankOnlyCredits: 'Add: Bank-only credits not in cash book',
+      lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
+      lessUnpresentedCheques: 'Less: Unpresented cheques / uncleared payments',
+      cashBookBalanceEnd: 'Cash book balance at end of period',
+      additionalInformationTitle: 'Additional information (Ghana BRS language profile)',
+      asAtReconciliationPosition: 'As-at reconciliation position',
+      postPeriodMovement: 'Post-period movement (carried forward)',
+      uncreditedLodgmentsOrUnclearedDeposits: 'Uncredited lodgments / uncleared deposits',
+      bankOnlyCreditsNotInCashBook: 'Bank-only credits not in cash book',
+      bankOnlyDebitsNotInCashBook: 'Bank-only debits not in cash book',
+      unpresentedChequesOrUnclearedPayments: 'Unpresented cheques / uncleared payments',
+      broughtForwardUncreditedLodgments: 'Brought-forward uncredited lodgments',
+      broughtForwardBankOnlyCredits: 'Brought-forward bank-only credits',
+      broughtForwardUnpresentedCheques: 'Brought-forward unpresented cheques',
+    },
+  }
+  res.json({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId: bankAccountId || null,
+    selectedBankAccountName: selectedBankAccount ? (selectedBankAccount as { name: string }).name : null,
+    narrative: defaultNarrative,
+    preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
+    reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
+    reportLanguageProfile,
+    brsStatement: {
+      bankClosingBalance,
+      bankClosingBalanceGhanaStyle,
+      uncreditedLodgmentsTotal,
+      uncreditedLodgmentsTimingTotal,
+      broughtForwardLodgmentsTotal,
+      unpresentedChequesTotal,
+      bankOnlyCreditsNotInCashBookTotal,
+      bankOnlyDebitsNotInCashBookTotal,
+      bankOnlyReconcilingNet,
+      balancePerCashBook,
+      bankStatementClosingBalance: toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance),
+    },
+    additionalInformation: {
+      asAtReconciliationPosition: {
+        uncreditedLodgmentsOrUnclearedDeposits: asAtUncreditedTotal,
+        bankOnlyCreditsNotInCashBook: unmatchedCreditsTotal,
+        bankOnlyDebitsNotInCashBook: unmatchedDebitsTotal,
+        unpresentedChequesOrUnclearedPayments: asAtUnpresentedTotal,
+      },
+      postPeriodMovement: {
+        broughtForwardUncreditedLodgments: broughtForwardLodgmentsTotal,
+        broughtForwardBankOnlyCredits: broughtForwardBankCreditsTotal,
+        broughtForwardUnpresentedCheques: broughtForwardTotal,
+      },
+    },
+    project: {
+      id: project.id,
+      name: project.name,
+      reconciliationDate: project.reconciliationDate,
+      status: project.status,
+      bankStatementClosingBalance: toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance),
+      reportNarrative: (project as { reportNarrative?: string | null }).reportNarrative ?? null,
+      preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
+      reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
+      preparedBy: project.preparedBy ? { name: project.preparedBy.name, email: project.preparedBy.email } : null,
+      preparedAt: project.preparedAt?.toISOString() ?? null,
+      reviewedBy: project.reviewedBy ? { name: project.reviewedBy.name, email: project.reviewedBy.email } : null,
+      reviewedAt: project.reviewedAt?.toISOString() ?? null,
+      approvedBy: project.approvedBy ? { name: project.approvedBy.name, email: project.approvedBy.email } : null,
+      approvedAt: project.approvedAt?.toISOString() ?? null,
+    },
+    organization: { name: project.organization.name, branding },
+    summary: {
+      matchedCount: project.matches.length,
+      matchedReceiptsCreditsCount: matchedReceiptsVsCredits.length,
+      matchedPaymentsDebitsCount: matchedPaymentsVsDebits.length,
+      unmatchedReceipts: unmatchedReceipts.length,
+      unmatchedCredits: unmatchedCredits.length,
+      unmatchedPayments: unmatchedPayments.length,
+      unmatchedDebits: unmatchedDebits.length,
+      totalTransactions:
+        receipts.length + credits.length + payments.length + debits.length,
+    },
+    sourceFilterLogic,
+    matchedPairs: (() => {
+      return matchPairs.map((p) => {
+        const isReceipt = receiptIds.has(p.cb.id)
+        return {
+          cbDate: fmt(p.cb.date),
+          cbName: p.cb.name || p.cb.details || '—',
+          cbChqNo: p.cb.chqNo || null,
+          cbDocRef: p.cb.docRef || null,
+          cbAmount: p.cb.amount,
+          cbAmountReceived: isReceipt ? p.cb.amount : null,
+          cbAmountPaid: !isReceipt ? p.cb.amount : null,
+          bankDate: fmt(p.bank.date),
+          bankDescription: p.bank.name || p.bank.details || '—',
+          bankChqNo: p.bank.chqNo || null,
+          bankDocRef: p.bank.docRef || null,
+          bankAmount: p.bank.amount,
+        }
+      })
+    })(),
+    matchedReceiptsVsCredits: matchedReceiptsVsCredits.map((p) => ({
+      cbDate: fmt(p.cb.date),
+      cbName: p.cb.name || p.cb.details || '—',
+      cbChqNo: p.cb.chqNo || null,
+      cbDocRef: p.cb.docRef || null,
+      cbAmount: p.cb.amount,
+      bankDate: fmt(p.bank.date),
+      bankDescription: p.bank.name || p.bank.details || '—',
+      bankChqNo: p.bank.chqNo || null,
+      bankDocRef: p.bank.docRef || null,
+      bankAmount: p.bank.amount,
+    })),
+    matchedPaymentsVsDebits: matchedPaymentsVsDebits.map((p) => ({
+      cbDate: fmt(p.cb.date),
+      cbName: p.cb.name || p.cb.details || '—',
+      cbChqNo: p.cb.chqNo || null,
+      cbDocRef: p.cb.docRef || null,
+      cbAmount: p.cb.amount,
+      bankDate: fmt(p.bank.date),
+      bankDescription: p.bank.name || p.bank.details || '—',
+      bankChqNo: p.bank.chqNo || null,
+      bankDocRef: p.bank.docRef || null,
+      bankAmount: p.bank.amount,
+    })),
+    discrepancies: effectiveDiscList.map(({ cbDate, cbName, cbChqNo, cbDocRef, cbAmount, cbAmountReceived, cbAmountPaid, bankDate, bankDescription, bankChqNo, bankDocRef, bankAmount, amountVariance, dateVarianceDays }) => ({
+      cbDate,
+      cbName,
+      cbChqNo: cbChqNo ?? null,
+      cbDocRef: cbDocRef ?? null,
+      cbAmount,
+      cbAmountReceived: cbAmountReceived ?? null,
+      cbAmountPaid: cbAmountPaid ?? null,
+      bankDate,
+      bankDescription,
+      bankChqNo: bankChqNo ?? null,
+      bankDocRef: bankDocRef ?? null,
+      bankAmount,
+      amountVariance,
+      dateVarianceDays,
+    })),
+    paidOutVarianceBreakdown,
+    missingChequesWithAgeing: effectiveMissingCheques,
+    missingChequesAgeingSummary: effectiveMissingChequesSummary,
+    discrepancySummary,
+    reversalCandidates,
+    unmatchedReceipts: unmatchedReceipts.map((t) => ({
+      date: fmt(t.date),
+      name: t.name || '—',
+      details: t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      amountReceived: t.amount,
+      amountPaid: null as number | null,
+    })),
+    unmatchedCredits: unmatchedCredits.map((t) => ({
+      date: fmt(t.date),
+      description: t.name || t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      debit: '',
+      credit: t.amount,
+    })),
+    unmatchedPayments: unmatchedPayments.map((t) => ({
+      date: fmt(t.date),
+      name: t.name || '—',
+      details: t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      amountReceived: null as number | null,
+      amountPaid: t.amount,
+    })),
+    unmatchedDebits: unmatchedDebits.map((t) => ({
+      date: fmt(t.date),
+      description: t.name || t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      debit: t.amount,
+      credit: '',
+    })),
+    broughtForwardItems,
+    broughtForwardLodgments,
+    currency: project.currency || 'GHS',
+    generatedAt: new Date().toISOString(),
+  })
+})
+
+router.get('/:projectId/export', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canExportReport(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to export reports' })
+  }
+  const format = (req.query.format as string)?.toLowerCase() || 'excel'
+  const bankAccountId = (req.query.bankAccountId as string) || undefined
+  const signedAmounts = String(req.query.signedAmounts || '').toLowerCase()
+  const useSignedAmounts = signedAmounts === '1' || signedAmounts === 'true' || signedAmounts === 'yes'
+  const orgId = req.auth!.orgId
+  const projectId = await resolveProjectId(req.params.projectId, orgId)
+  if (!projectId) return res.status(404).json({ error: 'Project not found' })
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId },
+    include: {
+      organization: true,
+      bankAccounts: true,
+      rollForwardFrom: { select: { id: true, name: true } },
+      documents: { include: { transactions: true } },
+      matches: { include: { matchItems: true } },
+    },
+  })
+  if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  let broughtForwardItemsExport: { amount: number }[] = []
+  let broughtForwardLodgmentsExport: { amount: number; source: 'cash_book_receipts' | 'bank_credits' }[] = []
+  if (project.rollForwardFromProjectId && project.rollForwardFrom) {
+    const prevProject = await prisma.project.findFirst({
+      where: { id: project.rollForwardFromProjectId, organizationId: orgId },
+      include: {
+        documents: { include: { transactions: true } },
+        matches: { include: { matchItems: true } },
+      },
+    })
+    if (prevProject) {
+      const prevPaymentsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_payments')
+      const prevReceiptsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_receipts')
+      const prevCreditsDocs = prevProject.documents.filter(
+        (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+      )
+      const prevDebitsDocs = prevProject.documents.filter(
+        (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+      )
+      const prevReceipts = prevReceiptsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
+      const prevPayments = prevPaymentsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
+      const prevCredits = prevCreditsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
+      const prevMatchedCbIds = new Set<string>()
+      const prevMatchedBankIds = new Set<string>()
+      for (const m of prevProject.matches) {
+        for (const mi of m.matchItems) {
+          if (mi.side === 'cash_book') prevMatchedCbIds.add(mi.transactionId)
+          else prevMatchedBankIds.add(mi.transactionId)
+        }
+      }
+      broughtForwardItemsExport = prevPayments
+        .filter((t) => !prevMatchedCbIds.has(t.id))
+        .map((t) => ({ amount: t.amount }))
+      broughtForwardLodgmentsExport = [
+        ...prevReceipts
+          .filter((t) => !prevMatchedCbIds.has(t.id))
+          .map((t) => ({ amount: t.amount, source: 'cash_book_receipts' as const })),
+        ...prevCredits
+          .filter((t) => !prevMatchedBankIds.has(t.id))
+          .map((t) => ({ amount: t.amount, source: 'bank_credits' as const })),
+      ]
+    }
+  }
+
+  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
+  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
+  const creditsDocs = project.documents.filter(
+    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+  const debitsDocs = project.documents.filter(
+    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+
+  const receipts = receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const payments = paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const credits = creditsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const debits = debitsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+
+  const matchedCbIds = new Set<string>()
+  const matchedBankIds = new Set<string>()
+  const matchPairs: { cb: TxLike; bank: TxLike }[] = []
+  const allTxsExport = receipts.concat(payments).concat(credits).concat(debits)
+
+  for (const m of project.matches) {
+    const cbIds: string[] = []
+    const bankIds: string[] = []
+    for (const mi of m.matchItems) {
+      const tx = allTxsExport.find((t: TxLike) => t.id === mi.transactionId)
+      if (!tx) continue
+      if (mi.side === 'cash_book') {
+        matchedCbIds.add(tx.id)
+        cbIds.push(tx.id)
+      } else {
+        matchedBankIds.add(tx.id)
+        bankIds.push(tx.id)
+      }
+    }
+    const cbTxs = cbIds.map((id) => allTxsExport.find((t: TxLike) => t.id === id)).filter(Boolean) as TxLike[]
+    const bankTxs = bankIds.map((id) => allTxsExport.find((t: TxLike) => t.id === id)).filter(Boolean) as TxLike[]
+    if (cbTxs.length === 0 || bankTxs.length === 0) continue
+    if (cbTxs.length === 1 && bankTxs.length >= 1) {
+      bankTxs.forEach((bt) => matchPairs.push({ cb: cbTxs[0]!, bank: bt }))
+    } else if (cbTxs.length >= 1 && bankTxs.length === 1) {
+      cbTxs.forEach((ct) => matchPairs.push({ cb: ct, bank: bankTxs[0]! }))
+    } else if (cbTxs.length === 1 && bankTxs.length === 1) {
+      matchPairs.push({ cb: cbTxs[0]!, bank: bankTxs[0]! })
+    } else {
+      const n = Math.max(cbTxs.length, bankTxs.length)
+      for (let i = 0; i < n; i++) {
+        matchPairs.push({ cb: cbTxs[i % cbTxs.length]!, bank: bankTxs[i % bankTxs.length]! })
+      }
+    }
+  }
+
+  const fmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
+  const branding = (project.organization.branding as Record<string, unknown>) || {}
+  const platformDefaults = await getPlatformDefaults()
+  const reportTitle = (branding.reportTitle as string) || platformDefaults.defaultReportTitle
+  const curr = project.currency || 'GHS'
+  const reportLanguageProfile = {
+    code: 'GHANA_BRS_V1',
+    label: 'Ghana BRS language profile',
+    signedAmountSupport: true,
+    asAtAndPostPeriodMovement: true,
+    labels: {
+      openingBankStatementBalance: 'Opening bank statement balance',
+      closingBankStatementBalance: 'Closing bank statement balance',
+      addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
+      addBankOnlyCredits: 'Add: Bank-only credits not in cash book',
+      lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
+      lessUnpresentedCheques: 'Less: Unpresented cheques / uncleared payments',
+      cashBookBalanceEnd: 'Cash book balance at end of period',
+      additionalInformationTitle: 'Additional Information',
+      asAtReconciliationPosition: 'As-at reconciliation position',
+      postPeriodMovement: 'Post-period movement (carried forward)',
+      uncreditedLodgmentsOrUnclearedDeposits: 'Uncredited lodgments / uncleared deposits',
+      bankOnlyCreditsNotInCashBook: 'Bank-only credits not in cash book',
+      bankOnlyDebitsNotInCashBook: 'Bank-only debits not in cash book',
+      unpresentedChequesOrUnclearedPayments: 'Unpresented cheques / uncleared payments',
+      broughtForwardUncreditedLodgments: 'Brought-forward uncredited lodgments',
+      broughtForwardBankOnlyCredits: 'Brought-forward bank-only credits',
+      broughtForwardUnpresentedCheques: 'Brought-forward unpresented cheques',
+    },
+  }
+  const exportLabels = reportLanguageProfile.labels
+  const primaryColor = (branding.primaryColor as string) || platformDefaults.defaultPrimaryColor
+
+  const receiptIds = new Set(receipts.map((t) => t.id))
+  const matchedRows = matchPairs.map((p) => {
+    const isReceipt = receiptIds.has(p.cb.id)
+    return {
+      'Cash Book Date': fmt(p.cb.date),
+      'Cash Book Name': p.cb.name || '',
+      'Cash Book Description': p.cb.details || '',
+      'Cash Book Chq No': p.cb.chqNo || '',
+      'Cash Book Ref Doc No': p.cb.docRef || '',
+      [`Amount Received (${curr})`]: isReceipt ? p.cb.amount : '',
+      [`Amount Paid (${curr})`]: !isReceipt ? p.cb.amount : '',
+      'Bank Date': fmt(p.bank.date),
+      'Bank Description': p.bank.name || p.bank.details || '',
+      'Bank Chq No': p.bank.chqNo || '',
+      'Bank Ref Doc No': p.bank.docRef || '',
+      [`Bank Amount (${curr})`]: p.bank.amount,
+    }
+  })
+
+  const unmatchedReceiptsRaw = receipts.filter((t) => !matchedCbIds.has(t.id))
+  let runningBal = 0
+  const unmatchedReceipts = unmatchedReceiptsRaw.map((t) => {
+    runningBal += t.amount
+    return {
+      Date: fmt(t.date),
+      Name: t.name || '',
+      Description: t.details || '',
+      'Chq No': t.chqNo || '',
+      'Ref Doc No': t.docRef || '',
+      [`Amount Received (${curr})`]: t.amount,
+      [`Amount Paid (${curr})`]: '',
+      [`Balance (${curr})`]: runningBal,
+    }
+  })
+  runningBal = 0
+  const unmatchedCreditsRaw = credits.filter((t) => !matchedBankIds.has(t.id))
+  const unmatchedCredits = unmatchedCreditsRaw.map((t) => {
+    runningBal += t.amount
+    return {
+      Date: fmt(t.date),
+      Description: t.name || t.details || '',
+      'Chq No': t.chqNo || '',
+      'Ref Doc No': t.docRef || '',
+      [`Debit (${curr})`]: '',
+      [`Credit (${curr})`]: t.amount,
+      [`Balance (${curr})`]: runningBal,
+    }
+  })
+  runningBal = 0
+  const unmatchedPaymentsRaw = payments.filter((t) => !matchedCbIds.has(t.id))
+  const unmatchedPayments = unmatchedPaymentsRaw.map((t) => {
+    runningBal -= t.amount
+    return {
+      Date: fmt(t.date),
+      Name: t.name || '',
+      Description: t.details || '',
+      'Cheque No': t.chqNo || '',
+      'Ref Doc No': t.docRef || '',
+      [`Amount Received (${curr})`]: '',
+      [`Amount Paid (${curr})`]: t.amount,
+      [`Balance (${curr})`]: runningBal,
+    }
+  })
+  const refDateExport = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
+  const missingChequesAgeingExport = payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => {
+    const txDate = t.date ? new Date(t.date) : refDateExport
+    const daysOutstanding = Math.floor((refDateExport.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24))
+    let ageingBand: string
+    if (daysOutstanding <= 30) ageingBand = '0–30'
+    else if (daysOutstanding <= 60) ageingBand = '31–60'
+    else if (daysOutstanding <= 90) ageingBand = '61–90'
+    else ageingBand = '90+'
+    return {
+      Date: fmt(t.date),
+      'Cheque No': t.chqNo || '',
+      'Ref Doc No': t.docRef || '',
+      Name: t.name || t.details || '',
+      [`Amount (${curr})`]: t.amount,
+      'Days Outstanding': daysOutstanding,
+      'Ageing Band': ageingBand,
+    }
+  })
+  const receiptIdsExport = new Set(receipts.map((t) => t.id))
+  const discrepancies = matchPairs.filter((p) => {
+    const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
+    const cbDate = p.cb.date ? new Date(p.cb.date) : null
+    const bankDate = p.bank.date ? new Date(p.bank.date) : null
+    const dateDiffDays = cbDate && bankDate ? Math.abs((cbDate.getTime() - bankDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    return amountDiff > 0.01 || dateDiffDays > 0
+  }).map((p) => {
+    const isReceipt = receiptIdsExport.has(p.cb.id)
+    return {
+      'Cash Book Date': fmt(p.cb.date),
+      'Cash Book Desc': (p.cb.name || p.cb.details || '').slice(0, 40),
+      'Cash Book Chq No': p.cb.chqNo || '',
+      'Cash Book Ref Doc No': p.cb.docRef || '',
+      [`Amount Received (${curr})`]: isReceipt ? p.cb.amount : '',
+      [`Amount Paid (${curr})`]: !isReceipt ? p.cb.amount : '',
+      'Bank Date': fmt(p.bank.date),
+      'Bank Desc': (p.bank.name || p.bank.details || '').slice(0, 40),
+      'Bank Chq No': p.bank.chqNo || '',
+      'Bank Ref Doc No': p.bank.docRef || '',
+      [`Bank Amount (${curr})`]: p.bank.amount,
+      [`Amount Variance (${curr})`]: Math.abs(p.cb.amount - p.bank.amount),
+      'Date Diff Days': p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+    }
+  })
+  runningBal = 0
+  const unmatchedDebitsRaw = debits.filter((t) => !matchedBankIds.has(t.id))
+  const unmatchedDebits = unmatchedDebitsRaw.map((t) => {
+    runningBal -= t.amount
+    return {
+      Date: fmt(t.date),
+      Description: t.name || t.details || '',
+      'Chq No': t.chqNo || '',
+      'Ref Doc No': t.docRef || '',
+      [`Debit (${curr})`]: t.amount,
+      [`Credit (${curr})`]: '',
+      [`Balance (${curr})`]: runningBal,
+    }
+  })
+
+  const balancePerCashBook = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
+  const unmatchedReceiptsTotalExport = receipts.filter((t) => !matchedCbIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
+  const unmatchedCreditsTotalExport = credits.filter((t) => !matchedBankIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
+  const unmatchedPaymentsTotalExport = payments.filter((t) => !matchedCbIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
+  const unmatchedDebitsTotalExport = debits.filter((t) => !matchedBankIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
+  const broughtForwardLodgmentsTotalExport = broughtForwardLodgmentsExport.reduce((s, t) => s + t.amount, 0)
+  const broughtForwardReceiptLodgmentsTotalExport = broughtForwardLodgmentsExport
+    .filter((t) => t.source === 'cash_book_receipts')
+    .reduce((s, t) => s + t.amount, 0)
+  const broughtForwardBankCreditsTotalExport = broughtForwardLodgmentsExport
+    .filter((t) => t.source === 'bank_credits')
+    .reduce((s, t) => s + t.amount, 0)
+  const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
+  const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
+  const unpresentedChequesTotal =
+    unmatchedPaymentsTotalExport +
+    broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
+  const broughtForwardChequesTotalExport = broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
+  const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport
+  const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport + unmatchedDebitsTotalExport
+  const bankOnlyCreditsNotInCashBookTotalExport = unmatchedCreditsTotalExport + broughtForwardBankCreditsTotalExport
+  const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport
+  const bankOnlyReconcilingNetExport = bankOnlyCreditsNotInCashBookTotalExport - bankOnlyDebitsNotInCashBookTotalExport
+  const bankClosingBalance = balancePerCashBook - uncreditedLodgmentsTotal + unpresentedChequesTotal
+  const bankClosingBalanceGhanaStyleExport =
+    balancePerCashBook -
+    uncreditedLodgmentsTimingTotalExport +
+    unpresentedChequesTotal +
+    bankOnlyReconcilingNetExport
+  const bankStatementClosingBalanceExport = toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance)
+  const selectedBankAccountExport =
+    bankAccountId && project.bankAccounts?.length
+      ? project.bankAccounts.find((a: { id: string }) => a.id === bankAccountId)
+      : null
+  const reconciliationDateExport = project.reconciliationDate
+  const fmtBRSTitle = (d: Date | string | null) => {
+    if (!d) return '—'
+    const date = typeof d === 'string' ? new Date(d) : d
+    if (Number.isNaN(date.getTime())) return '—'
+    const day = date.getDate()
+    const month = date.toLocaleString('en-GB', { month: 'long' }).toUpperCase()
+    const year = date.getFullYear()
+    return `${day}-${month}-${year}`
+  }
+
+  if (format === 'excel' || format === 'xlsx') {
+    const wb = XLSX.utils.book_new()
+    const footerExport = (branding.footer as string | undefined) || platformDefaults.defaultFooter
+    const maybeSigned = (n: number, opts?: { forceNegative?: boolean }): string | number => {
+      const forceNegative = !!opts?.forceNegative
+      if (!useSignedAmounts) return n
+      if (forceNegative) return `-${Math.abs(n).toFixed(2)}`
+      if (n > 0) return `+${n.toFixed(2)}`
+      if (n < 0) return `-${Math.abs(n).toFixed(2)}`
+      return n.toFixed(2)
+    }
+    const brsStatementRows: (string | number)[][] = [
+      [`${project.organization.name} - ${reportTitle}`],
+      [project.name],
+      [`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)}`],
+      ...(selectedBankAccountExport ? [[`Bank account: ${(selectedBankAccountExport as { name: string }).name}`]] : []),
+      [`Currency: ${curr}`],
+      [`Language profile: ${reportLanguageProfile.label}`],
+      [],
+      ...(bankStatementClosingBalanceExport != null ? [[exportLabels.openingBankStatementBalance, maybeSigned(bankStatementClosingBalanceExport)]] : []),
+      [exportLabels.closingBankStatementBalance + (bankStatementClosingBalanceExport != null ? ' (reconciled)' : ''), maybeSigned(bankClosingBalance)],
+      [exportLabels.addUncreditedLodgments, maybeSigned(uncreditedLodgmentsTotal)],
+      [exportLabels.addBankOnlyCredits, maybeSigned(bankOnlyCreditsNotInCashBookTotalExport)],
+      [exportLabels.lessBankOnlyDebits, maybeSigned(-Math.abs(bankOnlyDebitsNotInCashBookTotalExport), { forceNegative: true })],
+      [exportLabels.lessUnpresentedCheques, maybeSigned(-Math.abs(unpresentedChequesTotal), { forceNegative: true })],
+      [exportLabels.cashBookBalanceEnd, maybeSigned(balancePerCashBook)],
+      [],
+      ['Ghana-style bank balance (explicit decomposition)', maybeSigned(bankClosingBalanceGhanaStyleExport)],
+      ...(footerExport ? [[], [footerExport]] : []),
+    ]
+    const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
+    XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BRS Statement')
+    const additionalInformationRows: (string | number)[][] = [
+      [`${project.organization.name} - ${reportTitle}`],
+      [project.name],
+      [`${exportLabels.additionalInformationTitle} - As-at vs Post-period movement`],
+      [`Language profile: ${reportLanguageProfile.label}`],
+      [],
+      [exportLabels.asAtReconciliationPosition, `Amount (${curr})`],
+      [exportLabels.uncreditedLodgmentsOrUnclearedDeposits, maybeSigned(asAtUncreditedTotalExport)],
+      [exportLabels.bankOnlyCreditsNotInCashBook, maybeSigned(unmatchedCreditsTotalExport)],
+      [exportLabels.bankOnlyDebitsNotInCashBook, maybeSigned(-Math.abs(unmatchedDebitsTotalExport), { forceNegative: true })],
+      [exportLabels.unpresentedChequesOrUnclearedPayments, maybeSigned(-Math.abs(asAtUnpresentedTotalExport), { forceNegative: true })],
+      [],
+      [exportLabels.postPeriodMovement, `Amount (${curr})`],
+      [exportLabels.broughtForwardUncreditedLodgments, maybeSigned(broughtForwardLodgmentsTotalExport)],
+      [exportLabels.broughtForwardBankOnlyCredits, maybeSigned(broughtForwardBankCreditsTotalExport)],
+      [exportLabels.broughtForwardUnpresentedCheques, maybeSigned(-Math.abs(broughtForwardChequesTotalExport), { forceNegative: true })],
+    ]
+    const additionalInformationSheet = XLSX.utils.aoa_to_sheet(additionalInformationRows)
+    XLSX.utils.book_append_sheet(wb, additionalInformationSheet, 'Additional Information')
+    const generatedAt = new Date()
+    const header = [
+      [`${project.organization.name} - ${reportTitle}`],
+      [project.name],
+      [`Generated: ${formatGeneratedAt(generatedAt)} (Africa/Accra)`],
+      [],
+    ]
+    const matchedSheet = XLSX.utils.aoa_to_sheet(header)
+    if (matchedRows.length) {
+      XLSX.utils.sheet_add_json(matchedSheet, matchedRows, { skipHeader: false, origin: 'A5' })
+    } else {
+      XLSX.utils.sheet_add_aoa(matchedSheet, [['No matched transactions']], { origin: 'A5' })
+    }
+    XLSX.utils.book_append_sheet(wb, matchedSheet, 'Matched')
+    const unmatchedIn = unmatchedReceipts.length ? unmatchedReceipts : unmatchedCredits
+    if (unmatchedIn.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedIn), 'Unmatched Receipts-Credits')
+    }
+    const unmatchedOut = unmatchedPayments.length ? unmatchedPayments : unmatchedDebits
+    if (unmatchedOut.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'Missing Cheques - Payments')
+    }
+    if (missingChequesAgeingExport.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingChequesAgeingExport), 'Missing Cheques Ageing')
+    }
+    if (discrepancies.length) {
+      const discWithBands = matchPairs.filter((p) => {
+        const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
+        const cbDate = p.cb.date ? new Date(p.cb.date) : null
+        const bankDate = p.bank.date ? new Date(p.bank.date) : null
+        const dateDiffDays = cbDate && bankDate ? Math.abs((cbDate.getTime() - bankDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+        return amountDiff > 0.01 || dateDiffDays > 0
+      }).map((p) => {
+        const amountVariance = Math.abs(p.cb.amount - p.bank.amount)
+        const dateVarianceDays = p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0
+        const amountBand = amountVariance <= 1 ? '0–1' : amountVariance <= 100 ? '1–100' : amountVariance <= 500 ? '100–500' : '500+'
+        const dateBand = dateVarianceDays <= 7 ? '0–7 days' : dateVarianceDays <= 30 ? '7–30 days' : '30+ days'
+        const isReceipt = receiptIdsExport.has(p.cb.id)
+        return {
+          'Cash Book Date': fmt(p.cb.date),
+          'Cash Book Desc': (p.cb.name || p.cb.details || '').slice(0, 40),
+          [`Amount Received (${curr})`]: isReceipt ? p.cb.amount : '',
+          [`Amount Paid (${curr})`]: !isReceipt ? p.cb.amount : '',
+          'Bank Date': fmt(p.bank.date),
+          'Bank Desc': (p.bank.name || p.bank.details || '').slice(0, 40),
+          [`Bank Amount (${curr})`]: p.bank.amount,
+          [`Amount Variance (${curr})`]: amountVariance,
+          'Date Diff Days': dateVarianceDays,
+          'Amount Band': amountBand,
+          'Date Band': dateBand,
+        }
+      })
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discWithBands), 'Discrepancies')
+    }
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const filename = `BRS_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    await logAudit({
+      organizationId: orgId,
+      userId: req.auth!.userId,
+      projectId,
+      action: 'report_exported',
+      details: { format: 'excel' },
+    })
+    return res.send(buf)
+  }
+
+  if (format === 'pdf') {
+    const doc = new PDFDocument({ margin: 50, bufferPages: true })
+    const filename = `BRS_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    doc.pipe(res)
+    const pageWidth = doc.page.width
+    const margin = 50
+    const contentWidth = pageWidth - margin * 2
+    const logoPath = resolveBrandingLogoPath((branding.logoUrl as string | undefined) || '')
+    doc.rect(0, 0, pageWidth, 120).fill('#F8FAFC')
+    doc.rect(0, 118, pageWidth, 2).fill(primaryColor)
+    if (logoPath) {
+      try {
+        doc.image(logoPath, (pageWidth - 120) / 2, 20, { fit: [120, 48], align: 'center', valign: 'center' })
+      } catch {
+        // ignore logo render failures and continue with text header
+      }
+    }
+    doc.y = logoPath ? 74 : 36
+    doc.fillColor(primaryColor).fontSize(20).text(`${project.organization.name}`, { align: 'center' }).fillColor('#000000')
+    doc.moveDown(0.35)
+    const letterhead = branding.letterheadAddress as string | undefined
+    if (letterhead) {
+      doc.fontSize(9).fillColor('#444444').text(letterhead, { align: 'center' }).fillColor('#000000').moveDown(0.3)
+    }
+    doc.fontSize(14).text(reportTitle, { align: 'center' })
+    doc.fontSize(11).text(project.name, { align: 'center' })
+    const curr = project.currency || 'GHS'
+    doc.fontSize(9).text(`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)} • ${curr}`, { align: 'center' })
+    doc.fontSize(8).fillColor('#444444').text(`Language profile: ${reportLanguageProfile.label}`, { align: 'center' }).fillColor('#000000')
+    if (selectedBankAccountExport) {
+      doc.fontSize(9).text(`Bank account: ${(selectedBankAccountExport as { name: string }).name}`, { align: 'center' })
+    }
+    doc.fontSize(8).fillColor('#444444').text(`Generated: ${formatGeneratedAt(new Date())} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
+    doc.moveDown(0.8)
+
+    const amtNum = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    const fmtPdfDate = (d: string) => {
+      const x = new Date(d)
+      if (Number.isNaN(x.getTime())) return d || '—'
+      const dd = String(x.getDate()).padStart(2, '0')
+      const mm = String(x.getMonth() + 1).padStart(2, '0')
+      const yyyy = x.getFullYear()
+      return `${dd}/${mm}/${yyyy}`
+    }
+    const drawTable = (
+      title: string,
+      rows: Array<{ date: string; type: string; ref: string; description: string; amount: number }>,
+      opts?: { allowEmptyText?: string }
+    ) => {
+      const x = margin
+      const tableWidth = contentWidth
+      const cDate = 90
+      const cType = 95
+      const cRef = 90
+      const cAmount = 120
+      const cDesc = tableWidth - cDate - cType - cRef - cAmount
+      const rowH = 18
+      const ensureRoom = (needed: number, redrawHeader = false) => {
+        if (doc.y + needed < doc.page.height - 60) return
+        doc.addPage()
+        doc.y = 50
+        if (redrawHeader) {
+          doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+          doc.moveDown(0.35)
+          drawHeader()
+        }
+      }
+      const drawHeader = () => {
+        doc.save()
+        doc.rect(x, doc.y, tableWidth, rowH).fill('#F8FAFC')
+        doc.restore()
+        const y = doc.y + 5
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
+        doc.text('Date', x + 6, y, { width: cDate - 8 })
+        doc.text('Type', x + cDate + 6, y, { width: cType - 8 })
+        doc.text('Ref No.', x + cDate + cType + 6, y, { width: cRef - 8 })
+        doc.text('Description / Payee', x + cDate + cType + cRef + 6, y, { width: cDesc - 8 })
+        doc.text(`Amount (${curr})`, x + cDate + cType + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
+        doc.y += rowH
+      }
+      ensureRoom(36)
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+      doc.moveDown(0.35)
+      drawHeader()
+      if (!rows.length) {
+        doc.fontSize(9).font('Helvetica').fillColor('#6B7280').text(opts?.allowEmptyText || 'None', x + 6, doc.y + 4)
+        doc.y += rowH + 6
+        return
+      }
+      let total = 0
+      rows.forEach((r, idx) => {
+        ensureRoom(rowH + 8, true)
+        if (idx % 2 === 1) {
+          doc.save()
+          doc.rect(x, doc.y, tableWidth, rowH).fill('#FAFAFA')
+          doc.restore()
+        }
+        const y = doc.y + 4
+        total += r.amount
+        doc.fontSize(9).font('Helvetica').fillColor('#111827')
+        doc.text(fmtPdfDate(r.date), x + 6, y, { width: cDate - 8 })
+        doc.text(r.type || '—', x + cDate + 6, y, { width: cType - 8 })
+        doc.text(r.ref || '—', x + cDate + cType + 6, y, { width: cRef - 8 })
+        doc.text((r.description || '—').slice(0, 62), x + cDate + cType + cRef + 6, y, { width: cDesc - 8 })
+        doc.text(amtNum(r.amount), x + cDate + cType + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
+        doc.y += rowH
+      })
+      ensureRoom(24)
+      doc.font('Helvetica-Bold').fillColor('#111827')
+      doc.text('Total', x + 6, doc.y + 6, { width: tableWidth - cAmount - 12 })
+      doc.text(amtNum(total), x + tableWidth - cAmount + 6, doc.y + 6, { width: cAmount - 12, align: 'right' })
+      doc.moveTo(x, doc.y + 24).lineTo(x + tableWidth, doc.y + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
+      doc.y += 30
+    }
+    const drawAmountSummaryTable = (
+      title: string,
+      rows: Array<{ label: string; amount: number; forceNegative?: boolean }>,
+      opts?: { drawTotal?: boolean }
+    ) => {
+      const x = margin
+      const tableWidth = contentWidth
+      const cLabel = tableWidth - 150
+      const cAmount = 150
+      const rowH = 18
+      const ensureRoom = (needed: number, redrawHeader = false) => {
+        if (doc.y + needed < doc.page.height - 60) return
+        doc.addPage()
+        doc.y = 50
+        if (redrawHeader) {
+          doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+          doc.moveDown(0.35)
+          drawHeader()
+        }
+      }
+      const drawHeader = () => {
+        doc.save()
+        doc.rect(x, doc.y, tableWidth, rowH).fill('#F8FAFC')
+        doc.restore()
+        const y = doc.y + 5
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
+        doc.text('Description', x + 6, y, { width: cLabel - 8 })
+        doc.text(`Amount (${curr})`, x + cLabel + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
+        doc.y += rowH
+      }
+      ensureRoom(36)
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+      doc.moveDown(0.35)
+      drawHeader()
+      let total = 0
+      for (const r of rows) {
+        ensureRoom(rowH + 8, true)
+        total += r.amount
+        const y = doc.y + 4
+        const amountText = signedAmt(r.forceNegative ? -Math.abs(r.amount) : r.amount, { forceNegative: !!r.forceNegative })
+        doc.fontSize(9).font('Helvetica').fillColor('#111827')
+        doc.text(r.label, x + 6, y, { width: cLabel - 8 })
+        doc.text(amountText, x + cLabel + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
+        doc.y += rowH
+      }
+      if (opts?.drawTotal) {
+        ensureRoom(24)
+        doc.font('Helvetica-Bold').fillColor('#111827')
+        doc.text('Total', x + 6, doc.y + 6, { width: cLabel - 8 })
+        doc.text(amtNum(total), x + cLabel + 6, doc.y + 6, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, doc.y + 24).lineTo(x + tableWidth, doc.y + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
+        doc.y += 30
+      } else {
+        doc.y += 8
+      }
+    }
+    const signedAmt = (n: number, opts?: { forceNegative?: boolean }) => {
+      const forceNegative = !!opts?.forceNegative
+      const plain = amtNum(Math.abs(n))
+      if (!useSignedAmounts) return amtNum(n)
+      if (forceNegative) return `-${plain}`
+      if (n > 0) return `+${plain}`
+      if (n < 0) return `-${plain}`
+      return amtNum(0)
+    }
+    drawAmountSummaryTable('Bank Reconciliation Statement', [
+      ...(bankStatementClosingBalanceExport != null
+        ? [{ label: exportLabels.openingBankStatementBalance, amount: bankStatementClosingBalanceExport }]
+        : []),
+      {
+        label: exportLabels.closingBankStatementBalance + (bankStatementClosingBalanceExport != null ? ' (reconciled)' : ''),
+        amount: bankClosingBalance,
+      },
+      { label: exportLabels.addUncreditedLodgments, amount: uncreditedLodgmentsTotal },
+      { label: exportLabels.lessUnpresentedCheques, amount: unpresentedChequesTotal, forceNegative: true },
+      { label: exportLabels.cashBookBalanceEnd, amount: balancePerCashBook },
+    ], { drawTotal: false })
+
+    doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle)
+    doc.moveDown(0.2)
+    drawAmountSummaryTable(exportLabels.asAtReconciliationPosition, [
+      { label: exportLabels.uncreditedLodgmentsOrUnclearedDeposits, amount: asAtUncreditedTotalExport },
+      { label: exportLabels.unpresentedChequesOrUnclearedPayments, amount: asAtUnpresentedTotalExport, forceNegative: true },
+    ])
+    drawAmountSummaryTable(exportLabels.postPeriodMovement, [
+      { label: exportLabels.broughtForwardUncreditedLodgments, amount: broughtForwardLodgmentsTotalExport },
+      { label: exportLabels.broughtForwardUnpresentedCheques, amount: broughtForwardChequesTotalExport, forceNegative: true },
+    ])
+
+    const exportNarrative =
+      (project as { reportNarrative?: string | null }).reportNarrative ||
+      `This reconciliation shows ${matchPairs.length} matched transaction(s). Currency: ${curr}. Unpresented cheques total ${amtNum(unpresentedChequesTotal)}; uncredited lodgments total ${amtNum(uncreditedLodgmentsTotal)}.`
+    doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: 495 }).fillColor('#000000').moveDown(0.5)
+    const prepComment = (project as { preparerComment?: string | null }).preparerComment
+    const revComment = (project as { reviewerComment?: string | null }).reviewerComment
+    if (prepComment?.trim()) {
+      doc.fontSize(8).fillColor('#333333').text('Preparer note: ' + prepComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+    }
+    if (revComment?.trim()) {
+      doc.fontSize(8).fillColor('#333333').text('Reviewer note: ' + revComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+    }
+    if (prepComment?.trim() || revComment?.trim()) doc.moveDown(0.5)
+
+    const matchedTableRows = matchPairs.map((p) => {
+      const isReceipt = receiptIdsExport.has(p.cb.id)
+      return {
+        date: fmt(p.cb.date),
+        type: isReceipt ? 'Receipt/Credit' : 'Payment/Debit',
+        ref: p.cb.docRef || p.cb.chqNo || p.bank.docRef || p.bank.chqNo || '',
+        description: p.cb.name || p.cb.details || p.bank.name || p.bank.details || '—',
+        amount: p.cb.amount,
+      }
+    })
+    drawTable('Matched transactions', matchedTableRows, { allowEmptyText: 'No matched transactions.' })
+    const unmatchedReceiptRows = unmatchedReceipts.map((t) => ({
+      date: (t as { Date: string }).Date,
+      type: 'Receipt',
+      ref: (t as { 'Ref Doc No'?: string })['Ref Doc No'] || (t as { 'Chq No'?: string })['Chq No'] || '',
+      description: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
+      amount: (t as { 'Amount Received'?: number })['Amount Received'] ?? 0,
+    }))
+    drawTable('Unmatched receipts (cash book)', unmatchedReceiptRows)
+    const unmatchedPaymentRows = unmatchedPayments.map((t) => ({
+      date: (t as { Date: string }).Date,
+      type: 'Payment',
+      ref: (t as { 'Ref Doc No'?: string })['Ref Doc No'] || (t as { 'Cheque No'?: string })['Cheque No'] || '',
+      description: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
+      amount: (t as { 'Amount Paid'?: number })['Amount Paid'] ?? 0,
+    }))
+    drawTable('Unmatched payments (cash book)', unmatchedPaymentRows)
+
+    const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
+    const range = doc.bufferedPageRange()
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i)
+      const y = doc.page.height - 34
+      doc.moveTo(margin, y - 8).lineTo(doc.page.width - margin, y - 8).strokeColor('#E5E7EB').lineWidth(0.8).stroke()
+      if (footerText) {
+        doc.fontSize(8).fillColor('#666666').text(footerText, margin, y, { width: contentWidth, align: 'left' })
+      }
+      doc.fontSize(8).fillColor('#666666').text(`Page ${i + 1} of ${range.count}`, margin, y, { width: contentWidth, align: 'right' })
+      doc.fillColor('#000000')
+    }
+    doc.end()
+    await logAudit({
+      organizationId: orgId,
+      userId: req.auth!.userId,
+      projectId,
+      action: 'report_exported',
+      details: { format: 'pdf' },
+    })
+    return
+  }
+
+  res.status(400).json({ error: 'Unsupported format. Use format=excel or format=pdf' })
+})
+
+export default router

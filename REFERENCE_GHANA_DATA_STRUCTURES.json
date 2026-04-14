@@ -1,0 +1,176 @@
+{
+  "description": "Ghana-based cash book and bank statement structures derived from real Q-SOFT/Lordship Insurance data. Use for development - no placeholders.",
+  "currency": "GHS",
+  "currency_symbol": "GH₵",
+  "decimal_format": "1,234.56",
+  
+  "cash_book_schema": {
+    "receipts": {
+      "columns": ["s_no", "date", "name", "details", "doc_ref", "chq_no", "accode", "amt_received"],
+      "sample_rows": [
+        {
+          "date": "2025-01-06",
+          "name": "Enterprise Life Assurance",
+          "details": "Commissions received via transfer",
+          "doc_ref": null,
+          "chq_no": null,
+          "accode": 1020,
+          "amt_received": 29584.84
+        },
+        {
+          "date": "2025-01-15",
+          "name": "Ameyaw Boadu",
+          "details": "Payments received from Ameyaw Boadu GIPS transfer",
+          "doc_ref": null,
+          "chq_no": null,
+          "accode": 4300,
+          "amt_received": 10000
+        },
+        {
+          "date": "2025-01-13",
+          "name": "Ecobank",
+          "details": "182-DAY T-BILLS- MATURD",
+          "doc_ref": null,
+          "chq_no": "REDDEMED",
+          "accode": 3000,
+          "amt_received": 93462
+        },
+        {
+          "date": "2025-01-27",
+          "name": "Donewell Insurance",
+          "details": "Commissions received via Access bank cheque 001688",
+          "doc_ref": null,
+          "chq_no": null,
+          "accode": 1020,
+          "amt_received": 39.01
+        }
+      ]
+    },
+    "payments": {
+      "columns": ["s_no", "date", "name", "details", "doc_ref", "chq_no", "accode", "amt_paid"],
+      "sample_rows": [
+        {
+          "date": "2025-01-09",
+          "name": "Philip Akuffo",
+          "details": "Cost of office vehicle repairs",
+          "doc_ref": null,
+          "chq_no": "002038",
+          "accode": 2140,
+          "amt_paid": 640
+        },
+        {
+          "date": "2025-01-15",
+          "name": "Frederick-Leon Quayson",
+          "details": "Payment of Commissions August to Dec 2024",
+          "doc_ref": "OP008/01/25",
+          "chq_no": "001934",
+          "accode": 2040,
+          "amt_paid": 9126.41
+        },
+        {
+          "date": "2025-06-09",
+          "name": "Philip Akuffo",
+          "details": "Payment of petty cash for office running",
+          "doc_ref": null,
+          "chq_no": "002037",
+          "accode": 2110,
+          "amt_paid": 601
+        },
+        {
+          "date": "2025-07-28",
+          "name": "ECG",
+          "details": "Payment of ECG bill",
+          "doc_ref": null,
+          "chq_no": "001957",
+          "accode": null,
+          "amt_paid": 4714.58
+        }
+      ]
+    },
+    "account_codes": {
+      "1020": "Insurance commissions received",
+      "2040": "Commissions payable",
+      "2110": "Repairs and maintenance",
+      "2123": "Servicing",
+      "2140": "Office expenses",
+      "3000": "Treasury bills/investments",
+      "4300": "Receivables / Customer payments",
+      "7200": "Staff 2nd tier deductions",
+      "7400": "Salaries and wages",
+      "7800": "Other commission types"
+    }
+  },
+
+  "bank_statement_schema": {
+    "credits": {
+      "columns": ["transaction_date", "description", "credit"],
+      "description_formats": [
+        "FUNDS TRANSFER - INWARD [ref] trf b/o [payer] iro ifo [beneficiary]",
+        "OTHER BANKS INWARD TRANSFER ACH IRO [description]",
+        "TREASURY BILLS MATURED [term] Bill [ref]",
+        "MOBILE TRANSFER RRN:[rn]-GIP INCOMING B/O [payer] IFO [beneficiary]",
+        "CHEQUE CLEARING - OUTWARD LCY [bank] CHQ# [no] b/o [payer]",
+        "JOURNAL ENTRY - NON COT [description]",
+        "STAFF SALARIES - PAYMENT [description]"
+      ],
+      "sample_rows": [
+        {
+          "transaction_date": "2025-01-06",
+          "description": "FUNDS TRANSFER - INWARD GHAAO00625HWE6R trf b/o 1/ENTERPRISE LIFE ASSURANCE COMPANY iro ifo 1/LORDSHIP INSURANCE BROKERS / / //H98INFT250060275 06-Jan-2025",
+          "credit": 29584.84
+        },
+        {
+          "transaction_date": "2025-01-15",
+          "description": "MOBILE TRANSFER RRN:137232165441-GIP INCOMING B/O AMEYAW BOADU IFO LORDSHIP INSURANCE BROKERS LTD GIPS Transfer / / //H55sboe250150002 15-Jan-2025 GHS10,000.00 GHS82,328.89",
+          "credit": 10000
+        },
+        {
+          "transaction_date": "2025-01-13",
+          "description": "TREASURY BILLS MATURED 182-DAY Bill AUC 1911 MAT @ 23.03 Due 13-JAN-2025 IFO LORDSHIP INSURANCE BROKERS LTD-1441001519035",
+          "credit": 93462
+        }
+      ]
+    },
+    "debits": {
+      "columns": ["transaction_date", "description", "debit"],
+      "sample_rows": [
+        {
+          "transaction_date": "2025-01-03",
+          "description": "CHEQUE WITHDRAWAL CHQ NO 1925 PAID TO AKUFFO PHILIP KWAME / / //H75CQWL250030116 03-Jan-2025",
+          "debit": 3615
+        },
+        {
+          "transaction_date": "2025-01-13",
+          "description": "TREASURY BILLS MATURED 182-DAY Auct. 1937@25.05 Due 14-JUL-2025 / / /H01ZEXA2501307Q6 13-Jan-2025",
+          "debit": 93461.79
+        }
+      ]
+    }
+  },
+
+  "ghana_banks": [
+    {"name": "Ecobank", "code": "ECOBANK", "transaction_types": ["funds_transfer", "t_bills", "mobile", "cheque"]},
+    {"name": "Access Bank", "code": "Access", "transaction_types": ["cheque"]},
+    {"name": "Consolidated Bank", "code": "CBG", "transaction_types": ["cheque"]},
+    {"name": "GCB Bank", "code": "GCB", "transaction_types": ["cheque"]},
+    {"name": "ADB", "code": "ADB", "transaction_types": ["cheque"]},
+    {"name": "Prudential Bank", "code": "Prudential", "transaction_types": ["cheque"]},
+    {"name": "OMNI Bank", "code": "OMNI", "transaction_types": ["cheque"]}
+  ],
+
+  "bank_reconciliation_report_sections": [
+    "closing_balance_per_bank_statement",
+    "uncredited_lodgments",
+    "unmatched_receipts_in_cash_book",
+    "unmatched_credits_in_bank_statement",
+    "unpresented_cheques",
+    "unmatched_payments_in_cash_book",
+    "balance_per_cash_book_at_end_of_period"
+  ],
+
+  "subscription_tiers": {
+    "basic": {"projects_per_month": 5, "transactions_per_month": 500, "monthly_ghs": 150, "yearly_ghs": 1500},
+    "standard": {"projects_per_month": 20, "transactions_per_month": 2000, "monthly_ghs": 400, "yearly_ghs": 4000},
+    "premium": {"projects_per_month": 100, "transactions_per_month": 10000, "monthly_ghs": 900, "yearly_ghs": 9000}
+  }
+}

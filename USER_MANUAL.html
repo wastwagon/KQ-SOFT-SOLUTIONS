@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bank Reconciliation System — User Manual</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      a { color: #000; text-decoration: none; }
+      h2 { page-break-before: auto; }
+      h2, h3 { page-break-after: avoid; }
+      table { page-break-inside: avoid; }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.5;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: #333;
+    }
+    .print-hint {
+      background: #f0f9ff;
+      border: 1px solid #0ea5e9;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .print-hint strong { color: #0369a1; }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #16a34a;
+      padding-bottom: 8px;
+    }
+    .subtitle { font-size: 14px; color: #666; margin-bottom: 24px; }
+    h2 {
+      font-size: 20px;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      color: #15803d;
+    }
+    h3 { font-size: 16px; margin-top: 20px; margin-bottom: 8px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th { background: #f5f5f5; font-weight: 600; }
+    ul { margin: 8px 0; padding-left: 24px; }
+    li { margin: 4px 0; }
+    hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .toc { background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px; }
+    .toc a { color: #15803d; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 6px 0; }
+    .end-note { font-size: 12px; color: #666; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <div class="print-hint no-print">
+    <strong>To save as PDF:</strong> Press <kbd>Ctrl+P</kbd> (Windows) or <kbd>Cmd+P</kbd> (Mac), choose "Save as PDF" or "Print to PDF" as destination, then Save.
+  </div>
+
+  <h1>Bank Reconciliation System — User Manual</h1>
+  <p class="subtitle"><strong>Q-SOFT SOLUTIONS LIMITED</strong> | Ghana | Version 1.0 | March 2026</p>
+
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ul>
+      <li>1. <a href="#intro">Introduction</a></li>
+      <li>2. <a href="#features">Features List</a></li>
+      <li>3. <a href="#getting-started">Getting Started</a></li>
+      <li>4. <a href="#account">Account Management</a></li>
+      <li>5. <a href="#dashboard">Dashboard</a></li>
+      <li>6. <a href="#projects">Projects</a></li>
+      <li>7. <a href="#workflow">Reconciliation Workflow (5 Steps)</a></li>
+      <li>8. <a href="#clients">Clients</a></li>
+      <li>9. <a href="#settings">Settings</a></li>
+      <li>10. <a href="#audit">Audit Log</a></li>
+      <li>11. <a href="#reports">Reports</a></li>
+      <li>12. <a href="#plans">Subscription Plans & Limits</a></li>
+      <li>13. <a href="#banks">Supported Banks</a></li>
+      <li>14. <a href="#roles">Roles & Permissions</a></li>
+      <li>15. <a href="#troubleshooting">Troubleshooting</a></li>
+      <li>16. <a href="#glossary">Glossary</a></li>
+    </ul>
+  </div>
+
+  <h2 id="intro">1. Introduction</h2>
+  <p>The Bank Reconciliation System (BRS) is a web-based SaaS application designed for accounting firms and businesses in Ghana. It helps you:</p>
+  <ul>
+    <li>Upload cash books and bank statements (Excel, CSV, PDF, images)</li>
+    <li>Map columns to the correct fields</li>
+    <li>Reconcile receipts vs credits and payments vs debits with intelligent matching</li>
+    <li>Generate professional Bank Reconciliation Statements (BRS) with your branding</li>
+    <li>Export reports as PDF or Excel</li>
+  </ul>
+  <p>The system supports multiple Ghanaian banks with auto-detection of statement formats and offers flexible matching (1-to-1, 1-to-many, many-to-1, many-to-many).</p>
+
+  <h2 id="features">2. Features List</h2>
+
+  <h3>Core Features (All Plans)</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>Document upload</td><td>Excel (.xlsx), CSV, PDF, images (PNG, JPG, TIFF)</td></tr>
+    <tr><td>Multi-bank support</td><td>One project can have multiple bank accounts</td></tr>
+    <tr><td>Column mapping</td><td>Map columns to date, amount, description, reference, cheque number</td></tr>
+    <tr><td>1-to-1 matching</td><td>Match a single cash book line to a single bank line</td></tr>
+    <tr><td>Side-by-side view</td><td>View receipts vs credits and payments vs debits</td></tr>
+    <tr><td>Report generation</td><td>BRS with closing balance, uncredited lodgments, unpresented cheques</td></tr>
+    <tr><td>Export</td><td>PDF or Excel</td></tr>
+    <tr><td>Clients</td><td>Link projects to clients</td></tr>
+    <tr><td>Currency</td><td>GHS, USD, EUR per project</td></tr>
+  </table>
+
+  <h3>Standard Plan and Above</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>Bank rules</td><td>Custom rules for auto-suggest matching</td></tr>
+    <tr><td>Bulk match</td><td>Match up to 50 transactions at once</td></tr>
+    <tr><td>AI suggestions</td><td>Suggested matches based on amount, date, reference</td></tr>
+    <tr><td>Audit trail</td><td>Action history</td></tr>
+    <tr><td>Discrepancy report</td><td>Identify variances and exceptions</td></tr>
+    <tr><td>Missing cheques report</td><td>Track unpresented cheques</td></tr>
+  </table>
+
+  <h3>Premium Plan and Above</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>1-to-many / many-to-many</td><td>Match one cash book line to multiple bank lines (or vice versa)</td></tr>
+    <tr><td>Roll-forward</td><td>Carry unpresented cheques to next period</td></tr>
+    <tr><td>Threshold approval</td><td>Set approval threshold amount</td></tr>
+    <tr><td>Full branding</td><td>Logo, colours, letterhead, report title, footer</td></tr>
+  </table>
+
+  <h3>Firm Plan</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>API access</td><td>Create API keys for programmatic access</td></tr>
+    <tr><td>Multi-client dashboard</td><td>Manage multiple client organisations</td></tr>
+    <tr><td>Unlimited</td><td>Unlimited projects and transactions</td></tr>
+  </table>
+
+  <h3>Ghana Bank Support</h3>
+  <table>
+    <tr><th>Bank</th><th>Auto-detection</th></tr>
+    <tr><td>Ecobank Ghana</td><td>✓</td></tr>
+    <tr><td>GCB Bank</td><td>✓</td></tr>
+    <tr><td>Access Bank Ghana</td><td>✓</td></tr>
+    <tr><td>Stanbic Bank Ghana</td><td>✓</td></tr>
+    <tr><td>Fidelity Bank Ghana</td><td>✓</td></tr>
+    <tr><td>UBA Ghana</td><td>✓</td></tr>
+    <tr><td>Absa Ghana</td><td>✓</td></tr>
+  </table>
+
+  <h2 id="getting-started">3. Getting Started</h2>
+  <p><strong>Accessing the System:</strong></p>
+  <ol>
+    <li>Open your web browser and go to the application URL.</li>
+    <li>If you do not have an account, click <strong>Register</strong>.</li>
+    <li>If you have an account, enter your email and password and click <strong>Login</strong>.</li>
+  </ol>
+
+  <h2 id="account">4. Account Management</h2>
+  <h3>Registration</h3>
+  <p>Go to Register → Enter email, password, name, organisation name → Click Register.</p>
+  <h3>Login</h3>
+  <p>Enter email and password → Click Login.</p>
+  <h3>Forgot Password</h3>
+  <p>Click Forgot password → Enter email → Check your email for reset link.</p>
+
+  <h2 id="dashboard">5. Dashboard</h2>
+  <p>Overview: usage metrics, recent projects, quick links to settings. Navigation: Dashboard, Projects, Reports, Clients, Audit, Settings.</p>
+
+  <h2 id="projects">6. Projects</h2>
+  <h3>Creating a Project</h3>
+  <p>Projects → New project → Name, Client (optional), Currency (GHS/USD/EUR), Roll-forward from (optional) → Create.</p>
+  <h3>Project List</h3>
+  <p>Filter by status: Draft, Reconciling, In review, Completed.</p>
+
+  <h2 id="workflow">7. Reconciliation Workflow (5 Steps)</h2>
+  <p><strong>Upload → Map → Reconcile → Review → Report</strong></p>
+
+  <h3>Step 1: Upload</h3>
+  <p>Cash book: Receipts, Payments, or Both. Bank statement: Credits, Debits, or Both. Formats: Excel, CSV, PDF, images.</p>
+
+  <h3>Step 2: Map</h3>
+  <p>Map columns to Date, Amount, Description, Reference, Cheque number. Save mapping.</p>
+
+  <h3>Step 3: Reconcile</h3>
+  <p>Match receipts vs credits and payments vs debits. Single match, Bulk match (Standard+), or 1-to-many (Premium+). Unmatched items: uncredited lodgments and unpresented cheques appear on the BRS.</p>
+
+  <h3>Step 4: Review</h3>
+  <p>Submit for review → Reviewer or Admin approves or sends back.</p>
+
+  <h3>Step 5: Report</h3>
+  <p>View BRS, edit summary & notes, add supporting documents, Export PDF/Excel, approve, reopen, or roll-forward.</p>
+
+  <h2 id="clients">8. Clients</h2>
+  <p>Clients → Add client → Enter name (max 200 chars) → Save. Select client when creating or editing a project.</p>
+
+  <h2 id="settings">9. Settings</h2>
+  <p><strong>Branding:</strong> Logo, colours, letterhead, report title, footer, approval threshold (Premium+).</p>
+  <p><strong>Billing:</strong> Current plan, upgrade via Paystack (GHS); intro offer 50% off.</p>
+  <p><strong>Members:</strong> Add by email, assign role (Admin, Reviewer, Preparer, Viewer).</p>
+  <p><strong>API keys:</strong> Create/revoke (Firm plan).</p>
+  <p><strong>Bank rules:</strong> Conditions and actions for auto-suggest matches.</p>
+
+  <h2 id="audit">10. Audit Log</h2>
+  <p>(Standard plan and above) View who did what and when. Export if supported.</p>
+
+  <h2 id="reports">11. Reports</h2>
+  <p>Reports menu shows completed projects. Click to open Report step and export PDF or Excel.</p>
+
+  <h2 id="plans">12. Subscription Plans & Limits</h2>
+  <table>
+    <tr><th>Plan</th><th>Projects/mo</th><th>Transactions/mo</th><th>Users</th></tr>
+    <tr><td>Basic</td><td>5</td><td>500</td><td>1</td></tr>
+    <tr><td>Standard</td><td>20</td><td>2,000</td><td>3</td></tr>
+    <tr><td>Premium</td><td>100</td><td>10,000</td><td>5+</td></tr>
+    <tr><td>Firm</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+  </table>
+
+  <h2 id="banks">13. Supported Banks</h2>
+  <p>Ecobank, GCB, Access, Stanbic, Fidelity, UBA, Absa — auto-detected. Use Map step for others.</p>
+
+  <h2 id="roles">14. Roles & Permissions</h2>
+  <table>
+    <tr><th>Action</th><th>Admin</th><th>Reviewer</th><th>Preparer</th><th>Viewer</th></tr>
+    <tr><td>Delete project</td><td>✓</td><td></td><td></td><td></td></tr>
+    <tr><td>Reopen project</td><td>✓</td><td>✓</td><td></td><td></td></tr>
+    <tr><td>Edit bank rules</td><td>✓</td><td>✓</td><td></td><td></td></tr>
+    <tr><td>Edit branding</td><td>✓</td><td></td><td></td><td></td></tr>
+    <tr><td>Manage billing</td><td>✓</td><td></td><td></td><td></td></tr>
+    <tr><td>Manage members</td><td>✓</td><td></td><td></td><td></td></tr>
+    <tr><td>Export report</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td>Create project</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td>Upload documents</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td>Map documents</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td>Reconcile</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td>Submit for review</td><td>✓</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td>Approve</td><td>✓</td><td>✓</td><td></td><td></td></tr>
+  </table>
+
+  <h2 id="troubleshooting">15. Troubleshooting</h2>
+  <table>
+    <tr><th>Issue</th><th>Solution</th></tr>
+    <tr><td>Cannot log in / 401</td><td>Check API is running; ensure VITE_API_URL points to API</td></tr>
+    <tr><td>Upload fails</td><td>Use Excel or CSV; ensure file not corrupted</td></tr>
+    <tr><td>Parse errors</td><td>Check column headers; use Map step</td></tr>
+    <tr><td>No suggested matches</td><td>Ensure Standard plan or above; check bank rules</td></tr>
+    <tr><td>Export fails</td><td>For large reports (200+ tx), wait 30–60 seconds</td></tr>
+    <tr><td>Password reset not received</td><td>Configure RESEND_API_KEY and APP_URL in production</td></tr>
+  </table>
+
+  <h2 id="glossary">16. Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td>Cash book</td><td>Your organisation's record of receipts and payments</td></tr>
+    <tr><td>Bank statement</td><td>The bank's record of credits and debits</td></tr>
+    <tr><td>Receipts</td><td>Money received (cash book)</td></tr>
+    <tr><td>Payments</td><td>Money paid out (cash book)</td></tr>
+    <tr><td>Credits</td><td>Money credited to your account (bank)</td></tr>
+    <tr><td>Debits</td><td>Money debited from your account (bank)</td></tr>
+    <tr><td>Uncredited lodgments</td><td>Receipts recorded but not yet credited by bank</td></tr>
+    <tr><td>Unpresented cheques</td><td>Cheques issued but not yet presented to bank</td></tr>
+    <tr><td>Balance per cash book</td><td>Reconciled balance = bank closing + lodgments − unpresented cheques</td></tr>
+    <tr><td>BRS</td><td>Bank Reconciliation Statement</td></tr>
+    <tr><td>Roll-forward</td><td>Carry unpresented cheques to next period</td></tr>
+  </table>
+
+  <p class="end-note">— End of User Manual —</p>
+</body>
+</html>

@@ -1,0 +1,348 @@
+// Bank Reconciliation SaaS - Prisma Schema
+// Q-SOFT SOLUTIONS LIMITED
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  suspendedAt   DateTime? @map("suspended_at") // set = user disabled
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  memberships         OrganizationMember[]
+  passwordResetTokens PasswordResetToken[]
+  preparedProjects    Project[]          @relation("PreparedBy")
+  reviewedProjects    Project[]          @relation("ReviewedBy")
+  approvedProjects    Project[]          @relation("ApprovedBy")
+  brsAttachments      BrsAttachment[]
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token, expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Plan {
+  id                   String   @id @default(cuid())
+  slug                 String   @unique // basic | standard | premium | firm
+  name                 String
+  projectsPerMonth     Int      @map("projects_per_month") // -1 = unlimited
+  transactionsPerMonth Int      @map("transactions_per_month") // -1 = unlimited
+  monthlyGhs           Float    @map("monthly_ghs") @default(0)
+  yearlyGhs            Float    @map("yearly_ghs") @default(0)
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("plans")
+}
+
+enum DocumentType {
+  cash_book_receipts
+  cash_book_payments
+  bank_credits
+  bank_debits
+}
+
+model Organization {
+  id               String    @id @default(cuid())
+  name             String
+  slug             String    @unique
+  plan             String    @default("basic") // slug referencing Plan
+  branding         Json?     // { logoUrl?, primaryColor?, secondaryColor?, letterheadAddress?, reportTitle?, footer? }
+  suspendedAt      DateTime? @map("suspended_at") // set = org disabled
+  introOfferUsedAt DateTime? @map("intro_offer_used_at") // set when 50% intro offer was applied
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  members     OrganizationMember[]
+  clients     Client[]
+  projects    Project[]
+  payments    Payment[]
+  bankRules   BankRule[]
+  usageLogs   UsageLog[]
+  auditLogs   AuditLog[]
+  apiKeys     ApiKey[]
+
+  @@map("organizations")
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  name           String
+  keyHash        String    @map("key_hash")
+  keyPrefix      String    @map("key_prefix")
+  lastUsedAt     DateTime? @map("last_used_at")
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([keyPrefix])
+  @@map("api_keys")
+}
+
+model BankRule {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  priority       Int      @default(100)   // lower = higher priority
+  conditions     Json     // [{ field, operator, value }]
+  action         String   @default("suggest_match") // suggest_match | flag_for_review
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("bank_rules")
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  userId         String       @map("user_id")
+  organizationId String       @map("organization_id")
+  role           String       @default("member") // admin | reviewer | preparer | viewer | member
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("organization_members")
+}
+
+model Client {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects     Project[]
+
+  @@unique([organizationId, name])
+  @@map("clients")
+}
+
+model Project {
+  id                      String    @id @default(cuid())
+  organizationId          String    @map("organization_id")
+  clientId                String?   @map("client_id")
+  rollForwardFromProjectId String?  @map("roll_forward_from_project_id") // unpresented cheques carried from this project
+  name                    String
+  slug                    String    // URL-friendly identifier, unique per org
+  status                  String    @default("draft") // draft | mapping | reconciling | submitted_for_review | approved | completed
+  reconciliationDate      DateTime? @map("reconciliation_date")
+  currency                String    @default("GHS")  // GHS | USD | EUR
+  preparedById            String?   @map("prepared_by_id")
+  preparedAt              DateTime? @map("prepared_at")
+  reviewedById            String?   @map("reviewed_by_id")
+  reviewedAt              DateTime? @map("reviewed_at")
+  approvedById            String?   @map("approved_by_id")
+  approvedAt              DateTime? @map("approved_at")
+  reportNarrative             String?   @map("report_narrative")   // optional executive summary (or auto-generated)
+  bankStatementClosingBalance Decimal?  @map("bank_statement_closing_balance") @db.Decimal(18, 2)  // optional: as-per-bank closing for audit comparison
+  preparerComment             String?   @map("preparer_comment")    // optional preparer notes
+  reviewerComment         String?   @map("reviewer_comment")    // optional reviewer notes
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  preparedBy           User?        @relation("PreparedBy", fields: [preparedById], references: [id], onDelete: SetNull)
+  reviewedBy           User?        @relation("ReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  approvedBy           User?        @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, slug])
+  client               Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  rollForwardFrom      Project?     @relation("RollForward", fields: [rollForwardFromProjectId], references: [id], onDelete: SetNull)
+  rollForwardTo        Project[]    @relation("RollForward")
+  bankAccounts         BankAccount[]
+  documents            Document[]
+  matches              Match[]
+  attachments          BrsAttachment[]
+  auditLogs            AuditLog[]
+
+  @@map("projects")
+}
+
+// Phase 11: Multi-bank — one project can have multiple bank accounts
+model BankAccount {
+  id         String   @id @default(cuid())
+  projectId  String   @map("project_id")
+  name       String   // e.g. "Ecobank Main", "GCB Operating"
+  bankName   String?  @map("bank_name")   // optional
+  accountNo  String?  @map("account_no")  // optional
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([projectId])
+  @@map("bank_accounts")
+}
+
+model BrsAttachment {
+  id         String   @id @default(cuid())
+  projectId  String   @map("project_id")
+  type       String   // bank_statement | approval | other
+  filename   String
+  filepath   String
+  mimeType   String?  @map("mime_type")
+  uploadedBy String   @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("brs_attachments")
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  projectId      String       @map("project_id")
+  bankAccountId  String?      @map("bank_account_id")  // Phase 11: for bank_credits | bank_debits only
+  type           DocumentType // cash_book_receipts | cash_book_payments | bank_credits | bank_debits
+  filename       String
+  filepath       String
+  mimeType       String?      @map("mime_type")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bankAccount  BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@index([bankAccountId])
+  @@map("documents")
+}
+
+model Transaction {
+  id         String   @id @default(cuid())
+  documentId String   @map("document_id")
+  rowIndex   Int      @map("row_index")
+  date       DateTime?
+  name       String?
+  details    String?
+  docRef     String?  @map("doc_ref")
+  chqNo      String?  @map("chq_no")
+  accode     Int?
+  amount     Decimal  @db.Decimal(18, 2)
+  rawJson    Json?    @map("raw_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  matchItems MatchItem[]
+
+  @@map("transactions")
+}
+
+model Match {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  type        String   // one_to_one | one_to_many | many_to_one | many_to_many
+  status      String   @default("pending") // pending | confirmed | rejected
+  confidence  Float?   // 0-1
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  matchItems MatchItem[]
+
+  @@map("matches")
+}
+
+model MatchItem {
+  id            String   @id @default(cuid())
+  matchId       String   @map("match_id")
+  transactionId String   @map("transaction_id")
+  side          String   // cash_book | bank
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, transactionId])
+  @@unique([transactionId])
+  @@map("match_items")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  projectId      String?  @map("project_id")
+  action         String   // document_uploaded | document_mapped | match_created | match_deleted | match_bulk | report_generated | report_exported | project_submitted | project_approved | project_reopened
+  details        Json?    // { documentId?, documentType?, transactionCount?, matchId?, format? }
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, projectId, createdAt])
+  @@map("audit_logs")
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  amount         Decimal  @db.Decimal(18, 2)
+  currency       String   @default("GHS")
+  plan           String
+  period         String   // monthly | yearly
+  reference      String?  @unique
+  status         String   @default("success") // success | failed | refunded
+  paystackData   Json?    @map("paystack_data")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model UsageLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  period         String   // YYYY-MM
+  projectsCount  Int      @default(0) @map("projects_count")
+  transactionsCount Int   @default(0) @map("transactions_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("usage_logs")
+}
+
+// Platform-wide generation settings (report defaults, API limits, etc.)
+model PlatformSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}

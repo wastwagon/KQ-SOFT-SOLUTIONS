@@ -1,0 +1,288 @@
+{
+  "meta": {
+    "project": "Bank Reconciliation SaaS",
+    "client": "Q-SOFT SOLUTIONS LIMITED",
+    "market": "Ghana",
+    "version": "1.0",
+    "status": "planning_complete",
+    "principle": "build_once_no_return",
+    "last_updated": "2026-02-27"
+  },
+
+  "scope": {
+    "document_types": ["excel", "csv", "pdf", "png", "jpg", "tiff"],
+    "document_sources": ["cash_book", "bank_statement"],
+    "output_formats": ["pdf", "excel"],
+    "currencies": ["GHS"],
+    "languages": ["en"],
+    "deployment": {
+      "hosting": "vps",
+      "platform": "coolify",
+      "containerization": "docker"
+    }
+  },
+
+  "subscription_tiers": {
+    "basic": {
+      "name": "Basic",
+      "monthly_ghs": 150,
+      "yearly_ghs": 1500,
+      "yearly_discount_percent": 17,
+      "projects_per_month": 5,
+      "transactions_per_month": 500,
+      "users": 1,
+      "features": ["document_upload", "basic_matching", "brs_report", "basic_branding"]
+    },
+    "standard": {
+      "name": "Standard",
+      "monthly_ghs": 400,
+      "yearly_ghs": 4000,
+      "yearly_discount_percent": 17,
+      "projects_per_month": 20,
+      "transactions_per_month": 2000,
+      "users": 3,
+      "features": ["all_basic", "bank_rules", "bulk_match", "ai_suggestions", "audit_trail", "discrepancy_report"]
+    },
+    "premium": {
+      "name": "Premium",
+      "monthly_ghs": 900,
+      "yearly_ghs": 9000,
+      "yearly_discount_percent": 17,
+      "projects_per_month": 100,
+      "transactions_per_month": 10000,
+      "users": 5,
+      "features": ["all_standard", "one_to_many", "many_to_many", "roll_forward", "threshold_approval", "full_branding", "firm_dashboard"]
+    },
+    "firm": {
+      "name": "Firm",
+      "monthly_ghs": null,
+      "yearly_ghs": null,
+      "custom": true,
+      "projects_per_month": -1,
+      "transactions_per_month": -1,
+      "users": -1,
+      "features": ["all_premium", "unlimited", "multi_client", "api_access", "priority_support"]
+    }
+  },
+
+  "promotions": {
+    "intro_offer": {
+      "description": "50% off first 2 months",
+      "discount_percent": 50,
+      "duration_months": 2,
+      "eligible": "new_customers"
+    },
+    "annual_tiered": {
+      "12_months": 15,
+      "24_months": 20,
+      "36_months": 25
+    }
+  },
+
+  "canonical_schemas": {
+    "cash_book_receipts": {
+      "fields": [
+        {"name": "s_no", "type": "integer", "required": false},
+        {"name": "date", "type": "date", "required": true},
+        {"name": "name", "type": "string", "required": false},
+        {"name": "details", "type": "string", "required": true},
+        {"name": "doc_ref", "type": "string", "required": false},
+        {"name": "chq_no", "type": "string", "required": false},
+        {"name": "accode", "type": "integer", "required": false},
+        {"name": "amt_received", "type": "decimal", "required": true, "precision": 18, "scale": 2}
+      ]
+    },
+    "cash_book_payments": {
+      "fields": [
+        {"name": "s_no", "type": "integer", "required": false},
+        {"name": "date", "type": "date", "required": true},
+        {"name": "name", "type": "string", "required": false},
+        {"name": "details", "type": "string", "required": true},
+        {"name": "doc_ref", "type": "string", "required": false},
+        {"name": "chq_no", "type": "string", "required": false},
+        {"name": "accode", "type": "integer", "required": false},
+        {"name": "amt_paid", "type": "decimal", "required": true, "precision": 18, "scale": 2}
+      ]
+    },
+    "bank_statement_credits": {
+      "fields": [
+        {"name": "transaction_date", "type": "date", "required": true},
+        {"name": "description", "type": "string", "required": true},
+        {"name": "credit", "type": "decimal", "required": true, "precision": 18, "scale": 2}
+      ]
+    },
+    "bank_statement_debits": {
+      "fields": [
+        {"name": "transaction_date", "type": "date", "required": true},
+        {"name": "description", "type": "string", "required": true},
+        {"name": "debit", "type": "decimal", "required": true, "precision": 18, "scale": 2}
+      ]
+    }
+  },
+
+  "matching_engine": {
+    "rules_priority": ["exact_match", "amount_date_window", "amount_description_similarity", "reference_extraction", "bank_rules"],
+    "parameters": {
+      "amount_tolerance": 0.01,
+      "amount_tolerance_unit": "GHS",
+      "date_window_days": 3,
+      "description_similarity_threshold": 0.7,
+      "bulk_match_limit": 50
+    },
+    "match_types": ["one_to_one", "one_to_many", "many_to_one", "many_to_many"],
+    "exception_handling": ["flag_unmatched_cash_book", "flag_unmatched_bank", "flag_low_confidence", "detect_duplicates", "variance_analysis"]
+  },
+
+  "bank_rules_engine": {
+    "condition_operators": ["equals", "contains", "starts_with", "regex", "gt", "gte", "lt", "lte", "between"],
+    "actions": ["match_to_account", "suggest_match", "auto_approve", "flag_for_review"],
+    "prioritization": "user_defined_integer"
+  },
+
+  "report_sections": [
+    "header",
+    "closing_balance_per_bank_statement",
+    "uncredited_lodgments",
+    "unmatched_receipts_in_cash_book",
+    "unmatched_credits_in_bank_statement",
+    "unpresented_cheques",
+    "unmatched_payments_in_cash_book",
+    "balance_per_cash_book_at_end_of_period",
+    "adjusted_bank_balance",
+    "adjusted_cash_book_balance",
+    "reconciled_balance",
+    "sign_off"
+  ],
+
+  "competitor_feature_matrix": {
+    "quickbooks": ["tiered_plans", "usage_limits", "discrepancy_report", "missing_cheques_report", "accountant_view"],
+    "xero": ["bank_rules", "bulk_match", "suggested_matches", "jax_ai_beta", "reopen_periods"],
+    "sage_intacct": ["matching_rules", "creation_rules", "rule_prioritization", "reopenable_periods", "threshold_approval"],
+    "zoho_books": ["ai_field_prediction", "bulk_categorization_50", "centralized_rules", "filter_by_amount_date"],
+    "blackline": ["exception_flagging", "threshold_approval", "verity_ai", "transaction_matching_millions"],
+    "wave": ["free_tier", "simple_ux", "receipt_ocr_pro"],
+    "netsuite": ["intelligent_matching", "side_by_side_grids", "system_user_rules", "erp_integration"],
+    "q_soft_adoption": "all_above_closed"
+  },
+
+  "ghana_banks": [
+    {"name": "Ecobank", "code": "ECOBANK", "transaction_types": ["funds_transfer", "t_bills", "mobile", "cheque"]},
+    {"name": "GCB Bank", "code": "GCB", "transaction_types": ["cheque", "transfer"]},
+    {"name": "Access Bank", "code": "Access", "transaction_types": ["cheque"]},
+    {"name": "Zenith Bank", "code": "Zenith", "transaction_types": ["cheque", "transfer"]},
+    {"name": "Consolidated Bank", "code": "CBG", "transaction_types": ["cheque"]},
+    {"name": "ADB", "code": "ADB", "transaction_types": ["cheque"]},
+    {"name": "Prudential Bank", "code": "Prudential", "transaction_types": ["cheque"]},
+    {"name": "OMNI Bank", "code": "OMNI", "transaction_types": ["cheque"]},
+    {"name": "Stanbic Bank", "code": "Stanbic", "transaction_types": ["cheque", "transfer"]},
+    {"name": "Standard Chartered", "code": "SCB", "transaction_types": ["cheque", "transfer"]},
+    {"name": "FBNBank", "code": "FBNBank", "transaction_types": ["cheque", "transfer"]},
+    {"name": "GTBank", "code": "GTBank", "transaction_types": ["cheque", "transfer"]},
+    {"name": "UBA", "code": "UBA", "transaction_types": ["cheque", "transfer"]}
+  ],
+
+  "ghana_transaction_types": [
+    "funds_transfer_inward",
+    "funds_transfer_outward",
+    "mobile_transfer_gips",
+    "mobile_transfer_momo",
+    "cheque_clearing_inward",
+    "cheque_clearing_outward",
+    "treasury_bills",
+    "ach_payment",
+    "journal_entry",
+    "staff_salaries",
+    "bank_charges",
+    "interest_earned"
+  ],
+
+  "technical_stack": {
+    "frontend": ["react_18", "typescript", "tailwind_css", "zustand", "tanstack_query"],
+    "backend": ["node_express_or_fastapi"],
+    "database": "postgresql",
+    "cache": "redis",
+    "queue": "bull",
+    "storage": "minio_s3",
+    "ocr": ["tesseract", "azure_document_intelligence_optional"],
+    "auth": ["jwt", "refresh_tokens"],
+    "payments": "paystack_ghs"
+  },
+
+  "development_phases": [
+    {
+      "phase": 1,
+      "name": "Foundation",
+      "weeks": "1-4",
+      "tasks": ["repo_setup", "docker_compose", "auth", "user_org_models", "document_upload", "column_mapping", "schema_validation"]
+    },
+    {
+      "phase": 2,
+      "name": "Core Engine",
+      "weeks": "5-8",
+      "tasks": ["parsers_excel_csv_pdf_ocr", "matching_engine_1to1", "side_by_side_view", "suggested_matches", "brs_report", "basic_branding"]
+    },
+    {
+      "phase": 3,
+      "name": "Advanced Matching",
+      "weeks": "9-12",
+      "tasks": ["one_to_many_many_to_many", "bank_rules_engine", "bulk_match_50", "reference_extraction", "exception_flagging", "reopen_periods", "audit_trail", "discrepancy_missing_cheques_reports", "roll_forward"]
+    },
+    {
+      "phase": 4,
+      "name": "AI & Automation",
+      "weeks": "13-16",
+      "tasks": ["ai_suggested_matches", "learning_from_corrections", "bank_rules_ui", "threshold_approval", "auto_journal_suggestions", "ghana_bank_parsers"]
+    },
+    {
+      "phase": 5,
+      "name": "SaaS & Polish",
+      "weeks": "17-20",
+      "tasks": ["subscription_tiers", "paystack_integration", "usage_tracking", "limits_enforcement", "firm_dashboard", "audit_trail_ui", "white_label_branding", "intro_offer"]
+    },
+    {
+      "phase": 6,
+      "name": "Launch",
+      "weeks": "21-22",
+      "tasks": ["e2e_testing", "performance_tuning", "documentation", "coolify_deployment", "monitoring_alerts"]
+    }
+  ],
+
+  "acceptance_criteria": [
+    "upload_cash_book_bank_statement_excel_csv_pdf_image",
+    "extract_transactions_95_percent_accuracy_structured",
+    "map_columns_canonical_schema_ai_suggestions",
+    "suggest_matches_amount_date_reference",
+    "match_one_to_one_one_to_many_many_to_many",
+    "bank_rules_auto_match",
+    "bulk_match_50_transactions",
+    "side_by_side_view_match_status",
+    "reopen_past_periods_audit_trail",
+    "brs_report_pdf_excel_branding",
+    "discrepancy_missing_cheques_reports",
+    "roll_forward_unpresented_cheques",
+    "subscription_limits_enforced",
+    "firm_dashboard_multi_client",
+    "full_audit_trail",
+    "ghana_banks_parsed_ecobank_gcb_access",
+    "hosted_coolify_https"
+  ],
+
+  "branding_elements": [
+    {"element": "logo", "type": "image", "formats": ["png", "jpg"]},
+    {"element": "company_name", "type": "text"},
+    {"element": "primary_colour", "type": "hex"},
+    {"element": "secondary_colour", "type": "hex"},
+    {"element": "letterhead_address", "type": "text_block"},
+    {"element": "report_title", "type": "text"},
+    {"element": "footer", "type": "text"}
+  ],
+
+  "security_requirements": {
+    "encryption": ["tls_transit", "aes_at_rest"],
+    "auth": ["jwt", "bcrypt", "mfa_future"],
+    "access_control": "rbac_admin_reviewer_preparer_viewer",
+    "audit_trail": "immutable_log",
+    "data_retention": "configurable_default_7_years",
+    "compliance": ["icag", "ifrs"]
+  }
+}
