@@ -43,6 +43,15 @@ Do not commit `.env` files; configure secrets in Coolify.
 
 The production compose file **does not publish** `web` or `api` to the host. Coolify reaches them on the **Docker network** (container ports **80** and **9001**). If you still see this error, Coolify may be merging an old env or custom compose snippet that adds `ports:` — remove duplicate port mappings there.
 
+### `relation "projects" does not exist` (P3018 / migrate deploy)
+
+The migration history in git **starts** with `ALTER TABLE "projects"` — there is **no** older migration that creates base tables. A **new** Postgres volume therefore has an empty `public` schema until something creates tables.
+
+The **`api`** image runs **`start-api.sh`**, which detects this error and **bootstraps** once: `DELETE FROM "_prisma_migrations"`, **`prisma db push`** from `schema.prisma`, then **`prisma migrate resolve --applied`** for each folder under `prisma/migrations`, then **`migrate deploy`** (no-op). This is intended only for **empty / disposable** databases (typical first Coolify deploy).
+
+- **Disable:** set `PRISMA_BOOTSTRAP_EMPTY_DB=0` on the `api` service.
+- **Real production data** already in Postgres: do **not** rely on bootstrap; restore from backup or run a proper baseline / hand-managed SQL instead of wiping `_prisma_migrations`.
+
 ### API restarts / `P3009` / failed migration `20250228140000_add_project_slug`
 
 Older migration SQL used `"Project"` / `"User"` while the real tables are **`projects`** / **`users`**. That is **fixed in the repo**; the production **API** image runs **`api/start-api.sh`** (not nginx’s `/docker-entrypoint.sh` on the **web** container). On **`P3009`** mentioning `20250228140000_add_project_slug` it runs `prisma migrate resolve --rolled-back` and **retries** `migrate deploy` once. A normal redeploy after pull should recover without manual steps.
