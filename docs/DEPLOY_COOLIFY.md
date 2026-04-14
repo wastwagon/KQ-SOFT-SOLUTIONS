@@ -39,6 +39,10 @@ Do not commit `.env` files; configure secrets in Coolify.
 3. **Branch:** `main`.
 4. **Compose file path:** `docker-compose.yml` **or** `docker-compose.prod.yml` (both define the same **production** stack). Do **not** point Coolify at `docker-compose.development.yml`.
 
+### `Bind for 0.0.0.0:80 failed: port is already allocated`
+
+Coolify (or another reverse proxy) usually owns host port **80**. The stack defaults to publishing the web UI on host **8080** (`WEB_PORT` → container **80**). Do not set `WEB_PORT=80` unless that port is free on the host.
+
 ### Coolify restarts / dev images / “Prisma schema not found”
 
 If Coolify builds **`Dockerfile.development`** (log shows `load build definition from Dockerfile.development`), the resource is using the **development** compose file, or an old checkout where `docker-compose.yml` was dev-only.
@@ -59,7 +63,7 @@ Set these in Coolify for the **stack** (or per-service, depending on Coolify):
 
 ## 4. Domains and ports
 
-- **Web** service listens on **80** inside the container (`WEB_PORT` maps host → 80, default host `80`).
+- **Web** listens on **80** inside the container. Published host port defaults to **8080** (`WEB_PORT`, maps host → 80) so deploys do not fight Coolify or other proxies for host **:80**. In Coolify, point the domain at container port **80**. For a bare VPS with nothing on host 80, set `WEB_PORT=80` in the stack env.
 - **API** listens on **9001** (`API_PORT` default `9001`).
 
 In Coolify, attach:

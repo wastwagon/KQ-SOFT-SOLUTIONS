@@ -16,12 +16,14 @@ docker compose -f docker-compose.development.yml up -d
 - **Web:** http://localhost:9100
 - **API:** http://localhost:9101
 
-**Production-style stack** (same as Coolify default: multi-stage builds, web on **80**, API **9001**):
+**Production-style stack** (same as Coolify default: multi-stage builds; nginx on **80** inside the web container, published on host **8080** by default; API **9001**):
 
 ```bash
 cp .env.example .env   # Set JWT_SECRET, VITE_API_URL, CORS_ORIGIN for a real run
 docker compose up -d
 ```
+
+Then open **http://localhost:8080** (or set `WEB_PORT=80` in `.env` if host port 80 is free).
 
 **User manual:** See **[USER_MANUAL.pdf](USER_MANUAL.pdf)** for a comprehensive client handover guide (features, workflows, troubleshooting). Source: `USER_MANUAL.md`. To regenerate: `npm run manual:pdf` (requires Chrome).
 
