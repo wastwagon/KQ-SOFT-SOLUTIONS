@@ -1,27 +1,27 @@
--- Add slug column (nullable initially for backfill)
-ALTER TABLE "Project" ADD COLUMN "slug" TEXT;
+-- Add slug column (nullable initially for backfill). Table is "projects" (@@map).
+ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "slug" TEXT;
 
 -- Backfill: generate slugs from names (lowercase, replace non-alphanumeric with hyphens)
-UPDATE "Project" SET slug = COALESCE(
+UPDATE "projects" SET slug = COALESCE(
   NULLIF(
     LOWER(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(name), '[^a-zA-Z0-9\s]', '', 'g'), '\s+', '-', 'g')),
     ''
   ),
   id
-);
+) WHERE slug IS NULL;
 
 -- Handle duplicates per org: append -2, -3, etc.
 WITH ranked AS (
   SELECT id, slug, organization_id,
     ROW_NUMBER() OVER (PARTITION BY organization_id, slug ORDER BY created_at) AS rn
-  FROM "Project"
+  FROM "projects"
 )
-UPDATE "Project" p
-SET slug = CASE WHEN r.rn > 1 THEN r.slug || '-' || r.rn ELSE r.slug END
+UPDATE "projects" p
+SET slug = CASE WHEN r.rn > 1 THEN r.slug || '-' || r.rn::text ELSE r.slug END
 FROM ranked r WHERE p.id = r.id;
 
 -- Make NOT NULL
-ALTER TABLE "Project" ALTER COLUMN "slug" SET NOT NULL;
+ALTER TABLE "projects" ALTER COLUMN "slug" SET NOT NULL;
 
--- Add unique constraint
-CREATE UNIQUE INDEX "Project_organizationId_slug_key" ON "Project"("organizationId", "slug");
+-- Unique per organization (Prisma @@unique([organizationId, slug]) on mapped table)
+CREATE UNIQUE INDEX IF NOT EXISTS "projects_organization_id_slug_key" ON "projects"("organization_id", "slug");

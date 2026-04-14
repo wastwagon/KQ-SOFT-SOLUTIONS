@@ -43,6 +43,21 @@ Do not commit `.env` files; configure secrets in Coolify.
 
 The production compose file **does not publish** `web` or `api` to the host. Coolify reaches them on the **Docker network** (container ports **80** and **9001**). If you still see this error, Coolify may be merging an old env or custom compose snippet that adds `ports:` — remove duplicate port mappings there.
 
+### API restarts / `P3009` / failed migration `20250228140000_add_project_slug`
+
+Older migration SQL used quoted table names `"Project"` / `"User"` while the real tables are **`projects`** / **`users`** (`@@map`). That migration failed once; Prisma then refuses further deploys until the failure is cleared.
+
+1. **Pull** the repo version that contains the **corrected** `api/prisma/migrations/20250228140000_add_project_slug/migration.sql` (and `20250228160000_…`, which had the same issue).
+2. **Mark the failed migration as rolled back** (one time), from the same machine/network as the stack, with `DATABASE_URL` pointing at this Postgres — e.g. Coolify **Terminal** in the app directory, using the same Compose project name Coolify uses:
+
+```bash
+docker compose run --rm --no-deps api npx prisma migrate resolve --rolled-back 20250228140000_add_project_slug --schema=./prisma/schema.prisma
+```
+
+3. **Redeploy** (or `docker compose up -d` / restart the `api` service) so `prisma migrate deploy` runs again.
+
+**Dev-only / empty data:** you can instead remove the Postgres volume and redeploy for a clean database (destructive).
+
 ### Coolify restarts / dev images / “Prisma schema not found”
 
 If Coolify builds **`Dockerfile.development`** (log shows `load build definition from Dockerfile.development`), the resource is using the **development** compose file, or an old checkout where `docker-compose.yml` was dev-only.
