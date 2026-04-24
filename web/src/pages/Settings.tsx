@@ -33,6 +33,7 @@ export default function Settings() {
   const d = data as { logoUrl?: string; primaryColor?: string; secondaryColor?: string; letterheadAddress?: string; reportTitle?: string; footer?: string; approvalThresholdAmount?: number | null; organizationName?: string } | undefined
   useEffect(() => {
     if (d) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLogoUrl(d.logoUrl ?? '')
       setLogoLoadError(false)
       setPrimaryColor(d.primaryColor ?? '#16a34a')
@@ -42,7 +43,7 @@ export default function Settings() {
       setFooter(d.footer ?? '')
       setApprovalThresholdAmount(d.approvalThresholdAmount != null && d.approvalThresholdAmount > 0 ? String(d.approvalThresholdAmount) : '')
     }
-  }, [data])
+  }, [d])
 
   const updateMutation = useMutation({
     mutationFn: (body: Parameters<typeof settings.updateBranding>[0]) =>

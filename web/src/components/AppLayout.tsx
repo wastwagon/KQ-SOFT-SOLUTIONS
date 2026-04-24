@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -43,14 +43,13 @@ export default function AppLayout() {
   const roleLabel = role === 'admin' ? 'Admin' : role === 'reviewer' ? 'Reviewer' : role === 'preparer' ? 'Preparer' : role === 'viewer' ? 'Viewer' : null
   const [menuOpen, setMenuOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
-  const [logoLoadFailed, setLogoLoadFailed] = useState(false)
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null)
   const { data: branding } = useQuery({
     queryKey: ['settings', 'branding'],
     queryFn: settings.getBranding,
   })
   const logoUrl = (branding as { logoUrl?: string } | undefined)?.logoUrl
-  const showLogo = logoUrl && !logoLoadFailed
-  useEffect(() => { setLogoLoadFailed(false) }, [logoUrl])
+  const showLogo = !!logoUrl && failedLogoUrl !== logoUrl
 
   function handleLogout() {
     logout()
@@ -68,7 +67,7 @@ export default function AppLayout() {
               src={getLogoDisplayUrl(logoUrl)}
               alt="Organisation logo"
               className="max-h-8 w-auto max-w-[140px] object-contain object-left"
-              onError={() => setLogoLoadFailed(true)}
+              onError={() => setFailedLogoUrl(logoUrl)}
             />
           ) : (
             <span className="text-lg font-semibold text-primary-600">BRS</span>

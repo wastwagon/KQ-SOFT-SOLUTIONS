@@ -100,8 +100,34 @@ export interface ReportBroughtForwardLodgment extends ReportSimpleTx {
   fromProject?: string
 }
 
+export interface ReportBranding {
+  logoUrl?: string
+  letterheadAddress?: string
+  reportTitle?: string
+  primaryColor?: string
+  secondaryColor?: string
+  footer?: string
+}
+
+export interface ReportDiscrepancy {
+  cbDate: string
+  cbName: string
+  cbChqNo?: string | null
+  cbDocRef?: string | null
+  cbAmount: number
+  cbAmountReceived?: number | null
+  cbAmountPaid?: number | null
+  bankDate: string
+  bankDescription: string
+  bankChqNo?: string | null
+  bankDocRef?: string | null
+  bankAmount: number
+  amountVariance: number
+  dateVarianceDays: number
+}
+
 export interface ReportResponse {
-  organization?: { name?: string; branding?: Record<string, any> }
+  organization?: { name?: string; branding?: ReportBranding }
   project?: ReportProjectInfo
   bankAccounts?: { id: string; name: string }[]
   bankAccountId?: string | null
@@ -154,7 +180,7 @@ export interface ReportResponse {
   unmatchedCredits?: ReportSimpleTx[]
   unmatchedPayments?: ReportSimpleTx[]
   unmatchedDebits?: ReportSimpleTx[]
-  discrepancies?: any[]
+  discrepancies?: ReportDiscrepancy[]
   broughtForwardItems?: ReportBroughtForwardItem[]
   broughtForwardLodgments?: ReportBroughtForwardLodgment[]
   summary?: {

@@ -1,21 +1,26 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
 import { projects, clients, subscription, settings } from '../lib/api'
 
+function SelectWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      {children}
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" aria-hidden />
+    </div>
+  )
+}
+
 export default function ProjectNew() {
   const [name, setName] = useState('')
-  const [currency, setCurrency] = useState<'GHS' | 'USD' | 'EUR'>('GHS')
+  const [currencyOverride, setCurrencyOverride] = useState<'GHS' | 'USD' | 'EUR' | null>(null)
   const { data: platformDefaults } = useQuery({
     queryKey: ['settings', 'platform-defaults'],
     queryFn: settings.getPlatformDefaults,
   })
-  useEffect(() => {
-    if (platformDefaults?.defaultCurrency) {
-      setCurrency((prev) => (prev === 'GHS' ? platformDefaults.defaultCurrency : prev))
-    }
-  }, [platformDefaults?.defaultCurrency])
+  const currency = currencyOverride ?? platformDefaults?.defaultCurrency ?? 'GHS'
   const [clientId, setClientId] = useState('')
   const [reconciliationDate, setReconciliationDate] = useState('')
   const [rollForwardFromProjectId, setRollForwardFromProjectId] = useState('')
@@ -72,15 +77,6 @@ export default function ProjectNew() {
   const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5'
   const hintClass = 'text-sm text-gray-600 mt-1.5'
 
-  function SelectWrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <div className="relative">
-        {children}
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" aria-hidden />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -110,7 +106,7 @@ export default function ProjectNew() {
                 const p = templateProjects.find((x) => x.slug === slug)
                 if (p) {
                   setClientId(p.clientId || '')
-                  setCurrency((p.currency as 'GHS' | 'USD' | 'EUR') || 'GHS')
+                  setCurrencyOverride((p.currency as 'GHS' | 'USD' | 'EUR') || 'GHS')
                   if (!name && p.name) setName(`${p.name} (copy)`)
                 }
                 e.target.value = ''
@@ -173,7 +169,7 @@ export default function ProjectNew() {
           <SelectWrapper>
             <select
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as 'GHS' | 'USD' | 'EUR')}
+              onChange={(e) => setCurrencyOverride(e.target.value as 'GHS' | 'USD' | 'EUR')}
               className={selectClass}
             >
               <option value="GHS">GHS (GH₵)</option>

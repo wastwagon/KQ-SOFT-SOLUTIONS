@@ -35,7 +35,10 @@ export default function Audit() {
     queryFn: () => projects.list(),
   })
 
-  const projectsList = (projectsData as { id: string; name: string; slug: string }[]) || []
+  const projectsList = useMemo(
+    () => (projectsData as { id: string; name: string; slug: string }[]) || [],
+    [projectsData]
+  )
   const { projectMap, projectSlugMap } = useMemo(() => {
     const m: Record<string, string> = {}
     const s: Record<string, string> = {}
@@ -46,12 +49,11 @@ export default function Audit() {
     return { projectMap: m, projectSlugMap: s }
   }, [projectsList])
 
-  const logs: AuditLog[] = data?.logs || []
   const filtered = useMemo(() => {
-    let list = logs
+    let list = (data?.logs || []) as AuditLog[]
     if (projectFilter) list = list.filter((l) => l.projectId === projectFilter)
     return list
-  }, [logs, projectFilter])
+  }, [data?.logs, projectFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages - 1)

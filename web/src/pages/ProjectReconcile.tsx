@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { reconcile, subscription } from '../lib/api'
 import { formatAmount, formatAmountNumber, formatDateCompact } from '../lib/format'
@@ -46,12 +46,16 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     enabled: !!projectId,
   })
 
-  const bankAccounts = (data?.bankAccounts || []) as { id: string; name: string }[]
+  const bankAccounts = useMemo(
+    () => (data?.bankAccounts || []) as { id: string; name: string }[],
+    [data?.bankAccounts]
+  )
   useEffect(() => {
     if (bankAccountRestoredRef.current || !projectId || bankAccounts.length === 0) return
     try {
       const saved = localStorage.getItem(`brs_last_bank_account_${projectId}`)
       if (saved && bankAccounts.some((a) => a.id === saved)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBankAccountId(saved)
         bankAccountRestoredRef.current = true
       }
@@ -590,11 +594,14 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {(() => {
+                  const rows: Array<{ t: Tx & { _type?: 'receipt' | 'payment' }; isReceipt: boolean; runningBalance: number }> = []
                   let runningBalance = 0
-                  return cbTxs.map((t: Tx & { _type?: 'receipt' | 'payment' }) => {
+                  for (const t of (cbTxs as Array<Tx & { _type?: 'receipt' | 'payment' }>)) {
                     const isReceipt = view === 'all' ? t._type === 'receipt' : view === 'receipts'
                     runningBalance += isReceipt ? Number(t.amount) : -Number(t.amount)
-                    return (
+                    rows.push({ t, isReceipt, runningBalance })
+                  }
+                  return rows.map(({ t, isReceipt, runningBalance }) => (
                       <tr
                         key={t.id}
                         onClick={() => canReconcile && view !== 'all' && toggleCb(t.id)}
@@ -643,7 +650,7 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
                         )}
                       </tr>
                     )
-                  })
+                  )
                 })()}
               </tbody>
             </table>
@@ -671,12 +678,15 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {(() => {
+                  const rows: Array<{ t: Tx & { _type?: 'credit' | 'debit' }; amt: number; isCredit: boolean; runningBalance: number }> = []
                   let runningBalance = 0
-                  return bankTxs.map((t: Tx & { _type?: 'credit' | 'debit' }) => {
+                  for (const t of (bankTxs as Array<Tx & { _type?: 'credit' | 'debit' }>)) {
                     const amt = Number(t.amount)
                     const isCredit = view === 'all' ? t._type === 'credit' : view === 'receipts'
                     runningBalance += isCredit ? amt : -amt
-                    return (
+                    rows.push({ t, amt, isCredit, runningBalance })
+                  }
+                  return rows.map(({ t, amt, isCredit, runningBalance }) => (
                       <tr
                         key={t.id}
                         onClick={() => canReconcile && view !== 'all' && toggleBank(t.id)}
@@ -713,10 +723,10 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
                         <td className="px-2 sm:px-3 py-2 text-gray-600 font-mono text-xs whitespace-nowrap">{t.chqNo || '—'}</td>
                         <td className="px-2 sm:px-3 py-2 text-gray-600 font-mono text-xs whitespace-nowrap">{t.docRef || '—'}</td>
                         <td className="px-2 sm:px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
-                          {view === 'all' ? (t._type === 'debit' ? formatAmountNumber(amt) : '—') : view === 'payments' ? formatAmountNumber(amt) : '—'}
+                          {view === 'all' ? (!isCredit ? formatAmountNumber(amt) : '—') : view === 'payments' ? formatAmountNumber(amt) : '—'}
                         </td>
                         <td className="px-2 sm:px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
-                          {view === 'all' ? (t._type === 'credit' ? formatAmountNumber(amt) : '—') : view === 'receipts' ? formatAmountNumber(amt) : '—'}
+                          {view === 'all' ? (isCredit ? formatAmountNumber(amt) : '—') : view === 'receipts' ? formatAmountNumber(amt) : '—'}
                         </td>
                         <td className="px-2 sm:px-3 py-2 text-right text-gray-600 whitespace-nowrap">{formatAmountNumber(runningBalance)}</td>
                         {view !== 'all' && (
@@ -726,7 +736,7 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
                         )}
                       </tr>
                     )
-                  })
+                  )
                 })()}
               </tbody>
             </table>

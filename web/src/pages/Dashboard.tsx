@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { FolderKanban, X } from 'lucide-react'
@@ -17,16 +17,13 @@ export default function Dashboard() {
   const org = useAuth((s) => s.org)
   const role = useAuth((s) => s.role)
   const isAdmin = useAuth((s) => s.isAdmin())
-  const [getStartedDismissed, setGetStartedDismissed] = useState(true)
-  const [getStartedHydrated, setGetStartedHydrated] = useState(false)
-  useEffect(() => {
+  const [getStartedDismissed, setGetStartedDismissed] = useState(() => {
     try {
-      setGetStartedDismissed(localStorage.getItem(GET_STARTED_DISMISSED_KEY) === '1')
+      return localStorage.getItem(GET_STARTED_DISMISSED_KEY) === '1'
     } catch {
-      setGetStartedDismissed(false)
+      return false
     }
-    setGetStartedHydrated(true)
-  }, [])
+  })
   const dismissGetStarted = () => {
     try {
       localStorage.setItem(GET_STARTED_DISMISSED_KEY, '1')
@@ -69,7 +66,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {getStartedHydrated && !isLoading && projectsList.length === 0 && !getStartedDismissed && (
+      {!isLoading && projectsList.length === 0 && !getStartedDismissed && (
         <div className="flex items-start gap-4 rounded-lg border border-primary-200 bg-primary-50/50 p-4">
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold tracking-tight text-primary-900">Get started</h3>

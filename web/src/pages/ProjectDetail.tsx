@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
@@ -15,6 +15,15 @@ const STEPS = ['Upload', 'Map', 'Reconcile', 'Review', 'Report']
 const STEP_HASHES = ['upload', 'map', 'reconcile', 'review', 'report']
 const HASH_TO_STEP: Record<string, number> = Object.fromEntries(STEP_HASHES.map((h, i) => [h, i]))
 
+function SelectWrapper({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
+  return (
+    <div className="relative inline-block min-w-0">
+      {children}
+      <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none ${compact ? 'w-4 h-4' : 'w-5 h-5'}`} aria-hidden />
+    </div>
+  )
+}
+
 export default function ProjectDetail() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -28,18 +37,15 @@ export default function ProjectDetail() {
   })
 
   // Sync URL hash -> step on mount and when hash changes (so #review etc. works when opening link directly)
-  const syncHashToStep = () => {
+  const syncHashToStep = useCallback(() => {
     const h = (typeof window !== 'undefined' ? window.location.hash : location.hash).slice(1).toLowerCase()
     const idx = HASH_TO_STEP[h]
     if (idx !== undefined) setStepState(idx)
-  }
-  useLayoutEffect(() => {
-    syncHashToStep()
-  }, [])
+  }, [location.hash])
   useEffect(() => {
     window.addEventListener('hashchange', syncHashToStep)
     return () => window.removeEventListener('hashchange', syncHashToStep)
-  }, [])
+  }, [syncHashToStep])
 
   const setStep = (i: number) => {
     setStepState(i)
@@ -178,15 +184,6 @@ export default function ProjectDetail() {
   const selectClass =
     'w-full min-h-[44px] pl-4 pr-11 py-3 border border-gray-200 rounded-xl bg-gray-50/80 text-gray-900 text-sm shadow-sm hover:border-gray-300 hover:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:bg-white focus:outline-none appearance-none cursor-pointer transition-all duration-200'
   const isUploading = uploadCbMutation.isPending || uploadBsMutation.isPending
-
-  function SelectWrapper({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
-    return (
-      <div className="relative inline-block min-w-0">
-        {children}
-        <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none ${compact ? 'w-4 h-4' : 'w-5 h-5'}`} aria-hidden />
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-8">

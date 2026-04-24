@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
 import { report, projects, attachments, subscription, currency as currencyApi, getLogoDisplayUrl, type BrsStatement, type ReportResponse } from '../lib/api'
@@ -64,7 +64,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     setReportLogoLoadFailed(false)
   }, [reportLogoUrl])
 
-  const bankAccounts = data?.bankAccounts || []
+  const bankAccounts = useMemo(
+    () => (data?.bankAccounts || []) as { id: string; name: string }[],
+    [data?.bankAccounts]
+  )
   useEffect(() => {
     if (bankAccountRestoredRef.current || !projectId || bankAccounts.length === 0) return
     try {

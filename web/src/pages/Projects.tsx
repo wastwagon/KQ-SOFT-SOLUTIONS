@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { X, FolderKanban } from 'lucide-react'
@@ -30,11 +30,8 @@ export default function Projects({ initialStatus }: ProjectsProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const clientFromUrl = searchParams.get('clientId') || ''
   const statusFromUrl = searchParams.get('status') || ''
-  const [statusFilter, setStatusFilter] = useState(initialStatus || statusFromUrl)
-  const [clientFilter, setClientFilter] = useState(clientFromUrl)
-  useEffect(() => { if (clientFromUrl) setClientFilter(clientFromUrl) }, [clientFromUrl])
-  useEffect(() => { if (statusFromUrl) setStatusFilter(statusFromUrl) }, [statusFromUrl])
-  useEffect(() => { if (initialStatus) setStatusFilter(initialStatus) }, [initialStatus])
+  const [statusFilter, setStatusFilter] = useState(() => initialStatus || statusFromUrl)
+  const [clientFilter, setClientFilter] = useState(() => clientFromUrl)
   const [search, setSearch] = useState('')
 
   const { data: usageData } = useQuery({

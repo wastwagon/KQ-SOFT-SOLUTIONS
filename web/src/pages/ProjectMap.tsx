@@ -211,7 +211,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       const suggested = buildSuggestedMapping(headers, isCashBook, existing)
       setMapping(suggested)
     }
-  }, [preview, selectedDoc])
+  }, [preview, selectedDoc, mapping])
 
   const liveConfidence = useMemo(() => {
     if (!preview?.headers) return {} as Record<string, MappingConfidence>

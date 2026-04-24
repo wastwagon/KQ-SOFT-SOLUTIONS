@@ -41,6 +41,7 @@ export default function AdminGenerationSettings() {
   })
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (data) setForm(data)
   }, [data])
 
