@@ -37,11 +37,9 @@ export default function Register() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-surface px-4 py-8 relative">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center">
-            <BrandLogo className="h-12 sm:h-14 w-auto max-w-full object-contain" />
-          </div>
-          <p className="text-gray-500 mt-3">Bank Reconciliation SaaS</p>
+        <div className="mb-8 flex w-full flex-col items-center text-center">
+          <BrandLogo className="h-12 w-auto sm:h-14" />
+          <p className="mt-3 w-full text-sm text-gray-500 sm:text-base">Bank Reconciliation SaaS</p>
         </div>
         <form
           onSubmit={handleSubmit}

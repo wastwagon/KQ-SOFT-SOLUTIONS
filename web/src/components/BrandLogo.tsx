@@ -12,13 +12,14 @@ type BrandLogoProps = {
 
 export default function BrandLogo({ variant = 'wordmark', className = '' }: BrandLogoProps) {
   const src = variant === 'icon' ? '/kqsoft-icon.svg' : '/kqsoft-wordmark.svg'
+  // Wordmark SVG viewBox 140×48; icon 64×64 — keeps tagline/centre alignment under the visible mark
   return (
     <img
       src={src}
       alt={ALT}
       className={className}
-      width={variant === 'icon' ? 36 : 240}
-      height={variant === 'icon' ? 36 : 48}
+      width={variant === 'icon' ? 64 : 140}
+      height={variant === 'icon' ? 64 : 48}
       decoding="async"
     />
   )
