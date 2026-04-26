@@ -31,7 +31,7 @@ Or directly:
 
 ## What the script does
 
-1. Seeds the database (creates test user `admin@qsoft.com` / `Test123!`)
+1. Seeds the database (creates test user `admin@kqsoftwaresolutions.com` / `Test123!`)
 2. Logs in and creates a new project
 3. Uploads `sample_data/cashbook_full.csv` as receipts and payments
 4. Uploads `sample_data/bank_statement_full.csv` as credits and debits
@@ -45,7 +45,7 @@ Or directly:
 ## After the script
 
 1. Open the web UI: `http://localhost:9100`
-2. Log in with `admin@qsoft.com` / `Test123!`
+2. Log in with `admin@kqsoftwaresolutions.com` / `Test123!`
 3. Open the created project
 4. Go to **Reconcile** to match transactions
 5. Go to **Review** then **Report** to generate the BRS

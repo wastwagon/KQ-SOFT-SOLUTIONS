@@ -1,5 +1,5 @@
 // Bank Reconciliation SaaS - Prisma Schema
-// Q-SOFT SOLUTIONS LIMITED
+// KQ-SOFT SOLUTIONS LIMITED
 
 generator client {
   provider = "prisma-client-js"

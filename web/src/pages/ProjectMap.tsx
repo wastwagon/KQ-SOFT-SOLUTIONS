@@ -262,7 +262,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <div className="rounded border border-green-200 bg-green-50 px-2 py-1">Primary: {mapResult.signFilterSummary.primary ?? 0}</div>
               <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1">Cross-ref: {mapResult.signFilterSummary.cross_reference ?? 0}</div>
-              <div className="rounded border border-orange-200 bg-orange-50 px-2 py-1">Zero: {mapResult.signFilterSummary.zero ?? 0}</div>
+              <div className="rounded border border-primary-200 bg-primary-50 px-2 py-1 text-primary-900">Zero: {mapResult.signFilterSummary.zero ?? 0}</div>
               <div className="rounded border border-slate-200 bg-white px-2 py-1">Empty: {mapResult.signFilterSummary.empty ?? 0}</div>
             </div>
           )}

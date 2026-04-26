@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
+import BrandLogo from './BrandLogo'
 
 const adminNavItems = [
   { to: '/platform-admin', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -59,7 +60,10 @@ export default function AdminLayout() {
         aria-label="Admin navigation"
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-border-muted lg:px-5">
-          <span className="text-xl font-semibold text-primary-600">Platform Admin</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
+            <span className="text-lg font-semibold text-primary-600 truncate">Platform Admin</span>
+          </div>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}

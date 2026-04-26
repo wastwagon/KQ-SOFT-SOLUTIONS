@@ -6,7 +6,7 @@
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 API_URL="${API_URL:-http://localhost:9001}"
-EMAIL="admin@qsoft.com"
+EMAIL="admin@kqsoftwaresolutions.com"
 PASSWORD="Test123!"
 CASHBOOK="$ROOT/sample_data/cashbook_full.csv"
 BANK="$ROOT/sample_data/bank_statement_full.csv"

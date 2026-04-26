@@ -51,7 +51,7 @@ Open the URL shown by the web dev server (usually http://localhost:5173). Set `V
 ## 2. First time: sign in
 
 - **Register:** Open the app → **Register** → create an account. You’ll be in your own organisation.
-- **Or use seed accounts:** Run the seed (see README “Seed”) and sign in with e.g. `admin@qsoft.com` / `Test123!` to try different plans and roles.
+- **Or use seed accounts:** Run the seed (see README “Seed”) and sign in with e.g. `admin@kqsoftwaresolutions.com` / `Test123!` to try different plans and roles.
 
 ---
 

@@ -1,6 +1,6 @@
 # Bank Reconciliation SaaS — Planning Index
 
-**Project:** Q-SOFT SOLUTIONS LIMITED  
+**Project:** KQ-SOFT SOLUTIONS LIMITED  
 **Market:** Ghana  
 **Principle:** Build once. No return to improve. Advanced from day one. All gaps closed.
 
@@ -22,7 +22,7 @@
 | File | Purpose |
 |------|---------|
 | **BRRSAMPLE.xlsx** | Bank reconciliation output report (LORDSHIP INSURANCE, ECOBANK) |
-| **BRRsample2.xlsx** | Source data — cash book + bank statement (Q-SOFT, ECOBANK) |
+| **BRRsample2.xlsx** | Source data — cash book + bank statement (KQ-SOFT, ECOBANK) |
 
 ---
 

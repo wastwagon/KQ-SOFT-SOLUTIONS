@@ -9,7 +9,7 @@
 
 The project is generally consistent in naming, structure, and accounting terminology. Main issues:
 
-1. **Brand name**: "KQ SOFT" vs "Q-SOFT" vs "Q-SOFT SOLUTIONS"
+1. **Brand name**: (historical) "KQ SOFT" vs "Q-SOFT" — now **KQ-SOFT** / **KQ-SOFT SOLUTIONS LIMITED**
 2. **API response fields**: Redundant/legacy fields (`matchedCreditIds`, `matchedReceiptIds`)
 3. **Uncredited lodgment(s)**: Singular vs plural in planning docs
 4. **Missing Cheques**: Casing in headings vs body text
@@ -37,17 +37,15 @@ The project is generally consistent in naming, structure, and accounting termino
 
 ### 2.1 Brand name inconsistency
 
-| Location | Value |
+| Location | Value (current) |
 |----------|--------|
-| `index.html` | "Q-SOFT" |
-| `Settings.tsx`, `Register.tsx` | "Q-SOFT Solutions Ltd" |
-| `ProjectReport.tsx` | "Q-SOFT SOLUTIONS" |
-| `schema.prisma`, `README.md` | "Q-SOFT SOLUTIONS LIMITED" |
-| `EFFICIENCY_SYSTEM_PHASES.md` | "KQ SOFT SOLUTIONS" |
-| `PREMIUM_GHANA_IMPLEMENTATION_PLAN.md` | "KQ SOFT" |
-| Workspace folder | "KQ SOFT  SOLUTIONS" (double space) |
+| `index.html` | "KQ-SOFT SOLUTIONS" |
+| `Settings.tsx`, `Register.tsx` | "KQ-SOFT SOLUTIONS LIMITED" (placeholders) |
+| `ProjectReport.tsx` | "KQ-SOFT SOLUTIONS LIMITED" (fallback) |
+| `schema.prisma`, `README.md` | "KQ-SOFT SOLUTIONS LIMITED" |
+| Workspace folder | "KQ SOFT  SOLUTIONS" (double space) — rename is optional |
 
-**Recommendation:** Standardise on one brand (e.g. "Q-SOFT SOLUTIONS LIMITED"). ✅ Implemented.
+**Recommendation:** Standardise on one brand: **KQ-SOFT SOLUTIONS LIMITED** / **KQ-SOFT**. ✅ Implemented.
 
 ### 2.2 UK vs US spelling ✓
 - **organisation** (UK) — used in UI; appropriate for Ghana
@@ -139,7 +137,7 @@ draft → Mapping, reconciling → Reconciling, submitted_for_review → Submitt
 
 | Priority | Issue | Fix |
 |----------|-------|-----|
-| High | Brand name | Standardise on one brand (e.g. "Q-SOFT SOLUTIONS LIMITED") |
+| High | Brand name | Standardise on one brand: **KQ-SOFT SOLUTIONS LIMITED** / **KQ-SOFT** |
 | Medium | API response | Deprecate `matchedReceiptIds` and `matchedCreditIds`; document `matchedCashBookIds` and `matchedBankIds` as canonical |
 | Medium | Uncredited lodgment(s) | Use "Uncredited lodgments" (plural) in planning docs |
 | Low | Missing Cheques casing | "Missing Cheques" for headings, "missing cheques" for body |

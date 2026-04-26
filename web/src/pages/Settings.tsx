@@ -4,14 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
 import { settings, subscription, bankRules as bankRulesApi, apiKeys as apiKeysApi, getLogoDisplayUrl } from '../lib/api'
 import { canEditBranding, canManageBilling, canEditBankRules, canManageMembers } from '../lib/permissions'
+import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../lib/brandColors'
 import Card from '../components/ui/Card'
 
 export default function Settings() {
   const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
   const [logoUrl, setLogoUrl] = useState('')
-  const [primaryColor, setPrimaryColor] = useState('#16a34a')
-  const [secondaryColor, setSecondaryColor] = useState('#15803d')
+  const [primaryColor, setPrimaryColor] = useState(BRAND_PRIMARY_HEX)
+  const [secondaryColor, setSecondaryColor] = useState(BRAND_SECONDARY_HEX)
   const [letterheadAddress, setLetterheadAddress] = useState('')
   const [reportTitle, setReportTitle] = useState('Bank Reconciliation Statement')
   const [footer, setFooter] = useState('')
@@ -36,8 +37,8 @@ export default function Settings() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLogoUrl(d.logoUrl ?? '')
       setLogoLoadError(false)
-      setPrimaryColor(d.primaryColor ?? '#16a34a')
-      setSecondaryColor(d.secondaryColor ?? '#15803d')
+      setPrimaryColor(d.primaryColor ?? BRAND_PRIMARY_HEX)
+      setSecondaryColor(d.secondaryColor ?? BRAND_SECONDARY_HEX)
       setLetterheadAddress(d.letterheadAddress ?? '')
       setReportTitle(d.reportTitle ?? 'Bank Reconciliation Statement')
       setFooter(d.footer ?? '')
@@ -258,7 +259,7 @@ export default function Settings() {
                 type="text"
                 value={footer}
                 onChange={(e) => setFooter(e.target.value)}
-                placeholder="Prepared by Q-SOFT SOLUTIONS LIMITED"
+                placeholder="Prepared by KQ-SOFT SOLUTIONS LIMITED"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -295,8 +296,8 @@ export default function Settings() {
                 onClick={() => {
                   setReportTitle(platformDefaults.reportTitle ?? 'Bank Reconciliation Statement')
                   setFooter(platformDefaults.footer ?? '')
-                  setPrimaryColor(platformDefaults.primaryColor ?? '#16a34a')
-                  setSecondaryColor(platformDefaults.secondaryColor ?? '#15803d')
+                  setPrimaryColor(platformDefaults.primaryColor ?? BRAND_PRIMARY_HEX)
+                  setSecondaryColor(platformDefaults.secondaryColor ?? BRAND_SECONDARY_HEX)
                 }}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
               >

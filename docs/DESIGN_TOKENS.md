@@ -4,14 +4,30 @@ Single premium light theme for Ghana-acceptable BRS and dashboards.
 
 ---
 
+## Implementation (where things live)
+
+| What | Where |
+|------|--------|
+| **Tailwind `primary-*` and `green-*` scales** | `web/src/index.css` in `@theme` (canonical for builds). `web/tailwind.config.js` should stay a mirror to avoid editor drift. |
+| **Default hex for org branding (web)** | `web/src/lib/brandColors.ts` (`BRAND_PRIMARY_HEX`, `BRAND_SECONDARY_HEX`). |
+| **Default hex for new orgs / API** | `api/src/lib/platformDefaults.ts` (must match `brandColors.ts` manually). |
+| **Overridable report colours** | Per-org in Settings → Branding; applied in `ProjectReport` and PDF in `api/src/routes/report.ts` via `primaryColor` / `secondaryColor`. |
+| **Static PDF neutrals** | `report.ts` uses grays/slate hex (`#F8FAFC`, `#0F172A`, etc.) for layout — not the Tailwind brand scale. |
+| **Public logos** | `web/public/kqsoft-icon.svg` & `kqsoft-wordmark.svg` (brand blue + green). Wordmark “SOFT” text uses **#044080** for contrast (not a Tailwind token). |
+
+**Semantic (non-brand) tints** — still used on purpose: **`amber-*`** (warnings, unmatched, discrepancy, plan hints), **`red-*`** (errors, oldest ageing band), default **`slate/gray`**. They are not part of the two-colour mark but read clearly in accounting UIs.
+
+---
+
 ## Colour
 
 | Token | Value | Use |
 |-------|--------|-----|
-| **Primary** (brand) | `#16a34a` (green) | Nav active, primary buttons, report org name, key totals. Overridable per org in Settings > Branding. |
-| **Primary 50–900** | Tailwind primary scale | Backgrounds, hovers, borders (primary-50, primary-100, etc.). |
-| **Secondary** | From org branding (e.g. `#15803d`) | Section headers, accents, secondary buttons. Stored in branding; use in report. |
-| **Success** | green-50, green-700, green-800 | Matched count, positive states. |
+| **Primary** (brand) | `#0473ea` (blue) | Nav active, primary buttons, links, report information panels, key totals. Overridable per org in Settings > Branding. |
+| **Primary 50–900** | Tailwind `primary` scale (blue) | Backgrounds, hovers, borders (primary-50, primary-100, etc.). |
+| **Brand green** | `#38d200` (Tailwind `green` scale) | Success states, matched items, confirm actions, wordmark accent. |
+| **Secondary (report)** | From org branding (default `#38d200`) | Section headers, report accents. Stored in branding. |
+| **Success** | green-50, green-700, green-800 (brand-tinted) | Matched count, positive states, reconciliation panels. |
 | **Warning / Amber** | amber-50, amber-700, amber-800 | Unmatched counts, ageing bands, alerts. |
 | **Error** | red-50, red-600, red-700 | Errors, destructive actions. |
 | **Surface** | `#f8fafc` (slate-50) | Page background. |

@@ -1,5 +1,5 @@
 # Master Plan: Bank Reconciliation SaaS
-## Q-SOFT SOLUTIONS LIMITED | Ghana | Advanced | Gaps Closed
+## KQ-SOFT SOLUTIONS LIMITED | Ghana | Advanced | Gaps Closed
 
 **Version:** 1.0  
 **Last Updated:** February 2026  
@@ -37,7 +37,7 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 
 ### 3.1 Feature Adoption Matrix
 
-| Feature | QB | Xero | Sage | Zoho | BlackLine | Wave | NetSuite | **Q-SOFT** |
+| Feature | QB | Xero | Sage | Zoho | BlackLine | Wave | NetSuite | **KQ-SOFT** |
 |---------|----|------|------|------|-----------|------|----------|------------|
 | Bank feeds / import | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ Manual + API (future) |
 | Manual statement upload | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ Excel, CSV, PDF, Image |
@@ -402,7 +402,7 @@ ICAG, IFRS, ISA terminology and report format.
 
 - `REFERENCE_GHANA_DATA_STRUCTURES.json` — Canonical schemas, sample data
 - `PROJECT_PLANNING_UPDATE.md` — Earlier planning notes
-- `BRRSAMPLE.xlsx`, `BRRsample2.xlsx` — Real Q-SOFT data
+- `BRRSAMPLE.xlsx`, `BRRsample2.xlsx` — Real KQ-SOFT sample data
 
 ### B. Glossary
 

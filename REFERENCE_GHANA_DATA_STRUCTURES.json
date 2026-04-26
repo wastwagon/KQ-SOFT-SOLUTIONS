@@ -1,5 +1,5 @@
 {
-  "description": "Ghana-based cash book and bank statement structures derived from real Q-SOFT/Lordship Insurance data. Use for development - no placeholders.",
+  "description": "Ghana-based cash book and bank statement structures derived from real KQ-SOFT/Lordship Insurance data. Use for development - no placeholders.",
   "currency": "GHS",
   "currency_symbol": "GH₵",
   "decimal_format": "1,234.56",

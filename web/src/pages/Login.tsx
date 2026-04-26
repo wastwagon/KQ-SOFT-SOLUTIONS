@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
+import BrandLogo from '../components/BrandLogo'
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -32,8 +33,10 @@ export default function Login() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-surface px-4 relative">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-primary-600">BRS</h1>
-          <p className="text-gray-500">Bank Reconciliation SaaS</p>
+          <div className="flex justify-center">
+            <BrandLogo className="h-12 sm:h-14 w-auto max-w-full object-contain" />
+          </div>
+          <p className="text-gray-500 mt-3">Bank Reconciliation SaaS</p>
         </div>
         <form
           onSubmit={handleSubmit}

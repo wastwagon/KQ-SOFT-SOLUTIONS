@@ -1,6 +1,8 @@
 # Bank Reconciliation SaaS
 
-**Q-SOFT SOLUTIONS LIMITED** | Ghana
+**KQ-SOFT SOLUTIONS LIMITED** | Ghana
+
+**Live production:** [https://kqsoftwaresolutions.com/](https://kqsoftwaresolutions.com/)
 
 ---
 
@@ -115,7 +117,7 @@ cd api && npx prisma db seed
 
 | Account | Org plan | Purpose |
 |--------|----------|--------|
-| admin@qsoft.com | firm | Admin role, full access |
+| admin@kqsoftwaresolutions.com | firm | Admin role, full access (new seeds; legacy: `admin@qsoft.com`) |
 | basic@test.com | basic | Test Basic limits (5 projects, 500 tx/month) |
 | standard@test.com | standard | Test Standard (20 projects, 2000 tx/month) |
 | premium@test.com | premium | Test Premium (100 projects, 10000 tx/month) |

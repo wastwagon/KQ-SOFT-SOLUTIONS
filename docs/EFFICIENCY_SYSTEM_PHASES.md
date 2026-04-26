@@ -8,7 +8,7 @@ This plan adds customer efficiency and best practice **in phases**, without devi
 
 - **No deviation**: Each phase keeps current flow (Upload → Map → Reconcile → Review → Report) and outputs (full BRS, 5 report sections, draft/final, timestamp).
 - **Incremental**: One phase at a time; validate with customer before moving to next.
-- **Best practice**: Align with customer’s manual mapping (Q-SOFT SOLUTIONS process) and common BRS standards (Ghana/global).
+- **Best practice**: Align with customer’s manual mapping (KQ-SOFT SOLUTIONS process) and common BRS standards (Ghana/global).
 
 ---
 

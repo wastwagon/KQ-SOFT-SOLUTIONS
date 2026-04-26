@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../../lib/brandColors'
 
 type GenerationSettings = {
   defaultReportTitle: string
@@ -24,8 +25,8 @@ export default function AdminGenerationSettings() {
   const [form, setForm] = useState<GenerationSettings>({
     defaultReportTitle: 'Bank Reconciliation Statement',
     defaultFooter: 'Prepared by your organisation',
-    defaultPrimaryColor: '#16a34a',
-    defaultSecondaryColor: '#15803d',
+    defaultPrimaryColor: BRAND_PRIMARY_HEX,
+    defaultSecondaryColor: BRAND_SECONDARY_HEX,
     apiRateLimitPerMin: 100,
     defaultCurrency: 'GHS',
     manualRates: { GHS_USD: null, GHS_EUR: null },

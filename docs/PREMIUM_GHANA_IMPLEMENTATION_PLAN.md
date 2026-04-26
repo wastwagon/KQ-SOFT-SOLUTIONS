@@ -112,7 +112,7 @@
 
 ## Part 2 — Ghana-acceptable BRS layout (reference)
 
-Standard statement flow (as per Q-SOFT SOLUTIONS example and local practice):
+Standard statement flow (as per KQ-SOFT SOLUTIONS example and local practice):
 
 1. **Company name** (and optional logo).
 2. **Title:** "BANK RECONCILIATION STATEMENT AS AT [DD-MMM-YYYY]".

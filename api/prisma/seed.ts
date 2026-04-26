@@ -30,7 +30,7 @@ async function main() {
   console.log('Plans seeded:', plans.map((p) => p.slug).join(', '))
 
   // Admin: one user + org (plan: firm, role: admin)
-  const adminEmail = 'admin@qsoft.com'
+  const adminEmail = 'admin@kqsoftwaresolutions.com'
   let adminUser = await prisma.user.findUnique({ where: { email: adminEmail } })
   if (!adminUser) {
     adminUser = await prisma.user.create({
@@ -42,12 +42,12 @@ async function main() {
     })
     console.log('Created admin user:', adminEmail)
   }
-  const adminOrgSlug = 'qsoft-admin'
+  const adminOrgSlug = 'kqsoft-admin'
   let adminOrg = await prisma.organization.findUnique({ where: { slug: adminOrgSlug } })
   if (!adminOrg) {
     adminOrg = await prisma.organization.create({
       data: {
-        name: 'Q-SOFT Admin',
+        name: 'KQ-SOFT Admin',
         slug: adminOrgSlug,
         plan: 'firm',
         members: {

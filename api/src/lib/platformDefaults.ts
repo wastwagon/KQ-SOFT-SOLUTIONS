@@ -26,8 +26,9 @@ export interface PlatformDefaults {
 const DEFAULTS: PlatformDefaults = {
   defaultReportTitle: 'Bank Reconciliation Statement',
   defaultFooter: 'Prepared by your organisation',
-  defaultPrimaryColor: '#16a34a',
-  defaultSecondaryColor: '#15803d',
+  // Keep in sync with web: web/src/lib/brandColors.ts
+  defaultPrimaryColor: '#0473ea',
+  defaultSecondaryColor: '#38d200',
   apiRateLimitPerMin: 100,
   defaultCurrency: 'GHS',
   amountTolerance: 0.01,

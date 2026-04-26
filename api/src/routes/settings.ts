@@ -17,8 +17,8 @@ router.get('/platform-defaults', async (_req, res) => {
     defaultCurrency: ['GHS', 'USD', 'EUR'].includes(defaultCurrency) ? defaultCurrency : 'GHS',
     reportTitle: (value.defaultReportTitle as string) || 'Bank Reconciliation Statement',
     footer: (value.defaultFooter as string) || 'Prepared by your organisation',
-    primaryColor: (value.defaultPrimaryColor as string) || '#16a34a',
-    secondaryColor: (value.defaultSecondaryColor as string) || '#15803d',
+    primaryColor: (value.defaultPrimaryColor as string) || '#0473ea',
+    secondaryColor: (value.defaultSecondaryColor as string) || '#38d200',
   })
 })
 

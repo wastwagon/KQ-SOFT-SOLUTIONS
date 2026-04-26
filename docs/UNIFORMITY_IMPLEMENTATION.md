@@ -38,26 +38,23 @@
 
 ### Phase 4 — Brand name standardisation
 
-Standardised on **Q-SOFT SOLUTIONS LIMITED** (full legal name) and **Q-SOFT SOLUTIONS** (short form where appropriate).
+Standardised on **KQ-SOFT SOLUTIONS LIMITED** (full legal name) and **KQ-SOFT SOLUTIONS** (short form where appropriate). (2026-04: rebrand from “Q-SOFT”.)
 
 | File | Change |
 |------|--------|
-| `web/index.html` | "Q-SOFT" → "Q-SOFT SOLUTIONS" (page title) |
-| `web/src/pages/Settings.tsx` | "Q-SOFT Solutions Ltd" → "Q-SOFT SOLUTIONS LIMITED" (placeholder) |
-| `web/src/pages/Register.tsx` | "Q-SOFT Solutions Ltd" → "Q-SOFT SOLUTIONS LIMITED" (placeholder) |
-| `web/src/pages/ProjectReport.tsx` | "Q-SOFT SOLUTIONS" → "Q-SOFT SOLUTIONS LIMITED" (fallback org name) |
-| `docs/EFFICIENCY_SYSTEM_PHASES.md` | "KQ SOFT SOLUTIONS" → "Q-SOFT SOLUTIONS" |
-| `docs/PREMIUM_GHANA_IMPLEMENTATION_PLAN.md` | "KQ SOFT" → "Q-SOFT SOLUTIONS" |
-| `PROJECT_PLANNING_UPDATE.md` | "Q-SOFT Solutions Ltd" → "Q-SOFT SOLUTIONS LIMITED"; "Q-SOFT Solutions Jan 2025" → "Q-SOFT SOLUTIONS Jan 2025" |
+| `web/index.html` | Page title: **KQ-SOFT SOLUTIONS** |
+| `web/src/pages/Settings.tsx` | Placeholder: **KQ-SOFT SOLUTIONS LIMITED** |
+| `web/src/pages/Register.tsx` | Placeholder: **KQ-SOFT SOLUTIONS LIMITED** |
+| `web/src/pages/ProjectReport.tsx` | Fallback org name: **KQ-SOFT SOLUTIONS LIMITED** |
+| `docs/EFFICIENCY_SYSTEM_PHASES.md` / `docs/PREMIUM_GHANA_IMPLEMENTATION_PLAN.md` / planning docs | Aligned to **KQ-SOFT** |
 
 ---
 
 ## Unchanged (already correct)
 
-- `docker-compose.yml` — "Q-SOFT SOLUTIONS LIMITED"
-- `README.md` — "Q-SOFT SOLUTIONS LIMITED"
-- `api/prisma/schema.prisma` — unchanged
-- `PLANNING_DATA.json`, `REFERENCE_GHANA_DATA_STRUCTURES.json` — "Q-SOFT SOLUTIONS LIMITED"
+- `README.md` — **KQ-SOFT SOLUTIONS LIMITED**; live: https://kqsoftwaresolutions.com/
+- `api/prisma/schema.prisma` — KQ-SOFT comment header
+- `PLANNING_DATA.json`, `REFERENCE_GHANA_DATA_STRUCTURES.json` — **KQ-SOFT SOLUTIONS LIMITED** / KQ-SOFT
 
 ---
 

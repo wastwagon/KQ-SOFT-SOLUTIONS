@@ -32,8 +32,8 @@ router.get('/', async (_req, res) => {
   res.json({
     defaultReportTitle: value.defaultReportTitle ?? 'Bank Reconciliation Statement',
     defaultFooter: value.defaultFooter ?? 'Prepared by your organisation',
-    defaultPrimaryColor: value.defaultPrimaryColor ?? '#16a34a',
-    defaultSecondaryColor: value.defaultSecondaryColor ?? '#15803d',
+    defaultPrimaryColor: value.defaultPrimaryColor ?? '#0473ea',
+    defaultSecondaryColor: value.defaultSecondaryColor ?? '#38d200',
     apiRateLimitPerMin: value.apiRateLimitPerMin ?? 100,
     defaultCurrency: value.defaultCurrency ?? 'GHS',
     manualRates: { GHS_USD: manualRates.GHS_USD ?? null, GHS_EUR: manualRates.GHS_EUR ?? null },

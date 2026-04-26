@@ -1,5 +1,5 @@
 # Bank Reconciliation SaaS — Project Planning Update
-## Q-SOFT SOLUTIONS LIMITED | Ghana | World-Class Vision
+## KQ-SOFT SOLUTIONS LIMITED | Ghana | World-Class Vision
 
 **Last Updated:** February 2026  
 **Status:** Planning Phase
@@ -10,7 +10,7 @@
 
 ### 1.1 BRRSAMPLE.xlsx — Bank Reconciliation OUTPUT Report
 
-**Purpose:** This is the *output* of a completed bank reconciliation — the professional report Q-SOFT delivers to clients.
+**Purpose:** This is the *output* of a completed bank reconciliation — the professional report KQ-SOFT delivers to clients.
 
 | Section | Content | Column Structure |
 |--------|---------|------------------|
@@ -36,7 +36,7 @@
 
 ### 1.2 BRRsample2.xlsx — Source Data (Cash Book + Bank Statement INPUTS)
 
-This file represents the *inputs* Q-SOFT uses before reconciliation.
+This file represents the *inputs* KQ-SOFT uses before reconciliation.
 
 #### Sheet 1: MATCHED RECEIPTS IN CASH BOOK
 
@@ -87,7 +87,7 @@ This file represents the *inputs* Q-SOFT uses before reconciliation.
 
 ## Part 2: Ghana-Based Cash Book & Bank Statement Structures (Real Data, No Placeholders)
 
-### 2.1 Canonical Cash Book Schema (Derived from Q-SOFT Data)
+### 2.1 Canonical Cash Book Schema (Derived from KQ-SOFT Data)
 
 ```
 CASH BOOK — RECEIPTS (Credits)
@@ -220,7 +220,7 @@ DASHBOARD
 │  Recent Projects                                           [+ New Project]  │
 │  ─────────────────────────────────────────────────────────────────────────  │
 │  Lordship Insurance BRS Dec 2025     Completed     Dec 31, 2025    [View]   │
-│  Q-SOFT SOLUTIONS Jan 2025           In Progress   Jan 15, 2025    [Resume] │
+│  KQ-SOFT SOLUTIONS Jan 2025           In Progress   Jan 15, 2025    [Resume] │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 PROJECT WORKFLOW
@@ -292,7 +292,7 @@ REPORT PREVIEW
 | Secondary colour | Hex picker |
 | Letterhead/address | Text block |
 | Report title | Text (default: "Bank Reconciliation Statement") |
-| Footer | Text (e.g. "Prepared by Q-SOFT SOLUTIONS LIMITED") |
+| Footer | Text (e.g. "Prepared by KQ-SOFT SOLUTIONS LIMITED") |
 
 ### 4.6 Technical Stack (Align with Coolify + Docker)
 

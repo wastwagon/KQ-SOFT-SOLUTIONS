@@ -14,7 +14,7 @@ Full admin controls: user management, subscription tier management, revenue anal
 - Auth middleware: add `requirePlatformAdmin` for admin routes.
 - API routes: `/api/v1/admin/*` prefix, all require platform admin.
 - Web: admin layout, sidebar (Users, Orgs, Plans, Revenue), route `/admin/*`.
-- Seed or env: `PLATFORM_ADMIN_EMAILS=admin@qsoft.com` for superadmin.
+- Seed or env: `PLATFORM_ADMIN_EMAILS=admin@kqsoftwaresolutions.com,admin@qsoft.com` for superadmin (new vs legacy).
 
 **Outcome:** Platform admin can access `/admin` area; non-admin users get 403.
 

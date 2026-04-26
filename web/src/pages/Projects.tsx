@@ -264,7 +264,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                         p.status === 'completed'
                           ? 'bg-green-100 text-green-800'
                           : p.status === 'approved'
-                          ? 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-green-100 text-green-800'
                           : p.status === 'submitted_for_review'
                           ? 'bg-blue-100 text-blue-800'
                           : p.status === 'draft'

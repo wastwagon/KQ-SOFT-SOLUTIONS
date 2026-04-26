@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { settings, getLogoDisplayUrl } from '../lib/api'
+import BrandLogo from './BrandLogo'
 
 const preloadProjectsPage = () => import('../pages/Projects')
 const preloadSettingsPage = () => import('../pages/Settings')
@@ -49,7 +50,7 @@ export default function AppLayout() {
     queryFn: settings.getBranding,
   })
   const logoUrl = (branding as { logoUrl?: string } | undefined)?.logoUrl
-  const showLogo = !!logoUrl && failedLogoUrl !== logoUrl
+  const showOrgLogo = !!logoUrl?.trim() && failedLogoUrl !== logoUrl
 
   function handleLogout() {
     logout()
@@ -61,16 +62,21 @@ export default function AppLayout() {
       {/* Top header bar: logo + nav + user */}
       <header className="sticky top-0 z-40 flex items-center h-14 px-4 sm:px-6 bg-white border-b border-border shadow-sm">
         {/* Logo */}
-        <NavLink to="/" className="flex items-center gap-2 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded">
-          {showLogo ? (
-            <img
-              src={getLogoDisplayUrl(logoUrl)}
-              alt="Organisation logo"
-              className="max-h-8 w-auto max-w-[140px] object-contain object-left"
-              onError={() => setFailedLogoUrl(logoUrl)}
-            />
-          ) : (
-            <span className="text-lg font-semibold text-primary-600">BRS</span>
+        <NavLink
+          to="/"
+          className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded"
+        >
+          <BrandLogo className="h-9 w-auto min-w-[140px] max-w-[min(100%,240px)] object-left object-contain" />
+          {showOrgLogo && (
+            <>
+              <span className="hidden sm:block w-px h-7 bg-gray-200 shrink-0" aria-hidden />
+              <img
+                src={getLogoDisplayUrl(logoUrl!)}
+                alt="Organisation logo"
+                className="max-h-7 sm:max-h-8 w-auto max-w-[120px] object-contain object-left"
+                onError={() => setFailedLogoUrl(logoUrl ?? '')}
+              />
+            </>
           )}
         </NavLink>
 

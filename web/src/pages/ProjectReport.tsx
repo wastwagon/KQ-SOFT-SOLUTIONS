@@ -492,7 +492,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             className={`text-xl font-bold ${hasBranding ? '' : 'text-slate-800'}`}
             style={primaryColor ? { color: primaryColor } : undefined}
           >
-            {data.organization?.name || 'Q-SOFT SOLUTIONS LIMITED'}
+            {data.organization?.name || 'KQ-SOFT SOLUTIONS LIMITED'}
           </h1>
           {data.organization?.branding?.letterheadAddress && (
             <p className="text-sm text-slate-600 mt-1">{data.organization.branding.letterheadAddress}</p>
@@ -511,9 +511,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             {(data.organization?.branding?.reportTitle as string) || 'Bank Reconciliation Statement'} • Generated {formatDate(data.generatedAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {data.currency}
           </p>
           {data.reportLanguageProfile && (
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-800">
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-800">
               <span className="font-medium">{data.reportLanguageProfile?.label}</span>
-              <span className="text-indigo-600">({data.reportLanguageProfile?.code || 'GHANA_BRS_V1'})</span>
+              <span className="text-primary-600">({data.reportLanguageProfile?.code || 'GHANA_BRS_V1'})</span>
             </div>
           )}
           <div className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
@@ -770,66 +770,66 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             )}
           </div>
         )}
-        <div className="mb-6 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 print:bg-white print:border-slate-300">
-          <h3 className="font-semibold text-indigo-900 mb-2">{labels.additionalInformationTitle}</h3>
-          <p className="text-sm text-indigo-800 mb-3">
+        <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50/40 p-4 print:bg-white print:border-slate-300">
+          <h3 className="font-semibold text-primary-900 mb-2">{labels.additionalInformationTitle}</h3>
+          <p className="text-sm text-primary-800 mb-3">
             This section separates the reconciliation position as at the reconciliation date from post-period movement carried into this report.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg border border-indigo-100 bg-white p-3 overflow-auto">
-              <p className="font-medium text-indigo-900 mb-2">{labels.asAtReconciliationPosition}</p>
-              <p className="text-xs text-indigo-700 mb-2">
+            <div className="rounded-lg border border-primary-100 bg-white p-3 overflow-auto">
+              <p className="font-medium text-primary-900 mb-2">{labels.asAtReconciliationPosition}</p>
+              <p className="text-xs text-primary-700 mb-2">
                 As-at totals show differences existing on the reconciliation date.
               </p>
-              <table className="min-w-full text-sm text-indigo-900">
-                <thead className="bg-indigo-50 print:bg-slate-100">
+              <table className="min-w-full text-sm text-primary-900">
+                <thead className="bg-primary-50 print:bg-slate-100">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Description</th>
                     <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t border-indigo-100">
+                  <tr className="border-t border-primary-100">
                     <td className="px-2 py-1.5">{labels.uncreditedLodgmentsOrUnclearedDeposits}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(asAtUncreditedTotal)}</td>
                   </tr>
-                  <tr className="border-t border-indigo-100">
+                  <tr className="border-t border-primary-100">
                     <td className="px-2 py-1.5">{labels.bankOnlyCreditsNotInCashBook}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(asAtBankOnlyCreditsTotal)}</td>
                   </tr>
-                  <tr className="border-t border-indigo-100">
+                  <tr className="border-t border-primary-100">
                     <td className="px-2 py-1.5">{labels.bankOnlyDebitsNotInCashBook}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(asAtBankOnlyDebitsTotal), { forceNegative: true })}</td>
                   </tr>
-                  <tr className="border-t border-indigo-100 bg-indigo-50/40 print:bg-white">
+                  <tr className="border-t border-primary-100 bg-primary-50/40 print:bg-white">
                     <td className="px-2 py-1.5">{labels.unpresentedChequesOrUnclearedPayments}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(asAtUnpresentedTotal), { forceNegative: true })}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div className="rounded-lg border border-indigo-100 bg-white p-3 overflow-auto">
-              <p className="font-medium text-indigo-900 mb-2">{labels.postPeriodMovement}</p>
-              <p className="text-xs text-indigo-700 mb-2">
+            <div className="rounded-lg border border-primary-100 bg-white p-3 overflow-auto">
+              <p className="font-medium text-primary-900 mb-2">{labels.postPeriodMovement}</p>
+              <p className="text-xs text-primary-700 mb-2">
                 Post-period movement shows prior-period items carried into this period.
               </p>
-              <table className="min-w-full text-sm text-indigo-900">
-                <thead className="bg-indigo-50 print:bg-slate-100">
+              <table className="min-w-full text-sm text-primary-900">
+                <thead className="bg-primary-50 print:bg-slate-100">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Description</th>
                     <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t border-indigo-100">
+                  <tr className="border-t border-primary-100">
                     <td className="px-2 py-1.5">{labels.broughtForwardUncreditedLodgments}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(postPeriodLodgmentsTotal)}</td>
                   </tr>
-                  <tr className="border-t border-indigo-100">
+                  <tr className="border-t border-primary-100">
                     <td className="px-2 py-1.5">{labels.broughtForwardBankOnlyCredits}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(postPeriodBankOnlyCreditsTotal)}</td>
                   </tr>
-                  <tr className="border-t border-indigo-100 bg-indigo-50/40 print:bg-white">
+                  <tr className="border-t border-primary-100 bg-primary-50/40 print:bg-white">
                     <td className="px-2 py-1.5">{labels.broughtForwardUnpresentedCheques}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(postPeriodChequesTotal), { forceNegative: true })}</td>
                   </tr>
@@ -944,7 +944,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                               <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                                 t.ageingBand === '0–30' ? 'bg-green-100 text-green-800' :
                                 t.ageingBand === '31–60' ? 'bg-amber-100 text-amber-800' :
-                                t.ageingBand === '61–90' ? 'bg-orange-100 text-orange-800' :
+                                t.ageingBand === '61–90' ? 'bg-primary-100 text-primary-800' :
                                 'bg-red-100 text-red-800'
                               }`}>{t.ageingBand} days</span>
                             </td>
@@ -1056,13 +1056,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {/* Reversal candidates */}
         <div className="mb-6">
-          <h3 className="text-base font-semibold mb-3 text-purple-900">Reversal candidates</h3>
+          <h3 className="text-base font-semibold mb-3 text-primary-900">Reversal candidates</h3>
           {(data.reversalCandidates || []).length > 0 ? (
             <>
               <p className="text-sm text-gray-500 mb-2">
                 Potential reversal pairs detected by same reference/cheque/narration with opposite signs and similar amounts.
               </p>
-              <div className="border border-purple-200 rounded-lg overflow-auto max-h-48">
+              <div className="border border-primary-200 rounded-lg overflow-auto max-h-48">
                 <table className="min-w-full text-sm text-slate-900">
                   <thead className="bg-slate-100">
                     <tr>

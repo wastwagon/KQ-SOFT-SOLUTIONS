@@ -10,6 +10,8 @@ This project ships these Compose files:
 
 Repository: [https://github.com/wastwagon/kqsoftwaresolutions](https://github.com/wastwagon/kqsoftwaresolutions)
 
+**Live production app:** [https://kqsoftwaresolutions.com/](https://kqsoftwaresolutions.com/)
+
 ## 1. Push code to GitHub
 
 From the project root (first time):
@@ -128,7 +130,7 @@ Configure the webhook URL in Paystack to:
 
 If `prisma migrate deploy` on API startup did not run (e.g. missing `DATABASE_URL`, wrong service env), fix env and redeploy. The API now **fails fast** when `DATABASE_URL` is unset, so check Coolify logs for `start-api: FATAL — DATABASE_URL`.
 
-**After the API is running**, a **platform admin** (see `PLATFORM_ADMIN_EMAILS`, default `admin@qsoft.com` if seeded) can open **Platform Admin → Database** in the web app and run:
+**After the API is running**, a **platform admin** (see `PLATFORM_ADMIN_EMAILS`, default `admin@kqsoftwaresolutions.com` and legacy `admin@qsoft.com`) can open **Platform Admin → Database** in the web app and run:
 
 - **Refresh status** — `prisma migrate status` (read-only)
 - **Run migrate deploy** — same as startup migrations

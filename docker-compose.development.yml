@@ -1,7 +1,7 @@
 # Bank Reconciliation SaaS - Development (hot reload)
 # Run: docker compose -f docker-compose.development.yml up
 #
-# Q-SOFT SOLUTIONS LIMITED
+# KQ-SOFT SOLUTIONS LIMITED
 
 services:
   api:

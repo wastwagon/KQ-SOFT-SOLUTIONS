@@ -8,7 +8,7 @@ API_URL="${1:-http://localhost:9001}"
 PASS="Test123!"
 
 accounts=(
-  "admin@qsoft.com|Q-SOFT Admin|firm"
+  "admin@kqsoftwaresolutions.com|KQ-SOFT Admin|firm"
   "basic@test.com|Test Basic Org|basic"
   "standard@test.com|Test Standard Org|standard"
   "premium@test.com|Test Premium Org|premium"

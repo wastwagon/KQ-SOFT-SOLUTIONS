@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+/* Brand colours: mirror of `src/index.css` @theme. Prefer editing @theme, then copy scales here. */
 export default {
   content: [
     "./index.html",
@@ -8,16 +9,28 @@ export default {
     extend: {
       colors: {
         primary: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
+          50: '#e8f4ff',
+          100: '#cce6ff',
+          200: '#99ccff',
+          300: '#66b2ff',
+          400: '#3d9af5',
+          500: '#1a7de8',
+          600: '#0473ea',
+          700: '#0356b0',
+          800: '#044080',
+          900: '#062e57',
+        },
+        green: {
+          50: '#f0fff0',
+          100: '#dcfcc6',
+          200: '#b3f78a',
+          300: '#7deb4d',
+          400: '#5ce021',
+          500: '#38d200',
+          600: '#2db000',
+          700: '#228a00',
+          800: '#1a6b00',
+          900: '#145200',
         },
         surface: '#f8fafc',
         border: { DEFAULT: '#e2e8f0', muted: '#f1f5f9' },
