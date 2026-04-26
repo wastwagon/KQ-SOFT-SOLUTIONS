@@ -8,6 +8,7 @@ import {
   DollarSign,
   Receipt,
   Settings,
+  Server,
   ArrowLeft,
   Menu,
   X,
@@ -22,6 +23,7 @@ const adminNavItems = [
   { to: '/platform-admin/payments', label: 'Payments', icon: Receipt, end: false },
   { to: '/platform-admin/revenue', label: 'Revenue', icon: DollarSign, end: false },
   { to: '/platform-admin/generation-settings', label: 'Generation settings', icon: Settings, end: false },
+  { to: '/platform-admin/database', label: 'Database', icon: Server, end: false },
 ]
 
 export default function AdminLayout() {

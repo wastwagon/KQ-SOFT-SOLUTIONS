@@ -8,6 +8,7 @@ import organizationsRouter from './organizations.js'
 import paymentsRouter from './payments.js'
 import analyticsRouter from './analytics.js'
 import settingsRouter from './settings.js'
+import databaseRouter from './database.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -19,6 +20,7 @@ router.get('/', (_req, res) => {
 })
 
 router.use('/settings', settingsRouter)
+router.use('/database', databaseRouter)
 router.use('/plans', plansRouter)
 router.use('/users', usersRouter)
 router.use('/organizations', organizationsRouter)

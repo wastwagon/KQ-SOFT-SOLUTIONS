@@ -29,6 +29,8 @@ npx prisma migrate deploy
 npx prisma db seed  # Optional: seed plans, platform settings
 ```
 
+The API also refuses to start without `DATABASE_URL` (see `api/start-api.sh`). If migrations still did not run on the server, a **platform admin** can use **Platform Admin → Database** in the web app to run `migrate deploy` and `db seed` against the same `DATABASE_URL` (see `docs/DEPLOY_COOLIFY.md`).
+
 ### 3. Paystack Webhook
 
 1. In Paystack Dashboard → Settings → Webhooks

@@ -17,6 +17,7 @@ const AdminSubscribers = lazy(() => import('./pages/admin/AdminSubscribers'))
 const AdminOrgDetail = lazy(() => import('./pages/admin/AdminOrgDetail'))
 const AdminRevenue = lazy(() => import('./pages/admin/AdminRevenue'))
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'))
+const AdminDatabase = lazy(() => import('./pages/admin/AdminDatabase'))
 const Projects = lazy(() => import('./pages/Projects'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
@@ -52,6 +53,7 @@ function App() {
               <Route path="payments" element={<AdminPayments />} />
               <Route path="revenue" element={<AdminRevenue />} />
               <Route path="generation-settings" element={<AdminGenerationSettings />} />
+              <Route path="database" element={<AdminDatabase />} />
             </Route>
             <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />

@@ -124,10 +124,22 @@ Configure the webhook URL in Paystack to:
 
 `https://<your-api-domain>/api/v1/subscription/webhook`
 
-## 9. Smoke test
+## 9. Platform Admin — database (migrations & seed)
 
-1. Open the web URL → register or log in.
+If `prisma migrate deploy` on API startup did not run (e.g. missing `DATABASE_URL`, wrong service env), fix env and redeploy. The API now **fails fast** when `DATABASE_URL` is unset, so check Coolify logs for `start-api: FATAL — DATABASE_URL`.
+
+**After the API is running**, a **platform admin** (see `PLATFORM_ADMIN_EMAILS`, default `admin@qsoft.com` if seeded) can open **Platform Admin → Database** in the web app and run:
+
+- **Refresh status** — `prisma migrate status` (read-only)
+- **Run migrate deploy** — same as startup migrations
+- **Run seed** — `prisma db seed` (plans; optional test users — use only in controlled environments)
+
+These call `POST/GET /api/v1/admin/database/...` and require a logged-in platform admin.
+
+## 10. Smoke test
+
+1. Open the web URL → register or log in (or use a seeded test account if you ran seed in that environment only).
 2. Open `https://<api-domain>/health` (JSON `{ "status": "ok" }`) or trigger login from the app.
 3. Create a project and upload a small test file.
 
-If anything fails, check Coolify logs for `api` (migrations, `JWT_SECRET`) and `web` (wrong `VITE_API_URL` → API calls go to the wrong host).
+If anything fails, check Coolify logs for `api` (migrations, `JWT_SECRET`, `DATABASE_URL`) and `web` (wrong `VITE_API_URL` → API calls go to the wrong host).

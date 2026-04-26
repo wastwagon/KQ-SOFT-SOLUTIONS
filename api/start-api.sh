@@ -24,6 +24,12 @@ if [ "${NODE_ENV:-}" = "production" ]; then
   fi
 fi
 
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "start-api: FATAL — DATABASE_URL is not set. Migrations cannot run." >&2
+  echo "start-api: In Coolify, set DATABASE_URL for the api service to your PostgreSQL connection string, then redeploy." >&2
+  exit 1
+fi
+
 run_migrate() {
   npx prisma migrate deploy --schema="$SCHEMA"
 }

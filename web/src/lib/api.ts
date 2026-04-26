@@ -369,6 +369,20 @@ export const audit = {
   },
 }
 
+export type PlatformDatabaseOpResult = {
+  success: boolean
+  exitCode: number
+  stdout: string
+  stderr: string
+}
+
+/** Platform admin: run Prisma on server (see Platform Admin → Database) */
+export const platformAdminDatabase = {
+  status: () => api('/admin/database/status') as Promise<PlatformDatabaseOpResult>,
+  migrate: () => api('/admin/database/migrate', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
+  seed: () => api('/admin/database/seed', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
+}
+
 export const subscription = {
   getUsage: () => api('/subscription/usage') as Promise<SubscriptionUsageResponse>,
   getPlans: () => api('/subscription/plans'),
