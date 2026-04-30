@@ -29,6 +29,16 @@ import apiKeysRoutes from './routes/api-keys.js';
 
 const app = express();
 const PORT = process.env.PORT || 9001;
+const trustProxyEnv = (process.env.TRUST_PROXY || '').trim().toLowerCase()
+const defaultTrustProxy = isProd ? 1 : 0
+let trustProxySetting: boolean | number = defaultTrustProxy
+if (trustProxyEnv === 'true') trustProxySetting = true
+else if (trustProxyEnv === 'false') trustProxySetting = false
+else if (trustProxyEnv) {
+  const n = Number(trustProxyEnv)
+  if (!Number.isNaN(n) && n >= 0) trustProxySetting = n
+}
+app.set('trust proxy', trustProxySetting)
 
 const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) || [];
 const allowedOrigins = [
