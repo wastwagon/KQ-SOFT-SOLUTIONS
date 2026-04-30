@@ -178,6 +178,22 @@ export default function ProjectDetail() {
   const documents = project.documents || []
   const cashBookDocs = documents.filter((d: { type: string }) => d.type.startsWith('cash_book_'))
   const bankDocs = documents.filter((d: { type: string }) => d.type.startsWith('bank_'))
+  const uniqueCashBookFiles = new Set(cashBookDocs.map((d: { filename: string }) => d.filename)).size
+  const uniqueBankFiles = new Set(bankDocs.map((d: { filename: string }) => d.filename)).size
+  const groupedCashBookFiles: Array<[string, Set<string>]> = Array.from(
+    cashBookDocs.reduce((acc: Map<string, Set<string>>, d: { filename: string; type: string }) => {
+      if (!acc.has(d.filename)) acc.set(d.filename, new Set())
+      acc.get(d.filename)!.add(d.type)
+      return acc
+    }, new Map<string, Set<string>>())
+  )
+  const groupedBankFiles: Array<[string, Set<string>]> = Array.from(
+    bankDocs.reduce((acc: Map<string, Set<string>>, d: { filename: string; type: string }) => {
+      if (!acc.has(d.filename)) acc.set(d.filename, new Set())
+      acc.get(d.filename)!.add(d.type)
+      return acc
+    }, new Map<string, Set<string>>())
+  )
 
   const inputClass =
     'w-full min-h-[44px] px-4 py-3 border border-gray-200 rounded-xl bg-gray-50/80 text-gray-900 text-sm placeholder:text-gray-400 shadow-sm hover:border-gray-300 hover:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:bg-white focus:outline-none transition-all duration-200'
@@ -377,11 +393,25 @@ export default function ProjectDetail() {
                       </button>
                     </div>
                     {cashBookDocs.length > 0 && (
-                      <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">✓ {cashBookDocs.length} document(s) uploaded</p>
+                      <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                        ✓ {uniqueCashBookFiles} file(s) uploaded
+                        {cashBookDocs.length > uniqueCashBookFiles
+                          ? ` (${cashBookDocs.length} mapped side records — one file used for receipts and payments)`
+                          : ''}
+                      </p>
                     )}
                   </>
                 ) : (
-                  cashBookDocs.length > 0 ? <p className="text-xs text-gray-500">✓ {cashBookDocs.length} document(s) uploaded</p> : <p className="text-xs text-gray-500">No cash book uploaded.</p>
+                  cashBookDocs.length > 0
+                    ? (
+                      <p className="text-xs text-gray-500">
+                        ✓ {uniqueCashBookFiles} file(s) uploaded
+                        {cashBookDocs.length > uniqueCashBookFiles
+                          ? ` (${cashBookDocs.length} mapped side records — one file used for receipts and payments)`
+                          : ''}
+                      </p>
+                      )
+                    : <p className="text-xs text-gray-500">No cash book uploaded.</p>
                 )}
               </div>
 
@@ -449,11 +479,25 @@ export default function ProjectDetail() {
                       </button>
                     </div>
                     {bankDocs.length > 0 && (
-                      <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">✓ {bankDocs.length} document(s) uploaded</p>
+                      <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                        ✓ {uniqueBankFiles} file(s) uploaded
+                        {bankDocs.length > uniqueBankFiles
+                          ? ` (${bankDocs.length} mapped side records — one file used for credits and debits)`
+                          : ''}
+                      </p>
                     )}
                   </>
                 ) : (
-                  bankDocs.length > 0 ? <p className="text-xs text-gray-500">✓ {bankDocs.length} document(s) uploaded</p> : <p className="text-xs text-gray-500">No bank statement uploaded.</p>
+                  bankDocs.length > 0
+                    ? (
+                      <p className="text-xs text-gray-500">
+                        ✓ {uniqueBankFiles} file(s) uploaded
+                        {bankDocs.length > uniqueBankFiles
+                          ? ` (${bankDocs.length} mapped side records — one file used for credits and debits)`
+                          : ''}
+                      </p>
+                      )
+                    : <p className="text-xs text-gray-500">No bank statement uploaded.</p>
                 )}
               </div>
             </div>
@@ -462,12 +506,22 @@ export default function ProjectDetail() {
               <details className="mt-5 pt-4 border-t border-gray-100">
                 <summary className="text-[11px] font-medium text-gray-400 uppercase tracking-wider cursor-pointer">Uploaded files</summary>
                 <ul className="mt-2 space-y-1.5 text-xs text-gray-600">
-                  {cashBookDocs.map((d: { id: string; filename: string; type: string }) => (
-                    <li key={d.id}>Cash book ({d.type.includes('receipts') ? 'receipts' : 'payments'}): {d.filename}</li>
-                  ))}
-                  {bankDocs.map((d: { id: string; filename: string; type: string }) => (
-                    <li key={d.id}>Bank ({d.type.includes('credit') ? 'credits' : 'debits'}): {d.filename}</li>
-                  ))}
+                  {groupedCashBookFiles.map(([filename, types]) => {
+                    const hasReceipts = types.has('cash_book_receipts')
+                    const hasPayments = types.has('cash_book_payments')
+                    const label = hasReceipts && hasPayments ? 'receipts + payments' : hasReceipts ? 'receipts' : 'payments'
+                    return (
+                      <li key={`cb-${filename}`}>Cash book ({label}): {filename}</li>
+                    )
+                  })}
+                  {groupedBankFiles.map(([filename, types]) => {
+                    const hasCredits = types.has('bank_credits')
+                    const hasDebits = types.has('bank_debits')
+                    const label = hasCredits && hasDebits ? 'credits + debits' : hasCredits ? 'credits' : 'debits'
+                    return (
+                      <li key={`bank-${filename}`}>Bank ({label}): {filename}</li>
+                    )
+                  })}
                 </ul>
               </details>
             )}
@@ -481,7 +535,7 @@ export default function ProjectDetail() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                disabled={cashBookDocs.length === 0 && bankDocs.length === 0}
+                disabled={cashBookDocs.length === 0 || bankDocs.length === 0}
                 className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 Proceed to Map →

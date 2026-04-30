@@ -121,13 +121,22 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
   const type = req.body.type === 'debits' ? 'bank_debits' : 'bank_credits'
   let bankAccountId: string | undefined = req.body.bankAccountId
   if (!bankAccountId && req.body.accountName && typeof req.body.accountName === 'string' && req.body.accountName.trim()) {
-    const acct = await prisma.bankAccount.create({
-      data: {
-        projectId,
-        name: String(req.body.accountName).trim().slice(0, 200),
-      },
+    const normalizedName = String(req.body.accountName).trim().slice(0, 200)
+    const existing = await prisma.bankAccount.findFirst({
+      where: { projectId, name: normalizedName },
+      select: { id: true },
     })
-    bankAccountId = acct.id
+    if (existing) {
+      bankAccountId = existing.id
+    } else {
+      const acct = await prisma.bankAccount.create({
+        data: {
+          projectId,
+          name: normalizedName,
+        },
+      })
+      bankAccountId = acct.id
+    }
   }
   const safeFilename = sanitizeFilename(req.file.originalname)
   const doc = await prisma.document.create({
