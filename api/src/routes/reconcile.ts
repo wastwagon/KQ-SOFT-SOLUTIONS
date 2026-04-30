@@ -17,6 +17,14 @@ router.use(authMiddleware)
 const RECONCILE_DEFAULT_LIMIT = 1500
 const RECONCILE_MAX_LIMIT = 5000
 
+function parseBooleanQuery(value: unknown, defaultValue: boolean): boolean {
+  if (typeof value !== 'string') return defaultValue
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'true' || normalized === '1') return true
+  if (normalized === 'false' || normalized === '0') return false
+  return defaultValue
+}
+
 async function findAlreadyMatchedIds(projectId: string, transactionIds: string[]) {
   if (transactionIds.length === 0) return []
   const rows = await prisma.matchItem.findMany({
@@ -47,6 +55,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     parseInt(req.query.limit as string) || RECONCILE_DEFAULT_LIMIT,
     RECONCILE_MAX_LIMIT
   )
+  const useDate = parseBooleanQuery(req.query.useDate, true)
+  const useDocRef = parseBooleanQuery(req.query.useDocRef, true)
+  const useChequeNo = parseBooleanQuery(req.query.useChequeNo, true)
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
     include: {
@@ -150,8 +161,21 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   }
 
   // Matching suggestions for all plans (intelligent matching clues)
-  const receiptSuggestions = suggestMatches(receipts, credits, matchedCbIds, matchedBankIds, { ...matchOptions, requireDateMatch: true })
-  const paymentSuggestions = suggestMatches(payments, debits, matchedCbIds, matchedBankIds, { ...matchOptions, requireRefForCheques: true })
+  const receiptSuggestions = suggestMatches(receipts, credits, matchedCbIds, matchedBankIds, {
+    ...matchOptions,
+    requireDateMatch: useDate,
+    useDate,
+    useDocRef,
+    useChequeNo,
+  })
+  const paymentSuggestions = suggestMatches(payments, debits, matchedCbIds, matchedBankIds, {
+    ...matchOptions,
+    requireDateMatch: useDate,
+    requireRefForCheques: useDocRef || useChequeNo,
+    useDate,
+    useDocRef,
+    useChequeNo,
+  })
 
   // Apply bank rules for rule-based suggestions and flagged txs (Standard+ only)
   const bankRules = hasBankRulesPlan ? await prisma.bankRule.findMany({

@@ -32,7 +32,13 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set())
   const [bankAccountId, setBankAccountId] = useState<string>('')
   const [actionMessage, setActionMessage] = useState('')
+  const [matchParams, setMatchParams] = useState({
+    useDate: true,
+    useDocRef: true,
+    useChequeNo: true,
+  })
   const bankAccountRestoredRef = useRef(false)
+  const matchParamsRestoredRef = useRef(false)
 
   const { data: usageData } = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -41,8 +47,23 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
   const features = (usageData?.features || {}) as Record<string, boolean>
   const [reconcileLimit, setReconcileLimit] = useState(1500)
   const { data, isLoading } = useQuery({
-    queryKey: ['reconcile', projectId, bankAccountId || null, reconcileLimit],
-    queryFn: () => reconcile.get(projectId, { bankAccountId: bankAccountId || undefined, limit: reconcileLimit }),
+    queryKey: [
+      'reconcile',
+      projectId,
+      bankAccountId || null,
+      reconcileLimit,
+      matchParams.useDate,
+      matchParams.useDocRef,
+      matchParams.useChequeNo,
+    ],
+    queryFn: () =>
+      reconcile.get(projectId, {
+        bankAccountId: bankAccountId || undefined,
+        limit: reconcileLimit,
+        useDate: matchParams.useDate,
+        useDocRef: matchParams.useDocRef,
+        useChequeNo: matchParams.useChequeNo,
+      }),
     enabled: !!projectId,
   })
 
@@ -72,6 +93,34 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
       }
     }
   }, [projectId, bankAccountId])
+  useEffect(() => {
+    if (matchParamsRestoredRef.current || !projectId) return
+    try {
+      const saved = localStorage.getItem(`brs_match_params_${projectId}`)
+      if (!saved) {
+        matchParamsRestoredRef.current = true
+        return
+      }
+      const parsed = JSON.parse(saved) as Partial<{ useDate: boolean; useDocRef: boolean; useChequeNo: boolean }>
+      setMatchParams({
+        useDate: typeof parsed.useDate === 'boolean' ? parsed.useDate : true,
+        useDocRef: typeof parsed.useDocRef === 'boolean' ? parsed.useDocRef : true,
+        useChequeNo: typeof parsed.useChequeNo === 'boolean' ? parsed.useChequeNo : true,
+      })
+    } catch {
+      /* localStorage may be unavailable */
+    } finally {
+      matchParamsRestoredRef.current = true
+    }
+  }, [projectId])
+  useEffect(() => {
+    if (!projectId || !matchParamsRestoredRef.current) return
+    try {
+      localStorage.setItem(`brs_match_params_${projectId}`, JSON.stringify(matchParams))
+    } catch {
+      /* localStorage may be unavailable */
+    }
+  }, [projectId, matchParams])
 
   const matchMutation = useMutation({
     mutationFn: (body: { cashBookTransactionId: string; bankTransactionId: string }) =>
@@ -250,6 +299,16 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
   const canMatchManyTo1 = canMatchInView && hasMultiMatch && cbArr.length >= 2 && bankArr.length === 1
   const canMatchManyToMany = canMatchInView && hasMultiMatch && cbArr.length >= 2 && bankArr.length >= 2
   const canMatch = canMatch1to1 || canMatch1toMany || canMatchManyTo1 || canMatchManyToMany
+  const isStrictPreset = matchParams.useDate && matchParams.useDocRef && matchParams.useChequeNo
+  const isAmountDatePreset = matchParams.useDate && !matchParams.useDocRef && !matchParams.useChequeNo
+  const isAmountOnlyPreset = !matchParams.useDate && !matchParams.useDocRef && !matchParams.useChequeNo
+  const activeModeLabel = isStrictPreset
+    ? 'Strict'
+    : isAmountDatePreset
+      ? 'Amount + Date'
+      : isAmountOnlyPreset
+        ? 'Amount only'
+        : 'Custom'
 
   const handleMatch = () => {
     if (!canMatch) return
@@ -393,6 +452,103 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
               ? 'Click a suggestion to pre-select, or tick to bulk-select and match several at once.'
               : 'Click a suggestion to pre-select, then click Match. Bulk match requires Standard plan.'}
           </p>
+          <div className="mb-4 rounded-xl border border-amber-200 bg-white/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-900 mb-2">Matching parameters</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setMatchParams({ useDate: true, useDocRef: true, useChequeNo: true })}
+                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                  isStrictPreset
+                    ? 'border-amber-500 bg-amber-200 text-amber-950'
+                    : 'border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200'
+                }`}
+                title="Amount + date + reference + cheque"
+              >
+                Strict preset
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatchParams({ useDate: true, useDocRef: false, useChequeNo: false })}
+                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                  isAmountDatePreset
+                    ? 'border-amber-500 bg-amber-200 text-amber-950'
+                    : 'border-amber-300 bg-white text-amber-900 hover:bg-amber-50'
+                }`}
+                title="Amount + date matching"
+              >
+                Amount + Date preset
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatchParams({ useDate: false, useDocRef: false, useChequeNo: false })}
+                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                  isAmountOnlyPreset
+                    ? 'border-amber-500 bg-amber-200 text-amber-950'
+                    : 'border-amber-300 bg-white text-amber-900 hover:bg-amber-50'
+                }`}
+                title="Amount-only matching"
+              >
+                Amount-only preset
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatchParams({ useDate: true, useDocRef: true, useChequeNo: true })}
+                className="px-2.5 py-1 rounded-lg border border-amber-300 bg-white text-amber-900 text-xs font-medium hover:bg-amber-50 transition-colors"
+                title="Reset parameters to default strict mode"
+              >
+                Reset to default
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm text-amber-900">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked
+                  disabled
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Use amount (required)
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={matchParams.useDate}
+                  onChange={(e) => setMatchParams((prev) => ({ ...prev, useDate: e.target.checked }))}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Use date
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={matchParams.useDocRef}
+                  onChange={(e) => setMatchParams((prev) => ({ ...prev, useDocRef: e.target.checked }))}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Use reference doc
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={matchParams.useChequeNo}
+                  onChange={(e) => setMatchParams((prev) => ({ ...prev, useChequeNo: e.target.checked }))}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Use cheque number
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-amber-900">Active mode: <strong>{activeModeLabel}</strong></p>
+            <p className="mt-1 text-xs text-amber-800">
+              Preset guide: <strong>Strict</strong> for safest matching, <strong>Amount + Date</strong> for moderate volume,
+              <strong> Amount only</strong> for high-volume batches (review before confirming).
+            </p>
+            {!matchParams.useDate && !matchParams.useDocRef && !matchParams.useChequeNo && (
+              <p className="mt-2 text-xs text-amber-800">
+                Amount-only matching is broader and may return many possible suggestions.
+              </p>
+            )}
+          </div>
           {features.bulk_match && (
           <div className="flex flex-wrap gap-2 mb-4">
             {highConfidenceSuggestions.length > 0 && (

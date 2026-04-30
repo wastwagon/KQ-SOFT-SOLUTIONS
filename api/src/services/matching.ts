@@ -65,6 +65,30 @@ function refsMatch(cb: Tx, bk: Tx): boolean {
   return false
 }
 
+function docRefsMatch(cb: Tx, bk: Tx): boolean {
+  const cbRef = cb.docRef?.trim()
+  const bkRef = bk.docRef?.trim()
+  if (cbRef && bkRef && cbRef === bkRef) return true
+  if (!cbRef && !bkRef) return false
+  const cbText = [cb.details, cb.name].filter(Boolean).join(' ')
+  const bkText = [bk.details, bk.name].filter(Boolean).join(' ')
+  if (cbRef && bkText.includes(cbRef)) return true
+  if (bkRef && cbText.includes(bkRef)) return true
+  return false
+}
+
+function chequeNumbersMatch(cb: Tx, bk: Tx): boolean {
+  const cbChq = cb.chqNo?.trim()
+  const bkChq = bk.chqNo?.trim()
+  if (cbChq && bkChq && cbChq === bkChq) return true
+  if (!cbChq && !bkChq) return false
+  const cbText = [cb.details, cb.name].filter(Boolean).join(' ')
+  const bkText = [bk.details, bk.name].filter(Boolean).join(' ')
+  if (cbChq && bkText.includes(cbChq)) return true
+  if (bkChq && cbText.includes(bkChq)) return true
+  return false
+}
+
 export interface Tx {
   id: string
   date: Date | null
@@ -93,6 +117,12 @@ export interface SuggestMatchesOptions {
   amountTolerance?: number
   /** Date window in days. Default 3 */
   dateWindowDays?: number
+  /** Include date as a matching parameter. Default true. */
+  useDate?: boolean
+  /** Include reference document number as a matching parameter. Default true. */
+  useDocRef?: boolean
+  /** Include cheque number as a matching parameter. Default true. */
+  useChequeNo?: boolean
 }
 
 export function suggestMatches(
@@ -102,7 +132,15 @@ export function suggestMatches(
   matchedBankIds: Set<string>,
   options: SuggestMatchesOptions = {}
 ): SuggestedMatch[] {
-  const { requireRefForCheques = false, requireDateMatch = false, amountTolerance = 0.01, dateWindowDays = 3 } = options
+  const {
+    requireRefForCheques = false,
+    requireDateMatch = false,
+    amountTolerance = 0.01,
+    dateWindowDays = 3,
+    useDate = true,
+    useDocRef = true,
+    useChequeNo = true,
+  } = options
   const suggestions: SuggestedMatch[] = []
   for (const cb of cashBookTxs) {
     if (matchedCashBookIds.has(cb.id)) continue
@@ -111,23 +149,30 @@ export function suggestMatches(
       const amtMatch = amountsMatch(cb.amount, bk.amount, amountTolerance)
       const dateMatch = datesWithinWindow(cb.date, bk.date, dateWindowDays)
       if (!amtMatch) continue
-      if (requireDateMatch && !dateMatch) continue
-      const refMatch = refsMatch(cb, bk)
+      if (requireDateMatch && useDate && !dateMatch) continue
+      const chqMatch = useChequeNo ? chequeNumbersMatch(cb, bk) : false
+      const docRefMatch = useDocRef ? docRefsMatch(cb, bk) : false
+      const textRefMatch = useDocRef || useChequeNo ? refsMatch(cb, bk) : false
+      const refMatch = chqMatch || docRefMatch || textRefMatch
       if (requireRefForCheques && cb.chqNo?.trim() && !refMatch) continue
       let confidence = 0
       if (amtMatch) confidence += 0.6
-      if (dateMatch) confidence += 0.3
+      if (useDate && dateMatch) confidence += 0.3
       const descMatch = cb.details && bk.details &&
         (cb.details.toLowerCase().includes(bk.details.slice(0, 20).toLowerCase()) ||
          bk.details.toLowerCase().includes(cb.details.slice(0, 20).toLowerCase()))
       if (descMatch) confidence += 0.1
-      if (refMatch) confidence += 0.15
+      if ((useDocRef || useChequeNo) && refMatch) confidence += 0.15
       confidence = Math.min(confidence, 1)
       if (confidence >= 0.6) {
         const reasons: string[] = []
-        if (dateMatch) reasons.push('date')
+        if (useDate && dateMatch) reasons.push('date')
         if (descMatch) reasons.push('description')
-        if (refMatch) reasons.push('chq/ref')
+        if ((useDocRef || useChequeNo) && refMatch) {
+          if (useDocRef && useChequeNo) reasons.push('chq/ref')
+          else if (useDocRef) reasons.push('reference doc')
+          else reasons.push('cheque no.')
+        }
         const reason = reasons.length ? `Amount + ${reasons.join(', ')} match` : 'Amount match'
         suggestions.push({
           cashBookTx: cb,
@@ -149,7 +194,9 @@ export function suggestMatches(
   const excluded = new Set<string>()
   for (const list of byBankId.values()) {
     if (list.length <= 1) continue
-    const refList = list.filter((s) => refsMatch(s.cashBookTx, s.bankTx))
+    const refList = useDocRef || useChequeNo
+      ? list.filter((s) => refsMatch(s.cashBookTx, s.bankTx))
+      : []
     if (refList.length === 1) {
       for (const s of list) {
         if (s.cashBookTx.id !== refList[0]!.cashBookTx.id) {
@@ -158,7 +205,9 @@ export function suggestMatches(
       }
       continue
     }
-    const dateList = list.filter((s) => datesWithinWindow(s.cashBookTx.date, s.bankTx.date, dateWindowDays))
+    const dateList = useDate
+      ? list.filter((s) => datesWithinWindow(s.cashBookTx.date, s.bankTx.date, dateWindowDays))
+      : []
     if (dateList.length === 1) {
       for (const s of list) {
         if (s.cashBookTx.id !== dateList[0]!.cashBookTx.id) {

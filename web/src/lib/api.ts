@@ -539,10 +539,13 @@ export const report = {
 }
 
 export const reconcile = {
-  get: (projectId: string, params?: { bankAccountId?: string; limit?: number }) => {
+  get: (projectId: string, params?: { bankAccountId?: string; limit?: number; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
     if (params?.limit) q.set('limit', String(params.limit))
+    if (typeof params?.useDate === 'boolean') q.set('useDate', String(params.useDate))
+    if (typeof params?.useDocRef === 'boolean') q.set('useDocRef', String(params.useDocRef))
+    if (typeof params?.useChequeNo === 'boolean') q.set('useChequeNo', String(params.useChequeNo))
     return api(`/reconcile/${projectId}${q.toString() ? `?${q}` : ''}`)
   },
   createMatch: (projectId: string, body: { cashBookTransactionId: string; bankTransactionId: string }) =>
