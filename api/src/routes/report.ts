@@ -12,6 +12,7 @@ import { canExportReport } from '../lib/permissions.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
 import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
+import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -26,11 +27,79 @@ interface TxLike {
   amount: number
 }
 
+interface BrsComputationInput {
+  balancePerCashBook: number
+  uncreditedLodgmentsTotal: number
+  uncreditedLodgmentsTimingTotal: number
+  unpresentedChequesTotal: number
+  bankOnlyCreditsNotInCashBookTotal: number
+  bankOnlyDebitsNotInCashBookTotal: number
+  bankStatementClosingBalance: number | null
+}
+
+interface UnpresentedChequeLike {
+  date: Date | string | null
+  name: string | null
+  chqNo: string | null | undefined
+  amount: number
+  fromProject?: string
+}
+
 function toNumOrNull(v: unknown): number | null {
   if (v == null) return null
   if (typeof v === 'number' && Number.isFinite(v)) return v
   if (typeof v === 'object' && v !== null && 'toString' in v) return Number(String((v as { toString: () => string }).toString()))
   return Number.isFinite(Number(v)) ? Number(v) : null
+}
+
+export function computeBrsMetrics(input: BrsComputationInput) {
+  const {
+    balancePerCashBook,
+    uncreditedLodgmentsTotal,
+    uncreditedLodgmentsTimingTotal,
+    unpresentedChequesTotal,
+    bankOnlyCreditsNotInCashBookTotal,
+    bankOnlyDebitsNotInCashBookTotal,
+    bankStatementClosingBalance,
+  } = input
+  const bankOnlyReconcilingNet = bankOnlyCreditsNotInCashBookTotal - bankOnlyDebitsNotInCashBookTotal
+  const bankClosingBalanceLegacy = balancePerCashBook - uncreditedLodgmentsTotal + unpresentedChequesTotal
+  const bankClosingBalanceGhanaStyle =
+    balancePerCashBook -
+    uncreditedLodgmentsTimingTotal +
+    unpresentedChequesTotal +
+    bankOnlyReconcilingNet
+  const bankClosingBalance = bankStatementClosingBalance ?? bankClosingBalanceGhanaStyle
+  return {
+    bankOnlyReconcilingNet,
+    bankClosingBalanceLegacy,
+    bankClosingBalanceGhanaStyle,
+    bankClosingBalance,
+  }
+}
+
+function buildMissingChequesAgeing(
+  items: UnpresentedChequeLike[],
+  referenceDate: Date
+) {
+  return items.map((t) => {
+    const txDate = t.date ? new Date(t.date) : referenceDate
+    const daysOutstanding = Math.floor((referenceDate.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24))
+    let ageingBand: string
+    if (daysOutstanding <= 30) ageingBand = '0–30'
+    else if (daysOutstanding <= 60) ageingBand = '31–60'
+    else if (daysOutstanding <= 90) ageingBand = '61–90'
+    else ageingBand = '90+'
+    return {
+      date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
+      name: t.name || '—',
+      chqNo: t.chqNo ?? null,
+      amount: t.amount,
+      daysOutstanding,
+      ageingBand,
+      fromProject: t.fromProject,
+    }
+  })
 }
 
 function toTx(t: { id: string; date: Date | null; name: string | null; details: string | null; chqNo?: string | null; docRef?: string | null; amount: unknown }): TxLike {
@@ -45,6 +114,70 @@ function toTx(t: { id: string; date: Date | null; name: string | null; details: 
   }
 }
 
+export function normalizeRefToken(value: string | null | undefined): string {
+  return (value || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+}
+
+export function refTokensEquivalent(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = normalizeRefToken(a)
+  const y = normalizeRefToken(b)
+  if (!x || !y) return false
+  if (x === y) return true
+  if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+    return x.endsWith(y) || y.endsWith(x)
+  }
+  return false
+}
+
+export function hasChequeOrRefLink(left: TxLike, right: TxLike): boolean {
+  const normalizeText = (value: string | null | undefined): string =>
+    (value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const extractRefsFromText = (text: string | null | undefined): string[] => {
+    const src = (text || '').toString()
+    if (!src) return []
+    const out = new Set<string>()
+    const re = /\b(?:chq|cheque|ref)(?:\s*(?:no|number)\.?)?\s*[#:.]?\s*([a-z0-9-]{3,20})\b/gi
+    let m: RegExpExecArray | null
+    while ((m = re.exec(src))) {
+      if (m[1]) out.add(m[1])
+    }
+    return Array.from(out)
+  }
+  const leftRefs = [
+    left.chqNo,
+    left.docRef,
+    ...extractRefsFromText(left.details),
+    ...extractRefsFromText(left.name),
+  ]
+  const rightRefs = [
+    right.chqNo,
+    right.docRef,
+    ...extractRefsFromText(right.details),
+    ...extractRefsFromText(right.name),
+  ]
+  for (const a of leftRefs) {
+    for (const b of rightRefs) {
+      if (refTokensEquivalent(a, b)) return true
+    }
+  }
+  const leftName = normalizeText(left.name || left.details)
+  const rightName = normalizeText(right.name || right.details)
+  if (
+    leftName &&
+    rightName &&
+    leftName === rightName &&
+    Math.abs(left.amount - right.amount) <= 0.01
+  ) {
+    return true
+  }
+  return (
+    refTokensEquivalent(left.chqNo, right.chqNo) ||
+    refTokensEquivalent(left.docRef, right.docRef) ||
+    refTokensEquivalent(left.chqNo, right.docRef) ||
+    refTokensEquivalent(left.docRef, right.chqNo)
+  )
+}
+
 function formatGeneratedAt(date: Date): string {
   return date.toLocaleString('en-GB', {
     day: '2-digit',
@@ -56,6 +189,41 @@ function formatGeneratedAt(date: Date): string {
     hour12: false,
     timeZone: 'Africa/Accra',
   })
+}
+
+export function parseImportedAmount(v: unknown): number {
+  if (v == null) return 0
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
+  const s = String(v).trim().replace(/,/g, '')
+  if (!s) return 0
+  const n = Number(s)
+  return Number.isFinite(n) ? n : 0
+}
+
+export function extractCashBookClosingBalanceFromDoc(filepath: string): number | null {
+  if (!filepath || !fs.existsSync(filepath)) return null
+  const fileType = detectFileType(filepath)
+  const parsed =
+    fileType === 'excel' ? parseExcel(filepath) :
+    fileType === 'csv' ? parseCsv(filepath) :
+    null
+  if (!parsed?.headers?.length || !parsed.rows?.length) return null
+  const balanceCol = parsed.headers.findIndex((h) => /balance/i.test(h || ''))
+  if (balanceCol < 0) return null
+  for (let i = parsed.rows.length - 1; i >= 0; i--) {
+    const row = parsed.rows[i] as unknown[]
+    const amt = parseImportedAmount(row?.[balanceCol])
+    if (Math.abs(amt) > 0) return amt
+  }
+  return null
+}
+
+export function extractSourceClosingBalanceFromDocs(filepaths: string[]): number | null {
+  for (const fp of filepaths) {
+    const value = extractCashBookClosingBalanceFromDoc(fp)
+    if (value != null) return value
+  }
+  return null
 }
 
 function detectReversalCandidates(
@@ -291,24 +459,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     ...unmatchedPayments.map((t) => ({ ...t, fromProject: project.name })),
     ...broughtForwardItems.map((t) => ({ date: t.date, name: t.name, chqNo: t.chqNo, amount: t.amount, fromProject: t.fromProject })),
   ]
-  const missingChequesWithAgeing = allUnpresented.map((t) => {
-    const txDate = t.date ? new Date(t.date) : refDate
-    const daysOutstanding = Math.floor((refDate.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24))
-    let ageingBand: string
-    if (daysOutstanding <= 30) ageingBand = '0–30'
-    else if (daysOutstanding <= 60) ageingBand = '31–60'
-    else if (daysOutstanding <= 90) ageingBand = '61–90'
-    else ageingBand = '90+'
-    return {
-      date: fmt(t.date),
-      name: t.name || '—',
-      chqNo: t.chqNo ?? null,
-      amount: t.amount,
-      daysOutstanding,
-      ageingBand,
-      fromProject: (t as { fromProject?: string }).fromProject,
-    }
-  })
+  const missingChequesWithAgeing = buildMissingChequesAgeing(allUnpresented, refDate)
   const missingChequesAgeingSummary = {
     band0_30: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').reduce((s, x) => s + x.amount, 0) },
     band31_60: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').reduce((s, x) => s + x.amount, 0) },
@@ -399,7 +550,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   // Legacy Ghana BRS statement block used by current UI consumers.
   // Note: "uncredited lodgments" here includes unmatched bank credits for backward compatibility.
   // Unpresented cheques = unmatched payments (cheques not in bank) + brought forward
-  const balancePerCashBook = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
+  const computedCashBookBalance = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
+  const declaredCashBookBalance = extractCashBookClosingBalanceFromDoc(receiptsDocs[0]?.filepath || paymentsDocs[0]?.filepath || '')
+  const balancePerCashBook = declaredCashBookBalance ?? computedCashBookBalance
   const unmatchedReceiptsTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0)
   const unmatchedCreditsTotal = unmatchedCredits.reduce((s, t) => s + t.amount, 0)
   const broughtForwardLodgmentsTotal = broughtForwardLodgments.reduce((s, t) => s + t.amount, 0)
@@ -412,23 +565,39 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal + broughtForwardLodgmentsTotal
   const uncreditedLodgmentsTimingTotal = unmatchedReceiptsTotal + broughtForwardReceiptLodgmentsTotal
   const unmatchedPaymentsTotal = unmatchedPayments.reduce((s, t) => s + t.amount, 0)
+  const unmatchedPaymentsWithoutDetailsTotal = unmatchedPayments
+    .filter((t) => !(t.details || '').trim())
+    .reduce((s, t) => s + t.amount, 0)
   const broughtForwardTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
-  const unpresentedChequesTotal = unmatchedPaymentsTotal + broughtForwardTotal
+  // Manual-template alignment:
+  // "Unpresented cheques" excludes rows parked as unmatched payments with blank details.
+  const unpresentedChequesTotal = unmatchedPaymentsTotal - unmatchedPaymentsWithoutDetailsTotal + broughtForwardTotal
+  const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebits
+    .filter((d) => payments.some((p) => hasChequeOrRefLink(p, d)))
+    .reduce((s, t) => s + t.amount, 0)
   const unmatchedDebitsTotal = unmatchedDebits.reduce((s, t) => s + t.amount, 0)
   const asAtUncreditedTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal
   const asAtUnpresentedTotal = unmatchedPaymentsTotal + unmatchedDebitsTotal
   const bankOnlyCreditsNotInCashBookTotal = unmatchedCreditsTotal + broughtForwardBankCreditsTotal
-  const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal
-  const bankOnlyReconcilingNet = bankOnlyCreditsNotInCashBookTotal - bankOnlyDebitsNotInCashBookTotal
-  // Bank + Uncredited lodgments − Unpresented cheques = Balance per cash book
-  const bankClosingBalance = balancePerCashBook - uncreditedLodgmentsTotal + unpresentedChequesTotal
-  // Ghana-style explicit decomposition:
-  // Bank = Cash book - timing lodgments + unpresented cheques + bank-only credits - bank-only debits
-  const bankClosingBalanceGhanaStyle =
-    balancePerCashBook -
-    uncreditedLodgmentsTimingTotal +
-    unpresentedChequesTotal +
-    bankOnlyReconcilingNet
+  // Debits with cheque/ref linkage to cash-book payments are not treated as "bank-only" in manual workbook style.
+  const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal - unmatchedDebitsLinkedToCashBookTotal
+  const bankStatementClosingBalanceValue =
+    toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
+    extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
+  const {
+    bankOnlyReconcilingNet,
+    bankClosingBalanceLegacy,
+    bankClosingBalanceGhanaStyle,
+    bankClosingBalance,
+  } = computeBrsMetrics({
+    balancePerCashBook,
+    uncreditedLodgmentsTotal,
+    uncreditedLodgmentsTimingTotal,
+    unpresentedChequesTotal,
+    bankOnlyCreditsNotInCashBookTotal,
+    bankOnlyDebitsNotInCashBookTotal,
+    bankStatementClosingBalance: bankStatementClosingBalanceValue,
+  })
   const selectedBankAccount =
     bankAccountId && project.bankAccounts?.length
       ? project.bankAccounts.find((a: { id: string }) => a.id === bankAccountId)
@@ -454,8 +623,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     signedAmountSupport: true,
     asAtAndPostPeriodMovement: true,
     labels: {
-      openingBankStatementBalance: 'Opening bank statement balance',
-      closingBankStatementBalance: 'Closing bank statement balance',
+      openingBankStatementBalance: 'As per bank statement (input/source file)',
+      closingBankStatementBalance: 'Closing balance per bank statement',
       addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
       addBankOnlyCredits: 'Add: Bank-only credits not in cash book',
       lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
@@ -483,6 +652,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     reportLanguageProfile,
     brsStatement: {
       bankClosingBalance,
+      bankClosingBalanceLegacy,
       bankClosingBalanceGhanaStyle,
       uncreditedLodgmentsTotal,
       uncreditedLodgmentsTimingTotal,
@@ -492,7 +662,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       bankOnlyDebitsNotInCashBookTotal,
       bankOnlyReconcilingNet,
       balancePerCashBook,
-      bankStatementClosingBalance: toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance),
+      bankStatementClosingBalance: bankStatementClosingBalanceValue,
     },
     additionalInformation: {
       asAtReconciliationPosition: {
@@ -512,7 +682,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       name: project.name,
       reconciliationDate: project.reconciliationDate,
       status: project.status,
-      bankStatementClosingBalance: toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance),
+      bankStatementClosingBalance: bankStatementClosingBalanceValue,
       reportNarrative: (project as { reportNarrative?: string | null }).reportNarrative ?? null,
       preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
       reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
@@ -670,7 +840,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
-  let broughtForwardItemsExport: { amount: number }[] = []
+  let broughtForwardItemsExport: { date: string; name: string; chqNo: string | null; amount: number; fromProject: string }[] = []
   let broughtForwardLodgmentsExport: { amount: number; source: 'cash_book_receipts' | 'bank_credits' }[] = []
   if (project.rollForwardFromProjectId && project.rollForwardFrom) {
     const prevProject = await prisma.project.findFirst({
@@ -700,9 +870,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
           else prevMatchedBankIds.add(mi.transactionId)
         }
       }
+      const prevFmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
       broughtForwardItemsExport = prevPayments
         .filter((t) => !prevMatchedCbIds.has(t.id))
-        .map((t) => ({ amount: t.amount }))
+        .map((t) => ({
+          date: prevFmt(t.date),
+          name: t.name || t.details || '—',
+          chqNo: t.chqNo || null,
+          amount: t.amount,
+          fromProject: prevProject.name,
+        }))
       broughtForwardLodgmentsExport = [
         ...prevReceipts
           .filter((t) => !prevMatchedCbIds.has(t.id))
@@ -769,14 +946,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const platformDefaults = await getPlatformDefaults()
   const reportTitle = (branding.reportTitle as string) || platformDefaults.defaultReportTitle
   const curr = project.currency || 'GHS'
+  const hasDiscrepancyReportExport = hasPlanFeature(project.organization.plan, 'discrepancy_report')
+  const hasMissingChequesReportExport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
   const reportLanguageProfile = {
     code: 'GHANA_BRS_V1',
     label: 'Ghana BRS language profile',
     signedAmountSupport: true,
     asAtAndPostPeriodMovement: true,
     labels: {
-      openingBankStatementBalance: 'Opening bank statement balance',
-      closingBankStatementBalance: 'Closing bank statement balance',
+      openingBankStatementBalance: 'As per bank statement (input)',
+      closingBankStatementBalance: 'Derived bank balance from reconciliation',
       addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
       addBankOnlyCredits: 'Add: Bank-only credits not in cash book',
       lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
@@ -861,24 +1040,29 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
   })
   const refDateExport = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
-  const missingChequesAgeingExport = payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => {
-    const txDate = t.date ? new Date(t.date) : refDateExport
-    const daysOutstanding = Math.floor((refDateExport.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24))
-    let ageingBand: string
-    if (daysOutstanding <= 30) ageingBand = '0–30'
-    else if (daysOutstanding <= 60) ageingBand = '31–60'
-    else if (daysOutstanding <= 90) ageingBand = '61–90'
-    else ageingBand = '90+'
-    return {
-      Date: fmt(t.date),
-      'Cheque No': t.chqNo || '',
-      'Ref Doc No': t.docRef || '',
-      Name: t.name || t.details || '',
-      [`Amount (${curr})`]: t.amount,
-      'Days Outstanding': daysOutstanding,
-      'Ageing Band': ageingBand,
-    }
-  })
+  const allUnpresentedExport = [
+    ...payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => ({
+      date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
+      name: t.name || t.details || '—',
+      chqNo: t.chqNo || null,
+      amount: t.amount,
+    })),
+    ...broughtForwardItemsExport.map((t) => ({
+      date: t.date,
+      name: t.name,
+      chqNo: t.chqNo,
+      amount: t.amount,
+    })),
+  ]
+  const missingChequesAgeingExport = buildMissingChequesAgeing(allUnpresentedExport, refDateExport).map((t) => ({
+    Date: t.date,
+    'Cheque No': t.chqNo || '',
+    'Ref Doc No': '',
+    Name: t.name || '',
+    [`Amount (${curr})`]: t.amount,
+    'Days Outstanding': t.daysOutstanding,
+    'Ageing Band': t.ageingBand,
+  }))
   const receiptIdsExport = new Set(receipts.map((t) => t.id))
   const discrepancies = matchPairs.filter((p) => {
     const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
@@ -919,11 +1103,21 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
   })
 
-  const balancePerCashBook = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
+  const computedCashBookBalance = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
+  const declaredCashBookBalance = extractCashBookClosingBalanceFromDoc(receiptsDocs[0]?.filepath || paymentsDocs[0]?.filepath || '')
+  const balancePerCashBook = declaredCashBookBalance ?? computedCashBookBalance
   const unmatchedReceiptsTotalExport = receipts.filter((t) => !matchedCbIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
   const unmatchedCreditsTotalExport = credits.filter((t) => !matchedBankIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
-  const unmatchedPaymentsTotalExport = payments.filter((t) => !matchedCbIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
-  const unmatchedDebitsTotalExport = debits.filter((t) => !matchedBankIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
+  const unmatchedPaymentsOnlyExport = payments.filter((t) => !matchedCbIds.has(t.id))
+  const unmatchedDebitsOnlyExport = debits.filter((t) => !matchedBankIds.has(t.id))
+  const unmatchedPaymentsTotalExport = unmatchedPaymentsOnlyExport.reduce((s, t) => s + t.amount, 0)
+  const unmatchedPaymentsWithoutDetailsTotalExport = unmatchedPaymentsOnlyExport
+    .filter((t) => !(t.details || '').trim())
+    .reduce((s, t) => s + t.amount, 0)
+  const unmatchedDebitsTotalExport = unmatchedDebitsOnlyExport.reduce((s, t) => s + t.amount, 0)
+  const unmatchedDebitsLinkedToCashBookTotalExport = unmatchedDebitsOnlyExport
+    .filter((d) => payments.some((p) => hasChequeOrRefLink(p, d)))
+    .reduce((s, t) => s + t.amount, 0)
   const broughtForwardLodgmentsTotalExport = broughtForwardLodgmentsExport.reduce((s, t) => s + t.amount, 0)
   const broughtForwardReceiptLodgmentsTotalExport = broughtForwardLodgmentsExport
     .filter((t) => t.source === 'cash_book_receipts')
@@ -934,21 +1128,30 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
   const unpresentedChequesTotal =
-    unmatchedPaymentsTotalExport +
+    unmatchedPaymentsTotalExport -
+    unmatchedPaymentsWithoutDetailsTotalExport +
     broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
   const broughtForwardChequesTotalExport = broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
   const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport
   const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport + unmatchedDebitsTotalExport
   const bankOnlyCreditsNotInCashBookTotalExport = unmatchedCreditsTotalExport + broughtForwardBankCreditsTotalExport
-  const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport
-  const bankOnlyReconcilingNetExport = bankOnlyCreditsNotInCashBookTotalExport - bankOnlyDebitsNotInCashBookTotalExport
-  const bankClosingBalance = balancePerCashBook - uncreditedLodgmentsTotal + unpresentedChequesTotal
-  const bankClosingBalanceGhanaStyleExport =
-    balancePerCashBook -
-    uncreditedLodgmentsTimingTotalExport +
-    unpresentedChequesTotal +
-    bankOnlyReconcilingNetExport
-  const bankStatementClosingBalanceExport = toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance)
+  const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport - unmatchedDebitsLinkedToCashBookTotalExport
+  const bankStatementClosingBalanceExport =
+    toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
+    extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
+  const {
+    bankOnlyReconcilingNet: bankOnlyReconcilingNetExport,
+    bankClosingBalanceGhanaStyle: bankClosingBalanceGhanaStyleExport,
+    bankClosingBalance,
+  } = computeBrsMetrics({
+    balancePerCashBook,
+    uncreditedLodgmentsTotal,
+    uncreditedLodgmentsTimingTotal: uncreditedLodgmentsTimingTotalExport,
+    unpresentedChequesTotal,
+    bankOnlyCreditsNotInCashBookTotal: bankOnlyCreditsNotInCashBookTotalExport,
+    bankOnlyDebitsNotInCashBookTotal: bankOnlyDebitsNotInCashBookTotalExport,
+    bankStatementClosingBalance: bankStatementClosingBalanceExport,
+  })
   const selectedBankAccountExport =
     bankAccountId && project.bankAccounts?.length
       ? project.bankAccounts.find((a: { id: string }) => a.id === bankAccountId)
@@ -1037,10 +1240,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (unmatchedOut.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'Missing Cheques - Payments')
     }
-    if (missingChequesAgeingExport.length) {
+    if (hasMissingChequesReportExport && missingChequesAgeingExport.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingChequesAgeingExport), 'Missing Cheques Ageing')
     }
-    if (discrepancies.length) {
+    if (hasDiscrepancyReportExport && discrepancies.length) {
       const discWithBands = matchPairs.filter((p) => {
         const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
         const cbDate = p.cb.date ? new Date(p.cb.date) : null

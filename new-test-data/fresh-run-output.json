@@ -1,0 +1,36 @@
+{
+  "projectId": "cmolh5b0g0007yfg7d48cbgch",
+  "reconcileSummary": {
+    "existingMatches": 0,
+    "receiptSuggestions": 1,
+    "paymentSuggestions": 3,
+    "bulkAttemptPairs": 4,
+    "bulkResult": {
+      "created": 4
+    }
+  },
+  "brsStatement": {
+    "bankClosingBalance": 1466.8600000000001,
+    "bankClosingBalanceLegacy": 2700,
+    "bankClosingBalanceGhanaStyle": 1466.8600000000001,
+    "uncreditedLodgmentsTotal": 4000,
+    "uncreditedLodgmentsTimingTotal": 4000,
+    "broughtForwardLodgmentsTotal": 0,
+    "unpresentedChequesTotal": 5800,
+    "bankOnlyCreditsNotInCashBookTotal": 0,
+    "bankOnlyDebitsNotInCashBookTotal": 1233.1399999999999,
+    "bankOnlyReconcilingNet": -1233.1399999999999,
+    "balancePerCashBook": 900,
+    "bankStatementClosingBalance": null
+  },
+  "summary": {
+    "matchedCount": 4,
+    "matchedReceiptsCreditsCount": 1,
+    "matchedPaymentsDebitsCount": 3,
+    "unmatchedReceipts": 1,
+    "unmatchedCredits": 0,
+    "unmatchedPayments": 6,
+    "unmatchedDebits": 5,
+    "totalTransactions": 20
+  }
+}

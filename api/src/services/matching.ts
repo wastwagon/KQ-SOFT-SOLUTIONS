@@ -36,7 +36,7 @@ function extractRefsFromText(text: string | null): string[] {
   if (!text || typeof text !== 'string') return []
   const refs = new Set<string>()
   // Explicit patterns: CHQ 12345, Cheque 12345, REF 12345, Ref # 12345
-  const explicitRe = /\b(?:CHQ|Cheque|REF|Ref)\s*[#:.]?\s*(\d{3,10})\b/gi
+  const explicitRe = /\b(?:CHQ|Cheque|REF|Ref)(?:\s*(?:No|NO|no)\.?)?\s*[#:.]?\s*(\d{3,10})\b/gi
   let m: RegExpExecArray | null
   while ((m = explicitRe.exec(text)) !== null) {
     refs.add(m[1]!)
@@ -49,26 +49,47 @@ function extractRefsFromText(text: string | null): string[] {
   return Array.from(refs)
 }
 
+function normalizeRefToken(value: string | null | undefined): string {
+  if (!value) return ''
+  const trimmed = String(value).trim()
+  if (!trimmed) return ''
+  const digits = trimmed.replace(/\D/g, '')
+  if (digits) return digits.replace(/^0+/, '') || '0'
+  return trimmed.toLowerCase().replace(/\s+/g, '')
+}
+
+function refTokensEquivalent(a: string | null | undefined, b: string | null | undefined): boolean {
+  const na = normalizeRefToken(a)
+  const nb = normalizeRefToken(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  // Handle common truncated cheque formats, e.g. 122347 vs 347.
+  if (na.length >= 3 && nb.length >= 3) {
+    if (na.endsWith(nb) || nb.endsWith(na)) return true
+  }
+  return false
+}
+
 /**
  * Returns true if cash book chqNo matches bank description/refs, or vice versa.
  */
 function refsMatch(cb: Tx, bk: Tx): boolean {
   const cbChq = cb.chqNo?.trim()
   const bkChq = bk.chqNo?.trim()
-  if (cbChq && bkChq && cbChq === bkChq) return true
+  if (refTokensEquivalent(cbChq, bkChq)) return true
   const bkText = [bk.details, bk.name].filter(Boolean).join(' ')
   const cbText = [cb.details, cb.name].filter(Boolean).join(' ')
   const bkRefs = extractRefsFromText(bkText)
   const cbRefs = extractRefsFromText(cbText)
-  if (cbChq && (bkRefs.includes(cbChq) || bkText.includes(cbChq))) return true
-  if (bkChq && (cbRefs.includes(bkChq) || cbText.includes(bkChq))) return true
+  if (cbChq && (bkRefs.some((r) => refTokensEquivalent(r, cbChq)) || bkText.includes(cbChq))) return true
+  if (bkChq && (cbRefs.some((r) => refTokensEquivalent(r, bkChq)) || cbText.includes(bkChq))) return true
   return false
 }
 
 function docRefsMatch(cb: Tx, bk: Tx): boolean {
   const cbRef = cb.docRef?.trim()
   const bkRef = bk.docRef?.trim()
-  if (cbRef && bkRef && cbRef === bkRef) return true
+  if (refTokensEquivalent(cbRef, bkRef)) return true
   if (!cbRef && !bkRef) return false
   const cbText = [cb.details, cb.name].filter(Boolean).join(' ')
   const bkText = [bk.details, bk.name].filter(Boolean).join(' ')
@@ -80,7 +101,7 @@ function docRefsMatch(cb: Tx, bk: Tx): boolean {
 function chequeNumbersMatch(cb: Tx, bk: Tx): boolean {
   const cbChq = cb.chqNo?.trim()
   const bkChq = bk.chqNo?.trim()
-  if (cbChq && bkChq && cbChq === bkChq) return true
+  if (refTokensEquivalent(cbChq, bkChq)) return true
   if (!cbChq && !bkChq) return false
   const cbText = [cb.details, cb.name].filter(Boolean).join(' ')
   const bkText = [bk.details, bk.name].filter(Boolean).join(' ')

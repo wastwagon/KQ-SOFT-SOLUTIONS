@@ -1,0 +1,59 @@
+{
+  "projectId": "cmolgfuav0003oyob634245wh",
+  "docs": {
+    "cbReceipts": "cmolgfub90005oyobncat42k1",
+    "cbPayments": "cmolgfubp0009oyob8b28vo9e",
+    "bsCredits": "cmolgfuc2000foyobh2etfpea",
+    "bsDebits": "cmolgfuc9000joyob4a688nnw",
+    "bankAccountId": "cmolgfuc0000doyobrc7kc1in"
+  },
+  "reconcileSummary": {
+    "existingMatches": 0,
+    "receiptSuggestions": 1,
+    "paymentSuggestions": 0,
+    "bulkAttemptPairs": 1,
+    "bulkResult": {
+      "ok": true,
+      "status": 201,
+      "body": {
+        "created": 1
+      }
+    }
+  },
+  "brs": {
+    "bankClosingBalance": 8000,
+    "bankClosingBalanceGhanaStyle": 1466.8599999999997,
+    "uncreditedLodgmentsTotal": 4000,
+    "uncreditedLodgmentsTimingTotal": 4000,
+    "broughtForwardLodgmentsTotal": 0,
+    "unpresentedChequesTotal": 11100,
+    "bankOnlyCreditsNotInCashBookTotal": 0,
+    "bankOnlyDebitsNotInCashBookTotal": 6533.14,
+    "bankOnlyReconcilingNet": -6533.14,
+    "balancePerCashBook": 900,
+    "bankStatementClosingBalance": null
+  },
+  "summary": {
+    "matchedCount": 1,
+    "matchedReceiptsCreditsCount": 1,
+    "matchedPaymentsDebitsCount": 0,
+    "unmatchedReceipts": 1,
+    "unmatchedCredits": 0,
+    "unmatchedPayments": 9,
+    "unmatchedDebits": 8,
+    "totalTransactions": 20
+  },
+  "additionalInformation": {
+    "asAtReconciliationPosition": {
+      "uncreditedLodgmentsOrUnclearedDeposits": 4000,
+      "bankOnlyCreditsNotInCashBook": 0,
+      "bankOnlyDebitsNotInCashBook": 6533.14,
+      "unpresentedChequesOrUnclearedPayments": 17633.14
+    },
+    "postPeriodMovement": {
+      "broughtForwardUncreditedLodgments": 0,
+      "broughtForwardBankOnlyCredits": 0,
+      "broughtForwardUnpresentedCheques": 0
+    }
+  }
+}

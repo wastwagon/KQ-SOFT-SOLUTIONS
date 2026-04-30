@@ -53,6 +53,14 @@ describe('suggestMatches', () => {
     expect(result[0].reason).toContain('chq/ref')
   })
 
+  it('matches truncated cheque references (suffix match)', () => {
+    const cb = [tx('cb1', 1000, '2025-01-15', 'Supplier payment', '122347')]
+    const bank = [tx('bk1', 1000, '2025-01-15', 'john chq no. 347')]
+    const result = suggestMatches(cb, bank, new Set(), new Set())
+    expect(result).toHaveLength(1)
+    expect(result[0].reason).toContain('chq/ref')
+  })
+
   it('excludes already matched transactions', () => {
     const cb = [tx('cb1', 1000, '2025-01-15'), tx('cb2', 2000, '2025-01-15')]
     const bank = [tx('bk1', 1000, '2025-01-15'), tx('bk2', 2000, '2025-01-15')]
