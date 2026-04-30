@@ -40,7 +40,7 @@ interface BrsComputationInput {
 interface UnpresentedChequeLike {
   date: Date | string | null
   name: string | null
-  chqNo: string | null | undefined
+  chqNo?: string | null
   amount: number
   fromProject?: string
 }
