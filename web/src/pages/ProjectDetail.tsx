@@ -383,7 +383,7 @@ export default function ProjectDetail() {
                         onChange={(e) => setCbFiles(Array.from(e.target.files || []))}
                         className="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 file:text-xs file:cursor-pointer"
                       />
-                      <span className="text-xs text-gray-500">{cbFiles.length ? `${cbFiles.length} file(s)` : 'Choose files'}</span>
+                      {cbFiles.length > 0 && <span className="text-xs text-gray-500">{cbFiles.length} file(s)</span>}
                       <button
                         onClick={() => uploadCbMutation.mutate({ files: cbFiles, useAs: cbUseAs })}
                         disabled={cbFiles.length === 0 || isUploading}
@@ -469,7 +469,7 @@ export default function ProjectDetail() {
                         onChange={(e) => setBsFiles(Array.from(e.target.files || []))}
                         className="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 file:text-xs file:cursor-pointer"
                       />
-                      <span className="text-xs text-gray-500">{bsFiles.length ? `${bsFiles.length} file(s)` : 'Choose files'}</span>
+                      {bsFiles.length > 0 && <span className="text-xs text-gray-500">{bsFiles.length} file(s)</span>}
                       <button
                         onClick={() => uploadBsMutation.mutate({ files: bsFiles, useAs: bsUseAs, bankAccountId: bankAccountId || undefined, accountName: bankAccountId ? undefined : bankAccountName || undefined })}
                         disabled={bsFiles.length === 0 || isUploading}
