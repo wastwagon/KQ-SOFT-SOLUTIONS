@@ -229,6 +229,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const fmt = (d: string) => formatDate(d)
   const brsStatement = data.brsStatement as BrsStatement | undefined
   const selectedBankAccountName = data.selectedBankAccountName
+  const bankAccountHeaderLine = data.bankAccountHeaderLine
   const reconciliationDate = data.project?.reconciliationDate
   const secondaryColor = data?.organization?.branding?.secondaryColor as string | undefined
   const primaryColor = data?.organization?.branding?.primaryColor as string | undefined
@@ -549,8 +550,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             >
               Bank Reconciliation Statement as at {formatDateBRSTitle(reconciliationDate)}
             </h2>
-            {selectedBankAccountName && (
-              <p className="text-sm text-slate-700 mb-4 font-medium">Bank account: {selectedBankAccountName}</p>
+            {(bankAccountHeaderLine || selectedBankAccountName) && (
+              <p className="text-sm text-slate-700 mb-4 font-medium">
+                {bankAccountHeaderLine ?? `Bank account: ${selectedBankAccountName}`}
+              </p>
             )}
             <p className="text-sm text-slate-600 mb-4">
               Currency: {effectiveDisplayCurrency}

@@ -303,6 +303,39 @@ function resolveBrandingLogoPath(logoUrl: unknown): string | null {
   return fs.existsSync(localPath) ? localPath : null
 }
 
+/** Bank row shown under the BRS title (Ghana manual workbook style). */
+type ReportBankAccountRow = {
+  id: string
+  name: string
+  bankName: string | null
+  accountNo: string | null
+}
+
+function resolveBankAccountForReportHeader(
+  bankAccounts: ReportBankAccountRow[] | undefined,
+  bankAccountId: string | undefined
+): ReportBankAccountRow | null {
+  const list = bankAccounts?.filter(Boolean) ?? []
+  if (!list.length) return null
+  if (bankAccountId) {
+    const found = list.find((a) => a.id === bankAccountId)
+    if (found) return found
+  }
+  if (list.length === 1) return list[0]
+  return null
+}
+
+/** e.g. "KALALA BANK  ACCOUNT NO: P4576" — matches common manual BRS layout. */
+function formatBankAccountHeaderLine(account: ReportBankAccountRow): string | null {
+  const bankLabel = (account.bankName || account.name || '').trim()
+  const acctNo = (account.accountNo || '').trim()
+  const upper = bankLabel.toUpperCase()
+  if (acctNo && upper) return `${upper}  ACCOUNT NO: ${acctNo}`
+  if (acctNo) return `ACCOUNT NO: ${acctNo}`
+  if (upper) return upper
+  return null
+}
+
 router.get('/:projectId', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
   const projectId = await resolveProjectId(req.params.projectId, orgId)
@@ -598,10 +631,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal,
     bankStatementClosingBalance: bankStatementClosingBalanceValue,
   })
-  const selectedBankAccount =
-    bankAccountId && project.bankAccounts?.length
-      ? project.bankAccounts.find((a: { id: string }) => a.id === bankAccountId)
-      : null
+  const headerBankAccount = resolveBankAccountForReportHeader(
+    project.bankAccounts as ReportBankAccountRow[] | undefined,
+    bankAccountId
+  )
+  const bankAccountHeaderLine = headerBankAccount ? formatBankAccountHeaderLine(headerBankAccount) : null
 
   // Status is set to 'completed' only when the project is approved (see projects approve handler)
   await logAudit({
@@ -645,7 +679,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   res.json({
     bankAccounts: project.bankAccounts || [],
     bankAccountId: bankAccountId || null,
-    selectedBankAccountName: selectedBankAccount ? (selectedBankAccount as { name: string }).name : null,
+    selectedBankAccountName: headerBankAccount ? headerBankAccount.name : null,
+    bankAccountHeaderLine,
     narrative: defaultNarrative,
     preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
     reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
@@ -1152,10 +1187,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal: bankOnlyDebitsNotInCashBookTotalExport,
     bankStatementClosingBalance: bankStatementClosingBalanceExport,
   })
-  const selectedBankAccountExport =
-    bankAccountId && project.bankAccounts?.length
-      ? project.bankAccounts.find((a: { id: string }) => a.id === bankAccountId)
-      : null
+  const headerBankAccountExport = resolveBankAccountForReportHeader(
+    project.bankAccounts as ReportBankAccountRow[] | undefined,
+    bankAccountId
+  )
+  const bankAccountHeaderLineExport = headerBankAccountExport
+    ? formatBankAccountHeaderLine(headerBankAccountExport)
+    : null
   const reconciliationDateExport = project.reconciliationDate
   const fmtBRSTitle = (d: Date | string | null) => {
     if (!d) return '—'
@@ -1182,7 +1220,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [`${project.organization.name} - ${reportTitle}`],
       [project.name],
       [`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)}`],
-      ...(selectedBankAccountExport ? [[`Bank account: ${(selectedBankAccountExport as { name: string }).name}`]] : []),
+      ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [`Currency: ${curr}`],
       [`Language profile: ${reportLanguageProfile.label}`],
       [],
@@ -1202,6 +1240,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     const additionalInformationRows: (string | number)[][] = [
       [`${project.organization.name} - ${reportTitle}`],
       [project.name],
+      ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [`${exportLabels.additionalInformationTitle} - As-at vs Post-period movement`],
       [`Language profile: ${reportLanguageProfile.label}`],
       [],
@@ -1222,14 +1261,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     const header = [
       [`${project.organization.name} - ${reportTitle}`],
       [project.name],
+      ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [`Generated: ${formatGeneratedAt(generatedAt)} (Africa/Accra)`],
       [],
     ]
     const matchedSheet = XLSX.utils.aoa_to_sheet(header)
+    const matchedDataOrigin = bankAccountHeaderLineExport ? 'A6' : 'A5'
     if (matchedRows.length) {
-      XLSX.utils.sheet_add_json(matchedSheet, matchedRows, { skipHeader: false, origin: 'A5' })
+      XLSX.utils.sheet_add_json(matchedSheet, matchedRows, { skipHeader: false, origin: matchedDataOrigin })
     } else {
-      XLSX.utils.sheet_add_aoa(matchedSheet, [['No matched transactions']], { origin: 'A5' })
+      XLSX.utils.sheet_add_aoa(matchedSheet, [['No matched transactions']], { origin: matchedDataOrigin })
     }
     XLSX.utils.book_append_sheet(wb, matchedSheet, 'Matched')
     const unmatchedIn = unmatchedReceipts.length ? unmatchedReceipts : unmatchedCredits
@@ -1315,11 +1356,12 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     doc.fontSize(14).text(reportTitle, { align: 'center' })
     doc.fontSize(11).text(project.name, { align: 'center' })
     const curr = project.currency || 'GHS'
-    doc.fontSize(9).text(`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)} • ${curr}`, { align: 'center' })
-    doc.fontSize(8).fillColor('#444444').text(`Language profile: ${reportLanguageProfile.label}`, { align: 'center' }).fillColor('#000000')
-    if (selectedBankAccountExport) {
-      doc.fontSize(9).text(`Bank account: ${(selectedBankAccountExport as { name: string }).name}`, { align: 'center' })
+    doc.fontSize(9).text(`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)}`, { align: 'center' })
+    if (bankAccountHeaderLineExport) {
+      doc.fontSize(9).text(bankAccountHeaderLineExport, { align: 'center' })
     }
+    doc.fontSize(9).text(`Currency: ${curr}`, { align: 'center' })
+    doc.fontSize(8).fillColor('#444444').text(`Language profile: ${reportLanguageProfile.label}`, { align: 'center' }).fillColor('#000000')
     doc.fontSize(8).fillColor('#444444').text(`Generated: ${formatGeneratedAt(new Date())} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.8)
 

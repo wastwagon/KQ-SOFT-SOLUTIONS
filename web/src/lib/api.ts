@@ -129,9 +129,11 @@ export interface ReportDiscrepancy {
 export interface ReportResponse {
   organization?: { name?: string; branding?: ReportBranding }
   project?: ReportProjectInfo
-  bankAccounts?: { id: string; name: string }[]
+  bankAccounts?: { id: string; name: string; bankName?: string | null; accountNo?: string | null }[]
   bankAccountId?: string | null
   selectedBankAccountName?: string | null
+  /** Ghana manual-style header line, e.g. "KALALA BANK  ACCOUNT NO: P4576" */
+  bankAccountHeaderLine?: string | null
   currency?: string
   generatedAt?: string
   narrative?: string
