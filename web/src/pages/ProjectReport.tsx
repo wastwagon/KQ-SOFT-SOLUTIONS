@@ -334,8 +334,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
-        <h2 className="text-lg font-semibold text-gray-900">Bank Reconciliation Statement</h2>
+      <div className="flex flex-wrap items-center justify-end gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           {bankAccounts.length > 0 && (
             <select
@@ -555,7 +554,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             ) : null
           })()}
           <p className="text-sm text-slate-500 mt-1">
-            {(data.organization?.branding?.reportTitle as string) || 'Bank Reconciliation Statement'} • Generated {formatDate(data.generatedAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {data.currency}
+            Generated {formatDate(data.generatedAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {data.currency}
           </p>
           {data.reportLanguageProfile && (
             <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-800">
@@ -602,16 +601,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             ) : null}
             <div className="mt-8 overflow-auto">
               <table className="w-full max-w-xl border-collapse text-sm text-slate-900">
-                <thead>
-                  <tr className="border-b border-slate-400">
-                    <th className="py-2 pr-6 text-left text-sm font-bold text-slate-900">Description</th>
-                    <th className="py-2 pl-2 text-right text-sm font-bold text-slate-900">
-                      Amount ({effectiveDisplayCurrency})
-                    </th>
-                  </tr>
-                </thead>
                 <tbody className="align-top">
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-t border-b border-slate-200">
                     <td className="py-2 pr-6 text-slate-900">{labels.closingBankStatementBalance}</td>
                     <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
                       {fmtBaseReportAmt(brsStatement.bankClosingBalance)}

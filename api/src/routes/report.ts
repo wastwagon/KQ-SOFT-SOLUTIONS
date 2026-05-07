@@ -1270,6 +1270,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       return n.toFixed(2)
     }
     const wbAmt = (n: number) => Number(Math.abs(n).toFixed(2))
+    // Client-facing workbook: match standard 4-line BRS handout (see LICL template). Full detail stays on web report, NOTES sheet, and other tabs.
     const brsStatementRows: (string | number)[][] = [
       [`${project.organization.name}`],
       [],
@@ -1279,44 +1280,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       ['Description', `Amount (${curr})`],
       [exportLabels.closingBankStatementBalance, wbAmt(bankClosingBalance)],
       [exportLabels.addUncreditedLodgments, wbAmt(uncreditedLodgmentsTimingTotalExport)],
-    ]
-    if (timingUncreditedBroughtForwardPriorExport > epsComposition) {
-      brsStatementRows.push(
-        [`  ${exportLabels.workbookCompositionTimingUncreditedCurrent}`, wbAmt(timingUncreditedCurrentPeriodExport)],
-        [`  ${exportLabels.workbookCompositionTimingUncreditedPrior}`, wbAmt(timingUncreditedBroughtForwardPriorExport)],
-      )
-    }
-    brsStatementRows.push([exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)])
-    if (unpresentedBroughtForwardPriorExport > epsComposition) {
-      brsStatementRows.push(
-        [`  ${exportLabels.workbookCompositionUnpresentedCurrent}`, wbAmt(unpresentedCurrentCashBookPeriodExport)],
-        [`  ${exportLabels.workbookCompositionUnpresentedPrior}`, wbAmt(unpresentedBroughtForwardPriorExport)],
-      )
-    }
-    brsStatementRows.push(
-      [exportLabels.addBankOnlyDebitsNotInCashBookLine, wbAmt(bankOnlyDebitsNotInCashBookTotalExport)],
-      [exportLabels.deductBankOnlyCreditsNotInCashBookLine, wbAmt(bankOnlyCreditsNotInCashBookTotalExport)],
-    )
-    if (bankOnlyCreditsBroughtForwardPriorExport > epsComposition) {
-      brsStatementRows.push(
-        [`  ${exportLabels.workbookCompositionBankCreditsCurrent}`, wbAmt(bankOnlyCreditsCurrentPeriodExport)],
-        [`  ${exportLabels.workbookCompositionBankCreditsPrior}`, wbAmt(bankOnlyCreditsBroughtForwardPriorExport)],
-      )
-    }
-    brsStatementRows.push([exportLabels.cashBookBalanceEnd, wbAmt(balancePerCashBook)])
-    if (Math.abs(workbookScheduleTieOutVarianceExport) > 0.02) {
-      brsStatementRows.push([
-        'Workbook tie-out (declared cash book − schedule): variance',
-        wbAmt(workbookScheduleTieOutVarianceExport),
-      ])
-    }
-    brsStatementRows.push(
+      [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
+      [exportLabels.cashBookBalanceEnd, wbAmt(balancePerCashBook)],
       [],
       [
-        'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.' +
-          (broughtForwardLodgmentsTotalExport + broughtForwardChequesTotalExport > epsComposition ?
-            ' Brought-forward lines roll unmatched items from the prior reconciliation period into this schedule.' :
-            ''),
+        'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES sheet and supporting schedules.',
         '',
       ],
       [],
@@ -1324,7 +1292,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       ['Signed off By:', ''],
       ['Date:', ''],
       ...(footerExport ? [[], [footerExport]] : []),
-    )
+    ]
     const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
     XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BANK RECONCILIATION')
     const additionalInformationRows: (string | number)[][] = [
@@ -1625,80 +1593,21 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         bold: true,
       },
       { label: exportLabels.addUncreditedLodgments, amount: uncreditedLodgmentsTimingTotalExport, workbookStyle: true },
+      {
+        label: exportLabels.lessUnpresentedCheques,
+        amount: Math.abs(unpresentedChequesTotal),
+        workbookStyle: true,
+      },
+      {
+        label: exportLabels.cashBookBalanceEnd,
+        amount: balancePerCashBook,
+        workbookStyle: true,
+        bold: true,
+      },
     ]
-    if (timingUncreditedBroughtForwardPriorExport > epsComposition) {
-      pdfPrimaryBrsRows.push(
-        { label: exportLabels.workbookCompositionTimingUncreditedCurrent, amount: timingUncreditedCurrentPeriodExport, workbookStyle: true, subRow: true },
-        { label: exportLabels.workbookCompositionTimingUncreditedPrior, amount: timingUncreditedBroughtForwardPriorExport, workbookStyle: true, subRow: true },
-      )
-    }
-    pdfPrimaryBrsRows.push({
-      label: exportLabels.lessUnpresentedCheques,
-      amount: Math.abs(unpresentedChequesTotal),
-      workbookStyle: true,
-    })
-    if (unpresentedBroughtForwardPriorExport > epsComposition) {
-      pdfPrimaryBrsRows.push(
-        {
-          label: exportLabels.workbookCompositionUnpresentedCurrent,
-          amount: unpresentedCurrentCashBookPeriodExport,
-          workbookStyle: true,
-          subRow: true,
-        },
-        {
-          label: exportLabels.workbookCompositionUnpresentedPrior,
-          amount: unpresentedBroughtForwardPriorExport,
-          workbookStyle: true,
-          subRow: true,
-        },
-      )
-    }
-    pdfPrimaryBrsRows.push(
-      {
-        label: exportLabels.addBankOnlyDebitsNotInCashBookLine,
-        amount: bankOnlyDebitsNotInCashBookTotalExport,
-        workbookStyle: true,
-      },
-      {
-        label: exportLabels.deductBankOnlyCreditsNotInCashBookLine,
-        amount: bankOnlyCreditsNotInCashBookTotalExport,
-        workbookStyle: true,
-      },
-    )
-    if (bankOnlyCreditsBroughtForwardPriorExport > epsComposition) {
-      pdfPrimaryBrsRows.push(
-        {
-          label: exportLabels.workbookCompositionBankCreditsCurrent,
-          amount: bankOnlyCreditsCurrentPeriodExport,
-          workbookStyle: true,
-          subRow: true,
-        },
-        {
-          label: exportLabels.workbookCompositionBankCreditsPrior,
-          amount: bankOnlyCreditsBroughtForwardPriorExport,
-          workbookStyle: true,
-          subRow: true,
-        },
-      )
-    }
-    pdfPrimaryBrsRows.push({
-      label: exportLabels.cashBookBalanceEnd,
-      amount: balancePerCashBook,
-      workbookStyle: true,
-      bold: true,
-    })
     drawAmountSummaryTable('Bank Reconciliation Statement', pdfPrimaryBrsRows, { drawTotal: false })
-    if (Math.abs(workbookScheduleTieOutVarianceExport) > 0.02) {
-      doc.fontSize(8).fillColor('#B45309').text(
-        `Workbook tie-out: declared cash book minus schedule total = ${amtNum(workbookScheduleTieOutVarianceExport)} (review matches and opening balances).`,
-        { width: contentWidth },
-      ).fillColor('#000000').moveDown(0.4)
-    }
     doc.fontSize(8).fillColor('#444444').text(
-      'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.' +
-        (broughtForwardLodgmentsTotalExport + broughtForwardChequesTotalExport > epsComposition ?
-          ' Brought-forward lines roll unmatched items from the prior reconciliation period into this schedule.' :
-          ''),
+      'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES section below and supporting tables.',
       { width: contentWidth },
     ).fillColor('#000000').moveDown(0.6)
     doc.fontSize(9).fillColor('#111827').text('Checked By: _______________________________________', { continued: false })

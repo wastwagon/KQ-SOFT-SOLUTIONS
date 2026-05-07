@@ -46,11 +46,9 @@ Applies to: **first block** on `ProjectReport`, Excel sheet **`BANK RECONCILIATI
 
 `cashBook = bankClosing + timingUncredited − unpresentedMagnitude + bankOnlyDebits − bankOnlyCredits`
 
-**Tie-out**
+**Export (Excel `BANK RECONCILIATION` sheet & PDF summary)** uses the **short client handout**: the same four **main** lines only (closing, add timing uncredited, less unpresented, cash book). **Omitted on export:** bank-only debit/credit lines, roll-forward composition sub-rows, and tie-out variance — those remain on the **on-screen report**, **NOTES** sheet (Excel), and later PDF sections. Numbers still reflect the full reconciliation; the short schedule does not re-foot arithmetically when bank-only items exist.
 
-- API/UI expose `workbookScheduleDerivedCashBook` and `workbookScheduleTieOutVariance` (`declaredCashBook − derived`). Non-zero beyond tolerance → data review.
-
-**Header**
+---
 
 - Bank line uses **`{BankName} Account Number {digits}`** when `bankName`/`accountNo` exist (not legacy `ACCOUNT NO:` all-caps).
 
