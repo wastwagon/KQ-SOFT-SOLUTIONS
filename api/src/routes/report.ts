@@ -1514,7 +1514,12 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         /** Indented workbook composition line (does not contribute to PDF subtotal totals). */
         subRow?: boolean
       }>,
-      opts?: { drawTotal?: boolean; hideTitle?: boolean; hideColumnHeaders?: boolean }
+      opts?: {
+        drawTotal?: boolean
+        hideTitle?: boolean
+        hideColumnHeaders?: boolean
+        leftHeaderLabel?: string
+      }
     ) => {
       const x = margin
       const tableWidth = contentWidth
@@ -1541,7 +1546,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         doc.restore()
         const y = doc.y + 5
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
-        doc.text('Description', x + 6, y, { width: cLabel - 8 })
+        doc.text(opts?.leftHeaderLabel ?? 'Description', x + 6, y, { width: cLabel - 8 })
         doc.text(`Amount (${curr})`, x + cLabel + 6, y, { width: cAmount - 12, align: 'right' })
         doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
         doc.y += rowH
@@ -1626,15 +1631,22 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       drawTotal: false,
       hideTitle: true,
       hideColumnHeaders: false,
+      leftHeaderLabel: '',
     })
+    doc.x = margin
     doc.fontSize(8).fillColor('#444444').text(
       'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES section below and supporting tables.',
+      margin,
+      doc.y,
       { width: contentWidth },
     ).fillColor('#000000').moveDown(0.6)
+    doc.x = margin
     doc.fontSize(9).fillColor('#111827').text('Checked By: _______________________________________', { continued: false })
     doc.moveDown(0.4)
+    doc.x = margin
     doc.text('Signed off By: _______________________________________')
     doc.moveDown(0.4)
+    doc.x = margin
     doc.text('Date: _______________________________________')
     doc.moveDown(0.8).fillColor('#000000')
 
