@@ -1277,6 +1277,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [],
+      ['Description', `Amount (${curr})`],
       [exportLabels.closingBankStatementBalance, wbAmt(bankClosingBalance)],
       [exportLabels.addUncreditedLodgments, wbAmt(uncreditedLodgmentsTimingTotalExport)],
       [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
@@ -1624,7 +1625,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     drawAmountSummaryTable('Bank Reconciliation Statement', pdfPrimaryBrsRows, {
       drawTotal: false,
       hideTitle: true,
-      hideColumnHeaders: true,
+      hideColumnHeaders: false,
     })
     doc.fontSize(8).fillColor('#444444').text(
       'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES section below and supporting tables.',
