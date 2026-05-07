@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="rex-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <!-- Mark: container + motion -->
+  <rect x="2" y="12" width="44" height="40" rx="5" fill="#0f172a"/>
+  <rect x="10" y="20" width="36" height="24" rx="3" fill="url(#rex-accent)"/>
+  <path d="M18 28h20M18 34h14M18 40h20" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/>
+  <path d="M44 18 L54 12 L54 52 L44 46 Z" fill="#1e293b" opacity=".9"/>
+  <circle cx="52" cy="32" r="3" fill="#fbbf24"/>
+  <!-- Wordmark -->
+  <text x="68" y="38" fill="#0f172a" font-family="system-ui,Segoe UI,sans-serif" font-size="22" font-weight="800" letter-spacing="-0.02em">RexGroup</text>
+  <text x="68" y="54" fill="#64748b" font-family="system-ui,Segoe UI,sans-serif" font-size="9" font-weight="600" letter-spacing="0.12em">FREIGHT · TRANSPORT · LOGISTICS</text>
+</svg>

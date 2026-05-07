@@ -609,8 +609,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     .filter((d) => payments.some((p) => hasChequeOrRefLink(p, d)))
     .reduce((s, t) => s + t.amount, 0)
   const unmatchedDebitsTotal = unmatchedDebits.reduce((s, t) => s + t.amount, 0)
-  const asAtUncreditedTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal
-  const asAtUnpresentedTotal = unmatchedPaymentsTotal + unmatchedDebitsTotal
+  // Final-facing report excludes bank-only items from displayed as-at sections.
+  const asAtUncreditedTotal = unmatchedReceiptsTotal
+  const asAtUnpresentedTotal = unmatchedPaymentsTotal
   const bankOnlyCreditsNotInCashBookTotal = unmatchedCreditsTotal + broughtForwardBankCreditsTotal
   // Debits with cheque/ref linkage to cash-book payments are not treated as "bank-only" in manual workbook style.
   const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal - unmatchedDebitsLinkedToCashBookTotal
@@ -650,7 +651,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const fmtAmt = (n: number) => formatAmountForReport(n, curr)
   const defaultNarrative =
     project.reportNarrative ||
-    `This reconciliation shows ${matchPairs.length} matched transaction(s). Unpresented cheques total ${fmtAmt(unpresentedChequesTotal)}; uncredited lodgments total ${fmtAmt(uncreditedLodgmentsTotal)}.`
+    `This reconciliation shows ${matchPairs.length} matched transaction(s). Unpresented cheques total ${fmtAmt(unpresentedChequesTotal)}; uncredited lodgments total ${fmtAmt(uncreditedLodgmentsTimingTotal)}.`
   const reportLanguageProfile = {
     code: 'GHANA_BRS_V1',
     label: 'Ghana BRS language profile',
@@ -676,6 +677,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       broughtForwardUnpresentedCheques: 'Brought-forward unpresented cheques',
     },
   }
+  const reportCompletedAt = project.approvedAt || project.reviewedAt || project.preparedAt || new Date()
+
   res.json({
     bankAccounts: project.bankAccounts || [],
     bankAccountId: bankAccountId || null,
@@ -846,6 +849,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     broughtForwardItems,
     broughtForwardLodgments,
     currency: project.currency || 'GHS',
+    reportCompletedAt: reportCompletedAt.toISOString(),
     generatedAt: new Date().toISOString(),
   })
 })
@@ -996,7 +1000,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
       lessUnpresentedCheques: 'Less: Unpresented cheques / uncleared payments',
       cashBookBalanceEnd: 'Cash book balance at end of period',
-      additionalInformationTitle: 'Additional Information',
+      additionalInformationTitle: 'NOTES',
       asAtReconciliationPosition: 'As-at reconciliation position',
       postPeriodMovement: 'Post-period movement (carried forward)',
       uncreditedLodgmentsOrUnclearedDeposits: 'Uncredited lodgments / uncleared deposits',
@@ -1019,13 +1023,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       'Cash Book Name': p.cb.name || '',
       'Cash Book Description': p.cb.details || '',
       'Cash Book Chq No': p.cb.chqNo || '',
-      'Cash Book Ref Doc No': p.cb.docRef || '',
-      [`Amount Received (${curr})`]: isReceipt ? p.cb.amount : '',
-      [`Amount Paid (${curr})`]: !isReceipt ? p.cb.amount : '',
+      'DOC REF': p.cb.docRef || '',
+      [`AMT RECEIVED (${curr})`]: isReceipt ? p.cb.amount : '',
+      [`AMT PAID (${curr})`]: !isReceipt ? p.cb.amount : '',
       'Bank Date': fmt(p.bank.date),
       'Bank Description': p.bank.name || p.bank.details || '',
       'Bank Chq No': p.bank.chqNo || '',
-      'Bank Ref Doc No': p.bank.docRef || '',
+      'DOC REF (BANK)': p.bank.docRef || '',
       [`Bank Amount (${curr})`]: p.bank.amount,
     }
   })
@@ -1039,9 +1043,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       Name: t.name || '',
       Description: t.details || '',
       'Chq No': t.chqNo || '',
-      'Ref Doc No': t.docRef || '',
-      [`Amount Received (${curr})`]: t.amount,
-      [`Amount Paid (${curr})`]: '',
+      'DOC REF': t.docRef || '',
+      [`AMT RECEIVED (${curr})`]: t.amount,
+      [`AMT PAID (${curr})`]: '',
       [`Balance (${curr})`]: runningBal,
     }
   })
@@ -1053,7 +1057,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       Date: fmt(t.date),
       Description: t.name || t.details || '',
       'Chq No': t.chqNo || '',
-      'Ref Doc No': t.docRef || '',
+      'DOC REF': t.docRef || '',
       [`Debit (${curr})`]: '',
       [`Credit (${curr})`]: t.amount,
       [`Balance (${curr})`]: runningBal,
@@ -1067,10 +1071,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       Date: fmt(t.date),
       Name: t.name || '',
       Description: t.details || '',
-      'Cheque No': t.chqNo || '',
-      'Ref Doc No': t.docRef || '',
-      [`Amount Received (${curr})`]: '',
-      [`Amount Paid (${curr})`]: t.amount,
+      'CHQ NO': t.chqNo || '',
+      'DOC REF': t.docRef || '',
+      [`AMT RECEIVED (${curr})`]: '',
+      [`AMT PAID (${curr})`]: t.amount,
       [`Balance (${curr})`]: runningBal,
     }
   })
@@ -1091,8 +1095,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   ]
   const missingChequesAgeingExport = buildMissingChequesAgeing(allUnpresentedExport, refDateExport).map((t) => ({
     Date: t.date,
-    'Cheque No': t.chqNo || '',
-    'Ref Doc No': '',
+    'CHQ NO': t.chqNo || '',
+    'DOC REF': '',
     Name: t.name || '',
     [`Amount (${curr})`]: t.amount,
     'Days Outstanding': t.daysOutstanding,
@@ -1111,13 +1115,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       'Cash Book Date': fmt(p.cb.date),
       'Cash Book Desc': (p.cb.name || p.cb.details || '').slice(0, 40),
       'Cash Book Chq No': p.cb.chqNo || '',
-      'Cash Book Ref Doc No': p.cb.docRef || '',
-      [`Amount Received (${curr})`]: isReceipt ? p.cb.amount : '',
-      [`Amount Paid (${curr})`]: !isReceipt ? p.cb.amount : '',
+      'DOC REF': p.cb.docRef || '',
+      [`AMT RECEIVED (${curr})`]: isReceipt ? p.cb.amount : '',
+      [`AMT PAID (${curr})`]: !isReceipt ? p.cb.amount : '',
       'Bank Date': fmt(p.bank.date),
       'Bank Desc': (p.bank.name || p.bank.details || '').slice(0, 40),
       'Bank Chq No': p.bank.chqNo || '',
-      'Bank Ref Doc No': p.bank.docRef || '',
+      'DOC REF (BANK)': p.bank.docRef || '',
       [`Bank Amount (${curr})`]: p.bank.amount,
       [`Amount Variance (${curr})`]: Math.abs(p.cb.amount - p.bank.amount),
       'Date Diff Days': p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0,
@@ -1131,7 +1135,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       Date: fmt(t.date),
       Description: t.name || t.details || '',
       'Chq No': t.chqNo || '',
-      'Ref Doc No': t.docRef || '',
+      'DOC REF': t.docRef || '',
       [`Debit (${curr})`]: t.amount,
       [`Credit (${curr})`]: '',
       [`Balance (${curr})`]: runningBal,
@@ -1167,8 +1171,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     unmatchedPaymentsWithoutDetailsTotalExport +
     broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
   const broughtForwardChequesTotalExport = broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
-  const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport
-  const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport + unmatchedDebitsTotalExport
+  const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport
+  const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport
   const bankOnlyCreditsNotInCashBookTotalExport = unmatchedCreditsTotalExport + broughtForwardBankCreditsTotalExport
   const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport - unmatchedDebitsLinkedToCashBookTotalExport
   const bankStatementClosingBalanceExport =
@@ -1226,9 +1230,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [],
       ...(bankStatementClosingBalanceExport != null ? [[exportLabels.openingBankStatementBalance, maybeSigned(bankStatementClosingBalanceExport)]] : []),
       [exportLabels.closingBankStatementBalance + (bankStatementClosingBalanceExport != null ? ' (reconciled)' : ''), maybeSigned(bankClosingBalance)],
-      [exportLabels.addUncreditedLodgments, maybeSigned(uncreditedLodgmentsTotal)],
-      [exportLabels.addBankOnlyCredits, maybeSigned(bankOnlyCreditsNotInCashBookTotalExport)],
-      [exportLabels.lessBankOnlyDebits, maybeSigned(-Math.abs(bankOnlyDebitsNotInCashBookTotalExport), { forceNegative: true })],
+      [exportLabels.addUncreditedLodgments, maybeSigned(uncreditedLodgmentsTimingTotalExport)],
       [exportLabels.lessUnpresentedCheques, maybeSigned(-Math.abs(unpresentedChequesTotal), { forceNegative: true })],
       [exportLabels.cashBookBalanceEnd, maybeSigned(balancePerCashBook)],
       [],
@@ -1236,7 +1238,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       ...(footerExport ? [[], [footerExport]] : []),
     ]
     const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
-    XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BRS Statement')
+    XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BANK RECONCILIATION')
     const additionalInformationRows: (string | number)[][] = [
       [`${project.organization.name} - ${reportTitle}`],
       [project.name],
@@ -1246,8 +1248,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [],
       [exportLabels.asAtReconciliationPosition, `Amount (${curr})`],
       [exportLabels.uncreditedLodgmentsOrUnclearedDeposits, maybeSigned(asAtUncreditedTotalExport)],
-      [exportLabels.bankOnlyCreditsNotInCashBook, maybeSigned(unmatchedCreditsTotalExport)],
-      [exportLabels.bankOnlyDebitsNotInCashBook, maybeSigned(-Math.abs(unmatchedDebitsTotalExport), { forceNegative: true })],
       [exportLabels.unpresentedChequesOrUnclearedPayments, maybeSigned(-Math.abs(asAtUnpresentedTotalExport), { forceNegative: true })],
       [],
       [exportLabels.postPeriodMovement, `Amount (${curr})`],
@@ -1256,13 +1256,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [exportLabels.broughtForwardUnpresentedCheques, maybeSigned(-Math.abs(broughtForwardChequesTotalExport), { forceNegative: true })],
     ]
     const additionalInformationSheet = XLSX.utils.aoa_to_sheet(additionalInformationRows)
-    XLSX.utils.book_append_sheet(wb, additionalInformationSheet, 'Additional Information')
+    XLSX.utils.book_append_sheet(wb, additionalInformationSheet, 'NOTES')
     const generatedAt = new Date()
+    const reportCompletedAt = project.approvedAt || project.reviewedAt || project.preparedAt || generatedAt
     const header = [
       [`${project.organization.name} - ${reportTitle}`],
       [project.name],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
-      [`Generated: ${formatGeneratedAt(generatedAt)} (Africa/Accra)`],
+      [`Report completed: ${formatGeneratedAt(reportCompletedAt)} (Africa/Accra)`],
+      [`Print date: ${formatGeneratedAt(generatedAt)} (Africa/Accra)`],
       [],
     ]
     const matchedSheet = XLSX.utils.aoa_to_sheet(header)
@@ -1272,14 +1274,14 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     } else {
       XLSX.utils.sheet_add_aoa(matchedSheet, [['No matched transactions']], { origin: matchedDataOrigin })
     }
-    XLSX.utils.book_append_sheet(wb, matchedSheet, 'Matched')
-    const unmatchedIn = unmatchedReceipts.length ? unmatchedReceipts : unmatchedCredits
+    XLSX.utils.book_append_sheet(wb, matchedSheet, 'MATCHED')
+    const unmatchedIn = unmatchedReceipts
     if (unmatchedIn.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedIn), 'Unmatched Receipts-Credits')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedIn), 'UNMATCHED RECEIPTS IN CASH BOOK')
     }
-    const unmatchedOut = unmatchedPayments.length ? unmatchedPayments : unmatchedDebits
+    const unmatchedOut = unmatchedPayments
     if (unmatchedOut.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'Missing Cheques - Payments')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'UNMATCHED PAYMENTS IN CASH BOOK')
     }
     if (hasMissingChequesReportExport && missingChequesAgeingExport.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingChequesAgeingExport), 'Missing Cheques Ageing')
@@ -1362,7 +1364,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     doc.fontSize(9).text(`Currency: ${curr}`, { align: 'center' })
     doc.fontSize(8).fillColor('#444444').text(`Language profile: ${reportLanguageProfile.label}`, { align: 'center' }).fillColor('#000000')
-    doc.fontSize(8).fillColor('#444444').text(`Generated: ${formatGeneratedAt(new Date())} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
+    const printAt = new Date()
+    const reportCompletedAtPdf = project.approvedAt || project.reviewedAt || project.preparedAt || printAt
+    doc.fontSize(8).fillColor('#444444').text(`Report completed: ${formatGeneratedAt(reportCompletedAtPdf)} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
+    doc.fontSize(8).fillColor('#444444').text(`Print date: ${formatGeneratedAt(printAt)} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.8)
 
     const amtNum = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -1376,16 +1381,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     const drawTable = (
       title: string,
-      rows: Array<{ date: string; type: string; ref: string; description: string; amount: number }>,
-      opts?: { allowEmptyText?: string }
+      rows: Array<{ date: string; ref: string; details: string; amount: number }>,
+      opts?: { allowEmptyText?: string; refLabel?: string }
     ) => {
       const x = margin
       const tableWidth = contentWidth
       const cDate = 90
-      const cType = 95
-      const cRef = 90
+      const cRef = 100
       const cAmount = 120
-      const cDesc = tableWidth - cDate - cType - cRef - cAmount
+      const cDesc = tableWidth - cDate - cRef - cAmount
       const rowH = 18
       const ensureRoom = (needed: number, redrawHeader = false) => {
         if (doc.y + needed < doc.page.height - 60) return
@@ -1403,11 +1407,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         doc.restore()
         const y = doc.y + 5
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
-        doc.text('Date', x + 6, y, { width: cDate - 8 })
-        doc.text('Type', x + cDate + 6, y, { width: cType - 8 })
-        doc.text('Ref No.', x + cDate + cType + 6, y, { width: cRef - 8 })
-        doc.text('Description / Payee', x + cDate + cType + cRef + 6, y, { width: cDesc - 8 })
-        doc.text(`Amount (${curr})`, x + cDate + cType + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.text('DATE', x + 6, y, { width: cDate - 8 })
+        doc.text(opts?.refLabel || 'DOC REF', x + cDate + 6, y, { width: cRef - 8 })
+        doc.text('NAME - DETAILS', x + cDate + cRef + 6, y, { width: cDesc - 8 })
+        doc.text(`AMT (${curr})`, x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
         doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
         doc.y += rowH
       }
@@ -1432,10 +1435,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         total += r.amount
         doc.fontSize(9).font('Helvetica').fillColor('#111827')
         doc.text(fmtPdfDate(r.date), x + 6, y, { width: cDate - 8 })
-        doc.text(r.type || '—', x + cDate + 6, y, { width: cType - 8 })
-        doc.text(r.ref || '—', x + cDate + cType + 6, y, { width: cRef - 8 })
-        doc.text((r.description || '—').slice(0, 62), x + cDate + cType + cRef + 6, y, { width: cDesc - 8 })
-        doc.text(amtNum(r.amount), x + cDate + cType + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.text(r.ref || '—', x + cDate + 6, y, { width: cRef - 8 })
+        doc.text((r.details || '—').slice(0, 62), x + cDate + cRef + 6, y, { width: cDesc - 8 })
+        doc.text(amtNum(r.amount), x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
         doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
         doc.y += rowH
       })
@@ -1521,7 +1523,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         label: exportLabels.closingBankStatementBalance + (bankStatementClosingBalanceExport != null ? ' (reconciled)' : ''),
         amount: bankClosingBalance,
       },
-      { label: exportLabels.addUncreditedLodgments, amount: uncreditedLodgmentsTotal },
+      { label: exportLabels.addUncreditedLodgments, amount: uncreditedLodgmentsTimingTotalExport },
       { label: exportLabels.lessUnpresentedCheques, amount: unpresentedChequesTotal, forceNegative: true },
       { label: exportLabels.cashBookBalanceEnd, amount: balancePerCashBook },
     ], { drawTotal: false })
@@ -1539,7 +1541,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
     const exportNarrative =
       (project as { reportNarrative?: string | null }).reportNarrative ||
-      `This reconciliation shows ${matchPairs.length} matched transaction(s). Currency: ${curr}. Unpresented cheques total ${amtNum(unpresentedChequesTotal)}; uncredited lodgments total ${amtNum(uncreditedLodgmentsTotal)}.`
+      `This reconciliation shows ${matchPairs.length} matched transaction(s). Currency: ${curr}. Unpresented cheques total ${amtNum(unpresentedChequesTotal)}; uncredited lodgments total ${amtNum(uncreditedLodgmentsTimingTotalExport)}.`
     doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: 495 }).fillColor('#000000').moveDown(0.5)
     const prepComment = (project as { preparerComment?: string | null }).preparerComment
     const revComment = (project as { reviewerComment?: string | null }).reviewerComment
@@ -1551,33 +1553,35 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     if (prepComment?.trim() || revComment?.trim()) doc.moveDown(0.5)
 
-    const matchedTableRows = matchPairs.map((p) => {
-      const isReceipt = receiptIdsExport.has(p.cb.id)
-      return {
-        date: fmt(p.cb.date),
-        type: isReceipt ? 'Receipt/Credit' : 'Payment/Debit',
-        ref: p.cb.docRef || p.cb.chqNo || p.bank.docRef || p.bank.chqNo || '',
-        description: p.cb.name || p.cb.details || p.bank.name || p.bank.details || '—',
-        amount: p.cb.amount,
-      }
-    })
-    drawTable('Matched transactions', matchedTableRows, { allowEmptyText: 'No matched transactions.' })
+    const matchedTableRows = matchPairs.map((p) => ({
+      date: fmt(p.cb.date),
+      ref: p.cb.docRef || p.cb.chqNo || p.bank.docRef || p.bank.chqNo || '',
+      details: p.cb.name || p.cb.details || p.bank.name || p.bank.details || '—',
+      amount: p.cb.amount,
+    }))
+    drawTable('MATCHED', matchedTableRows, { allowEmptyText: 'None', refLabel: 'DOC REF / CHQ NO' })
+    const pickField = (row: Record<string, unknown>, prefix: string): unknown => {
+      const key = Object.keys(row).find((k) => k === prefix || k.startsWith(`${prefix} (`))
+      return key ? row[key] : undefined
+    }
     const unmatchedReceiptRows = unmatchedReceipts.map((t) => ({
       date: (t as { Date: string }).Date,
-      type: 'Receipt',
-      ref: (t as { 'Ref Doc No'?: string })['Ref Doc No'] || (t as { 'Chq No'?: string })['Chq No'] || '',
-      description: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
-      amount: (t as { 'Amount Received'?: number })['Amount Received'] ?? 0,
+      ref:
+        String(pickField(t as Record<string, unknown>, 'DOC REF') || '') ||
+        String(pickField(t as Record<string, unknown>, 'Chq No') || ''),
+      details: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
+      amount: Number(pickField(t as Record<string, unknown>, 'AMT RECEIVED') || 0),
     }))
-    drawTable('Unmatched receipts (cash book)', unmatchedReceiptRows)
+    drawTable('UNMATCHED RECEIPTS IN CASH BOOK', unmatchedReceiptRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
     const unmatchedPaymentRows = unmatchedPayments.map((t) => ({
       date: (t as { Date: string }).Date,
-      type: 'Payment',
-      ref: (t as { 'Ref Doc No'?: string })['Ref Doc No'] || (t as { 'Cheque No'?: string })['Cheque No'] || '',
-      description: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
-      amount: (t as { 'Amount Paid'?: number })['Amount Paid'] ?? 0,
+      ref:
+        String(pickField(t as Record<string, unknown>, 'DOC REF') || '') ||
+        String(pickField(t as Record<string, unknown>, 'CHQ NO') || ''),
+      details: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
+      amount: Number(pickField(t as Record<string, unknown>, 'AMT PAID') || 0),
     }))
-    drawTable('Unmatched payments (cash book)', unmatchedPaymentRows)
+    drawTable('UNMATCHED PAYMENTS IN CASH BOOK', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
 
     const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
     const range = doc.bufferedPageRange()
