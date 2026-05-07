@@ -856,6 +856,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
 })
 
 router.get('/:projectId/export', async (req: AuthRequest, res) => {
+  // Keep export table columns aligned with docs/REPORT_LAYOUT_SCHEMA.md (compact layout).
   const role = req.auth!.role
   if (!canExportReport(role)) {
     return res.status(403).json({ error: 'Insufficient permission to export reports' })
@@ -1018,65 +1019,41 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
   const receiptIds = new Set(receipts.map((t) => t.id))
   const matchedRows = matchPairs.map((p) => {
-    const isReceipt = receiptIds.has(p.cb.id)
+    const cbAmount = p.cb.amount
+    const variance = Math.abs(cbAmount - p.bank.amount)
     return {
-      'Cash Book Date': fmt(p.cb.date),
-      'Cash Book Name': p.cb.name || '',
-      'Cash Book Description': p.cb.details || '',
-      'Cash Book Chq No': p.cb.chqNo || '',
-      'DOC REF': p.cb.docRef || '',
-      [`AMT RECEIVED (${curr})`]: isReceipt ? p.cb.amount : '',
-      [`AMT PAID (${curr})`]: !isReceipt ? p.cb.amount : '',
-      'Bank Date': fmt(p.bank.date),
-      'Bank Description': p.bank.name || p.bank.details || '',
-      'Bank Chq No': p.bank.chqNo || '',
-      'DOC REF (BANK)': p.bank.docRef || '',
+      'Cash Book': `${fmt(p.cb.date)} - ${p.cb.name || p.cb.details || '—'}`,
+      [`Cash Book Amount (${curr})`]: cbAmount,
+      'Bank': `${fmt(p.bank.date)} - ${p.bank.name || p.bank.details || '—'}`,
       [`Bank Amount (${curr})`]: p.bank.amount,
+      [`Variance (${curr})`]: variance,
     }
   })
 
   const unmatchedReceiptsRaw = receipts.filter((t) => !matchedCbIds.has(t.id))
-  let runningBal = 0
   const unmatchedReceipts = unmatchedReceiptsRaw.map((t) => {
-    runningBal += t.amount
     return {
       Date: fmt(t.date),
-      Name: t.name || '',
-      Description: t.details || '',
-      'Chq No': t.chqNo || '',
-      'DOC REF': t.docRef || '',
-      [`AMT RECEIVED (${curr})`]: t.amount,
-      [`AMT PAID (${curr})`]: '',
-      [`Balance (${curr})`]: runningBal,
+      Details: t.name || t.details || '',
+      [`Amount (${curr})`]: t.amount,
     }
   })
-  runningBal = 0
+
   const unmatchedCreditsRaw = credits.filter((t) => !matchedBankIds.has(t.id))
   const unmatchedCredits = unmatchedCreditsRaw.map((t) => {
-    runningBal += t.amount
     return {
       Date: fmt(t.date),
       Description: t.name || t.details || '',
-      'Chq No': t.chqNo || '',
-      'DOC REF': t.docRef || '',
-      [`Debit (${curr})`]: '',
-      [`Credit (${curr})`]: t.amount,
-      [`Balance (${curr})`]: runningBal,
+      [`Amount (${curr})`]: t.amount,
     }
   })
-  runningBal = 0
+
   const unmatchedPaymentsRaw = payments.filter((t) => !matchedCbIds.has(t.id))
   const unmatchedPayments = unmatchedPaymentsRaw.map((t) => {
-    runningBal -= t.amount
     return {
       Date: fmt(t.date),
-      Name: t.name || '',
-      Description: t.details || '',
-      'CHQ NO': t.chqNo || '',
-      'DOC REF': t.docRef || '',
-      [`AMT RECEIVED (${curr})`]: '',
-      [`AMT PAID (${curr})`]: t.amount,
-      [`Balance (${curr})`]: runningBal,
+      Details: t.name || t.details || '',
+      [`Amount (${curr})`]: t.amount,
     }
   })
   const refDateExport = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
@@ -1128,18 +1105,12 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       'Date Diff Days': p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0,
     }
   })
-  runningBal = 0
   const unmatchedDebitsRaw = debits.filter((t) => !matchedBankIds.has(t.id))
   const unmatchedDebits = unmatchedDebitsRaw.map((t) => {
-    runningBal -= t.amount
     return {
       Date: fmt(t.date),
       Description: t.name || t.details || '',
-      'Chq No': t.chqNo || '',
-      'DOC REF': t.docRef || '',
-      [`Debit (${curr})`]: t.amount,
-      [`Credit (${curr})`]: '',
-      [`Balance (${curr})`]: runningBal,
+      [`Amount (${curr})`]: t.amount,
     }
   })
 
@@ -1297,21 +1268,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       }).map((p) => {
         const amountVariance = Math.abs(p.cb.amount - p.bank.amount)
         const dateVarianceDays = p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0
-        const amountBand = amountVariance <= 1 ? '0–1' : amountVariance <= 100 ? '1–100' : amountVariance <= 500 ? '100–500' : '500+'
-        const dateBand = dateVarianceDays <= 7 ? '0–7 days' : dateVarianceDays <= 30 ? '7–30 days' : '30+ days'
-        const isReceipt = receiptIdsExport.has(p.cb.id)
         return {
-          'Cash Book Date': fmt(p.cb.date),
-          'Cash Book Desc': (p.cb.name || p.cb.details || '').slice(0, 40),
-          [`Amount Received (${curr})`]: isReceipt ? p.cb.amount : '',
-          [`Amount Paid (${curr})`]: !isReceipt ? p.cb.amount : '',
-          'Bank Date': fmt(p.bank.date),
-          'Bank Desc': (p.bank.name || p.bank.details || '').slice(0, 40),
+          'Cash Book': `${fmt(p.cb.date)} - ${(p.cb.name || p.cb.details || '').slice(0, 40)}`,
+          [`Cash Book Amount (${curr})`]: p.cb.amount,
+          'Bank': `${fmt(p.bank.date)} - ${(p.bank.name || p.bank.details || '').slice(0, 40)}`,
           [`Bank Amount (${curr})`]: p.bank.amount,
           [`Amount Variance (${curr})`]: amountVariance,
           'Date Diff Days': dateVarianceDays,
-          'Amount Band': amountBand,
-          'Date Band': dateBand,
         }
       })
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discWithBands), 'Discrepancies')
