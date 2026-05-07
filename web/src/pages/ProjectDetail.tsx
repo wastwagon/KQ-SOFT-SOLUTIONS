@@ -61,6 +61,7 @@ export default function ProjectDetail() {
   const [bsUseAs, setBsUseAs] = useState<'credits' | 'debits' | 'both'>('both')
   const [bankAccountId, setBankAccountId] = useState<string>('')
   const [bankAccountName, setBankAccountName] = useState('')
+  const [bankAccountNo, setBankAccountNo] = useState('')
   const [uploadError, setUploadError] = useState('')
   const [uploadingCount, setUploadingCount] = useState(0)
   const [uploadTotal, setUploadTotal] = useState(0)
@@ -131,10 +132,14 @@ export default function ProjectDetail() {
     enabled: !!slug,
   })
   const uploadBsMutation = useMutation({
-    mutationFn: async (data: { files: File[]; useAs: 'credits' | 'debits' | 'both'; bankAccountId?: string; accountName?: string }) => {
+    mutationFn: async (data: { files: File[]; useAs: 'credits' | 'debits' | 'both'; bankAccountId?: string; accountName?: string; accountNo?: string }) => {
       setUploadError('')
       const types: ('credits' | 'debits')[] = data.useAs === 'both' ? ['credits', 'debits'] : [data.useAs]
-      const opts = { bankAccountId: data.bankAccountId || undefined, accountName: data.accountName || undefined }
+      const opts = {
+        bankAccountId: data.bankAccountId || undefined,
+        accountName: data.accountName || undefined,
+        accountNo: data.accountNo || undefined,
+      }
       let n = 0
       const total = data.files.length * types.length
       setUploadTotal(total)
@@ -152,6 +157,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['project', slug] })
       queryClient.invalidateQueries({ queryKey: ['bankAccounts', slug] })
       setBsFiles([])
+      setBankAccountNo('')
     },
     onError: (err) => {
       setUploadError(err instanceof Error ? err.message : 'Upload failed')
@@ -437,13 +443,22 @@ export default function ProjectDetail() {
                           </SelectWrapper>
                         )}
                         {bankAccountId === '' && (
-                          <input
-                            type="text"
-                            placeholder="Account name (optional)"
-                            value={bankAccountName}
-                            onChange={(e) => setBankAccountName(e.target.value)}
-                            className="min-h-[36px] max-w-[160px] px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-500/20"
-                          />
+                          <>
+                            <input
+                              type="text"
+                              placeholder="Account name (optional)"
+                              value={bankAccountName}
+                              onChange={(e) => setBankAccountName(e.target.value)}
+                              className="min-h-[36px] max-w-[160px] px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-500/20"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Account number (optional)"
+                              value={bankAccountNo}
+                              onChange={(e) => setBankAccountNo(e.target.value)}
+                              className="min-h-[36px] max-w-[180px] px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-500/20"
+                            />
+                          </>
                         )}
                       </div>
                     )}
@@ -471,7 +486,13 @@ export default function ProjectDetail() {
                       />
                       {bsFiles.length > 0 && <span className="text-xs text-gray-500">{bsFiles.length} file(s)</span>}
                       <button
-                        onClick={() => uploadBsMutation.mutate({ files: bsFiles, useAs: bsUseAs, bankAccountId: bankAccountId || undefined, accountName: bankAccountId ? undefined : bankAccountName || undefined })}
+                        onClick={() => uploadBsMutation.mutate({
+                          files: bsFiles,
+                          useAs: bsUseAs,
+                          bankAccountId: bankAccountId || undefined,
+                          accountName: bankAccountId ? undefined : bankAccountName || undefined,
+                          accountNo: bankAccountId ? undefined : bankAccountNo || undefined,
+                        })}
                         disabled={bsFiles.length === 0 || isUploading}
                         className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
                       >

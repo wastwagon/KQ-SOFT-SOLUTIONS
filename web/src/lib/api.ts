@@ -132,6 +132,7 @@ export interface ReportResponse {
   bankAccounts?: { id: string; name: string; bankName?: string | null; accountNo?: string | null }[]
   bankAccountId?: string | null
   selectedBankAccountName?: string | null
+  selectedBankAccountNo?: string | null
   /** Ghana manual-style header line, e.g. "KALALA BANK  ACCOUNT NO: P4576" */
   bankAccountHeaderLine?: string | null
   currency?: string
@@ -586,13 +587,14 @@ export function uploadBankStatement(
   projectId: string,
   file: File,
   type: 'credits' | 'debits',
-  opts?: { bankAccountId?: string; accountName?: string }
+  opts?: { bankAccountId?: string; accountName?: string; accountNo?: string }
 ) {
   const form = new FormData()
   form.append('file', file)
   form.append('type', type)
   if (opts?.bankAccountId) form.append('bankAccountId', opts.bankAccountId)
   if (opts?.accountName?.trim()) form.append('accountName', opts.accountName.trim())
+  if (opts?.accountNo?.trim()) form.append('accountNo', opts.accountNo.trim())
   const token = getToken()
   return fetch(`${API_URL}/api/v1/upload/bank-statement/${projectId}`, {
     method: 'POST',

@@ -120,19 +120,28 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
   }
   const type = req.body.type === 'debits' ? 'bank_debits' : 'bank_credits'
   let bankAccountId: string | undefined = req.body.bankAccountId
+  const rawAccountNo = typeof req.body.accountNo === 'string' ? req.body.accountNo.trim() : ''
+  const normalizedAccountNo = rawAccountNo ? rawAccountNo.slice(0, 50) : null
   if (!bankAccountId && req.body.accountName && typeof req.body.accountName === 'string' && req.body.accountName.trim()) {
     const normalizedName = String(req.body.accountName).trim().slice(0, 200)
     const existing = await prisma.bankAccount.findFirst({
       where: { projectId, name: normalizedName },
-      select: { id: true },
+      select: { id: true, accountNo: true },
     })
     if (existing) {
       bankAccountId = existing.id
+      if (normalizedAccountNo && !existing.accountNo) {
+        await prisma.bankAccount.update({
+          where: { id: existing.id },
+          data: { accountNo: normalizedAccountNo },
+        })
+      }
     } else {
       const acct = await prisma.bankAccount.create({
         data: {
           projectId,
           name: normalizedName,
+          accountNo: normalizedAccountNo,
         },
       })
       bankAccountId = acct.id

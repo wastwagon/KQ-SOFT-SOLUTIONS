@@ -244,6 +244,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const fmt = (d: string) => formatDate(d)
   const brsStatement = data.brsStatement as BrsStatement | undefined
   const selectedBankAccountName = data.selectedBankAccountName
+  const selectedBankAccountNo = data.selectedBankAccountNo
   const bankAccountHeaderLine = data.bankAccountHeaderLine
   const reconciliationDate = data.project?.reconciliationDate
   const secondaryColor = data?.organization?.branding?.secondaryColor as string | undefined
@@ -278,6 +279,14 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const canViewDiagnostics = canViewDiagnosticsByRole || hasSignAnomaly
   const completionTimestamp = data.reportCompletedAt || data.project?.approvedAt || data.project?.reviewedAt || data.project?.preparedAt || data.generatedAt
   const printTimestamp = new Date().toISOString()
+  const accountReferenceLine = bankAccountHeaderLine
+    || (selectedBankAccountName && selectedBankAccountNo
+      ? `${selectedBankAccountName.toUpperCase()}  ACCOUNT NO: ${selectedBankAccountNo}`
+      : selectedBankAccountName
+        ? `Bank account: ${selectedBankAccountName}`
+        : selectedBankAccountNo
+          ? `Account No: ${selectedBankAccountNo}`
+          : null)
   const organizationDisplayName = (data.organization?.name || 'KQ SOFT SOLUTIONS LIMITED').replace(/KQ-SOFT/gi, 'KQ SOFT')
 
   const labels = {
@@ -536,8 +545,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <p>
               Reconciled as at: <strong>{formatDateBRSTitle(reconciliationDate)}</strong>. Transactions posted after this reconciliation date are treated as post-period movements and are not part of the as-at matching position.
             </p>
-            <p className="mt-1">
-              Report completed: <strong>{fmtDateTime(completionTimestamp)}</strong> · Print date: <strong>{fmtDateTime(printTimestamp)}</strong>
+            <p className="mt-1 text-sm font-medium text-slate-800">
+              Report completed: <strong>{fmtDateTime(completionTimestamp)}</strong> · Print timestamp: <strong>{fmtDateTime(printTimestamp)}</strong>
             </p>
           </div>
           {(() => {
@@ -568,9 +577,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             >
               Bank Reconciliation Statement as at {formatDateBRSTitle(reconciliationDate)}
             </h2>
-            {(bankAccountHeaderLine || selectedBankAccountName) && (
+            {accountReferenceLine && (
               <p className="text-sm text-slate-700 mb-4 font-medium">
-                {bankAccountHeaderLine ?? `Bank account: ${selectedBankAccountName}`}
+                {accountReferenceLine}
               </p>
             )}
             <p className="text-sm text-slate-600 mb-4">
@@ -999,14 +1008,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     <thead className="bg-slate-100">
                       <tr>
                         <th className="px-2 py-1.5 text-left">Cash book</th>
-                        <th className="px-2 py-1.5 text-left">Chq no.</th>
-                        <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
-                        <th className="px-2 py-1.5 text-right">Amount Received ({effectiveDisplayCurrency})</th>
-                        <th className="px-2 py-1.5 text-right">Amount Paid ({effectiveDisplayCurrency})</th>
+                        <th className="px-2 py-1.5 text-right">Cash book amount ({effectiveDisplayCurrency})</th>
                         <th className="px-2 py-1.5 text-left">Bank</th>
-                        <th className="px-2 py-1.5 text-left">Chq no.</th>
-                        <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
-                        <th className="px-2 py-1.5 text-right">Bank Amount ({effectiveDisplayCurrency})</th>
+                        <th className="px-2 py-1.5 text-right">Bank amount ({effectiveDisplayCurrency})</th>
                         <th className="px-2 py-1.5 text-right">Variance ({effectiveDisplayCurrency})</th>
                         <th className="px-2 py-1.5 text-right">Date diff</th>
                       </tr>
@@ -1015,13 +1019,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       {(data.discrepancies || []).map((d: { cbDate: string; cbName: string; cbChqNo?: string | null; cbDocRef?: string | null; cbAmount: number; cbAmountReceived?: number | null; cbAmountPaid?: number | null; bankDate: string; bankDescription: string; bankChqNo?: string | null; bankDocRef?: string | null; bankAmount: number; amountVariance: number; dateVarianceDays: number }, i: number) => (
                         <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                           <td className="px-2 py-1.5" title={d.cbName}>{fmt(d.cbDate)} • {d.cbName.slice(0, 25)}{d.cbName.length > 25 ? '…' : ''}</td>
-                          <td className="px-2 py-1.5 font-mono text-xs">{d.cbChqNo || '—'}</td>
-                          <td className="px-2 py-1.5 font-mono text-xs">{d.cbDocRef || '—'}</td>
-                          <td className="px-2 py-1.5 text-right">{d.cbAmountReceived != null ? fmtSignedReportAmt(d.cbAmountReceived) : '—'}</td>
-                          <td className="px-2 py-1.5 text-right">{d.cbAmountPaid != null ? fmtSignedReportAmt(d.cbAmountPaid) : '—'}</td>
+                          <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt((d.cbAmountReceived ?? d.cbAmountPaid ?? d.cbAmount ?? 0) as number)}</td>
                           <td className="px-2 py-1.5" title={d.bankDescription}>{fmt(d.bankDate)} • {d.bankDescription.slice(0, 25)}{d.bankDescription.length > 25 ? '…' : ''}</td>
-                          <td className="px-2 py-1.5 font-mono text-xs">{d.bankChqNo || '—'}</td>
-                          <td className="px-2 py-1.5 font-mono text-xs">{d.bankDocRef || '—'}</td>
                           <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.bankAmount)}</td>
                           <td className="px-2 py-1.5 text-right font-medium text-amber-700">{fmtSignedReportAmt(d.amountVariance)}</td>
                           <td className="px-2 py-1.5 text-right text-gray-600">{d.dateVarianceDays?.toFixed(0) ?? 0} days</td>
@@ -1106,38 +1105,34 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <table className="min-w-full text-sm text-slate-900">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="px-3 py-2 text-left text-slate-700">Cash book date</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Cash book description</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Chq no.</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Ref. Doc. No.</th>
-                  <th className="px-3 py-2 text-right text-slate-700">Amount Received ({effectiveDisplayCurrency})</th>
-                  <th className="px-3 py-2 text-right text-slate-700">Amount Paid ({effectiveDisplayCurrency})</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Bank date</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Bank description</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Chq no.</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Ref. Doc. No.</th>
-                  <th className="px-3 py-2 text-right text-slate-700">Bank Amount ({effectiveDisplayCurrency})</th>
+                  <th className="px-3 py-2 text-left text-slate-700">Cash book</th>
+                  <th className="px-3 py-2 text-right text-slate-700">Cash book amount ({effectiveDisplayCurrency})</th>
+                  <th className="px-3 py-2 text-left text-slate-700">Bank</th>
+                  <th className="px-3 py-2 text-right text-slate-700">Bank amount ({effectiveDisplayCurrency})</th>
+                  <th className="px-3 py-2 text-right text-slate-700">Variance ({effectiveDisplayCurrency})</th>
                 </tr>
               </thead>
               <tbody>
                 {matchedPairs.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-3 py-6 text-center text-gray-500">No matched transactions</td>
+                    <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No matched transactions</td>
                   </tr>
                 ) : (
                   matchedPairs.map((p, i: number) => (
                     <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                      <td className="px-3 py-2">{fmt(p.cbDate)}</td>
-                      <td className="px-3 py-2 max-w-[180px] truncate" title={p.cbName}>{p.cbName}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{p.cbChqNo || '—'}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{p.cbDocRef || '—'}</td>
-                      <td className="px-3 py-2 text-right font-medium">{p.cbAmountReceived != null ? fmtSignedReportAmt(p.cbAmountReceived) : '—'}</td>
-                      <td className="px-3 py-2 text-right font-medium">{p.cbAmountPaid != null ? fmtSignedReportAmt(p.cbAmountPaid) : '—'}</td>
-                      <td className="px-3 py-2">{fmt(p.bankDate)}</td>
-                      <td className="px-3 py-2 max-w-[180px] truncate" title={p.bankDescription}>{p.bankDescription}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{p.bankChqNo || '—'}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{p.bankDocRef || '—'}</td>
+                      <td className="px-3 py-2 max-w-[260px] truncate" title={`${fmt(p.cbDate)} • ${p.cbName}`}>
+                        {fmt(p.cbDate)} • {p.cbName}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium">
+                        {fmtSignedReportAmt((p.cbAmountReceived ?? p.cbAmountPaid ?? p.cbAmount ?? 0) as number)}
+                      </td>
+                      <td className="px-3 py-2 max-w-[260px] truncate" title={`${fmt(p.bankDate)} • ${p.bankDescription}`}>
+                        {fmt(p.bankDate)} • {p.bankDescription}
+                      </td>
                       <td className="px-3 py-2 text-right font-medium">{fmtSignedReportAmt(p.bankAmount)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-amber-700">
+                        {fmtSignedReportAmt(Math.abs(((p.cbAmountReceived ?? p.cbAmountPaid ?? p.cbAmount ?? 0) as number) - p.bankAmount))}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -1183,27 +1178,19 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <thead className="bg-slate-100">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Date</th>
-                    <th className="px-2 py-1.5 text-left">Name</th>
-                    <th className="px-2 py-1.5 text-left">NAME - DETAILS</th>
-                    <th className="px-2 py-1.5 text-left">CHQ NO</th>
-                    <th className="px-2 py-1.5 text-left">DOC REF</th>
-                    <th className="px-2 py-1.5 text-right">AMT RECEIVED ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">AMT PAID ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-left">Details</th>
+                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data.unmatchedReceipts || []).length === 0 ? (
-                    <tr><td colSpan={7} className="px-2 py-4 text-center text-gray-500">None</td></tr>
+                    <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                   ) : (
                     (data.unmatchedReceipts || []).map((t, i: number) => (
                       <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                         <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                        <td className="px-2 py-1.5 truncate max-w-[100px]" title={t.name}>{t.name}</td>
-                        <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.details}>{t.details || '—'}</td>
-                        <td className="px-2 py-1.5 font-mono text-xs">{t.chqNo || '—'}</td>
-                        <td className="px-2 py-1.5 font-mono text-xs">{t.docRef || '—'}</td>
+                        <td className="px-2 py-1.5 truncate max-w-[220px]" title={`${t.name || ''} ${t.details || ''}`}>{t.name || t.details || '—'}</td>
                         <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amountReceived ?? t.amount)}</td>
-                        <td className="px-2 py-1.5 text-right">—</td>
                       </tr>
                     ))
                   )}
@@ -1211,9 +1198,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 {(data.unmatchedReceipts || []).length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
-                      <td colSpan={5} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched receipts)</td>
+                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched receipts)</td>
                       <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.unmatchedReceipts || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
-                      <td className="px-2 py-1.5 text-right text-slate-500">—</td>
                     </tr>
                   </tfoot>
                 )}
@@ -1225,9 +1211,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <table className="min-w-full text-sm text-slate-900">
                 <tbody>
                   <tr className="border-t-2 border-green-300 bg-green-50/70">
-                    <td colSpan={5} className="px-2 py-1.5 font-bold text-green-900">TOTAL UNCREDITED LODGMENTS (FOR BRS ADD LINE)</td>
+                    <td colSpan={2} className="px-2 py-1.5 font-bold text-green-900">TOTAL UNCREDITED LODGMENTS (FOR BRS ADD LINE)</td>
                     <td className="px-2 py-1.5 text-right font-bold text-green-900">{fmtSignedReportAmt(brsStatement?.uncreditedLodgmentsTimingTotal ?? brsStatement?.uncreditedLodgmentsTotal ?? 0)}</td>
-                    <td className="px-2 py-1.5 text-right text-slate-500">—</td>
                   </tr>
                 </tbody>
               </table>
@@ -1248,26 +1233,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <thead className="bg-slate-100">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Date</th>
-                    <th className="px-2 py-1.5 text-left">CHQ NO</th>
-                    <th className="px-2 py-1.5 text-left">DOC REF</th>
-                    <th className="px-2 py-1.5 text-left">Name</th>
-                    <th className="px-2 py-1.5 text-left">NAME - DETAILS</th>
-                    <th className="px-2 py-1.5 text-right">AMT RECEIVED ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">AMT PAID ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-left">Details</th>
+                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data.unmatchedPayments || []).length === 0 ? (
-                    <tr><td colSpan={7} className="px-2 py-4 text-center text-gray-500">None</td></tr>
+                    <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                   ) : (
                     (data.unmatchedPayments || []).map((t, i: number) => (
                       <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                         <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                        <td className="px-2 py-1.5 font-mono text-gray-600">{t.chqNo || '—'}</td>
-                        <td className="px-2 py-1.5 font-mono text-xs">{t.docRef || '—'}</td>
-                        <td className="px-2 py-1.5 truncate max-w-[100px]" title={t.name}>{t.name}</td>
-                        <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.details}>{t.details || '—'}</td>
-                        <td className="px-2 py-1.5 text-right">—</td>
+                        <td className="px-2 py-1.5 truncate max-w-[220px]" title={`${t.name || ''} ${t.details || ''}`}>{t.name || t.details || '—'}</td>
                         <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amountPaid ?? t.amount)}</td>
                       </tr>
                     ))
@@ -1276,8 +1253,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 {(data.unmatchedPayments || []).length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
-                      <td colSpan={5} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched payments)</td>
-                      <td className="px-2 py-1.5 text-right text-slate-500">—</td>
+                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched payments)</td>
                       <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.unmatchedPayments || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
                     </tr>
                   </tfoot>
@@ -1293,8 +1269,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <table className="min-w-full text-sm text-slate-900">
                   <tbody>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
-                      <td colSpan={5} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (brought forward)</td>
-                      <td className="px-2 py-1.5 text-right text-slate-500">—</td>
+                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (brought forward)</td>
                       <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.broughtForwardItems || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
                     </tr>
                   </tbody>
@@ -1307,8 +1282,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <table className="min-w-full text-sm text-slate-900">
                 <tbody>
                   <tr className="border-t-2 border-blue-300 bg-blue-50/70">
-                    <td colSpan={5} className="px-2 py-1.5 font-bold text-blue-900">Total Unpresented Cheques (for BRS Less line)</td>
-                    <td className="px-2 py-1.5 text-right text-slate-500">—</td>
+                    <td colSpan={2} className="px-2 py-1.5 font-bold text-blue-900">Total Unpresented Cheques (for BRS Less line)</td>
                     <td className="px-2 py-1.5 text-right font-bold text-blue-900">{fmtSignedReportAmt(-Math.abs(brsStatement?.unpresentedChequesTotal ?? 0), { forceNegative: true })}</td>
                   </tr>
                 </tbody>

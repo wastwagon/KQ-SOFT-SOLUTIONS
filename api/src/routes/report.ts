@@ -683,6 +683,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankAccounts: project.bankAccounts || [],
     bankAccountId: bankAccountId || null,
     selectedBankAccountName: headerBankAccount ? headerBankAccount.name : null,
+    selectedBankAccountNo: headerBankAccount?.accountNo || null,
     bankAccountHeaderLine,
     narrative: defaultNarrative,
     preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
