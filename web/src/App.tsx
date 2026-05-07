@@ -26,6 +26,7 @@ const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
 const Audit = lazy(() => import('./pages/Audit'))
 const Clients = lazy(() => import('./pages/Clients'))
 const Settings = lazy(() => import('./pages/Settings'))
+const UserManual = lazy(() => import('./pages/UserManual'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
@@ -63,6 +64,7 @@ function App() {
               <Route path="reports" element={<Projects initialStatus="completed" />} />
               <Route path="audit" element={<Audit />} />
               <Route path="clients" element={<Clients />} />
+              <Route path="manual" element={<UserManual />} />
               <Route path="settings" element={<Navigate to="/settings/branding" replace />} />
               <Route path="settings/:tab" element={<Settings />} />
             </Route>

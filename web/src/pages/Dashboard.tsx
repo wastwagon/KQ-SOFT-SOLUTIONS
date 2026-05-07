@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { FolderKanban, X } from 'lucide-react'
@@ -32,6 +32,33 @@ export default function Dashboard() {
       setGetStartedDismissed(true)
     }
   }
+  const [latestRelease, setLatestRelease] = useState<{ date: string; version: string; changes: string } | null>(null)
+  useEffect(() => {
+    let mounted = true
+    fetch('/user-manual.md')
+      .then(async (res) => {
+        if (!res.ok) return ''
+        return res.text()
+      })
+      .then((text) => {
+        if (!mounted || !text) return
+        const changelogSectionMatch = text.match(/##\s+Changelog([\s\S]*?)(?:\n##\s+|\s*$)/i)
+        const changelogSection = changelogSectionMatch?.[1] || ''
+        const rows = changelogSection.match(/^\|\s*\d{4}-\d{2}-\d{2}\s*\|.*\|.*\|$/gm) || []
+        if (!rows.length) return
+        const firstRow = rows.at(0)
+        if (!firstRow) return
+        const first = firstRow.split('|').map((p) => p.trim()).filter(Boolean)
+        if (first.length < 3) return
+        setLatestRelease({ date: first[0], version: first[1], changes: first[2] })
+      })
+      .catch(() => {
+        // Keep dashboard usable even if manual file is temporarily unavailable.
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
   const { data: projectsList = [], isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
@@ -61,9 +88,17 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
-        {isAdmin && (
-          <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded">Admin</span>
-        )}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/manual"
+            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            Help / User Manual
+          </Link>
+          {isAdmin && (
+            <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded">Admin</span>
+          )}
+        </div>
       </div>
 
       {!isLoading && projectsList.length === 0 && !getStartedDismissed && (
@@ -132,6 +167,76 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      <Card title="What’s new">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            {latestRelease ? (
+              <>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium text-gray-900">Version {latestRelease.version}</span> - {latestRelease.changes}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Released: {latestRelease.date}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600">No changelog entry found yet.</p>
+                <p className="text-xs text-gray-500 mt-1">Add a row under the manual changelog table to display updates here.</p>
+              </>
+            )}
+          </div>
+          <Link
+            to="/manual"
+            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            View full changelog
+          </Link>
+        </div>
+      </Card>
+
+      <Card title="Go-live checklist">
+        <p className="text-sm text-gray-600 mb-3">
+          Use this quick checklist when onboarding a new customer team.
+        </p>
+        <ul className="space-y-2 text-sm text-gray-700">
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-primary-600">-</span>
+            <span>Review user onboarding steps in the manual.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-primary-600">-</span>
+            <span>Assign member roles (`admin`, `reviewer`, `preparer`, `viewer`).</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-primary-600">-</span>
+            <span>Configure branding and billing before client training.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-primary-600">-</span>
+            <span>Create a pilot project and run one full reconciliation cycle.</span>
+          </li>
+        </ul>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            to="/manual"
+            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            Open manual
+          </Link>
+          <Link
+            to="/settings/members"
+            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            Manage members
+          </Link>
+          <Link
+            to="/projects/new"
+            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            Create pilot project
+          </Link>
+        </div>
+      </Card>
 
       {isAdmin && (
         <Card title="Manage app & settings">

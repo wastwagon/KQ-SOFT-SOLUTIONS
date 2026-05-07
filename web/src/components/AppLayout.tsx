@@ -13,6 +13,7 @@ import {
   X,
   Bell,
   FileText,
+  BookOpen,
   ChevronDown,
   UserCircle2,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ const workNavItems = [
 
 const administrationNavItems = [
   { to: '/audit', label: 'Audit log', icon: FileCheck },
+  { to: '/manual', label: 'User manual', icon: BookOpen },
   { to: '/settings', label: 'Settings', icon: Settings, preload: preloadSettingsPage },
 ]
 
@@ -59,7 +61,7 @@ export default function AppLayout() {
   const showOrgLogo = !!logoUrl?.trim() && failedLogoUrl !== logoUrl
   const path = location.pathname
   const workActive = path === '/projects' || path.startsWith('/projects/') || path === '/clients' || path.startsWith('/clients/') || path === '/reports' || path.startsWith('/reports/')
-  const administrationActive = path === '/audit' || path.startsWith('/audit/') || path === '/settings' || path.startsWith('/settings/')
+  const administrationActive = path === '/audit' || path.startsWith('/audit/') || path === '/manual' || path.startsWith('/manual/') || path === '/settings' || path.startsWith('/settings/')
   const platformActive = path === '/platform-admin' || path.startsWith('/platform-admin/')
 
   function closeDesktopMenus() {
