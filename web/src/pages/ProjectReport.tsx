@@ -217,6 +217,21 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const v = convertAmt(n)
     return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   }
+  const fmtDateTime = (d: string | null | undefined) => {
+    if (!d) return '—'
+    const x = new Date(d)
+    if (Number.isNaN(x.getTime())) return '—'
+    return x.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'Africa/Accra',
+    })
+  }
   const fmtSignedReportAmt = (n: number, opts?: { forceNegative?: boolean }) => {
     const forceNegative = !!opts?.forceNegative
     const base = fmtBaseReportAmt(Math.abs(n))
@@ -239,22 +254,17 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const matchedPaymentsVsDebits = data.matchedPaymentsVsDebits || []
   const paidOutVarianceBreakdown = data.paidOutVarianceBreakdown
   const unmatchedReceipts = data.unmatchedReceipts || []
-  const unmatchedCredits = data.unmatchedCredits || []
   const unmatchedPayments = data.unmatchedPayments || []
-  const unmatchedDebits = data.unmatchedDebits || []
   const broughtForwardItems = data.broughtForwardItems || []
   const broughtForwardLodgments = data.broughtForwardLodgments || []
-  const localAsAtUncreditedTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0) + unmatchedCredits.reduce((s, t) => s + t.amount, 0)
-  const localAsAtUnpresentedTotal = unmatchedPayments.reduce((s, t) => s + t.amount, 0) + unmatchedDebits.reduce((s, t) => s + t.amount, 0)
+  const localAsAtUncreditedTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0)
+  const localAsAtUnpresentedTotal = unmatchedPayments.reduce((s, t) => s + t.amount, 0)
   const localPostPeriodLodgmentsTotal = broughtForwardLodgments.reduce((s, t) => s + t.amount, 0)
   const localPostPeriodChequesTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
   const additionalInformation = data.additionalInformation
   const asAtUncreditedTotal = additionalInformation?.asAtReconciliationPosition?.uncreditedLodgmentsOrUnclearedDeposits ?? localAsAtUncreditedTotal
-  const asAtBankOnlyCreditsTotal = additionalInformation?.asAtReconciliationPosition?.bankOnlyCreditsNotInCashBook ?? unmatchedCredits.reduce((s, t) => s + t.amount, 0)
-  const asAtBankOnlyDebitsTotal = additionalInformation?.asAtReconciliationPosition?.bankOnlyDebitsNotInCashBook ?? unmatchedDebits.reduce((s, t) => s + t.amount, 0)
   const asAtUnpresentedTotal = additionalInformation?.asAtReconciliationPosition?.unpresentedChequesOrUnclearedPayments ?? localAsAtUnpresentedTotal
   const postPeriodLodgmentsTotal = additionalInformation?.postPeriodMovement?.broughtForwardUncreditedLodgments ?? localPostPeriodLodgmentsTotal
-  const postPeriodBankOnlyCreditsTotal = additionalInformation?.postPeriodMovement?.broughtForwardBankOnlyCredits ?? broughtForwardLodgments.filter((t) => t.source === 'bank_credits').reduce((s, t) => s + t.amount, 0)
   const postPeriodChequesTotal = additionalInformation?.postPeriodMovement?.broughtForwardUnpresentedCheques ?? localPostPeriodChequesTotal
   const sourceFilterLogic = data.sourceFilterLogic
   const profileLabels = data.reportLanguageProfile?.labels
@@ -266,25 +276,30 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   ].some((s) => (s?.cross_reference ?? 0) > 0 || (s?.zero ?? 0) > 0 || (s?.empty ?? 0) > 0)
   const canViewDiagnosticsByRole = ['admin', 'reviewer', 'preparer'].includes(role || '')
   const canViewDiagnostics = canViewDiagnosticsByRole || hasSignAnomaly
+  const completionTimestamp = data.reportCompletedAt || data.project?.approvedAt || data.project?.reviewedAt || data.project?.preparedAt || data.generatedAt
+  const printTimestamp = new Date().toISOString()
+  const organizationDisplayName = (data.organization?.name || 'KQ SOFT SOLUTIONS LIMITED').replace(/KQ-SOFT/gi, 'KQ SOFT')
+
   const labels = {
     openingBankStatementBalance: profileLabels?.openingBankStatementBalance || 'Opening bank statement balance',
     closingBankStatementBalance: profileLabels?.closingBankStatementBalance || 'Closing bank statement balance',
-    addUncreditedLodgments: profileLabels?.addUncreditedLodgments || 'Add: Uncredited lodgments / uncleared deposits',
+    addUncreditedLodgments: profileLabels?.addUncreditedLodgments || 'ADD: UNCREDITED LODGMENTS',
     addBankOnlyCredits: profileLabels?.addBankOnlyCredits || 'Add: Bank-only credits not in cash book',
     lessBankOnlyDebits: profileLabels?.lessBankOnlyDebits || 'Less: Bank-only debits not in cash book',
-    lessUnpresentedCheques: profileLabels?.lessUnpresentedCheques || 'Less: Unpresented cheques / uncleared payments',
+    lessUnpresentedCheques: profileLabels?.lessUnpresentedCheques || 'LESS: UNPRESENTED CHEQUES',
     cashBookBalanceEnd: profileLabels?.cashBookBalanceEnd || 'Cash book balance at end of period',
     additionalInformationTitle: profileLabels?.additionalInformationTitle || 'Additional information (Ghana BRS language profile)',
     asAtReconciliationPosition: profileLabels?.asAtReconciliationPosition || 'As-at reconciliation position',
     postPeriodMovement: profileLabels?.postPeriodMovement || 'Post-period movement (carried forward)',
-    uncreditedLodgmentsOrUnclearedDeposits: profileLabels?.uncreditedLodgmentsOrUnclearedDeposits || 'Uncredited lodgments / uncleared deposits',
+    uncreditedLodgmentsOrUnclearedDeposits: profileLabels?.uncreditedLodgmentsOrUnclearedDeposits || 'UNCREDITED LODGMENTS',
     bankOnlyCreditsNotInCashBook: profileLabels?.bankOnlyCreditsNotInCashBook || 'Bank-only credits not in cash book',
     bankOnlyDebitsNotInCashBook: profileLabels?.bankOnlyDebitsNotInCashBook || 'Bank-only debits not in cash book',
-    unpresentedChequesOrUnclearedPayments: profileLabels?.unpresentedChequesOrUnclearedPayments || 'Unpresented cheques / uncleared payments',
+    unpresentedChequesOrUnclearedPayments: profileLabels?.unpresentedChequesOrUnclearedPayments || 'UNPRESENTED CHEQUES',
     broughtForwardUncreditedLodgments: profileLabels?.broughtForwardUncreditedLodgments || 'Brought-forward uncredited lodgments',
-    broughtForwardBankOnlyCredits: profileLabels?.broughtForwardBankOnlyCredits || 'Brought-forward bank-only credits',
     broughtForwardUnpresentedCheques: profileLabels?.broughtForwardUnpresentedCheques || 'Brought-forward unpresented cheques',
   }
+
+  const showExtendedSections = false
 
   return (
     <div className="space-y-6">
@@ -493,7 +508,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             className={`text-xl font-bold ${hasBranding ? '' : 'text-slate-800'}`}
             style={primaryColor ? { color: primaryColor } : undefined}
           >
-            {data.organization?.name || 'KQ-SOFT SOLUTIONS LIMITED'}
+            {organizationDisplayName}
           </h1>
           {data.organization?.branding?.letterheadAddress && (
             <p className="text-sm text-slate-600 mt-1">{data.organization.branding.letterheadAddress}</p>
@@ -517,9 +532,12 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <span className="text-primary-600">({data.reportLanguageProfile?.code || 'GHANA_BRS_V1'})</span>
             </div>
           )}
-          <div className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+          <div className="mt-2 text-xs text-slate-700 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-md px-3 py-2 shadow-sm">
             <p>
               Reconciled as at: <strong>{formatDateBRSTitle(reconciliationDate)}</strong>. Transactions posted after this reconciliation date are treated as post-period movements and are not part of the as-at matching position.
+            </p>
+            <p className="mt-1">
+              Report completed: <strong>{fmtDateTime(completionTimestamp)}</strong> · Print date: <strong>{fmtDateTime(printTimestamp)}</strong>
             </p>
           </div>
           {(() => {
@@ -584,20 +602,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   </tr>
                   <tr className="border-t border-slate-200">
                     <td className="px-3 py-2 font-medium text-slate-800">{labels.addUncreditedLodgments}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(brsStatement.uncreditedLodgmentsTotal)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(brsStatement.uncreditedLodgmentsTimingTotal ?? brsStatement.uncreditedLodgmentsTotal)}</td>
                   </tr>
-                  {brsStatement.bankOnlyCreditsNotInCashBookTotal != null && (
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 font-medium text-slate-800">{labels.addBankOnlyCredits}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(brsStatement.bankOnlyCreditsNotInCashBookTotal)}</td>
-                    </tr>
-                  )}
-                  {brsStatement.bankOnlyDebitsNotInCashBookTotal != null && (
-                    <tr className="border-t border-slate-200 bg-slate-50/50 print:bg-white">
-                      <td className="px-3 py-2 font-medium text-slate-800">{labels.lessBankOnlyDebits}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(-Math.abs(brsStatement.bankOnlyDebitsNotInCashBookTotal), { forceNegative: true })}</td>
-                    </tr>
-                  )}
                   <tr className="border-t border-slate-200 bg-slate-50/50 print:bg-white">
                     <td className="px-3 py-2 font-medium text-slate-800">{labels.lessUnpresentedCheques}</td>
                     <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(-Math.abs(brsStatement.unpresentedChequesTotal), { forceNegative: true })}</td>
@@ -724,7 +730,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         )}
 
         {/* Summary */}
-        <div id="brs-summary" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 scroll-mt-4">
+        {showExtendedSections && <div id="brs-summary" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 scroll-mt-4">
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-sm text-green-700 font-medium">Matched</p>
             <p className="text-lg font-bold text-green-800">{data.summary?.matchedCount || 0}</p>
@@ -734,15 +740,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedReceipts || 0}</p>
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-sm text-amber-700 font-medium">Unmatched credits</p>
-            <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedCredits || 0}</p>
-          </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
             <p className="text-sm text-amber-700 font-medium">Unmatched payments</p>
             <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedPayments || 0}</p>
           </div>
-        </div>
-        {!!sourceFilterLogic && canViewDiagnostics && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <p className="text-sm text-slate-700 font-medium">Currency</p>
+            <p className="text-lg font-bold text-slate-800">{effectiveDisplayCurrency}</p>
+          </div>
+        </div>}
+        {showExtendedSections && !!sourceFilterLogic && canViewDiagnostics && (
           <div className="mb-6 rounded-lg border border-slate-200 p-4 bg-slate-50/60">
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-medium text-slate-800">Source filter logic (sign diagnostics)</h3>
@@ -773,7 +779,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             )}
           </div>
         )}
-        <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50/40 p-4 print:bg-white print:border-slate-300">
+        {showExtendedSections && <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50/40 p-4 print:bg-white print:border-slate-300">
           <h3 className="font-semibold text-primary-900 mb-2">{labels.additionalInformationTitle}</h3>
           <p className="text-sm text-primary-800 mb-3">
             This section separates the reconciliation position as at the reconciliation date from post-period movement carried into this report.
@@ -795,14 +801,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr className="border-t border-primary-100">
                     <td className="px-2 py-1.5">{labels.uncreditedLodgmentsOrUnclearedDeposits}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(asAtUncreditedTotal)}</td>
-                  </tr>
-                  <tr className="border-t border-primary-100">
-                    <td className="px-2 py-1.5">{labels.bankOnlyCreditsNotInCashBook}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(asAtBankOnlyCreditsTotal)}</td>
-                  </tr>
-                  <tr className="border-t border-primary-100">
-                    <td className="px-2 py-1.5">{labels.bankOnlyDebitsNotInCashBook}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(asAtBankOnlyDebitsTotal), { forceNegative: true })}</td>
                   </tr>
                   <tr className="border-t border-primary-100 bg-primary-50/40 print:bg-white">
                     <td className="px-2 py-1.5">{labels.unpresentedChequesOrUnclearedPayments}</td>
@@ -828,10 +826,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     <td className="px-2 py-1.5">{labels.broughtForwardUncreditedLodgments}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(postPeriodLodgmentsTotal)}</td>
                   </tr>
-                  <tr className="border-t border-primary-100">
-                    <td className="px-2 py-1.5">{labels.broughtForwardBankOnlyCredits}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(postPeriodBankOnlyCreditsTotal)}</td>
-                  </tr>
                   <tr className="border-t border-primary-100 bg-primary-50/40 print:bg-white">
                     <td className="px-2 py-1.5">{labels.broughtForwardUnpresentedCheques}</td>
                     <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(postPeriodChequesTotal), { forceNegative: true })}</td>
@@ -840,7 +834,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </table>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Brought forward unpresented cheques from previous period BRS */}
         {(data.broughtForwardItems || []).length > 0 && (
@@ -1176,11 +1170,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {/* Exceptions — BRS sections */}
         <div className="flex flex-col gap-6">
-          {/* 1. Uncredited Lodgments: Unmatched receipts (cash book) + Unmatched credits (bank) */}
+          {/* 1. Uncredited Lodgments: final format uses cash-book receipts only */}
           <div className="rounded-xl border border-green-200 bg-green-50/30 p-5 print:bg-white print:border-slate-300">
-            <h3 className="font-semibold mb-3 text-green-900">1. Uncredited Lodgments</h3>
+            <h3 className="font-semibold mb-3 text-green-900">1. UNCREDITED LODGMENTS</h3>
             <p className="text-sm text-green-800 mb-4">
-              Items to add to bank balance: unmatched receipts in cash book (deposits not yet credited by bank) and unmatched credits in bank statement (bank credits not yet in cash book).
+              Items to add to bank balance: unmatched receipts in cash book (deposits not yet credited by bank).
             </p>
           <div>
             <h4 className="text-sm font-medium mb-2 text-gray-800">1a. Unmatched receipts in cash book (deposits not yet in bank)</h4>
@@ -1190,11 +1184,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr>
                     <th className="px-2 py-1.5 text-left">Date</th>
                     <th className="px-2 py-1.5 text-left">Name</th>
-                    <th className="px-2 py-1.5 text-left">Description</th>
-                    <th className="px-2 py-1.5 text-left">Chq no.</th>
-                    <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right">Amount Received ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">Amount Paid ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-left">NAME - DETAILS</th>
+                    <th className="px-2 py-1.5 text-left">CHQ NO</th>
+                    <th className="px-2 py-1.5 text-left">DOC REF</th>
+                    <th className="px-2 py-1.5 text-right">AMT RECEIVED ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-right">AMT PAID ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1226,63 +1220,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </table>
             </div>
           </div>
-          <div className="mt-4">
-            <h4 className="text-sm font-medium mb-2 text-gray-800">1b. Unmatched credits in bank statement (bank credits not in cash book)</h4>
-            <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
-              <table className="min-w-full text-sm text-slate-900">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left">Date</th>
-                    <th className="px-2 py-1.5 text-left">Description</th>
-                    <th className="px-2 py-1.5 text-left">Chq no.</th>
-                    <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right">Debit ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">Credit ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">Balance ({effectiveDisplayCurrency})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.unmatchedCredits || []).length === 0 ? (
-                    <tr><td colSpan={7} className="px-2 py-4 text-center text-gray-500">None</td></tr>
-                  ) : (
-                    (() => {
-                      let bal = 0
-                      return (data.unmatchedCredits || []).map((t, i: number) => {
-                        bal += t.amount
-                        return (
-                          <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                            <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                            <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.description}>{t.description}</td>
-                            <td className="px-2 py-1.5 font-mono text-xs">{t.chqNo || '—'}</td>
-                            <td className="px-2 py-1.5 font-mono text-xs">{t.docRef || '—'}</td>
-                            <td className="px-2 py-1.5 text-right">—</td>
-                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-600">{fmtSignedReportAmt(bal)}</td>
-                          </tr>
-                        )
-                      })
-                    })()
-                  )}
-                </tbody>
-                {(data.unmatchedCredits || []).length > 0 && (
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-300 bg-slate-50/80">
-                      <td colSpan={5} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched credits)</td>
-                      <td className="px-2 py-1.5 text-right text-slate-500">—</td>
-                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.unmatchedCredits || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </div>
           <div className="mt-3 pt-3 border-t border-green-200">
             <div className="border border-slate-200 rounded-lg overflow-auto">
               <table className="min-w-full text-sm text-slate-900">
                 <tbody>
                   <tr className="border-t-2 border-green-300 bg-green-50/70">
-                    <td colSpan={5} className="px-2 py-1.5 font-bold text-green-900">Total Uncredited Lodgments (for BRS Add line)</td>
-                    <td className="px-2 py-1.5 text-right font-bold text-green-900">{fmtSignedReportAmt(brsStatement?.uncreditedLodgmentsTotal ?? 0)}</td>
+                    <td colSpan={5} className="px-2 py-1.5 font-bold text-green-900">TOTAL UNCREDITED LODGMENTS (FOR BRS ADD LINE)</td>
+                    <td className="px-2 py-1.5 text-right font-bold text-green-900">{fmtSignedReportAmt(brsStatement?.uncreditedLodgmentsTimingTotal ?? brsStatement?.uncreditedLodgmentsTotal ?? 0)}</td>
                     <td className="px-2 py-1.5 text-right text-slate-500">—</td>
                   </tr>
                 </tbody>
@@ -1293,7 +1237,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
           {/* 2. Unpresented Cheques: Unmatched payments (cash book) + Brought forward */}
           <div className="rounded-xl border border-blue-200 bg-blue-50/30 p-5 print:bg-white print:border-slate-300">
-            <h3 className="font-semibold mb-3 text-blue-900">2. Unpresented Cheques</h3>
+            <h3 className="font-semibold mb-3 text-blue-900">2. UNPRESENTED CHEQUES</h3>
             <p className="text-sm text-blue-800 mb-4">
               Items to deduct from bank balance: unmatched payments in cash book (cheques issued not yet presented) and brought-forward unpresented cheques from previous period.
             </p>
@@ -1304,12 +1248,12 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <thead className="bg-slate-100">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Date</th>
-                    <th className="px-2 py-1.5 text-left">Cheque No</th>
-                    <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
+                    <th className="px-2 py-1.5 text-left">CHQ NO</th>
+                    <th className="px-2 py-1.5 text-left">DOC REF</th>
                     <th className="px-2 py-1.5 text-left">Name</th>
-                    <th className="px-2 py-1.5 text-left">Description</th>
-                    <th className="px-2 py-1.5 text-right">Amount Received ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">Amount Paid ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-left">NAME - DETAILS</th>
+                    <th className="px-2 py-1.5 text-right">AMT RECEIVED ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-right">AMT PAID ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1373,48 +1317,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           </div>
           </div>
 
-          {/* Unmatched debits in bank — for reference */}
-          <div>
-            <h3 className="font-medium mb-2 text-gray-900">Unmatched debits in bank statement (bank debits not in cash book)</h3>
-            <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
-              <table className="min-w-full text-sm text-slate-900">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left">Date</th>
-                    <th className="px-2 py-1.5 text-left">Description</th>
-                    <th className="px-2 py-1.5 text-left">Chq no.</th>
-                    <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right">Debit ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">Credit ({effectiveDisplayCurrency})</th>
-                    <th className="px-2 py-1.5 text-right">Balance ({effectiveDisplayCurrency})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.unmatchedDebits || []).length === 0 ? (
-                    <tr><td colSpan={7} className="px-2 py-4 text-center text-gray-500">None</td></tr>
-                  ) : (
-                    (() => {
-                      let bal = 0
-                      return (data.unmatchedDebits || []).map((t, i: number) => {
-                        bal -= t.amount
-                        return (
-                          <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                            <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                            <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.description}>{t.description}</td>
-                            <td className="px-2 py-1.5 font-mono text-xs">{t.chqNo || '—'}</td>
-                            <td className="px-2 py-1.5 font-mono text-xs">{t.docRef || '—'}</td>
-                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
-                            <td className="px-2 py-1.5 text-right">—</td>
-                            <td className="px-2 py-1.5 text-right text-gray-600">{fmtSignedReportAmt(bal)}</td>
-                          </tr>
-                        )
-                      })
-                    })()
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
         {/* Phase 7: Supporting documents */}

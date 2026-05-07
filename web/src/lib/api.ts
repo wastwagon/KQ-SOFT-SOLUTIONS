@@ -135,6 +135,7 @@ export interface ReportResponse {
   /** Ghana manual-style header line, e.g. "KALALA BANK  ACCOUNT NO: P4576" */
   bankAccountHeaderLine?: string | null
   currency?: string
+  reportCompletedAt?: string
   generatedAt?: string
   narrative?: string
   preparerComment?: string
