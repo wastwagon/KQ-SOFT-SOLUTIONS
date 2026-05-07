@@ -217,6 +217,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const v = convertAmt(n)
     return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   }
+  const fmtBrWorkbookMagnitudeAmt = (n: number) => fmtBaseReportAmt(Math.abs(n))
   const fmtDateTime = (d: string | null | undefined) => {
     if (!d) return '—'
     const x = new Date(d)
@@ -279,23 +280,32 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const canViewDiagnostics = canViewDiagnosticsByRole || hasSignAnomaly
   const completionTimestamp = data.reportCompletedAt || data.project?.approvedAt || data.project?.reviewedAt || data.project?.preparedAt || data.generatedAt
   const printTimestamp = new Date().toISOString()
-  const accountReferenceLine = bankAccountHeaderLine
-    || (selectedBankAccountName && selectedBankAccountNo
-      ? `${selectedBankAccountName.toUpperCase()}  ACCOUNT NO: ${selectedBankAccountNo}`
+  const accountReferenceLine =
+    bankAccountHeaderLine ||
+    (selectedBankAccountName && selectedBankAccountNo
+      ? `${selectedBankAccountName} Account Number ${selectedBankAccountNo}`
       : selectedBankAccountName
-        ? `Bank account: ${selectedBankAccountName}`
+        ? `${selectedBankAccountName}`
         : selectedBankAccountNo
-          ? `Account No: ${selectedBankAccountNo}`
+          ? `Account Number ${selectedBankAccountNo}`
           : null)
   const organizationDisplayName = (data.organization?.name || 'KQ SOFT SOLUTIONS LIMITED').replace(/KQ-SOFT/gi, 'KQ SOFT')
 
   const labels = {
     openingBankStatementBalance: profileLabels?.openingBankStatementBalance || 'Opening bank statement balance',
-    closingBankStatementBalance: profileLabels?.closingBankStatementBalance || 'Closing bank statement balance',
-    addUncreditedLodgments: profileLabels?.addUncreditedLodgments || 'ADD: UNCREDITED LODGMENTS',
-    addBankOnlyCredits: profileLabels?.addBankOnlyCredits || 'Add: Bank-only credits not in cash book',
-    lessBankOnlyDebits: profileLabels?.lessBankOnlyDebits || 'Less: Bank-only debits not in cash book',
-    lessUnpresentedCheques: profileLabels?.lessUnpresentedCheques || 'LESS: UNPRESENTED CHEQUES',
+    closingBankStatementBalance: profileLabels?.closingBankStatementBalance || 'Closing balance per bank statement',
+    addUncreditedLodgments: profileLabels?.addUncreditedLodgments || 'Add: Uncredited lodgments / uncleared deposits',
+    addBankOnlyDebitsWorkbookLine:
+      profileLabels?.addBankOnlyDebitsNotInCashBookLine ??
+      profileLabels?.lessBankOnlyDebits ??
+      'Add: Bank-only debits not in cash book',
+    deductBankOnlyCreditsWorkbookLine:
+      profileLabels?.deductBankOnlyCreditsNotInCashBookLine ??
+      profileLabels?.addBankOnlyCredits ??
+      'Deduct: Bank-only credits not in cash book',
+    addBankOnlyCredits: profileLabels?.addBankOnlyCredits || 'Deduct: Bank-only credits not in cash book',
+    lessBankOnlyDebits: profileLabels?.lessBankOnlyDebits || 'Add: Bank-only debits not in cash book',
+    lessUnpresentedCheques: profileLabels?.lessUnpresentedCheques || 'Less: Unpresented cheques',
     cashBookBalanceEnd: profileLabels?.cashBookBalanceEnd || 'Cash book balance at end of period',
     additionalInformationTitle: profileLabels?.additionalInformationTitle || 'Additional information (Ghana BRS language profile)',
     asAtReconciliationPosition: profileLabels?.asAtReconciliationPosition || 'As-at reconciliation position',
@@ -306,6 +316,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     unpresentedChequesOrUnclearedPayments: profileLabels?.unpresentedChequesOrUnclearedPayments || 'UNPRESENTED CHEQUES',
     broughtForwardUncreditedLodgments: profileLabels?.broughtForwardUncreditedLodgments || 'Brought-forward uncredited lodgments',
     broughtForwardUnpresentedCheques: profileLabels?.broughtForwardUnpresentedCheques || 'Brought-forward unpresented cheques',
+    workbookCompositionTimingUncreditedCurrent:
+      profileLabels?.workbookCompositionTimingUncreditedCurrent || 'Thereof — current-period timing uncredited',
+    workbookCompositionTimingUncreditedPrior:
+      profileLabels?.workbookCompositionTimingUncreditedPrior || 'Thereof — brought-forward timing uncredited (prior period)',
+    workbookCompositionUnpresentedCurrent:
+      profileLabels?.workbookCompositionUnpresentedCurrent || 'Thereof — current-period unpresented cheques',
+    workbookCompositionUnpresentedPrior:
+      profileLabels?.workbookCompositionUnpresentedPrior || 'Thereof — brought-forward unpresented cheques (prior period)',
+    workbookCompositionBankCreditsCurrent:
+      profileLabels?.workbookCompositionBankCreditsCurrent || 'Thereof — current-period bank-only credits',
+    workbookCompositionBankCreditsPrior:
+      profileLabels?.workbookCompositionBankCreditsPrior || 'Thereof — brought-forward bank-only credits (prior period)',
   }
 
   const showExtendedSections = false
@@ -568,74 +590,147 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           })()}
         </div>
 
-        {/* BRS statement block — formal layout with professional theme */}
+        {/* BRS statement — two-column workbook layout (spreadsheet/manual style) */}
         {brsStatement && (
-          <div id="brs-statement" className={`mb-8 p-6 rounded-lg border-2 print:bg-white ${hasBranding ? 'border-primary-200 bg-primary-50/30 print:border-slate-300' : 'border-slate-300 bg-slate-50/80'}`}>
-            <h2
-              className={`text-lg font-bold uppercase tracking-wide mb-1 ${hasBranding ? '' : 'text-slate-800'}`}
-              style={primaryColor ? { color: primaryColor } : undefined}
-            >
+          <div id="brs-statement" className="mb-8 rounded-lg border border-slate-200 bg-white p-6 print:border-slate-300 print:bg-white">
+            <p className="text-[15px] leading-snug text-slate-900">{organizationDisplayName}</p>
+            <p className="mt-6 text-[15px] font-bold leading-snug text-slate-900">
               Bank Reconciliation Statement as at {formatDateBRSTitle(reconciliationDate)}
-            </h2>
-            {accountReferenceLine && (
-              <p className="text-sm text-slate-700 mb-4 font-medium">
-                {accountReferenceLine}
-              </p>
-            )}
-            <p className="text-sm text-slate-600 mb-4">
-              Currency: {effectiveDisplayCurrency}
-              {effectiveDisplayCurrency !== currency && (
-                <span className="ml-2 text-amber-600">(displayed in {effectiveDisplayCurrency})</span>
-              )}
             </p>
-            <div className="overflow-auto">
-              <table className="min-w-full text-sm text-slate-800">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Description</th>
-                    <th className="px-3 py-2 text-right">Amount ({effectiveDisplayCurrency})</th>
+            {accountReferenceLine ? (
+              <p className="mt-3 text-[15px] font-bold leading-snug text-slate-900">{accountReferenceLine}</p>
+            ) : null}
+            <div className="mt-8 overflow-auto">
+              <table className="w-full max-w-xl border-collapse text-sm text-slate-900">
+                <thead>
+                  <tr className="border-b border-slate-400">
+                    <th className="py-2 pr-6 text-left text-sm font-bold text-slate-900">Description</th>
+                    <th className="py-2 pl-2 text-right text-sm font-bold text-slate-900">
+                      Amount ({effectiveDisplayCurrency})
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {brsStatement.bankStatementClosingBalance != null && (
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 font-medium text-slate-600">{labels.openingBankStatementBalance}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-700">{fmtSignedReportAmt(brsStatement.bankStatementClosingBalance)}</td>
-                    </tr>
-                  )}
-                  <tr className="border-t border-slate-200 bg-slate-50/50 print:bg-white">
-                    <td className="px-3 py-2 font-medium text-slate-800">{labels.closingBankStatementBalance} {brsStatement.bankStatementClosingBalance != null ? '(reconciled)' : ''}</td>
-                    <td className={`px-3 py-2 text-right font-bold ${hasBranding ? '' : 'text-slate-800'}`} style={primaryColor ? { color: primaryColor } : undefined}>
-                      {fmtSignedReportAmt(brsStatement.bankClosingBalance)}
+                <tbody className="align-top">
+                  <tr className="border-b border-slate-200">
+                    <td className="py-2 pr-6 text-slate-900">{labels.closingBankStatementBalance}</td>
+                    <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
+                      {fmtBaseReportAmt(brsStatement.bankClosingBalance)}
                     </td>
                   </tr>
-                  <tr className="border-t border-slate-200">
-                    <td className="px-3 py-2 font-medium text-slate-800">{labels.addUncreditedLodgments}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(brsStatement.uncreditedLodgmentsTimingTotal ?? brsStatement.uncreditedLodgmentsTotal)}</td>
-                  </tr>
-                  <tr className="border-t border-slate-200 bg-slate-50/50 print:bg-white">
-                    <td className="px-3 py-2 font-medium text-slate-800">{labels.lessUnpresentedCheques}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtSignedReportAmt(-Math.abs(brsStatement.unpresentedChequesTotal), { forceNegative: true })}</td>
-                  </tr>
-                  <tr className="border-t border-slate-300">
-                    <td className="px-3 py-2 font-bold text-slate-900">{labels.cashBookBalanceEnd}</td>
-                    <td className={`px-3 py-2 text-right font-bold ${hasBranding ? '' : 'text-slate-800'}`} style={primaryColor ? { color: primaryColor } : undefined}>
-                      {fmtSignedReportAmt(brsStatement.balancePerCashBook)}
+                  <tr className="border-b border-slate-200">
+                    <td className="py-2 pr-6 text-slate-900">{labels.addUncreditedLodgments}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums text-slate-900">
+                      {fmtBrWorkbookMagnitudeAmt(brsStatement.uncreditedLodgmentsTimingTotal ?? brsStatement.uncreditedLodgmentsTotal)}
                     </td>
                   </tr>
-                  {brsStatement.bankClosingBalanceGhanaStyle != null && (
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 font-medium text-slate-700">Ghana-style bank balance (explicit decomposition)</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-700">{fmtSignedReportAmt(brsStatement.bankClosingBalanceGhanaStyle)}</td>
-                    </tr>
+                  {(brsStatement.timingUncreditedBroughtForwardPrior ?? 0) > 0.005 &&
+                    typeof brsStatement.timingUncreditedCurrentPeriod === 'number' && (
+                    <>
+                      <tr className="border-b border-slate-100 bg-slate-50/80 print:bg-white">
+                        <td className="py-1.5 pr-6 pl-3 text-xs text-slate-600">{labels.workbookCompositionTimingUncreditedCurrent}</td>
+                        <td className="py-1.5 pl-2 text-right text-xs tabular-nums text-slate-700">
+                          {fmtBrWorkbookMagnitudeAmt(brsStatement.timingUncreditedCurrentPeriod)}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-slate-200 bg-slate-50/80 print:bg-white">
+                        <td className="py-1.5 pr-6 pl-3 text-xs text-slate-600">{labels.workbookCompositionTimingUncreditedPrior}</td>
+                        <td className="py-1.5 pl-2 text-right text-xs tabular-nums text-slate-700">
+                          {fmtBrWorkbookMagnitudeAmt(brsStatement.timingUncreditedBroughtForwardPrior ?? 0)}
+                        </td>
+                      </tr>
+                    </>
                   )}
+                  <tr className="border-b border-slate-200">
+                    <td className="py-2 pr-6 text-slate-900">{labels.lessUnpresentedCheques}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums text-slate-900">
+                      {fmtBrWorkbookMagnitudeAmt(brsStatement.unpresentedChequesTotal)}
+                    </td>
+                  </tr>
+                  {(brsStatement.unpresentedBroughtForwardPrior ?? 0) > 0.005 &&
+                    typeof brsStatement.unpresentedCurrentCashBookPeriod === 'number' && (
+                    <>
+                      <tr className="border-b border-slate-100 bg-slate-50/80 print:bg-white">
+                        <td className="py-1.5 pr-6 pl-3 text-xs text-slate-600">{labels.workbookCompositionUnpresentedCurrent}</td>
+                        <td className="py-1.5 pl-2 text-right text-xs tabular-nums text-slate-700">
+                          {fmtBrWorkbookMagnitudeAmt(brsStatement.unpresentedCurrentCashBookPeriod)}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-slate-200 bg-slate-50/80 print:bg-white">
+                        <td className="py-1.5 pr-6 pl-3 text-xs text-slate-600">{labels.workbookCompositionUnpresentedPrior}</td>
+                        <td className="py-1.5 pl-2 text-right text-xs tabular-nums text-slate-700">
+                          {fmtBrWorkbookMagnitudeAmt(brsStatement.unpresentedBroughtForwardPrior ?? 0)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  <tr className="border-b border-slate-200">
+                    <td className="py-2 pr-6 text-slate-900">{labels.addBankOnlyDebitsWorkbookLine}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums text-slate-900">
+                      {fmtBrWorkbookMagnitudeAmt(brsStatement.bankOnlyDebitsNotInCashBookTotal ?? 0)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-200">
+                    <td className="py-2 pr-6 text-slate-900">{labels.deductBankOnlyCreditsWorkbookLine}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums text-slate-900">
+                      {fmtBrWorkbookMagnitudeAmt(brsStatement.bankOnlyCreditsNotInCashBookTotal ?? 0)}
+                    </td>
+                  </tr>
+                  {(brsStatement.bankOnlyCreditsBroughtForwardPrior ?? 0) > 0.005 &&
+                    typeof brsStatement.bankOnlyCreditsCurrentPeriod === 'number' && (
+                    <>
+                      <tr className="border-b border-slate-100 bg-slate-50/80 print:bg-white">
+                        <td className="py-1.5 pr-6 pl-3 text-xs text-slate-600">{labels.workbookCompositionBankCreditsCurrent}</td>
+                        <td className="py-1.5 pl-2 text-right text-xs tabular-nums text-slate-700">
+                          {fmtBrWorkbookMagnitudeAmt(brsStatement.bankOnlyCreditsCurrentPeriod)}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-slate-200 bg-slate-50/80 print:bg-white">
+                        <td className="py-1.5 pr-6 pl-3 text-xs text-slate-600">{labels.workbookCompositionBankCreditsPrior}</td>
+                        <td className="py-1.5 pl-2 text-right text-xs tabular-nums text-slate-700">
+                          {fmtBrWorkbookMagnitudeAmt(brsStatement.bankOnlyCreditsBroughtForwardPrior ?? 0)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  <tr className="border-b border-slate-400">
+                    <td className="py-2 pr-6 text-base font-bold text-slate-900">{labels.cashBookBalanceEnd}</td>
+                    <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
+                      {fmtBaseReportAmt(brsStatement.balancePerCashBook)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-xs text-slate-600">
-              Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date.
-              Bank-only items are transactions on the bank statement not yet recorded in the cash book.
+            {Math.abs(brsStatement.workbookScheduleTieOutVariance ?? 0) > 0.02 ? (
+              <div className="mt-4 max-w-xl rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
+                Workbook tie-out: declared cash book minus schedule =
+                {' '}
+                <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
+                Large variances usually mean duplicate cash-book exposure, mismatched reconciliation date, or a missing /
+                overstated closing balance inputs — review mappings and extracted balances.
+              </div>
+            ) : null}
+            <p className="mt-6 max-w-xl text-xs leading-relaxed text-slate-700">
+              Note: timing items are transactions already in the cash book but not yet reflected by the bank at the
+              reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.
+              {((brsStatement.timingUncreditedBroughtForwardPrior ?? 0) > 0.005 ||
+                (brsStatement.unpresentedBroughtForwardPrior ?? 0) > 0.005 ||
+                (brsStatement.bankOnlyCreditsBroughtForwardPrior ?? 0) > 0.005) ?
+                (
+                  <>
+                    {' '}
+                    Rows labelled &quot;brought forward&quot; roll unmatched balances from the immediately preceding
+                    reconciliation period (roll-forward project); they are part of the same workbook schedule, not
+                    additional charges.
+                  </>
+                ) :
+                null}
             </p>
+            <div className="mt-8 max-w-xl space-y-4 text-sm text-slate-900 print:mt-10">
+              <p>Checked By: _________________________________________</p>
+              <p>Signed off By: _________________________________________</p>
+              <p>Date: _________________________________________</p>
+            </div>
           </div>
         )}
 
@@ -1212,7 +1307,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <tbody>
                   <tr className="border-t-2 border-green-300 bg-green-50/70">
                     <td colSpan={2} className="px-2 py-1.5 font-bold text-green-900">TOTAL UNCREDITED LODGMENTS (FOR BRS ADD LINE)</td>
-                    <td className="px-2 py-1.5 text-right font-bold text-green-900">{fmtSignedReportAmt(brsStatement?.uncreditedLodgmentsTimingTotal ?? brsStatement?.uncreditedLodgmentsTotal ?? 0)}</td>
+                    <td className="px-2 py-1.5 text-right font-bold text-green-900">
+                      {fmtBrWorkbookMagnitudeAmt(brsStatement?.uncreditedLodgmentsTimingTotal ?? brsStatement?.uncreditedLodgmentsTotal ?? 0)}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1282,8 +1379,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <table className="min-w-full text-sm text-slate-900">
                 <tbody>
                   <tr className="border-t-2 border-blue-300 bg-blue-50/70">
-                    <td colSpan={2} className="px-2 py-1.5 font-bold text-blue-900">Total Unpresented Cheques (for BRS Less line)</td>
-                    <td className="px-2 py-1.5 text-right font-bold text-blue-900">{fmtSignedReportAmt(-Math.abs(brsStatement?.unpresentedChequesTotal ?? 0), { forceNegative: true })}</td>
+                    <td colSpan={2} className="px-2 py-1.5 font-bold text-blue-900">Total Unpresented Cheques (for BRS Less line — magnitude)</td>
+                    <td className="px-2 py-1.5 text-right font-bold text-blue-900">
+                      {fmtBrWorkbookMagnitudeAmt(brsStatement?.unpresentedChequesTotal ?? 0)}
+                    </td>
                   </tr>
                 </tbody>
               </table>

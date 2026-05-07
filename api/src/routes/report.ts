@@ -78,6 +78,29 @@ export function computeBrsMetrics(input: BrsComputationInput) {
   }
 }
 
+/**
+ * Two-column workbook schedule (same order as the printed BRS block):
+ * cash book = bank closing + timing uncredited − unpresented + bank-only debits − bank-only credits.
+ * Unpresented and bank-only credits are stored as positive magnitudes in the schedule.
+ * Use for tie-out checks and for subsequent periods where timing uncredited and unpresented include
+ * current-period items plus brought-forward slices (see brsStatement composition fields).
+ */
+export function deriveCashBookFromWorkbookSchedule(payload: {
+  bankClosingBalance: number
+  uncreditedLodgmentsTimingTotal: number
+  unpresentedChequesTotal: number
+  bankOnlyDebitsNotInCashBookTotal: number
+  bankOnlyCreditsNotInCashBookTotal: number
+}): number {
+  return (
+    payload.bankClosingBalance +
+    payload.uncreditedLodgmentsTimingTotal -
+    payload.unpresentedChequesTotal +
+    payload.bankOnlyDebitsNotInCashBookTotal -
+    payload.bankOnlyCreditsNotInCashBookTotal
+  )
+}
+
 function buildMissingChequesAgeing(
   items: UnpresentedChequeLike[],
   referenceDate: Date
@@ -325,14 +348,13 @@ function resolveBankAccountForReportHeader(
   return null
 }
 
-/** e.g. "KALALA BANK  ACCOUNT NO: P4576" — matches common manual BRS layout. */
+/** Worksheet row format, e.g. "Ecobank Account Number 5565668889". */
 function formatBankAccountHeaderLine(account: ReportBankAccountRow): string | null {
   const bankLabel = (account.bankName || account.name || '').trim()
   const acctNo = (account.accountNo || '').trim()
-  const upper = bankLabel.toUpperCase()
-  if (acctNo && upper) return `${upper}  ACCOUNT NO: ${acctNo}`
-  if (acctNo) return `ACCOUNT NO: ${acctNo}`
-  if (upper) return upper
+  if (bankLabel && acctNo) return `${bankLabel} Account Number ${acctNo}`
+  if (acctNo) return `Account Number ${acctNo}`
+  if (bankLabel) return bankLabel
   return null
 }
 
@@ -632,6 +654,20 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal,
     bankStatementClosingBalance: bankStatementClosingBalanceValue,
   })
+  const unpresentedCurrentCashBookPeriod = unmatchedPaymentsTotal - unmatchedPaymentsWithoutDetailsTotal
+  const timingUncreditedCurrentPeriod = unmatchedReceiptsTotal
+  const timingUncreditedBroughtForwardPrior = broughtForwardReceiptLodgmentsTotal
+  const unpresentedBroughtForwardPrior = broughtForwardTotal
+  const bankOnlyCreditsCurrentPeriod = unmatchedCreditsTotal
+  const bankOnlyCreditsBroughtForwardPrior = broughtForwardBankCreditsTotal
+  const workbookScheduleDerivedCashBook = deriveCashBookFromWorkbookSchedule({
+    bankClosingBalance,
+    uncreditedLodgmentsTimingTotal,
+    unpresentedChequesTotal,
+    bankOnlyDebitsNotInCashBookTotal,
+    bankOnlyCreditsNotInCashBookTotal,
+  })
+  const workbookScheduleTieOutVariance = balancePerCashBook - workbookScheduleDerivedCashBook
   const headerBankAccount = resolveBankAccountForReportHeader(
     project.bankAccounts as ReportBankAccountRow[] | undefined,
     bankAccountId
@@ -661,9 +697,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       openingBankStatementBalance: 'As per bank statement (input/source file)',
       closingBankStatementBalance: 'Closing balance per bank statement',
       addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
-      addBankOnlyCredits: 'Add: Bank-only credits not in cash book',
-      lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
-      lessUnpresentedCheques: 'Less: Unpresented cheques / uncleared payments',
+      /** Main BRS workbook lines — wording matches Ghana manual worksheet layouts. */
+      addBankOnlyDebitsNotInCashBookLine: 'Add: Bank-only debits not in cash book',
+      deductBankOnlyCreditsNotInCashBookLine: 'Deduct: Bank-only credits not in cash book',
+      addBankOnlyCredits: 'Deduct: Bank-only credits not in cash book',
+      lessBankOnlyDebits: 'Add: Bank-only debits not in cash book',
+      lessUnpresentedCheques: 'Less: Unpresented cheques',
       cashBookBalanceEnd: 'Cash book balance at end of period',
       additionalInformationTitle: 'Additional information (Ghana BRS language profile)',
       asAtReconciliationPosition: 'As-at reconciliation position',
@@ -675,6 +714,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       broughtForwardUncreditedLodgments: 'Brought-forward uncredited lodgments',
       broughtForwardBankOnlyCredits: 'Brought-forward bank-only credits',
       broughtForwardUnpresentedCheques: 'Brought-forward unpresented cheques',
+      workbookCompositionTimingUncreditedCurrent: 'Thereof — current-period timing uncredited',
+      workbookCompositionTimingUncreditedPrior: 'Thereof — brought-forward timing uncredited (prior period)',
+      workbookCompositionUnpresentedCurrent: 'Thereof — current-period unpresented cheques',
+      workbookCompositionUnpresentedPrior: 'Thereof — brought-forward unpresented cheques (prior period)',
+      workbookCompositionBankCreditsCurrent: 'Thereof — current-period bank-only credits',
+      workbookCompositionBankCreditsPrior: 'Thereof — brought-forward bank-only credits (prior period)',
     },
   }
   const reportCompletedAt = project.approvedAt || project.reviewedAt || project.preparedAt || new Date()
@@ -702,6 +747,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       bankOnlyReconcilingNet,
       balancePerCashBook,
       bankStatementClosingBalance: bankStatementClosingBalanceValue,
+      workbookScheduleDerivedCashBook,
+      workbookScheduleTieOutVariance,
+      timingUncreditedCurrentPeriod,
+      timingUncreditedBroughtForwardPrior,
+      unpresentedCurrentCashBookPeriod,
+      unpresentedBroughtForwardPrior,
+      bankOnlyCreditsCurrentPeriod,
+      bankOnlyCreditsBroughtForwardPrior,
     },
     additionalInformation: {
       asAtReconciliationPosition: {
@@ -996,11 +1049,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     asAtAndPostPeriodMovement: true,
     labels: {
       openingBankStatementBalance: 'As per bank statement (input)',
-      closingBankStatementBalance: 'Derived bank balance from reconciliation',
+      closingBankStatementBalance: 'Closing balance per bank statement',
       addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
-      addBankOnlyCredits: 'Add: Bank-only credits not in cash book',
-      lessBankOnlyDebits: 'Less: Bank-only debits not in cash book',
-      lessUnpresentedCheques: 'Less: Unpresented cheques / uncleared payments',
+      addBankOnlyDebitsNotInCashBookLine: 'Add: Bank-only debits not in cash book',
+      deductBankOnlyCreditsNotInCashBookLine: 'Deduct: Bank-only credits not in cash book',
+      addBankOnlyCredits: 'Deduct: Bank-only credits not in cash book',
+      lessBankOnlyDebits: 'Add: Bank-only debits not in cash book',
+      lessUnpresentedCheques: 'Less: Unpresented cheques',
       cashBookBalanceEnd: 'Cash book balance at end of period',
       additionalInformationTitle: 'NOTES',
       asAtReconciliationPosition: 'As-at reconciliation position',
@@ -1012,6 +1067,12 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       broughtForwardUncreditedLodgments: 'Brought-forward uncredited lodgments',
       broughtForwardBankOnlyCredits: 'Brought-forward bank-only credits',
       broughtForwardUnpresentedCheques: 'Brought-forward unpresented cheques',
+      workbookCompositionTimingUncreditedCurrent: 'Thereof — current-period timing uncredited',
+      workbookCompositionTimingUncreditedPrior: 'Thereof — brought-forward timing uncredited (prior period)',
+      workbookCompositionUnpresentedCurrent: 'Thereof — current-period unpresented cheques',
+      workbookCompositionUnpresentedPrior: 'Thereof — brought-forward unpresented cheques (prior period)',
+      workbookCompositionBankCreditsCurrent: 'Thereof — current-period bank-only credits',
+      workbookCompositionBankCreditsPrior: 'Thereof — brought-forward bank-only credits (prior period)',
     },
   }
   const exportLabels = reportLanguageProfile.labels
@@ -1163,6 +1224,22 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal: bankOnlyDebitsNotInCashBookTotalExport,
     bankStatementClosingBalance: bankStatementClosingBalanceExport,
   })
+  const epsComposition = 0.005
+  const unpresentedCurrentCashBookPeriodExport =
+    unmatchedPaymentsTotalExport - unmatchedPaymentsWithoutDetailsTotalExport
+  const timingUncreditedCurrentPeriodExport = unmatchedReceiptsTotalExport
+  const timingUncreditedBroughtForwardPriorExport = broughtForwardReceiptLodgmentsTotalExport
+  const unpresentedBroughtForwardPriorExport = broughtForwardChequesTotalExport
+  const bankOnlyCreditsCurrentPeriodExport = unmatchedCreditsTotalExport
+  const bankOnlyCreditsBroughtForwardPriorExport = broughtForwardBankCreditsTotalExport
+  const workbookScheduleDerivedCashBookExport = deriveCashBookFromWorkbookSchedule({
+    bankClosingBalance,
+    uncreditedLodgmentsTimingTotal: uncreditedLodgmentsTimingTotalExport,
+    unpresentedChequesTotal,
+    bankOnlyDebitsNotInCashBookTotal: bankOnlyDebitsNotInCashBookTotalExport,
+    bankOnlyCreditsNotInCashBookTotal: bankOnlyCreditsNotInCashBookTotalExport,
+  })
+  const workbookScheduleTieOutVarianceExport = balancePerCashBook - workbookScheduleDerivedCashBookExport
   const headerBankAccountExport = resolveBankAccountForReportHeader(
     project.bankAccounts as ReportBankAccountRow[] | undefined,
     bankAccountId
@@ -1192,23 +1269,62 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       if (n < 0) return `-${Math.abs(n).toFixed(2)}`
       return n.toFixed(2)
     }
+    const wbAmt = (n: number) => Number(Math.abs(n).toFixed(2))
     const brsStatementRows: (string | number)[][] = [
-      [`${project.organization.name} - ${reportTitle}`],
-      [project.name],
-      [`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)}`],
+      [`${project.organization.name}`],
+      [],
+      [`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
-      [`Currency: ${curr}`],
-      [`Language profile: ${reportLanguageProfile.label}`],
       [],
-      ...(bankStatementClosingBalanceExport != null ? [[exportLabels.openingBankStatementBalance, maybeSigned(bankStatementClosingBalanceExport)]] : []),
-      [exportLabels.closingBankStatementBalance + (bankStatementClosingBalanceExport != null ? ' (reconciled)' : ''), maybeSigned(bankClosingBalance)],
-      [exportLabels.addUncreditedLodgments, maybeSigned(uncreditedLodgmentsTimingTotalExport)],
-      [exportLabels.lessUnpresentedCheques, maybeSigned(-Math.abs(unpresentedChequesTotal), { forceNegative: true })],
-      [exportLabels.cashBookBalanceEnd, maybeSigned(balancePerCashBook)],
-      [],
-      ['Ghana-style bank balance (explicit decomposition)', maybeSigned(bankClosingBalanceGhanaStyleExport)],
-      ...(footerExport ? [[], [footerExport]] : []),
+      ['Description', `Amount (${curr})`],
+      [exportLabels.closingBankStatementBalance, wbAmt(bankClosingBalance)],
+      [exportLabels.addUncreditedLodgments, wbAmt(uncreditedLodgmentsTimingTotalExport)],
     ]
+    if (timingUncreditedBroughtForwardPriorExport > epsComposition) {
+      brsStatementRows.push(
+        [`  ${exportLabels.workbookCompositionTimingUncreditedCurrent}`, wbAmt(timingUncreditedCurrentPeriodExport)],
+        [`  ${exportLabels.workbookCompositionTimingUncreditedPrior}`, wbAmt(timingUncreditedBroughtForwardPriorExport)],
+      )
+    }
+    brsStatementRows.push([exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)])
+    if (unpresentedBroughtForwardPriorExport > epsComposition) {
+      brsStatementRows.push(
+        [`  ${exportLabels.workbookCompositionUnpresentedCurrent}`, wbAmt(unpresentedCurrentCashBookPeriodExport)],
+        [`  ${exportLabels.workbookCompositionUnpresentedPrior}`, wbAmt(unpresentedBroughtForwardPriorExport)],
+      )
+    }
+    brsStatementRows.push(
+      [exportLabels.addBankOnlyDebitsNotInCashBookLine, wbAmt(bankOnlyDebitsNotInCashBookTotalExport)],
+      [exportLabels.deductBankOnlyCreditsNotInCashBookLine, wbAmt(bankOnlyCreditsNotInCashBookTotalExport)],
+    )
+    if (bankOnlyCreditsBroughtForwardPriorExport > epsComposition) {
+      brsStatementRows.push(
+        [`  ${exportLabels.workbookCompositionBankCreditsCurrent}`, wbAmt(bankOnlyCreditsCurrentPeriodExport)],
+        [`  ${exportLabels.workbookCompositionBankCreditsPrior}`, wbAmt(bankOnlyCreditsBroughtForwardPriorExport)],
+      )
+    }
+    brsStatementRows.push([exportLabels.cashBookBalanceEnd, wbAmt(balancePerCashBook)])
+    if (Math.abs(workbookScheduleTieOutVarianceExport) > 0.02) {
+      brsStatementRows.push([
+        'Workbook tie-out (declared cash book − schedule): variance',
+        wbAmt(workbookScheduleTieOutVarianceExport),
+      ])
+    }
+    brsStatementRows.push(
+      [],
+      [
+        'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.' +
+          (broughtForwardLodgmentsTotalExport + broughtForwardChequesTotalExport > epsComposition ?
+            ' Brought-forward lines roll unmatched items from the prior reconciliation period into this schedule.' :
+            ''),
+        '',
+      ],
+      [],
+      ['Checked By:', ''],
+      ['Signed off By:', ''],
+      ['Date:', ''],
+      ...(footerExport ? [[], [footerExport]] : []),
+    )
     const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
     XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BANK RECONCILIATION')
     const additionalInformationRows: (string | number)[][] = [
@@ -1322,7 +1438,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     doc.fontSize(14).text(reportTitle, { align: 'center' })
     doc.fontSize(11).text(project.name, { align: 'center' })
     const curr = project.currency || 'GHS'
-    doc.fontSize(9).text(`BANK RECONCILIATION STATEMENT AS AT ${fmtBRSTitle(reconciliationDateExport)}`, { align: 'center' })
+    doc.fontSize(9).text(`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`, { align: 'center' })
     if (bankAccountHeaderLineExport) {
       doc.fontSize(9).text(bankAccountHeaderLineExport, { align: 'center' })
     }
@@ -1414,7 +1530,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     const drawAmountSummaryTable = (
       title: string,
-      rows: Array<{ label: string; amount: number; forceNegative?: boolean }>,
+      rows: Array<{
+        label: string
+        amount: number
+        forceNegative?: boolean
+        /** Plain positive/display magnitudes — Ghana worksheet-style BRS amounts */
+        workbookStyle?: boolean
+        bold?: boolean
+        /** Indented workbook composition line (does not contribute to PDF subtotal totals). */
+        subRow?: boolean
+      }>,
       opts?: { drawTotal?: boolean }
     ) => {
       const x = margin
@@ -1450,12 +1575,19 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       let total = 0
       for (const r of rows) {
         ensureRoom(rowH + 8, true)
-        total += r.amount
+        if (!r.subRow) total += r.amount
         const y = doc.y + 4
-        const amountText = signedAmt(r.forceNegative ? -Math.abs(r.amount) : r.amount, { forceNegative: !!r.forceNegative })
-        doc.fontSize(9).font('Helvetica').fillColor('#111827')
+        const amountText =
+          r.workbookStyle ?
+            amtNum(Math.abs(r.amount)) :
+            signedAmt(r.forceNegative ? -Math.abs(r.amount) : r.amount, { forceNegative: !!r.forceNegative })
+        const fontBody = r.bold ? 'Helvetica-Bold' : 'Helvetica'
+        const fs = r.subRow ? 8 : 9
+        const fill = r.subRow ? '#374151' : '#111827'
+        doc.fontSize(fs).font(fontBody).fillColor(fill)
         doc.text(r.label, x + 6, y, { width: cLabel - 8 })
         doc.text(amountText, x + cLabel + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.font('Helvetica')
         doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
         doc.y += rowH
       }
@@ -1479,18 +1611,102 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       if (n < 0) return `-${plain}`
       return amtNum(0)
     }
-    drawAmountSummaryTable('Bank Reconciliation Statement', [
-      ...(bankStatementClosingBalanceExport != null
-        ? [{ label: exportLabels.openingBankStatementBalance, amount: bankStatementClosingBalanceExport }]
-        : []),
+    const pdfPrimaryBrsRows: Array<{
+      label: string
+      amount: number
+      workbookStyle?: boolean
+      bold?: boolean
+      subRow?: boolean
+    }> = [
       {
-        label: exportLabels.closingBankStatementBalance + (bankStatementClosingBalanceExport != null ? ' (reconciled)' : ''),
+        label: exportLabels.closingBankStatementBalance,
         amount: bankClosingBalance,
+        workbookStyle: true,
+        bold: true,
       },
-      { label: exportLabels.addUncreditedLodgments, amount: uncreditedLodgmentsTimingTotalExport },
-      { label: exportLabels.lessUnpresentedCheques, amount: unpresentedChequesTotal, forceNegative: true },
-      { label: exportLabels.cashBookBalanceEnd, amount: balancePerCashBook },
-    ], { drawTotal: false })
+      { label: exportLabels.addUncreditedLodgments, amount: uncreditedLodgmentsTimingTotalExport, workbookStyle: true },
+    ]
+    if (timingUncreditedBroughtForwardPriorExport > epsComposition) {
+      pdfPrimaryBrsRows.push(
+        { label: exportLabels.workbookCompositionTimingUncreditedCurrent, amount: timingUncreditedCurrentPeriodExport, workbookStyle: true, subRow: true },
+        { label: exportLabels.workbookCompositionTimingUncreditedPrior, amount: timingUncreditedBroughtForwardPriorExport, workbookStyle: true, subRow: true },
+      )
+    }
+    pdfPrimaryBrsRows.push({
+      label: exportLabels.lessUnpresentedCheques,
+      amount: Math.abs(unpresentedChequesTotal),
+      workbookStyle: true,
+    })
+    if (unpresentedBroughtForwardPriorExport > epsComposition) {
+      pdfPrimaryBrsRows.push(
+        {
+          label: exportLabels.workbookCompositionUnpresentedCurrent,
+          amount: unpresentedCurrentCashBookPeriodExport,
+          workbookStyle: true,
+          subRow: true,
+        },
+        {
+          label: exportLabels.workbookCompositionUnpresentedPrior,
+          amount: unpresentedBroughtForwardPriorExport,
+          workbookStyle: true,
+          subRow: true,
+        },
+      )
+    }
+    pdfPrimaryBrsRows.push(
+      {
+        label: exportLabels.addBankOnlyDebitsNotInCashBookLine,
+        amount: bankOnlyDebitsNotInCashBookTotalExport,
+        workbookStyle: true,
+      },
+      {
+        label: exportLabels.deductBankOnlyCreditsNotInCashBookLine,
+        amount: bankOnlyCreditsNotInCashBookTotalExport,
+        workbookStyle: true,
+      },
+    )
+    if (bankOnlyCreditsBroughtForwardPriorExport > epsComposition) {
+      pdfPrimaryBrsRows.push(
+        {
+          label: exportLabels.workbookCompositionBankCreditsCurrent,
+          amount: bankOnlyCreditsCurrentPeriodExport,
+          workbookStyle: true,
+          subRow: true,
+        },
+        {
+          label: exportLabels.workbookCompositionBankCreditsPrior,
+          amount: bankOnlyCreditsBroughtForwardPriorExport,
+          workbookStyle: true,
+          subRow: true,
+        },
+      )
+    }
+    pdfPrimaryBrsRows.push({
+      label: exportLabels.cashBookBalanceEnd,
+      amount: balancePerCashBook,
+      workbookStyle: true,
+      bold: true,
+    })
+    drawAmountSummaryTable('Bank Reconciliation Statement', pdfPrimaryBrsRows, { drawTotal: false })
+    if (Math.abs(workbookScheduleTieOutVarianceExport) > 0.02) {
+      doc.fontSize(8).fillColor('#B45309').text(
+        `Workbook tie-out: declared cash book minus schedule total = ${amtNum(workbookScheduleTieOutVarianceExport)} (review matches and opening balances).`,
+        { width: contentWidth },
+      ).fillColor('#000000').moveDown(0.4)
+    }
+    doc.fontSize(8).fillColor('#444444').text(
+      'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.' +
+        (broughtForwardLodgmentsTotalExport + broughtForwardChequesTotalExport > epsComposition ?
+          ' Brought-forward lines roll unmatched items from the prior reconciliation period into this schedule.' :
+          ''),
+      { width: contentWidth },
+    ).fillColor('#000000').moveDown(0.6)
+    doc.fontSize(9).fillColor('#111827').text('Checked By: _______________________________________', { continued: false })
+    doc.moveDown(0.4)
+    doc.text('Signed off By: _______________________________________')
+    doc.moveDown(0.4)
+    doc.text('Date: _______________________________________')
+    doc.moveDown(0.8).fillColor('#000000')
 
     doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle)
     doc.moveDown(0.2)

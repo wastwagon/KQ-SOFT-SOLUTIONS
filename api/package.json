@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "db:seed": "npx tsx prisma/seed.ts",
     "test": "vitest run",
+    "test:licl-qtest": "vitest run --run src/routes/report.qtest-licl-golden.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -61,6 +61,8 @@ export interface ReportProjectInfo {
 
 export interface BrsStatement {
   bankClosingBalance: number
+  /** Legacy tie: cash book − full uncredited + unpresented (still returned for diagnostics). */
+  bankClosingBalanceLegacy?: number
   bankClosingBalanceGhanaStyle?: number
   uncreditedLodgmentsTotal: number
   uncreditedLodgmentsTimingTotal?: number
@@ -71,6 +73,14 @@ export interface BrsStatement {
   bankOnlyReconcilingNet?: number
   balancePerCashBook: number
   bankStatementClosingBalance?: number | null
+  workbookScheduleDerivedCashBook?: number
+  workbookScheduleTieOutVariance?: number
+  timingUncreditedCurrentPeriod?: number
+  timingUncreditedBroughtForwardPrior?: number
+  unpresentedCurrentCashBookPeriod?: number
+  unpresentedBroughtForwardPrior?: number
+  bankOnlyCreditsCurrentPeriod?: number
+  bankOnlyCreditsBroughtForwardPrior?: number
 }
 
 export interface ReportSimpleTx {
@@ -133,7 +143,7 @@ export interface ReportResponse {
   bankAccountId?: string | null
   selectedBankAccountName?: string | null
   selectedBankAccountNo?: string | null
-  /** Ghana manual-style header line, e.g. "KALALA BANK  ACCOUNT NO: P4576" */
+  /** Ghana workbook-style header line, e.g. "Ecobank Account Number 5565668889" */
   bankAccountHeaderLine?: string | null
   currency?: string
   reportCompletedAt?: string
@@ -151,6 +161,9 @@ export interface ReportResponse {
       openingBankStatementBalance?: string
       closingBankStatementBalance?: string
       addUncreditedLodgments?: string
+      /** Primary BRS worksheet row labels — bank-only reconciliation lines */
+      addBankOnlyDebitsNotInCashBookLine?: string
+      deductBankOnlyCreditsNotInCashBookLine?: string
       addBankOnlyCredits?: string
       lessBankOnlyDebits?: string
       lessUnpresentedCheques?: string
@@ -165,6 +178,12 @@ export interface ReportResponse {
       broughtForwardUncreditedLodgments?: string
       broughtForwardBankOnlyCredits?: string
       broughtForwardUnpresentedCheques?: string
+      workbookCompositionTimingUncreditedCurrent?: string
+      workbookCompositionTimingUncreditedPrior?: string
+      workbookCompositionUnpresentedCurrent?: string
+      workbookCompositionUnpresentedPrior?: string
+      workbookCompositionBankCreditsCurrent?: string
+      workbookCompositionBankCreditsPrior?: string
     }
   }
   additionalInformation?: {

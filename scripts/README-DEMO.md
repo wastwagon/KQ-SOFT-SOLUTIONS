@@ -7,6 +7,13 @@ This script creates a new project with sample data containing **doc_ref**, **chq
 1. **Database**: Ensure PostgreSQL is running and `DATABASE_URL` is set in `api/.env`
 2. **API**: The BRS API must be running on port 9001
 
+## Qtest / LICL workbook pack (root `new-test-data/`)
+
+Uses **`Qtestcash book.xlsx`** and **`Qtestbank statement.xlsx`**. Golden template figures (4,566.86 / 4,000 / 5,400 / 833.14 / 0 → 4,000) are recorded in **`new-test-data/qtest-licl-golden.json`**.
+
+- **Lock / regression:** from `api/`, run `npm run test:licl-qtest`.
+- **Demo upload + map (API must be running):** from repo root, `npm run demo:flow:qtest`. Then reconcile in the UI to match the workbook; the JSON above is the target BRS line totals.
+
 ## Quick Start
 
 ### Terminal 1 – Start the API

@@ -8,14 +8,12 @@ Standard layout and terminology for Bank Reconciliation Statements (BRS) as used
 
 1. **Company name** (and optional logo).
 2. **Title:** "BANK RECONCILIATION STATEMENT AS AT [DD-MMM-YYYY]".
-3. **Bank:** When a single bank account is selected, the report header (web, PDF, and Excel) shows **"Bank account: [name]"** (e.g. "Ecobank Main", "GCB Operating"). This appears in the BRS statement block and on the first sheet/header of exports.
+3. **Bank:** When a single bank account is selected, header lines use **`{bankName or account name} Account Number {accountNo}`** (e.g. `Ecobank Account Number 5565668889`). Web, Excel first sheet, and PDF share `formatBankAccountHeaderLine` / `bankAccountHeaderLine`.
 4. **Currency:** e.g. "GHS" or "GH₵".
-5. **Closing balance per bank statement** — single prominent amount.
-6. **Add: Uncredited lodgments** — table (Date, Name/Details, Amount) + **total**.
-7. **Less: Unpresented cheques** — table (Date, Name/Details, Chq No, Amount) + **total**.
-8. **Balance per cash book at end of period** — single prominent amount (= bank closing + lodgments − cheques).
-9. Sign-off (Prepared by, Reviewed by, Approved by) and optional narrative/comments.
-10. Footer (from organisation branding).
+5. **Primary workbook block** (two-column): Closing balance per bank statement → Add timing uncredited → Less unpresented (magnitudes) → Add bank-only debits → Deduct bank-only credits → Cash book balance. Optional indented lines split **current period vs brought-forward** when roll-forward applies. See `docs/REPORT_LAYOUT_SCHEMA.md` §0 and `deriveCashBookFromWorkbookSchedule` in `api/src/routes/report.ts`.
+6. **Supporting tables:** Uncredited lodgments (unmatched receipts + lists), Unpresented cheques (unmatched payments + brought forward). Compact columns per schema.
+7. Sign-off (Prepared by, Reviewed by, Approved by) plus workbook-style **Checked By / Signed off By / Date** on the primary block.
+8. Footer (from organisation branding).
 
 ---
 
@@ -23,15 +21,14 @@ Standard layout and terminology for Bank Reconciliation Statements (BRS) as used
 
 | Term | Use in report, PDF, Excel |
 |------|---------------------------|
-| **Uncredited lodgments** | Receipts/lodgments not yet credited by the bank. |
-| **Unpresented cheques** | Cheques issued but not yet presented to the bank. |
-| **Balance per cash book at end of period** | Resulting balance after reconciliation. |
+| **Uncredited lodgments** | Receipts/lodgments not yet credited by the bank (timing). **Add line** on workbook uses **timing total** (may include BF receipt lodgments). |
+| **Unpresented cheques** | Cheques issued not yet presented; **Less line** uses **positive magnitude** in the workbook block. |
+| **Cash book balance at end of period** | Declared or computed closing; must tie to workbook formula when inputs are consistent. |
+| **Bank-only debits / credits** | Statement items not yet in cash book; **Add** debits, **Deduct** credits in the workbook. |
 | **As at [date]** | Reconciliation date in title, e.g. "AS AT 31-DECEMBER-2024". |
-| **Closing balance per bank statement** | Balance from the bank statement. |
+| **Closing balance per bank statement** | From statement file / manual input; drives workbook when provided. |
 
----
-
-## Date & number formatting (Ghana)
+See `web/src/lib/format.ts` and `web/src/lib/currency.ts`.
 
 - **Dates (display):** DD MMM YYYY (e.g. 31 Dec 2024), via `formatDate()`.
 - **BRS title date:** DD-MMM-YYYY (e.g. 31-DECEMBER-2024), via `formatDateBRSTitle()`.

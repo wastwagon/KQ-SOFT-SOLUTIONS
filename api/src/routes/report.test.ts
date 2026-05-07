@@ -2,6 +2,7 @@ import path from 'path'
 import { describe, expect, it } from 'vitest'
 import {
   computeBrsMetrics,
+  deriveCashBookFromWorkbookSchedule,
   extractCashBookClosingBalanceFromDoc,
   extractSourceClosingBalanceFromDocs,
   hasChequeOrRefLink,
@@ -72,5 +73,16 @@ describe('report helpers', () => {
     })
     expect(withStatement.bankClosingBalance).toBeCloseTo(4566.86, 2)
     expect(withStatement.bankClosingBalanceGhanaStyle).toBeCloseTo(4166.86, 2)
+  })
+
+  it('derives cash book from workbook schedule (same order as primary BRS rows)', () => {
+    const derived = deriveCashBookFromWorkbookSchedule({
+      bankClosingBalance: 4566.86,
+      uncreditedLodgmentsTimingTotal: 4000,
+      unpresentedChequesTotal: 5400,
+      bankOnlyDebitsNotInCashBookTotal: 833.14,
+      bankOnlyCreditsNotInCashBookTotal: 0,
+    })
+    expect(derived).toBeCloseTo(4000, 2)
   })
 })

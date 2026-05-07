@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "manual:pdf": "node scripts/generate-pdf.js",
-    "demo:flow": "bash scripts/run-full-flow.sh"
+    "demo:flow": "bash scripts/run-full-flow.sh",
+    "demo:flow:qtest": "bash scripts/run-qtest-licl-flow.sh"
   },
   "devDependencies": {
     "md-to-pdf": "^5.2.5"

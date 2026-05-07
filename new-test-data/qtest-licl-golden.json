@@ -1,0 +1,25 @@
+{
+  "_comment": "LICL-style worksheet figures tied to Qtestcash book.xlsx + Qtestbank statement.xlsx in this folder.",
+  "sourceFiles": ["Qtestcash book.xlsx", "Qtestbank statement.xlsx"],
+  "currency": "GHS",
+  "balancePerCashBook": 4000,
+  "bankStatementClosingBalance": 4566.86,
+  "uncreditedLodgmentsTimingTotal": 4000,
+  "unpresentedChequesTotal": 5400,
+  "bankOnlyDebitsNotInCashBookTotal": 833.14,
+  "bankOnlyCreditsNotInCashBookTotal": 0,
+  "layoutReference": {
+    "title": "Bank Reconciliation Statement as at 31-JANUARY-2023",
+    "note": "Timing items vs bank-only items — wording matches workbook template.",
+    "rowOrder": [
+      "Closing balance per bank statement",
+      "Add: Uncredited lodgments / uncleared deposits",
+      "Less: Unpresented cheques",
+      "Add: Bank-only debits not in cash book",
+      "Deduct: Bank-only credits not in cash book",
+      "Cash book balance at end of period"
+    ]
+  },
+  "_reconciliationArithmetic": "bankClosing + uncreditedTiming - unpresented + bankOnlyDebits - bankOnlyCredits === cashBook (4566.86 + 4000 - 5400 + 833.14 - 0 = 4000)",
+  "_derivedFromBankSpreadsheet": "833.14 is the debit total of Description rows starting with 'REF :' on Qtestbank statement.xlsx (clearing/settlement)."
+}
