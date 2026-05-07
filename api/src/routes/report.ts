@@ -1277,7 +1277,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [],
-      ['Description', `Amount (${curr})`],
       [exportLabels.closingBankStatementBalance, wbAmt(bankClosingBalance)],
       [exportLabels.addUncreditedLodgments, wbAmt(uncreditedLodgmentsTimingTotalExport)],
       [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
@@ -1387,36 +1386,42 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     const margin = 50
     const contentWidth = pageWidth - margin * 2
     const logoPath = resolveBrandingLogoPath((branding.logoUrl as string | undefined) || '')
-    doc.rect(0, 0, pageWidth, 120).fill('#F8FAFC')
-    doc.rect(0, 118, pageWidth, 2).fill(primaryColor)
+    doc.y = 48
     if (logoPath) {
       try {
-        doc.image(logoPath, (pageWidth - 120) / 2, 20, { fit: [120, 48], align: 'center', valign: 'center' })
+        doc.image(logoPath, (pageWidth - 120) / 2, doc.y, { fit: [120, 48], align: 'center', valign: 'center' })
+        doc.y += 54
       } catch {
         // ignore logo render failures and continue with text header
       }
     }
-    doc.y = logoPath ? 74 : 36
     doc.fillColor(primaryColor).fontSize(20).text(`${project.organization.name}`, { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.35)
     const letterhead = branding.letterheadAddress as string | undefined
     if (letterhead) {
       doc.fontSize(9).fillColor('#444444').text(letterhead, { align: 'center' }).fillColor('#000000').moveDown(0.3)
     }
-    doc.fontSize(14).text(reportTitle, { align: 'center' })
     doc.fontSize(11).text(project.name, { align: 'center' })
+    doc.moveDown(0.25)
     const curr = project.currency || 'GHS'
-    doc.fontSize(9).text(`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`, { align: 'center' })
+    doc.fontSize(10).font('Helvetica-Bold').text(`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`, { align: 'center' }).font('Helvetica')
     if (bankAccountHeaderLineExport) {
+      doc.moveDown(0.2)
       doc.fontSize(9).text(bankAccountHeaderLineExport, { align: 'center' })
     }
+    doc.moveDown(0.2)
     doc.fontSize(9).text(`Currency: ${curr}`, { align: 'center' })
     doc.fontSize(8).fillColor('#444444').text(`Language profile: ${reportLanguageProfile.label}`, { align: 'center' }).fillColor('#000000')
     const printAt = new Date()
     const reportCompletedAtPdf = project.approvedAt || project.reviewedAt || project.preparedAt || printAt
     doc.fontSize(8).fillColor('#444444').text(`Report completed: ${formatGeneratedAt(reportCompletedAtPdf)} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
     doc.fontSize(8).fillColor('#444444').text(`Print date: ${formatGeneratedAt(printAt)} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
-    doc.moveDown(0.8)
+    doc.moveDown(0.45)
+    const dividerY = doc.y + 2
+    doc.save()
+    doc.moveTo(0, dividerY).lineTo(pageWidth, dividerY).lineWidth(2).strokeColor(primaryColor).stroke()
+    doc.restore()
+    doc.y = dividerY + 10
 
     const amtNum = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
     const fmtPdfDate = (d: string) => {
@@ -1508,21 +1513,25 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         /** Indented workbook composition line (does not contribute to PDF subtotal totals). */
         subRow?: boolean
       }>,
-      opts?: { drawTotal?: boolean }
+      opts?: { drawTotal?: boolean; hideTitle?: boolean; hideColumnHeaders?: boolean }
     ) => {
       const x = margin
       const tableWidth = contentWidth
       const cLabel = tableWidth - 150
       const cAmount = 150
       const rowH = 18
+      const hideTitle = !!opts?.hideTitle
+      const hideColumnHeaders = !!opts?.hideColumnHeaders
       const ensureRoom = (needed: number, redrawHeader = false) => {
         if (doc.y + needed < doc.page.height - 60) return
         doc.addPage()
         doc.y = 50
         if (redrawHeader) {
-          doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
-          doc.moveDown(0.35)
-          drawHeader()
+          if (!hideTitle) {
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+            doc.moveDown(0.35)
+          }
+          if (!hideColumnHeaders) drawHeader()
         }
       }
       const drawHeader = () => {
@@ -1537,9 +1546,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         doc.y += rowH
       }
       ensureRoom(36)
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
-      doc.moveDown(0.35)
-      drawHeader()
+      if (!hideTitle) {
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+        doc.moveDown(0.35)
+      }
+      if (!hideColumnHeaders) {
+        drawHeader()
+      } else {
+        doc.moveTo(x, doc.y).lineTo(x + tableWidth, doc.y).strokeColor('#94A3B8').lineWidth(1).stroke()
+        doc.y += 4
+      }
       let total = 0
       for (const r of rows) {
         ensureRoom(rowH + 8, true)
@@ -1605,7 +1621,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         bold: true,
       },
     ]
-    drawAmountSummaryTable('Bank Reconciliation Statement', pdfPrimaryBrsRows, { drawTotal: false })
+    drawAmountSummaryTable('Bank Reconciliation Statement', pdfPrimaryBrsRows, {
+      drawTotal: false,
+      hideTitle: true,
+      hideColumnHeaders: true,
+    })
     doc.fontSize(8).fillColor('#444444').text(
       'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES section below and supporting tables.',
       { width: contentWidth },
