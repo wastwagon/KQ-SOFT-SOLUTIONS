@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Mail } from 'lucide-react'
 import { auth } from '../lib/api'
-import BrandLogo from '../components/BrandLogo'
+import AuthLayout, {
+  authAlertErrorClass,
+  authCardClass,
+  authFieldClass,
+  authLabelClass,
+  authPrimaryButtonClass,
+} from '../components/AuthLayout'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -24,56 +31,69 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-surface px-4 relative">
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex w-full flex-col items-center text-center">
-          <BrandLogo className="h-12 w-auto sm:h-14" />
-          <p className="mt-3 w-full text-sm text-gray-500 sm:text-base">Bank Reconciliation SaaS</p>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-lg p-6 space-y-4 border border-border shadow-card"
-        >
-          <h2 className="text-lg font-semibold text-gray-900">Forgot password</h2>
-          {sent ? (
-            <p className="text-sm text-gray-600">
-              If that email exists in our system, a reset link was sent. Check your inbox and spam folder.
+    <AuthLayout
+      eyebrow="Account"
+      title="Reset your password"
+      subtitle="We’ll email you a secure link if your address is registered."
+    >
+      <div className={authCardClass}>
+        {sent ? (
+          <div className="space-y-4 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
+              <Mail className="h-6 w-6" aria-hidden />
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              If that email exists in our system, we sent a reset link. Check your inbox and spam folder.
             </p>
-          ) : (
-            <>
-              {error && (
-                <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
-              )}
-              <p className="text-sm text-gray-600">
-                Enter your email and we will send you a link to reset your password.
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <Link
+              to="/login"
+              className="inline-flex justify-center font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+            >
+              Back to sign in
+            </Link>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className={authAlertErrorClass} role="alert">
+                {error}
+              </div>
+            )}
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Enter the email you use for KQ-SOFT. The link expires after a short time for security.
+            </p>
+            <div>
+              <label htmlFor="forgot-email" className={authLabelClass}>
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
                 <input
+                  id="forgot-email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="you@example.com"
+                  className={`${authFieldClass} pl-11`}
+                  placeholder="you@firm.com"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            </div>
+            <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+              {loading ? 'Sending…' : 'Send reset link'}
+            </button>
+            <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
+              <Link
+                to="/login"
+                className="font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
               >
-                {loading ? 'Sending...' : 'Send reset link'}
-              </button>
-            </>
-          )}
-          <p className="text-center text-sm text-gray-500">
-            <Link to="/login" className="text-primary-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
-              Back to login
-            </Link>
-          </p>
-        </form>
+                Back to sign in
+              </Link>
+            </p>
+          </form>
+        )}
       </div>
-    </div>
+    </AuthLayout>
   )
 }

@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Building2, Lock, Mail, User } from 'lucide-react'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
-import BrandLogo from '../components/BrandLogo'
+import AuthLayout, {
+  authAlertErrorClass,
+  authCardClass,
+  authFieldClass,
+  authLabelClass,
+  authPrimaryButtonClass,
+} from '../components/AuthLayout'
 
 export default function Register() {
   const isAuthenticated = useAuth((s) => !!s.token)
@@ -40,89 +47,123 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-surface px-4 py-8 relative">
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex w-full flex-col items-center text-center">
-          <BrandLogo className="h-12 w-auto sm:h-14" />
-          <p className="mt-3 w-full text-sm text-gray-500 sm:text-base">Bank Reconciliation SaaS</p>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl p-7 sm:p-8 space-y-5 border border-border shadow-card"
-        >
-          <h2 className="text-lg font-semibold text-gray-900">Create account</h2>
-          {error && (
-            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Organization name
-            </label>
+    <AuthLayout
+      eyebrow="Get started"
+      title="Create your workspace"
+      subtitle="One organisation per account. You can invite teammates from Settings after you sign up."
+    >
+      <form onSubmit={handleSubmit} className={`${authCardClass} space-y-5`}>
+        {error && (
+          <div className={authAlertErrorClass} role="alert">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="register-org" className={authLabelClass}>
+            Organisation name
+          </label>
+          <div className="relative">
+            <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
             <input
+              id="register-org"
               type="text"
+              autoComplete="organization"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="KQ SOFT SOLUTIONS"
+              className={`${authFieldClass} pl-11`}
+              placeholder="Your firm or company name"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Your name
-            </label>
+        </div>
+
+        <div>
+          <label htmlFor="register-name" className={authLabelClass}>
+            Your name <span className="font-normal text-gray-500">(optional)</span>
+          </label>
+          <div className="relative">
+            <User className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
             <input
+              id="register-name"
               type="text"
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="John Doe"
+              className={`${authFieldClass} pl-11`}
+              placeholder="How we’ll greet you in the app"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+        </div>
+
+        <div>
+          <label htmlFor="register-email" className={authLabelClass}>
+            Work email
+          </label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
             <input
+              id="register-email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="you@example.com"
+              className={`${authFieldClass} pl-11`}
+              placeholder="you@firm.com"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+        </div>
+
+        <div>
+          <label htmlFor="register-password" className={authLabelClass}>
+            Password
+          </label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
             <input
+              id="register-password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className={`${authFieldClass} pl-11`}
               placeholder="At least 6 characters"
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
-          <p className="text-center text-sm text-gray-500">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
-              Sign in
-            </Link>
+          <p className="mt-1.5 text-xs text-gray-500">
+            Use at least 6 characters. You can change this anytime from your profile.
           </p>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+          {loading ? 'Creating workspace…' : 'Create workspace'}
+        </button>
+
+        <p className="text-center text-xs leading-relaxed text-gray-500">
+          By continuing you agree to use KQ-SOFT in line with your organisation’s policies.
+          Need help?{' '}
+          <a
+            href="mailto:info@kqsoftwaresolutions.com"
+            className="font-medium text-primary-600 hover:underline"
+          >
+            Contact support
+          </a>
+          .
+        </p>
+
+        <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+          >
+            Sign in
+          </Link>
+        </p>
+      </form>
+    </AuthLayout>
   )
 }

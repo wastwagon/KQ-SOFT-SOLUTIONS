@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { Lock } from 'lucide-react'
 import { auth } from '../lib/api'
-import BrandLogo from '../components/BrandLogo'
+import AuthLayout, {
+  authAlertErrorClass,
+  authCardClass,
+  authFieldClass,
+  authLabelClass,
+  authPrimaryButtonClass,
+} from '../components/AuthLayout'
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
@@ -41,69 +48,92 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-surface px-4 relative">
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex w-full flex-col items-center text-center">
-          <BrandLogo className="h-12 w-auto sm:h-14" />
-          <p className="mt-3 w-full text-sm text-gray-500 sm:text-base">Bank Reconciliation SaaS</p>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-lg p-6 space-y-4 border border-border shadow-card"
-        >
-          <h2 className="text-lg font-semibold text-gray-900">Reset password</h2>
-          {success ? (
-            <p className="text-sm text-green-600">
-              Password reset successfully. Redirecting to login...
+    <AuthLayout
+      eyebrow="Security"
+      title="Choose a new password"
+      subtitle="Pick a strong password you haven’t used elsewhere."
+    >
+      <form onSubmit={handleSubmit} className={`${authCardClass} space-y-5`}>
+        {success ? (
+          <div className="space-y-3 text-center">
+            <p className="text-sm font-medium text-green-700">
+              Password updated. Redirecting you to sign in…
             </p>
-          ) : !token ? (
-            <p className="text-sm text-red-600">
-              Invalid or missing reset link. Request a new one from the forgot password page.
+          </div>
+        ) : !token ? (
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-red-700">
+              This reset link is invalid or expired. Request a new one from the forgot password page.
             </p>
-          ) : (
-            <>
-              {error && (
-                <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+            <Link
+              to="/forgot-password"
+              className="inline-flex font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+            >
+              Request new link
+            </Link>
+          </div>
+        ) : (
+          <>
+            {error && (
+              <div className={authAlertErrorClass} role="alert">
+                {error}
+              </div>
+            )}
+            <div>
+              <label htmlFor="reset-password" className={authLabelClass}>
+                New password
+              </label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
                 <input
+                  id="reset-password"
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className={`${authFieldClass} pl-11`}
                   placeholder="At least 6 characters"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
+            </div>
+            <div>
+              <label htmlFor="reset-confirm" className={authLabelClass}>
+                Confirm password
+              </label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
                 <input
+                  id="reset-confirm"
                   type="password"
+                  autoComplete="new-password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className={`${authFieldClass} pl-11`}
+                  placeholder="Repeat new password"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-              >
-                {loading ? 'Resetting...' : 'Reset password'}
-              </button>
-            </>
-          )}
-          <p className="text-center text-sm text-gray-500">
-            <Link to="/login" className="text-primary-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
-              Back to login
+            </div>
+            <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+              {loading ? 'Updating…' : 'Update password'}
+            </button>
+          </>
+        )}
+
+        {!success && token && (
+          <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
+            <Link
+              to="/login"
+              className="font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+            >
+              Back to sign in
             </Link>
           </p>
-        </form>
-      </div>
-    </div>
+        )}
+      </form>
+    </AuthLayout>
   )
 }
