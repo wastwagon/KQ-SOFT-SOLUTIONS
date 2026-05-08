@@ -1362,11 +1362,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     
     // --- AUDIT WORKING PAPERS (INTERNAL USE) ---
-    if (unmatchedIn.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedIn), 'UNMATCHED RECEIPTS')
+    if (unmatchedReceipts.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedReceipts), 'UNMATCHED RECEIPTS')
     }
-    if (unmatchedOut.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'UNMATCHED PAYMENTS')
+    if (unmatchedPayments.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedPayments), 'UNMATCHED PAYMENTS')
     }
     if (unmatchedDebits.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedDebits), 'BANK-ONLY DEBITS (ADD)')
