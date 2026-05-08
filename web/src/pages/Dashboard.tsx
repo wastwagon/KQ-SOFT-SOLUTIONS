@@ -85,7 +85,7 @@ export default function Dashboard() {
   const completedCount = projectsList.filter((p: { status: string }) => p.status === 'completed').length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
         <div className="flex items-center gap-2">
@@ -108,45 +108,45 @@ export default function Dashboard() {
 
       {!isLoading && projectsList.length === 0 && !getStartedDismissed && (
         <Card className="border-l-4 border-l-primary-500 bg-primary-50/30 overflow-hidden">
-          <div className="flex items-start justify-between p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-6 p-5 sm:p-7">
             <div className="min-w-0 flex-1">
               <h2 className="text-xl font-bold tracking-tight text-primary-900 mb-2">Welcome to your new workspace</h2>
-              <p className="text-sm text-primary-800 mb-6 max-w-2xl leading-relaxed">
+              <p className="text-sm text-primary-800 mb-8 max-w-2xl leading-relaxed">
                 Follow these best practices to set up your firm for professional bank reconciliation and collaboration.
               </p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">1</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">1</div>
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Branding</h3>
-                    <p className="text-xs text-gray-600 mt-1 mb-2">Set your logo and colors for professional reports.</p>
-                    <Link to="/settings/branding" className="text-xs font-semibold text-primary-600 hover:underline">Configure branding →</Link>
+                    <h3 className="text-sm font-semibold text-primary-900">Branding</h3>
+                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Set your logo and colors for professional reports.</p>
+                    <Link to="/settings/branding" className="text-sm font-semibold text-primary-600 hover:underline">Configure branding →</Link>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">2</div>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">2</div>
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Team</h3>
-                    <p className="text-xs text-gray-600 mt-1 mb-2">Invite employees for a clear audit trail.</p>
-                    <Link to="/settings/members" className="text-xs font-semibold text-primary-600 hover:underline">Invite members →</Link>
+                    <h3 className="text-sm font-semibold text-primary-900">Team</h3>
+                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Invite employees for a clear audit trail.</p>
+                    <Link to="/settings/members" className="text-sm font-semibold text-primary-600 hover:underline">Invite members →</Link>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">3</div>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">3</div>
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Clients</h3>
-                    <p className="text-xs text-gray-600 mt-1 mb-2">Add the entities you are reconciling for.</p>
-                    <Link to="/clients" className="text-xs font-semibold text-primary-600 hover:underline">Add clients →</Link>
+                    <h3 className="text-sm font-semibold text-primary-900">Clients</h3>
+                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Add the entities you are reconciling for.</p>
+                    <Link to="/clients" className="text-sm font-semibold text-primary-600 hover:underline">Add clients →</Link>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">4</div>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">4</div>
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Projects</h3>
-                    <p className="text-xs text-gray-600 mt-1 mb-2">Start your first reconciliation project.</p>
+                    <h3 className="text-sm font-semibold text-primary-900">Projects</h3>
+                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Start your first reconciliation project.</p>
                     {canCreateProject(role) && (
-                      <Link to="/projects/new" className="text-xs font-semibold text-primary-600 hover:underline">New Project →</Link>
+                      <Link to="/projects/new" className="text-sm font-semibold text-primary-600 hover:underline">New Project →</Link>
                     )}
                   </div>
                 </div>
@@ -164,7 +164,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
         {usageLoading ? (
           <>
             <MetricCardSkeleton />
@@ -232,7 +232,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <Card title="What’s new">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -263,8 +263,8 @@ export default function Dashboard() {
 
         <div className="space-y-6">
           <Card title="Plan features">
-            <p className="text-xs text-gray-500 mb-4 uppercase font-bold tracking-widest">Included in your plan</p>
-            <ul className="space-y-2.5">
+            <p className="text-xs text-gray-500 mb-5 uppercase font-bold tracking-widest">Included in your plan</p>
+            <ul className="space-y-3">
               {[
                 { id: 'bulk_match', label: 'Bulk Match (50 items)' },
                 { id: 'audit_trail', label: 'Full Audit Trail' },
@@ -294,34 +294,34 @@ export default function Dashboard() {
 
       {isAdmin && (
         <Card title="Manage app & settings">
-          <p className="text-sm text-gray-600 mb-4">Control branding, billing, bank rules, API keys, and view activity.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <Link to="/settings/branding" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+          <p className="text-sm text-gray-600 mb-5">Control branding, billing, bank rules, API keys, and view activity.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <Link to="/settings/branding" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Branding</span>
               <span className="text-xs text-gray-500 mt-0.5">Logo, colours, report title</span>
             </Link>
-            <Link to="/settings/billing" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/settings/billing" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Billing</span>
               <span className="text-xs text-gray-500 mt-0.5">Plan & payment</span>
             </Link>
-            <Link to="/settings/members" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/settings/members" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Members</span>
               <span className="text-xs text-gray-500 mt-0.5">Add & manage team</span>
             </Link>
             {features.api_access && (
-            <Link to="/settings/api-keys" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/settings/api-keys" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">API keys</span>
               <span className="text-xs text-gray-500 mt-0.5">Create & manage API access</span>
             </Link>
             )}
             {features.bank_rules && (
-            <Link to="/settings/bank-rules" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/settings/bank-rules" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
               <span className="text-xs text-gray-500 mt-0.5">Auto-suggest & flag rules</span>
             </Link>
             )}
             {features.audit_trail && (
-            <Link to="/audit" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/audit" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
               <span className="text-xs text-gray-500 mt-0.5">All actions & exports</span>
             </Link>
@@ -332,28 +332,28 @@ export default function Dashboard() {
 
       {!isAdmin && (
         <Card title="Settings">
-          <p className="text-sm text-gray-600 mb-4">Branding, billing, and team — manage your organisation.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <Link to="/settings/branding" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+          <p className="text-sm text-gray-600 mb-5">Branding, billing, and team — manage your organisation.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <Link to="/settings/branding" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Branding</span>
               <span className="text-xs text-gray-500 mt-0.5">Logo, colours, report title</span>
             </Link>
-            <Link to="/settings/billing" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/settings/billing" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Billing</span>
               <span className="text-xs text-gray-500 mt-0.5">Plan & payment</span>
             </Link>
-            <Link to="/settings/members" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link to="/settings/members" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <span className="font-semibold tracking-tight text-gray-900">Members</span>
               <span className="text-xs text-gray-500 mt-0.5">Add & manage team</span>
             </Link>
             {features.bank_rules && (
-              <Link to="/settings/bank-rules" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <Link to="/settings/bank-rules" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                 <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
                 <span className="text-xs text-gray-500 mt-0.5">Auto-suggest & flag rules</span>
               </Link>
             )}
             {features.audit_trail && (
-              <Link to="/audit" className="flex flex-col p-4 rounded-lg border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <Link to="/audit" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                 <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
                 <span className="text-xs text-gray-500 mt-0.5">Actions & exports</span>
               </Link>
@@ -416,7 +416,7 @@ export default function Dashboard() {
             />
           ) : (
             projectsList.map((p: { id: string; name: string; slug: string; status: string; createdAt: string }) => (
-              <div key={p.id} className="px-6 py-4 flex justify-between items-center hover:bg-surface/50 transition-colors">
+              <div key={p.id} className="px-6 py-5 flex justify-between items-center hover:bg-surface/50 transition-colors">
                 <div>
                   <p className="font-medium text-gray-900">{p.name}</p>
                   <p className="text-sm text-gray-500">

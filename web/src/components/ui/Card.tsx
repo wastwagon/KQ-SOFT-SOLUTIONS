@@ -18,7 +18,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       {...props}
     >
       {(title || actions) && (
-        <div className="px-6 py-4 border-b border-border-muted flex items-center justify-between gap-4">
+        <div className="px-6 py-5 border-b border-border-muted flex items-start sm:items-center justify-between gap-4">
           <div>
             {title && <h2 className="text-lg font-semibold tracking-tight text-gray-900">{title}</h2>}
             {sublabel && <p className="mt-1 text-sm text-gray-600">{sublabel}</p>}

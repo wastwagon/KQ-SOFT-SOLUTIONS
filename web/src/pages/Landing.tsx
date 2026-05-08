@@ -708,7 +708,7 @@ function StatBand() {
     { value: '< 5 min', label: 'setup — sign up, upload, reconcile' },
   ]
   return (
-    <section className="py-16 sm:py-20">
+    <section className="py-24 sm:py-28 border-y border-gray-100">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-10">
           {stats.map((s, i) => (
@@ -734,7 +734,7 @@ function StatBand() {
 
 function Features() {
   return (
-    <section id="features" className="py-20 sm:py-28 bg-gray-50/40">
+    <section id="features" className="py-24 sm:py-32 bg-gray-50/40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
@@ -749,14 +749,14 @@ function Features() {
           </p>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {FEATURES.map((f) => {
             const Icon = f.icon
             return (
               <div
                 key={f.title}
                 data-reveal
-                className="group relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 hover:border-primary-200 transition-all duration-300"
+                className="group relative rounded-2xl border border-gray-200 bg-white p-7 shadow-sm hover:shadow-xl hover:-translate-y-0.5 hover:border-primary-200 transition-all duration-300"
               >
                 <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-primary-500 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="w-11 h-11 rounded-xl bg-primary-50 grid place-items-center text-primary-600 ring-1 ring-primary-100">
@@ -781,7 +781,7 @@ function Features() {
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-20 sm:py-28">
+    <section id="how-it-works" className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
@@ -826,7 +826,7 @@ function HowItWorks() {
 
 function DashboardShowcase() {
   return (
-    <section className="py-20 sm:py-28 bg-gradient-to-b from-white via-gray-50/60 to-white">
+    <section className="py-24 sm:py-32 bg-gradient-to-b from-white via-gray-50/60 to-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div data-reveal>
@@ -944,7 +944,7 @@ function Pricing({
   setShowCompare: (b: boolean) => void
 }) {
   return (
-    <section id="pricing" className="relative py-20 sm:py-28 bg-gray-50/40 overflow-hidden">
+    <section id="pricing" className="relative py-24 sm:py-32 bg-gray-50/40 overflow-hidden">
       <div aria-hidden className="absolute -top-32 right-0 h-[420px] w-[420px] rounded-full bg-primary-200/25 blur-3xl" />
       <div aria-hidden className="absolute -bottom-32 left-0 h-[420px] w-[420px] rounded-full bg-green-200/20 blur-3xl" />
 
@@ -997,7 +997,7 @@ function Pricing({
           </div>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
           {plans.map((p) => (
             <PlanCard key={p.slug} plan={p} period={billingPeriod} />
           ))}
@@ -1119,7 +1119,7 @@ function PlanCard({
         </p>
       )}
 
-      <ul className={`${plan.inheritsFromLabel ? 'mt-3' : 'mt-6'} space-y-2.5 flex-1`}>
+      <ul className={`${plan.inheritsFromLabel ? 'mt-3' : 'mt-6'} space-y-3 flex-1`}>
         {plan.bullets.map((b) => (
           <li key={b} className="flex items-start gap-2.5 text-sm text-gray-700">
             <Check
@@ -1271,7 +1271,7 @@ function FeatureCell({ value, highlight }: { value: boolean | string | undefined
 
 function Testimonials() {
   return (
-    <section className="py-20 sm:py-28">
+    <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
@@ -1282,7 +1282,7 @@ function Testimonials() {
           </h2>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {TESTIMONIALS.map((t, i) => (
             <figure
               key={i}
@@ -1323,7 +1323,7 @@ function Faq({
   setOpenFaq: (i: number | null) => void
 }) {
   return (
-    <section id="faq" className="py-20 sm:py-28 bg-gray-50/40">
+    <section id="faq" className="py-24 sm:py-32 bg-gray-50/40">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="text-center">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
@@ -1334,7 +1334,7 @@ function Faq({
           </h2>
         </div>
 
-        <div className="mt-12 space-y-3">
+        <div className="mt-12 space-y-4">
           {FAQS.map((f, i) => {
             const isOpen = openFaq === i
             return (
@@ -1380,7 +1380,7 @@ function Faq({
 
 function FinalCta() {
   return (
-    <section className="py-20 sm:py-24">
+    <section className="py-24 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 p-10 sm:p-14 text-white shadow-2xl">
           <div aria-hidden className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-green-400/30 blur-3xl" />
@@ -1656,7 +1656,7 @@ function FooterColumn({
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">{title}</p>
-      <ul className="mt-4 space-y-2.5 text-sm">
+      <ul className="mt-4 space-y-3 text-sm">
         {links.map((l) =>
           l.internal ? (
             <li key={l.label}>

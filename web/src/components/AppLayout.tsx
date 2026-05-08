@@ -38,7 +38,7 @@ const administrationNavItems = [
 ]
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+  `flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
     isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
   }`
 
@@ -81,7 +81,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Top header bar: logo + nav + user */}
-      <header className="sticky top-0 z-40 flex items-center h-14 px-4 sm:px-6 bg-white border-b border-border shadow-sm">
+      <header className="sticky top-0 z-40 flex items-center h-14 px-4 sm:px-6 lg:px-8 bg-white border-b border-border shadow-sm">
         {/* Logo */}
         <NavLink
           to="/"
@@ -111,7 +111,7 @@ export default function AppLayout() {
           <div className="relative">
             <button
               type="button"
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 workActive || workMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}
               onClick={() => {
@@ -128,7 +128,7 @@ export default function AppLayout() {
             {workMenuOpen && (
               <>
                 <div className="fixed inset-0 z-30" aria-hidden onClick={() => setWorkMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-40 w-52 rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                <div className="absolute left-0 top-full mt-1.5 z-40 w-52 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
                   {workNavItems.map(({ to, label, icon: Icon, preload }) => (
                     <NavLink
                       key={to}
@@ -150,7 +150,7 @@ export default function AppLayout() {
           <div className="relative">
             <button
               type="button"
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 administrationActive || adminMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}
               onClick={() => {
@@ -167,7 +167,7 @@ export default function AppLayout() {
             {adminMenuOpen && (
               <>
                 <div className="fixed inset-0 z-30" aria-hidden onClick={() => setAdminMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-40 w-52 rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                <div className="absolute left-0 top-full mt-1.5 z-40 w-52 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
                   {administrationNavItems.map(({ to, label, icon: Icon, preload }) => (
                     <NavLink
                       key={to}
@@ -190,7 +190,7 @@ export default function AppLayout() {
             <div className="relative">
               <button
                 type="button"
-                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   platformActive || platformMenuOpen ? 'bg-amber-50 text-amber-800' : 'text-amber-800 hover:bg-amber-50'
                 }`}
                 onClick={() => {
@@ -208,7 +208,7 @@ export default function AppLayout() {
               {platformMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-30" aria-hidden onClick={() => setPlatformMenuOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-40 w-60 rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                  <div className="absolute left-0 top-full mt-1.5 z-40 w-60 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
                     <NavLink to="/platform-admin" end className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
                       Overview
                     </NavLink>
@@ -446,7 +446,7 @@ export default function AppLayout() {
         </div>
       </header>
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
         <Outlet />
       </main>
     </div>

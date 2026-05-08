@@ -95,7 +95,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
   const statusLabel = (s: string) => STATUS_OPTIONS.find((o) => o.value === s)?.label || s
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projects</h1>
         {canCreateProject(role) && (
@@ -126,7 +126,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       )}
 
       {/* Status KPI cards — consistent with Dashboard */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
         {STATUS_OPTIONS.map(({ value, label }) => {
           const count = value ? (counts as Record<string, number>)[value] ?? 0 : counts.all
           const isActive = statusFilter === value
@@ -135,7 +135,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
               key={value || 'all'}
               type="button"
               onClick={() => setStatusFilter(value)}
-              className={`text-left rounded-xl border border-l-4 border-l-primary-500 p-4 sm:p-5 transition-all duration-200 ${
+              className={`text-left rounded-xl border border-l-4 border-l-primary-500 p-4 sm:p-5 min-h-[4.5rem] transition-all duration-200 ${
                 isActive
                   ? 'border-primary-500 bg-primary-50/80 shadow-md'
                   : 'border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-primary-100'
@@ -149,7 +149,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       </div>
 
       {/* Search & filter bar */}
-      <div className="flex flex-wrap gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
         <input
           type="search"
           placeholder="Search by project name..."

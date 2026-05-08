@@ -31,7 +31,7 @@ export default function MetricCard({ label, value, sublabel, icon, accent = 'pri
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 break-words leading-tight">
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-400 break-words leading-tight">
             {label}
           </p>
           <div className="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tabular-nums tracking-tight break-words leading-tight">

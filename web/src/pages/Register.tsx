@@ -48,7 +48,7 @@ export default function Register() {
         </div>
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-lg p-6 space-y-4 border border-border shadow-card"
+          className="bg-white rounded-xl p-7 sm:p-8 space-y-5 border border-border shadow-card"
         >
           <h2 className="text-lg font-semibold text-gray-900">Create account</h2>
           {error && (
