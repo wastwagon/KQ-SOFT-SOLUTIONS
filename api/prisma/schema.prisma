@@ -1,5 +1,5 @@
 // Bank Reconciliation SaaS - Prisma Schema
-// KQ-SOFT SOLUTIONS LIMITED
+// KQ SOFT SOLUTIONS
 
 generator client {
   provider = "prisma-client-js"
@@ -207,7 +207,8 @@ model BankAccount {
 model BrsAttachment {
   id         String   @id @default(cuid())
   projectId  String   @map("project_id")
-  type       String   // bank_statement | approval | other
+  matchId    String?  @map("match_id")
+  type       String   // bank_statement | approval | match_evidence | other
   filename   String
   filepath   String
   mimeType   String?  @map("mime_type")
@@ -215,9 +216,11 @@ model BrsAttachment {
   createdAt  DateTime @default(now()) @map("created_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  match   Match?  @relation(fields: [matchId], references: [id], onDelete: SetNull)
   user    User    @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@index([matchId])
   @@map("brs_attachments")
 }
 
@@ -270,6 +273,7 @@ model Match {
 
   project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   matchItems MatchItem[]
+  attachments BrsAttachment[]
 
   @@map("matches")
 }

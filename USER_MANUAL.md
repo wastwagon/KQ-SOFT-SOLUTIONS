@@ -1,6 +1,6 @@
 # Bank Reconciliation System — User Manual
 
-**KQ-SOFT SOLUTIONS LIMITED** | Ghana  
+**KQ SOFT SOLUTIONS** | Ghana  
 **Version 1.0** | March 2026
 
 ---

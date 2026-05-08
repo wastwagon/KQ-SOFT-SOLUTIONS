@@ -59,10 +59,12 @@ export default function Dashboard() {
       mounted = false
     }
   }, [])
-  const { data: projectsList = [], isLoading } = useQuery({
+  const { data: projectsData, isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
   })
+  const projectsList = projectsData?.projects || []
+
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
@@ -95,9 +97,14 @@ export default function Dashboard() {
           >
             Help / User Manual
           </Link>
-          {isAdmin && (
-            <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded">Admin</span>
-          )}
+            <span className={`px-2.5 py-1 text-xs font-bold rounded-lg uppercase tracking-wider ${
+              isAdmin ? 'bg-primary-100 text-primary-800' : 
+              role === 'reviewer' ? 'bg-green-100 text-green-800' :
+              role === 'preparer' ? 'bg-blue-100 text-blue-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {role}
+            </span>
         </div>
       </div>
 
@@ -144,99 +151,162 @@ export default function Dashboard() {
           </>
         ) : (
           <>
+            <div className="lg:col-span-2 space-y-4">
+              <MetricCard
+                label="Plan usage"
+                value={`${usage?.organization?.plan ? String(usage.organization.plan).charAt(0).toUpperCase() + String(usage.organization.plan).slice(1).toLowerCase() : (org?.name ?? '—')}`}
+                sublabel={
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
+                        <span>Projects</span>
+                        <span>{projectsUsed} / {projectsUnlimited ? '∞' : projectsLimit}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all ${projectsUsed / projectsLimit > 0.9 ? 'bg-red-500' : 'bg-primary-500'}`}
+                          style={{ width: `${projectsUnlimited ? 0 : Math.min(100, (projectsUsed / projectsLimit) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
+                        <span>Transactions</span>
+                        <span>{transactionsUsed} / {transactionsUnlimited ? '∞' : transactionsLimit}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all ${transactionsUsed / transactionsLimit > 0.9 ? 'bg-red-500' : 'bg-primary-500'}`}
+                          style={{ width: `${transactionsUnlimited ? 0 : Math.min(100, (transactionsUsed / transactionsLimit) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </div>
             <MetricCard
-              label="Projects remaining"
-              value={projectsUnlimited ? 'Unlimited' : String(projectsRemaining)}
-            />
-            <MetricCard
-              label="Transactions remaining"
-              value={transactionsUnlimited ? 'Unlimited' : String(transactionsRemaining)}
-            />
-            <MetricCard
-              label="Plan"
-              value={usage?.organization?.plan ? String(usage.organization.plan).charAt(0).toUpperCase() + String(usage.organization.plan).slice(1).toLowerCase() : (org?.name ?? '—')}
+              label="Status"
+              value={usage?.subscription?.status ? String(usage.subscription.status).charAt(0).toUpperCase() + String(usage.subscription.status).slice(1).toLowerCase() : 'Active'}
+              sublabel={usage?.subscription?.currentPeriodEnd ? `Renews ${formatDate(usage.subscription.currentPeriodEnd)}` : 'On Trial'}
             />
             <MetricCard
               label="In progress"
               value={String(inProgressCount)}
+              sublabel="Active projects"
             />
             <MetricCard
               label="Completed"
               value={String(completedCount)}
+              sublabel="Archived reports"
             />
           </>
         )}
       </div>
 
-      <Card title="What’s new">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            {latestRelease ? (
-              <>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-900">Version {latestRelease.version}</span> - {latestRelease.changes}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Released: {latestRelease.date}</p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">No changelog entry found yet.</p>
-                <p className="text-xs text-gray-500 mt-1">Add a row under the manual changelog table to display updates here.</p>
-              </>
-            )}
-          </div>
-          <Link
-            to="/manual"
-            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            View full changelog
-          </Link>
-        </div>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card title="What’s new">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                {latestRelease ? (
+                  <>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium text-gray-900">Version {latestRelease.version}</span> - {latestRelease.changes}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Released: {latestRelease.date}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600">No changelog entry found yet.</p>
+                    <p className="text-xs text-gray-500 mt-1">Add a row under the manual changelog table to display updates here.</p>
+                  </>
+                )}
+              </div>
+              <Link
+                to="/manual"
+                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                View full changelog
+              </Link>
+            </div>
+          </Card>
 
-      <Card title="Go-live checklist">
-        <p className="text-sm text-gray-600 mb-3">
-          Use this quick checklist when onboarding a new customer team.
-        </p>
-        <ul className="space-y-2 text-sm text-gray-700">
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 text-primary-600">-</span>
-            <span>Review user onboarding steps in the manual.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 text-primary-600">-</span>
-            <span>Assign member roles (`admin`, `reviewer`, `preparer`, `viewer`).</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 text-primary-600">-</span>
-            <span>Configure branding and billing before client training.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 text-primary-600">-</span>
-            <span>Create a pilot project and run one full reconciliation cycle.</span>
-          </li>
-        </ul>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            to="/manual"
-            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            Open manual
-          </Link>
-          <Link
-            to="/settings/members"
-            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            Manage members
-          </Link>
-          <Link
-            to="/projects/new"
-            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            Create pilot project
-          </Link>
+          <Card title="Go-live checklist">
+            <p className="text-sm text-gray-600 mb-3">
+              Use this quick checklist when onboarding a new customer team.
+            </p>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-primary-600">-</span>
+                <span>Review user onboarding steps in the manual.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-primary-600">-</span>
+                <span>Assign member roles (`admin`, `reviewer`, `preparer`, `viewer`).</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-primary-600">-</span>
+                <span>Configure branding and billing before client training.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-primary-600">-</span>
+                <span>Create a pilot project and run one full reconciliation cycle.</span>
+              </li>
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                to="/manual"
+                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Open manual
+              </Link>
+              <Link
+                to="/settings/members"
+                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Manage members
+              </Link>
+              <Link
+                to="/projects/new"
+                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Create pilot project
+              </Link>
+            </div>
+          </Card>
         </div>
-      </Card>
+
+        <div className="space-y-6">
+          <Card title="Plan features">
+            <p className="text-xs text-gray-500 mb-4 uppercase font-bold tracking-widest">Included in your plan</p>
+            <ul className="space-y-2.5">
+              {[
+                { id: 'bulk_match', label: 'Bulk Match (50 items)' },
+                { id: 'audit_trail', label: 'Full Audit Trail' },
+                { id: 'one_to_many', label: 'One-to-Many Matching' },
+                { id: 'discrepancy_report', label: 'Discrepancy Reporting' },
+                { id: 'full_branding', label: 'Custom Branding' },
+                { id: 'multi_client', label: 'Multi-Client Support' },
+              ].map(f => (
+                <li key={f.id} className={`flex items-center gap-2.5 text-sm ${features[f.id] ? 'text-gray-900' : 'text-gray-400 grayscale opacity-60'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${features[f.id] ? 'bg-primary-500' : 'bg-gray-300'}`} />
+                  {f.label}
+                  {!features[f.id] && <span className="ml-auto text-[10px] font-bold text-gray-400">UPGRADE</span>}
+                </li>
+              ))}
+            </ul>
+            {isAdmin && (
+              <Link 
+                to="/settings/billing" 
+                className="mt-6 block w-full text-center px-4 py-2 text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors border border-primary-200"
+              >
+                Manage subscription
+              </Link>
+            )}
+          </Card>
+        </div>
+      </div>
 
       {isAdmin && (
         <Card title="Manage app & settings">

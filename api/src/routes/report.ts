@@ -1459,7 +1459,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       const tableWidth = contentWidth
       const cDate = 90
       const cRef = 100
-      const cAmount = 120
+      const cAmount = opts?.hideAmount ? 0 : 120
       const cDesc = tableWidth - cDate - cRef - cAmount
       const rowH = 18
       const ensureRoom = (needed: number, redrawHeader = false) => {
@@ -1480,8 +1480,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
         doc.text('DATE', x + 6, y, { width: cDate - 8 })
         doc.text(opts?.refLabel || 'DOC REF', x + cDate + 6, y, { width: cRef - 8 })
-        doc.text('NAME - DETAILS', x + cDate + cRef + 6, y, { width: cDesc - 8 })
-        doc.text(`AMT (${curr})`, x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.text(opts?.hideAmount ? 'EVENT DETAILS' : 'NAME - DETAILS', x + cDate + cRef + 6, y, { width: cDesc - 8 })
+        if (!opts?.hideAmount) {
+          doc.text(`AMT (${curr})`, x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        }
         doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
         doc.y += rowH
       }
@@ -1507,17 +1509,23 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         doc.fontSize(9).font('Helvetica').fillColor('#111827')
         doc.text(fmtPdfDate(r.date), x + 6, y, { width: cDate - 8 })
         doc.text(r.ref || '—', x + cDate + 6, y, { width: cRef - 8 })
-        doc.text((r.details || '—').slice(0, 62), x + cDate + cRef + 6, y, { width: cDesc - 8 })
-        doc.text(amtNum(r.amount), x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.text((r.details || '—').slice(0, opts?.hideAmount ? 120 : 62), x + cDate + cRef + 6, y, { width: cDesc - 8 })
+        if (!opts?.hideAmount) {
+          doc.text(amtNum(r.amount), x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+        }
         doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
         doc.y += rowH
       })
-      ensureRoom(24)
-      doc.font('Helvetica-Bold').fillColor('#111827')
-      doc.text('Total', x + 6, doc.y + 6, { width: tableWidth - cAmount - 12 })
-      doc.text(amtNum(total), x + tableWidth - cAmount + 6, doc.y + 6, { width: cAmount - 12, align: 'right' })
-      doc.moveTo(x, doc.y + 24).lineTo(x + tableWidth, doc.y + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
-      doc.y += 30
+      if (!opts?.hideAmount) {
+        ensureRoom(24)
+        doc.font('Helvetica-Bold').fillColor('#111827')
+        doc.text('Total', x + 6, doc.y + 6, { width: tableWidth - cAmount - 12 })
+        doc.text(amtNum(total), x + tableWidth - cAmount + 6, doc.y + 6, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, doc.y + 24).lineTo(x + tableWidth, doc.y + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
+        doc.y += 30
+      } else {
+        doc.y += 12
+      }
     }
     const drawAmountSummaryTable = (
       title: string,
@@ -1762,6 +1770,23 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
     }))
     drawTable('BANK-ONLY CREDITS (DEDUCT)', unmatchedCreditRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
+
+    // --- REVISION HISTORY ---
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        projectId,
+        action: { in: ['project_submitted', 'project_approved', 'project_reopened', 'document_uploaded'] }
+      },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { name: true } } }
+    })
+    const revisionRows = logs.map(l => ({
+      date: fmt(l.createdAt),
+      ref: l.action.replace('project_', '').replace('document_', '').toUpperCase(),
+      details: `${l.user?.name || 'System'} - ${l.action === 'document_uploaded' ? 'New data added' : 'Status change'}`,
+      amount: 0
+    }))
+    drawTable('PROJECT REVISION HISTORY', revisionRows, { allowEmptyText: 'No revisions found', refLabel: 'ACTION', hideAmount: true })
 
     const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
     const range = doc.bufferedPageRange()

@@ -2,7 +2,7 @@
  * KQ-SOFT mark — `public/kqsoft-wordmark.svg` and `public/kqsoft-icon.svg`.
  * The main app header always shows the wordmark; org logo is shown next to it when set (see AppLayout).
  */
-const ALT = 'KQ-SOFT SOLUTIONS'
+const ALT = 'KQ SOFT SOLUTIONS'
 
 type BrandLogoProps = {
   /** Full horizontal wordmark (default) or square icon */

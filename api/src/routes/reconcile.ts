@@ -6,7 +6,7 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canReconcile, isProjectEditable } from '../lib/permissions.js'
 import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
-import { suggestMatches, type Tx } from '../services/matching.js'
+import { suggestMatches, suggestSplitMatches, type Tx, type SuggestedSplitMatch } from '../services/matching.js'
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { logAudit } from '../services/audit.js'
@@ -65,7 +65,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       documents: {
         include: { transactions: true, bankAccount: true },
       },
-      matches: { include: { matchItems: true } },
+      matches: { include: { matchItems: true, attachments: true } },
     },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
@@ -109,7 +109,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
 
   const matchedCbIds = new Set<string>()
   const matchedBankIds = new Set<string>()
-  const matchList: { matchId: string; cashBookTxId: string; bankTxId: string; cbTx: Tx; bankTx: Tx }[] = []
+  const matchList: { matchId: string; cashBookTxId: string; bankTxId: string; cbTx: Tx; bankTx: Tx; attachments: any[] }[] = []
   const allTxs = new Map<string, Tx>()
   ;[...receipts, ...credits, ...payments, ...debits].forEach((t) => allTxs.set(t.id, t))
   for (const m of project.matches) {
@@ -139,10 +139,19 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         pairs.push([cbIds[i % cbIds.length]!, bankIds[i % bankIds.length]!])
       }
     }
-    for (const [cbTxId, bankTxId] of pairs) {
-      const cbTx = allTxs.get(cbTxId)
-      const bankTx = allTxs.get(bankTxId)
-      if (cbTx && bankTx) matchList.push({ matchId: m.id, cashBookTxId: cbTxId, bankTxId, cbTx, bankTx })
+    for (const [cid, bid] of pairs) {
+      const cbTx = allTxs.get(cid)
+      const bankTx = allTxs.get(bid)
+      if (cbTx && bankTx) {
+        matchList.push({
+          matchId: m.id,
+          cashBookTxId: cid,
+          bankTxId: bid,
+          cbTx: cbTx,
+          bankTx: bankTx,
+          attachments: (m as any).attachments || [],
+        })
+      }
     }
   }
 
@@ -153,6 +162,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const plan = org?.plan ?? 'basic'
   const hasAiSuggestions = hasPlanFeature(plan, 'ai_suggestions')
   const hasBankRulesPlan = hasPlanFeature(plan, 'bank_rules')
+  const hasSplitMatchingPlan = hasPlanFeature(plan, 'one_to_many')
 
   const platformDefaults = await getPlatformDefaults()
   const matchOptions = {
@@ -247,6 +257,16 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   receiptSuggestions.sort((a, b) => b.confidence - a.confidence)
   paymentSuggestions.sort((a, b) => b.confidence - a.confidence)
 
+  let splitSuggestions: { receipts: SuggestedSplitMatch[]; payments: SuggestedSplitMatch[] } = { receipts: [], payments: [] }
+  if (hasSplitMatchingPlan) {
+    splitSuggestions.receipts = suggestSplitMatches(receipts, credits, matchedCbIds, matchedBankIds, {
+      ...matchOptions,
+    })
+    splitSuggestions.payments = suggestSplitMatches(payments, debits, matchedCbIds, matchedBankIds, {
+      ...matchOptions,
+    })
+  }
+
   res.json({
     project: { id: project.id, name: project.name, status: project.status, currency: project.currency || 'GHS' },
     bankAccounts: project.bankAccounts || [],
@@ -262,6 +282,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     suggestions: {
       receipts: receiptSuggestions.slice(0, 50),
       payments: paymentSuggestions.slice(0, 50),
+      split: splitSuggestions,
     },
     flaggedBankIds,
     existingMatches: project.matches.length,

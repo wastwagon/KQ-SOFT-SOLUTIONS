@@ -34,15 +34,38 @@ const createSchema = z.object({
 router.get('/', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
   const clientId = req.query.clientId as string | undefined
-  const projects = await prisma.project.findMany({
-    where: {
-      organizationId: orgId,
-      ...(clientId ? { clientId } : {}),
-    },
-    include: { client: true },
-    orderBy: { createdAt: 'desc' },
-  })
-  res.json(projects)
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+  const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
+
+  const [projects, total] = await Promise.all([
+    prisma.project.findMany({
+      where: {
+        organizationId: orgId,
+        ...(clientId ? { clientId } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        reconciliationDate: true,
+        currency: true,
+        createdAt: true,
+        updatedAt: true,
+        client: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.project.count({
+      where: {
+        organizationId: orgId,
+        ...(clientId ? { clientId } : {}),
+      },
+    }),
+  ])
+  res.json({ projects, total, limit, offset })
 })
 
 router.post('/', async (req: AuthRequest, res) => {

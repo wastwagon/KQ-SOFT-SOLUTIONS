@@ -168,6 +168,18 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     },
   })
 
+  const evidenceUploadMutation = useMutation({
+    mutationFn: ({ file, matchId }: { file: File; matchId: string }) =>
+      attachments.upload(projectId, file, 'match_evidence', matchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+      setActionMessage('Evidence uploaded successfully.')
+    },
+    onError: (err: any) => {
+      setActionMessage(`Upload failed: ${err.message}`)
+    },
+  })
+
   const bulkMatchMutation = useMutation({
     mutationFn: (matches: { cashBookTransactionId: string; bankTransactionId: string }[]) =>
       reconcile.createMatchBulk(projectId, { matches }),
@@ -230,6 +242,13 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
         ? data.suggestions?.receipts || []
         : data.suggestions?.payments || []
 
+  const splitSuggestions: SuggestedSplitMatch[] =
+    view === 'all'
+      ? [...(data.suggestions?.split?.receipts || []), ...(data.suggestions?.split?.payments || [])]
+      : view === 'receipts'
+        ? data.suggestions?.split?.receipts || []
+        : data.suggestions?.split?.payments || []
+
   const highConfidenceSuggestions = suggestions.filter((s) => s.confidence >= 0.95)
 
   // Build suggestion maps for row tooltips (cbId/bankId -> suggested matches)
@@ -279,16 +298,19 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     return 'No matching cash book payment'
   }
 
-  const matches: { matchId: string; cbTx: Tx; bankTx: Tx }[] = data.matches || []
-  const matchesForView = view === 'all'
-    ? matches
-    : view === 'receipts'
-      ? matches.filter((m: { cbTx: Tx; bankTx: Tx }) =>
-          receipts.some((r: Tx) => r.id === m.cbTx.id) && credits.some((c: Tx) => c.id === m.bankTx.id)
-        )
-      : matches.filter((m: { cbTx: Tx; bankTx: Tx }) =>
-          payments.some((p: Tx) => p.id === m.cbTx.id) && debits.some((d: Tx) => d.id === m.bankTx.id)
-        )
+  const matches: { matchId: string; cbTx: Tx; bankTx: Tx; attachments?: any[] }[] = data.matches || []
+  const matchesForView = useMemo(() => {
+    if (view === 'all') return matches
+    const receiptIds = new Set(receipts.map(r => r.id))
+    const creditIds = new Set(credits.map(c => c.id))
+    const paymentIds = new Set(payments.map(p => p.id))
+    const debitIds = new Set(debits.map(d => d.id))
+
+    if (view === 'receipts') {
+      return matches.filter(m => receiptIds.has(m.cbTx.id) && creditIds.has(m.bankTx.id))
+    }
+    return matches.filter(m => paymentIds.has(m.cbTx.id) && debitIds.has(m.bankTx.id))
+  }, [view, matches, receipts, credits, payments, debits])
 
   const cbArr = Array.from(selectedCbIds)
   const bankArr = Array.from(selectedBankIds)
@@ -649,13 +671,55 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
         </div>
       )}
 
+      {/* Split suggestions (1-to-many, many-to-1) */}
+      {splitSuggestions.length > 0 && canReconcile && (
+        <div className="rounded-xl border border-primary-200/80 bg-primary-50/50 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-2 py-0.5 bg-primary-600 text-white text-[10px] font-bold rounded uppercase tracking-wider">Premium</span>
+            <h3 className="text-base font-bold text-primary-900 tracking-tight">Split suggestions</h3>
+          </div>
+          <p className="text-sm text-primary-800/90 mb-4">
+            These items appear to be bulk deposits or multi-item payments. Click to select the group.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {splitSuggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setSelectedCbIds(new Set(s.cashBookTxs.map(t => t.id)))
+                  setSelectedBankIds(new Set(s.bankTxs.map(t => t.id)))
+                }}
+                className={`flex flex-col gap-1 w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                  s.cashBookTxs.every(t => selectedCbIds.has(t.id)) && s.bankTxs.every(t => selectedBankIds.has(t.id))
+                    ? 'border-primary-400 bg-primary-100 shadow-sm'
+                    : 'border-primary-200/50 bg-white hover:bg-primary-50'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[10px] font-bold text-primary-700 uppercase">{s.reason}</span>
+                  <span className="text-[10px] font-bold text-gray-500">{Math.round(s.confidence * 100)}% Match</span>
+                </div>
+                <div className="text-xs text-gray-900">
+                   <div className="font-semibold mb-0.5">Book: {s.cashBookTxs.length} item(s)</div>
+                   <div className="font-semibold">Bank: {s.bankTxs.length} item(s)</div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-primary-100 flex justify-between items-center">
+                  <span className="text-xs font-bold text-primary-900">{formatAmount(s.cashBookTxs.reduce((sum, t) => sum + t.amount, 0), currency)}</span>
+                  <span className="text-[10px] text-primary-600 font-medium italic">Click to match group</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Matched pairs with Unmatch */}
       {matchesForView.length > 0 && (
         <div className="rounded-xl border border-green-200/80 bg-green-50/80 p-5 shadow-sm">
           <h3 className="text-base font-bold text-green-900 tracking-tight mb-1">Confirmed matches</h3>
           <p className="text-sm text-green-800/90 mb-4">{canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}</p>
           <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-            {matchesForView.map((m: { matchId: string; cbTx: Tx; bankTx: Tx }) => (
+            {matchesForView.map((m: { matchId: string; cbTx: Tx; bankTx: Tx; attachments?: any[] }) => (
               <div
                 key={m.matchId}
                 className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-green-200/70 bg-white shadow-sm"
@@ -665,19 +729,52 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
                   <span className="mx-1.5 text-green-600">↔</span>
                   <span>{m.bankTx.name || m.bankTx.details || '—'}</span>
                   <span className="ml-2 text-xs font-medium text-gray-500">{formatAmount(m.cbTx.amount, currency)}</span>
+                  {m.attachments && m.attachments.length > 0 && (
+                    <span className="ml-2 text-primary-600" title={`Evidence: ${m.attachments[0].filename}`}>📎</span>
+                  )}
                 </span>
-                {canReconcile && (
-                <button
-                  onClick={() => unmatchMutation.mutate(m.matchId)}
-                  disabled={unmatchMutation.isPending}
-                  className="ml-2 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  Unmatch
-                </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canReconcile && (
+                    <>
+                      <button
+                        onClick={() => {
+                          const input = document.getElementById('match-evidence-input') as HTMLInputElement
+                          if (input) {
+                            input.dataset.matchId = m.matchId
+                            input.click()
+                          }
+                        }}
+                        disabled={evidenceUploadMutation.isPending}
+                        className="px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                      >
+                        {evidenceUploadMutation.isPending && evidenceUploadMutation.variables?.matchId === m.matchId ? 'Uploading…' : 'Evidence'}
+                      </button>
+                      <button
+                        onClick={() => unmatchMutation.mutate(m.matchId)}
+                        disabled={unmatchMutation.isPending}
+                        className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        Unmatch
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
+          <input
+            id="match-evidence-input"
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              const matchId = e.target.dataset.matchId
+              if (file && matchId) {
+                evidenceUploadMutation.mutate({ file, matchId })
+              }
+              e.target.value = ''
+            }}
+          />
         </div>
       )}
 

@@ -259,7 +259,7 @@ export default function Settings() {
                 type="text"
                 value={footer}
                 onChange={(e) => setFooter(e.target.value)}
-                placeholder="Prepared by KQ-SOFT SOLUTIONS LIMITED"
+                placeholder="Prepared by KQ SOFT SOLUTIONS"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -531,7 +531,7 @@ function MembersSection({ canManage = false }: { canManage?: boolean }) {
                         value={m.role}
                         onChange={(e) => updateRoleMutation.mutate({ userId: m.userId, role: e.target.value })}
                         disabled={updateRoleMutation.isPending}
-                        className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-900"
+                        className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 transition-shadow"
                       >
                         <option value="member">Member</option>
                         <option value="viewer">Viewer</option>
@@ -738,11 +738,19 @@ function BankRulesSection({ canEdit = true }: { canEdit?: boolean }) {
       {rules.length > 0 && (
         <ul className="space-y-2">
           {rules.map((r) => (
-            <li key={r.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl shadow-sm bg-white">
+            <li key={r.id} className="group flex items-center justify-between p-4 border border-gray-200 rounded-xl shadow-sm bg-white hover:border-primary-200 transition-colors">
               <div>
-                <p className="font-medium text-gray-900">{r.name}</p>
-                <p className="text-xs text-gray-500">
-                  Priority {r.priority} • {r.conditions?.map((c: { field: string; operator: string; value: unknown }) => `${c.field} ${c.operator} ${c.value}`).join(', ') || '—'} → {r.action}
+                <p className="font-semibold text-gray-900">{r.name}</p>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${r.action === 'suggest_match' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                    {r.action.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    Priority {r.priority}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs text-gray-600 leading-relaxed italic">
+                  IF {r.conditions?.map((c: { field: string; operator: string; value: unknown }) => `${c.field} ${c.operator} "${c.value}"`).join(' AND ')}
                 </p>
               </div>
               {canEdit && (

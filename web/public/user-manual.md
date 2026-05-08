@@ -1,7 +1,7 @@
 # KQ BRS Platform User Manual
 
 **Product:** KQ Bank Reconciliation System (BRS)  
-**Company:** KQ SOFT SOLUTIONS LIMITED  
+**Company:** KQ SOFT SOLUTIONS  
 **Audience:** End users and operations teams  
 **Updated:** May 7, 2026
 

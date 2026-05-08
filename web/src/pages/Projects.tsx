@@ -40,10 +40,15 @@ export default function Projects({ initialStatus }: ProjectsProps) {
   })
   const features = (usageData?.features || {}) as Record<string, boolean>
   const effectiveClientFilter = features.multi_client ? clientFilter : ''
-  const { data: projectsList = [], isLoading } = useQuery({
-    queryKey: ['projects', effectiveClientFilter || null],
-    queryFn: () => projects.list(effectiveClientFilter ? { clientId: effectiveClientFilter } : undefined),
+  const [limit] = useState(50)
+  const [offset, setOffset] = useState(0)
+
+  const { data: projectsData, isLoading } = useQuery({
+    queryKey: ['projects', effectiveClientFilter || null, offset],
+    queryFn: () => projects.list(effectiveClientFilter ? { clientId: effectiveClientFilter, limit, offset } : { limit, offset }),
   })
+  const projectsList = projectsData?.projects || []
+  const totalProjects = projectsData?.total || 0
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
@@ -295,6 +300,32 @@ export default function Projects({ initialStatus }: ProjectsProps) {
           </div>
         )}
       </Card>
+
+      {totalProjects > limit && (
+        <div className="flex items-center justify-between gap-4 py-4 px-2">
+          <p className="text-sm text-gray-500">
+            Showing <span className="font-medium">{offset + 1}</span> to <span className="font-medium">{Math.min(offset + limit, totalProjects)}</span> of <span className="font-medium">{totalProjects}</span> projects
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={offset === 0}
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={offset + limit >= totalProjects}
+              onClick={() => setOffset(offset + limit)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

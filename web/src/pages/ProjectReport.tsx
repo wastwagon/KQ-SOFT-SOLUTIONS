@@ -288,7 +288,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         : selectedBankAccountNo
           ? `Account Number ${selectedBankAccountNo}`
           : null)
-  const organizationDisplayName = (data.organization?.name || 'KQ SOFT SOLUTIONS LIMITED').replace(/KQ-SOFT/gi, 'KQ SOFT')
+  const organizationDisplayName = (data.organization?.name || 'KQ SOFT SOLUTIONS').replace(/KQ-SOFT/gi, 'KQ SOFT')
 
   const labels = {
     openingBankStatementBalance: profileLabels?.openingBankStatementBalance || 'Opening bank statement balance',

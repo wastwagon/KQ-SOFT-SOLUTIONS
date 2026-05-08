@@ -1,5 +1,5 @@
 # Master Plan: Bank Reconciliation SaaS
-## KQ-SOFT SOLUTIONS LIMITED | Ghana | Advanced | Gaps Closed
+## KQ SOFT SOLUTIONS | Ghana | Advanced | Gaps Closed
 
 **Version:** 1.0  
 **Last Updated:** February 2026  

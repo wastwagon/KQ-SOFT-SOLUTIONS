@@ -168,7 +168,7 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
   res.status(201).json(doc)
 })
 
-// Phase 7: Supporting documents (BrsAttachment)
+// Phase 7: Supporting documents (BrsAttachment) - Extended for Phase 3 Match Evidence
 router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
   const role = req.auth!.role
@@ -182,13 +182,17 @@ router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRe
     where: { id: projectId, organizationId: orgId },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  const matchId = (req.body.matchId as string) || undefined
   const type = (req.body.type as string) || 'other'
-  const validTypes = ['bank_statement', 'approval', 'other']
+  const validTypes = ['bank_statement', 'approval', 'match_evidence', 'other']
   const attachmentType = validTypes.includes(type) ? type : 'other'
   const safeFilename = sanitizeFilename(req.file.originalname)
+
   const attachment = await prisma.brsAttachment.create({
     data: {
       projectId,
+      matchId,
       type: attachmentType,
       filename: safeFilename,
       filepath: req.file.path,
@@ -201,7 +205,7 @@ router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRe
     userId: req.auth!.userId,
     projectId,
     action: 'attachment_uploaded',
-    details: { attachmentId: attachment.id, type: attachmentType, filename: safeFilename },
+    details: { attachmentId: attachment.id, type: attachmentType, filename: safeFilename, matchId },
   })
   res.status(201).json(attachment)
 })

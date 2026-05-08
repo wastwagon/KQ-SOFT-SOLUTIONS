@@ -245,19 +245,25 @@ export default function AppLayout() {
         {/* Top bar items: org, role, notifications, user, logout */}
         <div className="flex items-center gap-2 sm:gap-3">
           {org?.name && (
-            <span className="hidden lg:inline text-sm text-gray-500 truncate max-w-[120px]" title={org.name}>
-              {org.name}
-            </span>
+            <div className="hidden lg:flex flex-col items-end mr-1">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Organisation</span>
+              <span className="text-sm font-semibold text-gray-900 truncate max-w-[150px]" title={org.name}>
+                {org.name}
+              </span>
+            </div>
           )}
-          {roleLabel && (
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg">
             <span
-              className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-semibold rounded uppercase tracking-wide ${
-                role === 'admin' ? 'bg-primary-100 text-primary-800' : 'bg-gray-100 text-gray-700'
+              className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider ${
+                role === 'admin' ? 'bg-primary-600 text-white' : 
+                role === 'reviewer' ? 'bg-green-600 text-white' :
+                role === 'preparer' ? 'bg-blue-600 text-white' :
+                'bg-gray-400 text-white'
               }`}
             >
               {roleLabel}
             </span>
-          )}
+          </div>
           <div className="relative">
             <button
               type="button"

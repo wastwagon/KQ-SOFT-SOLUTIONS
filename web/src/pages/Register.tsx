@@ -61,7 +61,7 @@ export default function Register() {
               onChange={(e) => setOrgName(e.target.value)}
               required
               className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="KQ-SOFT SOLUTIONS LIMITED"
+              placeholder="KQ SOFT SOLUTIONS"
             />
           </div>
           <div>

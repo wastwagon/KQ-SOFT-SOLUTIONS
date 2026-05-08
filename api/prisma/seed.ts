@@ -47,7 +47,7 @@ async function main() {
   if (!adminOrg) {
     adminOrg = await prisma.organization.create({
       data: {
-        name: 'KQ-SOFT Admin',
+        name: 'KQ SOFT Admin',
         slug: adminOrgSlug,
         plan: 'firm',
         members: {

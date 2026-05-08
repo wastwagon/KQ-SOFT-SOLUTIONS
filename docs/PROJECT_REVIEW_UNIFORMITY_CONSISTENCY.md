@@ -9,7 +9,7 @@
 
 The project is generally consistent in naming, structure, and accounting terminology. Main issues:
 
-1. **Brand name**: (historical) "KQ SOFT" vs "Q-SOFT" — now **KQ-SOFT** / **KQ-SOFT SOLUTIONS LIMITED**
+1. **Brand name**: (historical) "KQ SOFT" vs "Q-SOFT" — now **KQ-SOFT** / **KQ SOFT SOLUTIONS**
 2. **API response fields**: Redundant/legacy fields (`matchedCreditIds`, `matchedReceiptIds`)
 3. **Uncredited lodgment(s)**: Singular vs plural in planning docs
 4. **Missing Cheques**: Casing in headings vs body text
@@ -39,13 +39,13 @@ The project is generally consistent in naming, structure, and accounting termino
 
 | Location | Value (current) |
 |----------|--------|
-| `index.html` | "KQ-SOFT SOLUTIONS" |
-| `Settings.tsx`, `Register.tsx` | "KQ-SOFT SOLUTIONS LIMITED" (placeholders) |
-| `ProjectReport.tsx` | "KQ-SOFT SOLUTIONS LIMITED" (fallback) |
-| `schema.prisma`, `README.md` | "KQ-SOFT SOLUTIONS LIMITED" |
+| `index.html` | "KQ SOFT SOLUTIONS" |
+| `Settings.tsx`, `Register.tsx` | "KQ SOFT SOLUTIONS" (placeholders) |
+| `ProjectReport.tsx` | "KQ SOFT SOLUTIONS" (fallback) |
+| `schema.prisma`, `README.md` | "KQ SOFT SOLUTIONS" |
 | Workspace folder | "KQ SOFT  SOLUTIONS" (double space) — rename is optional |
 
-**Recommendation:** Standardise on one brand: **KQ-SOFT SOLUTIONS LIMITED** / **KQ-SOFT**. ✅ Implemented.
+**Recommendation:** Standardise on one brand: **KQ SOFT SOLUTIONS** / **KQ-SOFT**. ✅ Implemented.
 
 ### 2.2 UK vs US spelling ✓
 - **organisation** (UK) — used in UI; appropriate for Ghana
@@ -137,7 +137,7 @@ draft → Mapping, reconciling → Reconciling, submitted_for_review → Submitt
 
 | Priority | Issue | Fix |
 |----------|-------|-----|
-| High | Brand name | Standardise on one brand: **KQ-SOFT SOLUTIONS LIMITED** / **KQ-SOFT** |
+| High | Brand name | Standardise on one brand: **KQ SOFT SOLUTIONS** / **KQ-SOFT** |
 | Medium | API response | Deprecate `matchedReceiptIds` and `matchedCreditIds`; document `matchedCashBookIds` and `matchedBankIds` as canonical |
 | Medium | Uncredited lodgment(s) | Use "Uncredited lodgments" (plural) in planning docs |
 | Low | Missing Cheques casing | "Missing Cheques" for headings, "missing cheques" for body |

@@ -144,6 +144,8 @@ export interface SuggestMatchesOptions {
   useDocRef?: boolean
   /** Include cheque number as a matching parameter. Default true. */
   useChequeNo?: boolean
+  /** When true, enable many-to-one and one-to-many sum matching suggestions. */
+  enableSplitMatching?: boolean
 }
 
 export function suggestMatches(
@@ -163,27 +165,44 @@ export function suggestMatches(
     useChequeNo = true,
   } = options
   const suggestions: SuggestedMatch[] = []
+
+  // Optimization: Index bank transactions by amount to avoid O(N*M) complexity
+  // We round amounts to 2 decimal places to handle float precision issues in keys
+  const bankByAmt = new Map<string, Tx[]>()
+  for (const bk of bankTxs) {
+    if (matchedBankIds.has(bk.id)) continue
+    const key = bk.amount.toFixed(2)
+    if (!bankByAmt.has(key)) bankByAmt.set(key, [])
+    bankByAmt.get(key)!.push(bk)
+  }
+
   for (const cb of cashBookTxs) {
     if (matchedCashBookIds.has(cb.id)) continue
-    for (const bk of bankTxs) {
-      if (matchedBankIds.has(bk.id)) continue
-      const amtMatch = amountsMatch(cb.amount, bk.amount, amountTolerance)
+    
+    // Quick lookup instead of inner loop
+    const candidates = bankByAmt.get(cb.amount.toFixed(2)) || []
+    
+    for (const bk of candidates) {
       const dateMatch = datesWithinWindow(cb.date, bk.date, dateWindowDays)
-      if (!amtMatch) continue
       if (requireDateMatch && useDate && !dateMatch) continue
+      
       const chqMatch = useChequeNo ? chequeNumbersMatch(cb, bk) : false
       const docRefMatch = useDocRef ? docRefsMatch(cb, bk) : false
       const textRefMatch = useDocRef || useChequeNo ? refsMatch(cb, bk) : false
       const refMatch = chqMatch || docRefMatch || textRefMatch
+      
       if (requireRefForCheques && cb.chqNo?.trim() && !refMatch) continue
+      
       let confidence = 0
-      if (amtMatch) confidence += 0.6
+      confidence += 0.6 // Base amount match
       if (useDate && dateMatch) confidence += 0.3
+      
       const descMatch = cb.details && bk.details &&
         (cb.details.toLowerCase().includes(bk.details.slice(0, 20).toLowerCase()) ||
          bk.details.toLowerCase().includes(cb.details.slice(0, 20).toLowerCase()))
       if (descMatch) confidence += 0.1
       if ((useDocRef || useChequeNo) && refMatch) confidence += 0.15
+      
       confidence = Math.min(confidence, 1)
       if (confidence >= 0.6) {
         const reasons: string[] = []
@@ -274,4 +293,74 @@ export function suggestMatches(
     }
   }
   return filtered.sort((a, b) => b.confidence - a.confidence)
+}
+export function suggestSplitMatches(
+  cashBookTxs: Tx[],
+  bankTxs: Tx[],
+  matchedCbIds: Set<string>,
+  matchedBankIds: Set<string>,
+  options: SuggestMatchesOptions = {}
+): SuggestedSplitMatch[] {
+  const { amountTolerance = 0.01, dateWindowDays = 3 } = options
+  const results: SuggestedSplitMatch[] = []
+  const unmatchedCb = cashBookTxs.filter((t) => !matchedCbIds.has(t.id))
+  const unmatchedBank = bankTxs.filter((t) => !matchedBankIds.has(t.id))
+
+  // 1-to-Many: One Cash Book vs Multiple Bank (e.g. one deposit matching multiple cleared items)
+  for (const cb of unmatchedCb) {
+    const windowBank = unmatchedBank.filter((bk) => datesWithinWindow(cb.date, bk.date, dateWindowDays))
+    if (windowBank.length < 2) continue
+    
+    // Strategy: Consecutive or same-day items that sum up
+    for (let i = 0; i < windowBank.length; i++) {
+      let currentSum = 0
+      const subset: Tx[] = []
+      for (let j = i; j < Math.min(i + 5, windowBank.length); j++) {
+        currentSum += windowBank[j]!.amount
+        subset.push(windowBank[j]!)
+        if (subset.length >= 2 && amountsMatch(cb.amount, currentSum, amountTolerance)) {
+          results.push({
+            cashBookTxs: [cb],
+            bankTxs: [...subset],
+            confidence: 0.8,
+            reason: `One-to-many: Total matches ${cb.amount.toFixed(2)}`,
+          })
+          break
+        }
+      }
+    }
+  }
+
+  // Many-to-1: Multiple Cash Book vs One Bank (e.g. multiple cheques matching one bulk debit)
+  for (const bk of unmatchedBank) {
+    const windowCb = unmatchedCb.filter((cb) => datesWithinWindow(cb.date, bk.date, dateWindowDays))
+    if (windowCb.length < 2) continue
+    
+    for (let i = 0; i < windowCb.length; i++) {
+      let currentSum = 0
+      const subset: Tx[] = []
+      for (let j = i; j < Math.min(i + 5, windowCb.length); j++) {
+        currentSum += windowCb[j]!.amount
+        subset.push(windowCb[j]!)
+        if (subset.length >= 2 && amountsMatch(bk.amount, currentSum, amountTolerance)) {
+          results.push({
+            cashBookTxs: [...subset],
+            bankTxs: [bk],
+            confidence: 0.8,
+            reason: `Many-to-one: Total matches ${bk.amount.toFixed(2)}`,
+          })
+          break
+        }
+      }
+    }
+  }
+
+  return results
+}
+
+export interface SuggestedSplitMatch {
+  cashBookTxs: Tx[]
+  bankTxs: Tx[]
+  confidence: number
+  reason: string
 }

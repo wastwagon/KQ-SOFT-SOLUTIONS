@@ -1,6 +1,6 @@
 # Bank Reconciliation SaaS — Planning Index
 
-**Project:** KQ-SOFT SOLUTIONS LIMITED  
+**Project:** KQ SOFT SOLUTIONS  
 **Market:** Ghana  
 **Principle:** Build once. No return to improve. Advanced from day one. All gaps closed.
 

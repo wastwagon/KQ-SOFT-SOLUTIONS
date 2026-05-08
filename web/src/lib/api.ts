@@ -340,9 +340,12 @@ export const clients = {
 }
 
 export const projects = {
-  list: (params?: { clientId?: string }) => {
-    const q = params?.clientId ? `?clientId=${params.clientId}` : ''
-    return api(`/projects${q}`)
+  list: (params?: { clientId?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.clientId) q.set('clientId', params.clientId)
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.offset) q.set('offset', String(params.offset))
+    return api(`/projects${q.toString() ? `?${q}` : ''}`)
   },
   get: (id: string) => api(`/projects/${id}`),
   create: (body: { name: string; clientId?: string; reconciliationDate?: string; rollForwardFromProjectId?: string; currency?: 'GHS' | 'USD' | 'EUR' }) =>
@@ -520,10 +523,11 @@ async function reportExport(projectId: string, format: string, bankAccountId?: s
 
 export const attachments = {
   list: (projectId: string) => api(`/attachments?projectId=${projectId}`) as Promise<{ id: string; filename: string; type: string; createdAt: string; user?: { name?: string; email?: string } }[]>,
-  upload: (projectId: string, file: File, type: 'bank_statement' | 'approval' | 'other') => {
+  upload: (projectId: string, file: File, type: 'bank_statement' | 'approval' | 'match_evidence' | 'other', matchId?: string) => {
     const form = new FormData()
     form.append('file', file)
     form.append('type', type)
+    if (matchId) form.append('matchId', matchId)
     const token = getToken()
     return fetch(`${API_URL}/api/v1/upload/attachments/${projectId}`, {
       method: 'POST',

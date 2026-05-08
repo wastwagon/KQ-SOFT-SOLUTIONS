@@ -1,5 +1,5 @@
 # Bank Reconciliation SaaS — Project Planning Update
-## KQ-SOFT SOLUTIONS LIMITED | Ghana | World-Class Vision
+## KQ SOFT SOLUTIONS | Ghana | World-Class Vision
 
 **Last Updated:** February 2026  
 **Status:** Planning Phase
@@ -220,7 +220,7 @@ DASHBOARD
 │  Recent Projects                                           [+ New Project]  │
 │  ─────────────────────────────────────────────────────────────────────────  │
 │  Lordship Insurance BRS Dec 2025     Completed     Dec 31, 2025    [View]   │
-│  KQ-SOFT SOLUTIONS Jan 2025           In Progress   Jan 15, 2025    [Resume] │
+│  KQ SOFT SOLUTIONS Jan 2025           In Progress   Jan 15, 2025    [Resume] │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 PROJECT WORKFLOW
@@ -292,7 +292,7 @@ REPORT PREVIEW
 | Secondary colour | Hex picker |
 | Letterhead/address | Text block |
 | Report title | Text (default: "Bank Reconciliation Statement") |
-| Footer | Text (e.g. "Prepared by KQ-SOFT SOLUTIONS LIMITED") |
+| Footer | Text (e.g. "Prepared by KQ SOFT SOLUTIONS") |
 
 ### 4.6 Technical Stack (Align with Coolify + Docker)
 

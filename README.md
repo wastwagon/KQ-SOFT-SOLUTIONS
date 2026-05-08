@@ -1,6 +1,6 @@
 # Bank Reconciliation SaaS
 
-**KQ-SOFT SOLUTIONS LIMITED** | Ghana
+**KQ SOFT SOLUTIONS** | Ghana
 
 **Live production:** [https://kqsoftwaresolutions.com/](https://kqsoftwaresolutions.com/)
 
