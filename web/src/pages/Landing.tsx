@@ -1258,20 +1258,39 @@ function Footer() {
               Bank reconciliation built for Ghanaian accountants and finance
               teams. Match faster, report cleaner, audit better.
             </p>
-            <ul className="mt-6 space-y-2 text-sm text-gray-600">
+            <ul className="mt-6 space-y-2.5 text-sm text-gray-600">
               <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-primary-600" />
-                <a href="mailto:hello@kqsoft.com" className="hover:text-gray-900">
-                  hello@kqsoft.com
+                <Mail className="w-4 h-4 text-primary-600 flex-shrink-0" />
+                <a
+                  href="mailto:info@kqsoftwaresolutions.com"
+                  className="hover:text-gray-900 break-all"
+                >
+                  info@kqsoftwaresolutions.com
                 </a>
               </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-primary-600" />
-                <span>+233 (0) 24 000 0000</span>
+              <li className="flex items-start gap-2">
+                <Phone className="w-4 h-4 mt-0.5 text-primary-600 flex-shrink-0" />
+                <span className="flex flex-col">
+                  <a href="tel:+233302512596" className="hover:text-gray-900">
+                    0302 512 596
+                  </a>
+                  <a href="tel:+233275762180" className="hover:text-gray-900">
+                    0275 762 180
+                  </a>
+                  <a href="tel:+233245396813" className="hover:text-gray-900">
+                    0245 396 813
+                  </a>
+                </span>
               </li>
-              <li className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary-600" />
-                <span>Accra, Ghana</span>
+              <li className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 mt-0.5 text-primary-600 flex-shrink-0" />
+                <span>
+                  USS No. NS 12, Third Gate
+                  <br />
+                  Madina, Accra
+                  <br />
+                  P. O. Box CT 6306, Cantonments, Accra
+                </span>
               </li>
             </ul>
           </div>
@@ -1305,7 +1324,7 @@ function Footer() {
             </p>
             <ul className="mt-4 space-y-2 text-sm">
               <li><a href="/user-manual.md" className="text-gray-600 hover:text-gray-900">User manual</a></li>
-              <li><a href="mailto:support@kqsoft.com" className="text-gray-600 hover:text-gray-900">Support</a></li>
+              <li><a href="mailto:info@kqsoftwaresolutions.com" className="text-gray-600 hover:text-gray-900">Support</a></li>
             </ul>
           </div>
         </div>
