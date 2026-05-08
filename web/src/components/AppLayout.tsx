@@ -31,9 +31,10 @@ const workNavItems = [
 ]
 
 const administrationNavItems = [
-  { to: '/audit', label: 'Audit log', icon: FileCheck },
-  { to: '/manual', label: 'User manual', icon: BookOpen },
-  { to: '/settings', label: 'Settings', icon: Settings, preload: preloadSettingsPage },
+  { to: '/settings/members', label: 'Team Members', icon: Users },
+  { to: '/audit', label: 'Audit Log', icon: FileCheck },
+  { to: '/manual', label: 'User Manual', icon: BookOpen },
+  { to: '/settings/branding', label: 'Firm Branding', icon: Settings, preload: preloadSettingsPage },
 ]
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>

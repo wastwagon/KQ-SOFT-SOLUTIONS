@@ -17,28 +17,34 @@ export default function MetricCard({ label, value, sublabel, icon, accent = 'pri
       ? 'border-l-4 border-l-primary-500'
       : accent === 'muted'
         ? 'border-l-4 border-l-gray-300'
-        : ''
+        : accent === 'amber'
+          ? 'border-l-4 border-l-amber-500'
+          : accent === 'green'
+            ? 'border-l-4 border-l-green-500'
+            : accent === 'indigo'
+              ? 'border-l-4 border-l-indigo-500'
+              : ''
 
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 p-4 sm:p-5 ${accentBorder} ${className}`}
+      className={`bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 sm:p-6 ${accentBorder} ${className}`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 break-words leading-tight">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 break-words leading-tight">
             {label}
           </p>
-          <p className="mt-2 text-lg sm:text-xl font-bold text-gray-900 tabular-nums tracking-tight break-words leading-tight">
+          <div className="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tabular-nums tracking-tight break-words leading-tight">
             {value}
-          </p>
+          </div>
           {sublabel && (
-            <p className="mt-1 text-xs text-gray-500 break-words leading-snug">
+            <div className="mt-2 text-xs font-medium text-gray-500 break-words leading-snug">
               {sublabel}
-            </p>
+            </div>
           )}
         </div>
         {icon && (
-          <div className="flex-shrink-0 text-gray-400 [&>svg]:w-5 [&>svg]:h-5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
+          <div className="flex-shrink-0 text-gray-400/60 [&>svg]:w-5 [&>svg]:h-5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
             {icon}
           </div>
         )}

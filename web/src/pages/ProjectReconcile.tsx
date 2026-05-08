@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { reconcile, subscription, attachments } from '../lib/api'
 import { formatAmount, formatAmountNumber, formatDateCompact } from '../lib/format'
 import { getCurrencySymbol } from '../lib/currency'
+import { Settings, Link as LinkIcon, ArrowRight } from 'lucide-react'
 import BrsHelp from '../components/BrsHelp'
 
 interface Tx {
@@ -44,6 +45,7 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     useDocRef: true,
     useChequeNo: true,
   })
+  const [showSettings, setShowSettings] = useState(false)
   const bankAccountRestoredRef = useRef(false)
   const matchParamsRestoredRef = useRef(false)
 
@@ -475,109 +477,102 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
       {/* Suggested matches with bulk action */}
       {suggestions.length > 0 && canReconcile && (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 p-5 shadow-sm">
-          <h3 className="text-base font-bold text-amber-900 tracking-tight mb-1">Suggested matches</h3>
-          <p className="text-sm text-amber-800/90 mb-4">
-            {features.bulk_match
-              ? 'Click a suggestion to pre-select, or tick to bulk-select and match several at once.'
-              : 'Click a suggestion to pre-select, then click Match. Bulk match requires Standard plan.'}
-          </p>
-          <div className="mb-4 rounded-xl border border-amber-200 bg-white/70 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-900 mb-2">Matching parameters</p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setMatchParams({ useDate: true, useDocRef: true, useChequeNo: true })}
-                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
-                  isStrictPreset
-                    ? 'border-amber-500 bg-amber-200 text-amber-950'
-                    : 'border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200'
-                }`}
-                title="Amount + date + reference + cheque"
-              >
-                Strict preset
-              </button>
-              <button
-                type="button"
-                onClick={() => setMatchParams({ useDate: true, useDocRef: false, useChequeNo: false })}
-                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
-                  isAmountDatePreset
-                    ? 'border-amber-500 bg-amber-200 text-amber-950'
-                    : 'border-amber-300 bg-white text-amber-900 hover:bg-amber-50'
-                }`}
-                title="Amount + date matching"
-              >
-                Amount + Date preset
-              </button>
-              <button
-                type="button"
-                onClick={() => setMatchParams({ useDate: false, useDocRef: false, useChequeNo: false })}
-                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
-                  isAmountOnlyPreset
-                    ? 'border-amber-500 bg-amber-200 text-amber-950'
-                    : 'border-amber-300 bg-white text-amber-900 hover:bg-amber-50'
-                }`}
-                title="Amount-only matching"
-              >
-                Amount-only preset
-              </button>
-              <button
-                type="button"
-                onClick={() => setMatchParams({ useDate: true, useDocRef: true, useChequeNo: true })}
-                className="px-2.5 py-1 rounded-lg border border-amber-300 bg-white text-amber-900 text-xs font-medium hover:bg-amber-50 transition-colors"
-                title="Reset parameters to default strict mode"
-              >
-                Reset to default
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm text-amber-900">
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked
-                  disabled
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                Use amount (required)
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={matchParams.useDate}
-                  onChange={(e) => setMatchParams((prev) => ({ ...prev, useDate: e.target.checked }))}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                Use date
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={matchParams.useDocRef}
-                  onChange={(e) => setMatchParams((prev) => ({ ...prev, useDocRef: e.target.checked }))}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                Use reference doc
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={matchParams.useChequeNo}
-                  onChange={(e) => setMatchParams((prev) => ({ ...prev, useChequeNo: e.target.checked }))}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                Use cheque number
-              </label>
-            </div>
-            <p className="mt-2 text-xs text-amber-900">Active mode: <strong>{activeModeLabel}</strong></p>
-            <p className="mt-1 text-xs text-amber-800">
-              Preset guide: <strong>Strict</strong> for safest matching, <strong>Amount + Date</strong> for moderate volume,
-              <strong> Amount only</strong> for high-volume batches (review before confirming).
-            </p>
-            {!matchParams.useDate && !matchParams.useDocRef && !matchParams.useChequeNo && (
-              <p className="mt-2 text-xs text-amber-800">
-                Amount-only matching is broader and may return many possible suggestions.
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-amber-900 tracking-tight mb-1">Suggested matches</h3>
+              <p className="text-sm text-amber-800/90">
+                {features.bulk_match
+                  ? 'Click a suggestion to pre-select, or tick to bulk-select.'
+                  : 'Click a suggestion to pre-select, then click Match.'}
               </p>
-            )}
+            </div>
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                showSettings ? 'bg-amber-200 text-amber-900' : 'bg-white/80 text-amber-700 hover:bg-white'
+              } border border-amber-200`}
+            >
+              <Settings className="w-4 h-4" />
+              {showSettings ? 'Hide Settings' : 'Matching Settings'}
+            </button>
           </div>
+
+          {showSettings && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-white/70 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-900 mb-3">Matching parameters</p>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setMatchParams({ useDate: true, useDocRef: true, useChequeNo: true })}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                    isStrictPreset
+                      ? 'border-amber-500 bg-amber-200 text-amber-950'
+                      : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+                  }`}
+                >
+                  Strict
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchParams({ useDate: true, useDocRef: false, useChequeNo: false })}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                    isAmountDatePreset
+                      ? 'border-amber-500 bg-amber-200 text-amber-950'
+                      : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+                  }`}
+                >
+                  Amount + Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchParams({ useDate: false, useDocRef: false, useChequeNo: false })}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                    isAmountOnlyPreset
+                      ? 'border-amber-500 bg-amber-200 text-amber-950'
+                      : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+                  }`}
+                >
+                  Amount-only
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-5 text-sm text-amber-900 font-medium">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked disabled className="rounded border-amber-300 text-amber-600 focus:ring-amber-500" />
+                  Amount
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={matchParams.useDate}
+                    onChange={(e) => setMatchParams((prev) => ({ ...prev, useDate: e.target.checked }))}
+                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  Date
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={matchParams.useDocRef}
+                    onChange={(e) => setMatchParams((prev) => ({ ...prev, useDocRef: e.target.checked }))}
+                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  Reference
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={matchParams.useChequeNo}
+                    onChange={(e) => setMatchParams((prev) => ({ ...prev, useChequeNo: e.target.checked }))}
+                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  Cheque No.
+                </label>
+              </div>
+              <p className="mt-3 text-[11px] text-amber-700 leading-relaxed italic">
+                Active mode: <strong>{activeModeLabel}</strong>. Settings apply to suggestions and automated matching.
+              </p>
+            </div>
+          )}
           {features.bulk_match && (
           <div className="flex flex-wrap gap-2 mb-4">
             {highConfidenceSuggestions.length > 0 && (
@@ -785,40 +780,68 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
         </div>
       )}
 
-      {/* Match button */}
+      {/* Floating Match Action Bar */}
       {canMatch && canReconcile && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-800 p-2 pl-6 flex items-center gap-6 backdrop-blur-md bg-opacity-90">
+            <div className="flex items-center gap-4 py-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Selected for match</span>
+                <span className="text-sm font-semibold">
+                  {cbArr.length} Book ↔ {bankArr.length} Bank
+                </span>
+              </div>
+            </div>
+            <div className="h-8 w-px bg-gray-800" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSelectedCbIds(new Set())
+                  setSelectedBankIds(new Set())
+                }}
+                className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+              <button
+                onClick={handleMatch}
+                disabled={matchMutation.isPending || multiMatchMutation.isPending}
+                className="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-primary-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all flex items-center gap-2"
+              >
+                {matchMutation.isPending || multiMatchMutation.isPending ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Matching…
+                  </>
+                ) : (
+                  <>
+                    <LinkIcon className="w-4 h-4" />
+                    Confirm Match
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proceed to Review */}
+      {onProceedToReview && (
+        <div className="pt-8 mt-12 border-t border-gray-100 flex flex-wrap items-center justify-between gap-6">
+          <div className="max-w-md">
+            <h4 className="text-base font-bold text-gray-900 mb-1">Ready to finalise?</h4>
+            <p className="text-sm text-gray-500">
+              Review your matches and verify un-reconciled items before generating your professional BRS report.
+            </p>
+          </div>
           <button
-            onClick={handleMatch}
-            disabled={matchMutation.isPending || multiMatchMutation.isPending}
-            className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 transition-all"
+            type="button"
+            onClick={onProceedToReview}
+            className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold shadow-lg hover:bg-gray-800 hover:shadow-xl active:scale-[0.98] transition-all flex items-center gap-2"
           >
-            {matchMutation.isPending || multiMatchMutation.isPending
-              ? 'Matching…'
-              : canMatch1to1
-                ? 'Confirm match'
-                : canMatch1toMany
-                  ? `Match 1 cash book ↔ ${bankArr.length} bank`
-                  : canMatchManyTo1
-                    ? `Match ${cbArr.length} cash book ↔ 1 bank`
-                    : canMatchManyToMany
-                      ? `Match ${cbArr.length} cash book ↔ ${bankArr.length} bank`
-                      : 'Match'}
+            Proceed to Review
+            <ArrowRight className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              setSelectedCbIds(new Set())
-              setSelectedBankIds(new Set())
-            }}
-            className="text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            Clear selection
-          </button>
-          {(matchMutation.isError || multiMatchMutation.isError) && (
-            <span className="text-sm font-medium text-red-600">
-              {(matchMutation.error || multiMatchMutation.error)?.message}
-            </span>
-          )}
         </div>
       )}
 

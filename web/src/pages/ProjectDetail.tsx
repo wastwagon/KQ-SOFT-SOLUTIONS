@@ -338,28 +338,42 @@ export default function ProjectDetail() {
         ))}
       </div>
       {step === 0 && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-gray-200 border-l-4 border-l-primary-500 bg-white shadow-sm p-4 sm:p-5">
-            <h2 className="text-base font-semibold text-gray-900 mb-1">Upload documents</h2>
-            <p className="text-xs text-gray-600 mb-4 max-w-2xl">
-              Real bank statements and cash books usually have <strong>credits and debits (or receipts and payments) in the same document</strong>. Upload your file(s) once and choose &quot;Both&quot; so we use it for both sides. At the <strong>Map</strong> step you’ll map which columns are credits/debits (or receipts/payments); the system will then match and advise at Reconcile. You can upload several documents per project.
-            </p>
-            <p className="text-xs text-slate-600 mb-4 max-w-2xl rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-              <strong>Best practice:</strong> Cash book date is required for matching. Cheque amounts should match the bank statement for accurate reconciliation.
-            </p>
-            <p className="text-xs text-blue-700 mb-4 max-w-2xl rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
-              <strong>Signed amount mode:</strong> when receipts/payments or credits/debits are mixed in one amount column, positive values are treated as receipts/credits and negative values as payments/debits.
-            </p>
+        <div className="space-y-6">
+          <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center">
+                <FolderKanban className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 mb-1">Upload documents</h2>
+                <p className="text-sm text-gray-600 max-w-3xl leading-relaxed">
+                  To begin reconciliation, upload your <strong>Cash Book</strong> and <strong>Bank Statement</strong>. 
+                  If your files contain both receipts and payments in a single document, select &quot;Both&quot; during upload. 
+                  Our system will automatically detect and suggest column mappings in the next step.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2 text-xs font-medium text-primary-700 bg-white px-3 py-1.5 rounded-lg border border-primary-100">
+                    <span className="w-2 h-2 rounded-full bg-primary-500" />
+                    Cash book date required
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-blue-700 bg-white px-3 py-1.5 rounded-lg border border-blue-100">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    Excel, CSV, and PDF supported
+                  </div>
+                </div>
+              </div>
+            </div>
             {!canUploadDocuments(role) && (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                View-only. Contact an admin to upload.
+              <p className="mt-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                View-only access. Contact an administrator to upload documents.
               </p>
             )}
             {uploadError && (
-              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium border border-red-100">
+              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium border border-red-100">
                 {uploadError}
               </div>
             )}
+          </div>
 
             <div className="grid md:grid-cols-2 gap-6">
               {/* Cash book */}

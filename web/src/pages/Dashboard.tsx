@@ -107,41 +107,66 @@ export default function Dashboard() {
       </div>
 
       {!isLoading && projectsList.length === 0 && !getStartedDismissed && (
-        <div className="flex items-start gap-4 rounded-lg border border-primary-200 bg-primary-50/50 p-4">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base font-semibold tracking-tight text-primary-900">Get started</h3>
-            <p className="mt-1 text-sm text-primary-800">
-              Create a project, upload your cash book and bank statement, then match transactions and export your BRS report.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {canCreateProject(role) && (
-                <Link
-                  to="/projects/new"
-                  className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
-                  Create first project
-                </Link>
-              )}
-              <a href="#recent-projects" className="text-sm font-medium text-primary-700 hover:text-primary-800 underline">
-                See recent projects
-              </a>
+        <Card className="border-l-4 border-l-primary-500 bg-primary-50/30 overflow-hidden">
+          <div className="flex items-start justify-between p-4 sm:p-6">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-bold tracking-tight text-primary-900 mb-2">Welcome to your new workspace</h2>
+              <p className="text-sm text-primary-800 mb-6 max-w-2xl leading-relaxed">
+                Follow these best practices to set up your firm for professional bank reconciliation and collaboration.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">1</div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Branding</h3>
+                    <p className="text-xs text-gray-600 mt-1 mb-2">Set your logo and colors for professional reports.</p>
+                    <Link to="/settings/branding" className="text-xs font-semibold text-primary-600 hover:underline">Configure branding →</Link>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">2</div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Team</h3>
+                    <p className="text-xs text-gray-600 mt-1 mb-2">Invite employees for a clear audit trail.</p>
+                    <Link to="/settings/members" className="text-xs font-semibold text-primary-600 hover:underline">Invite members →</Link>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">3</div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Clients</h3>
+                    <p className="text-xs text-gray-600 mt-1 mb-2">Add the entities you are reconciling for.</p>
+                    <Link to="/clients" className="text-xs font-semibold text-primary-600 hover:underline">Add clients →</Link>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 border border-primary-100 shadow-sm">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">4</div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary-900">Projects</h3>
+                    <p className="text-xs text-gray-600 mt-1 mb-2">Start your first reconciliation project.</p>
+                    {canCreateProject(role) && (
+                      <Link to="/projects/new" className="text-xs font-semibold text-primary-600 hover:underline">New Project →</Link>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={dismissGetStarted}
+              className="flex-shrink-0 rounded p-1 text-primary-600 hover:bg-primary-100 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={dismissGetStarted}
-            className="flex-shrink-0 rounded p-1 text-primary-600 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            aria-label="Dismiss"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {usageLoading ? (
           <>
-            <MetricCardSkeleton />
             <MetricCardSkeleton />
             <MetricCardSkeleton />
             <MetricCardSkeleton />
@@ -149,54 +174,59 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <div className="lg:col-span-2 space-y-4">
-              <MetricCard
-                label="Plan usage"
-                value={`${usage?.organization?.plan ? String(usage.organization.plan).charAt(0).toUpperCase() + String(usage.organization.plan).slice(1).toLowerCase() : (org?.name ?? '—')}`}
-                sublabel={
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
-                        <span>Projects</span>
-                        <span>{projectsUsed} / {projectsUnlimited ? '∞' : projectsLimit}</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all ${projectsUsed / projectsLimit > 0.9 ? 'bg-red-500' : 'bg-primary-500'}`}
-                          style={{ width: `${projectsUnlimited ? 0 : Math.min(100, (projectsUsed / projectsLimit) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
-                        <span>Transactions</span>
-                        <span>{transactionsUsed} / {transactionsUnlimited ? '∞' : transactionsLimit}</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all ${transactionsUsed / transactionsLimit > 0.9 ? 'bg-red-500' : 'bg-primary-500'}`}
-                          style={{ width: `${transactionsUnlimited ? 0 : Math.min(100, (transactionsUsed / transactionsLimit) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
+            <MetricCard
+              label="Total Projects"
+              value={usage?.usage?.projectsUsed ?? projectsList.length}
+              sublabel={
+                <div className="mt-4">
+                  <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
+                    <span>Usage</span>
+                    <span>{projectsUsed} / {projectsUnlimited ? '∞' : projectsLimit}</span>
                   </div>
-                }
-              />
-            </div>
-            <MetricCard
-              label="Status"
-              value={usage?.subscription?.status ? String(usage.subscription.status).charAt(0).toUpperCase() + String(usage.subscription.status).slice(1).toLowerCase() : 'Active'}
-              sublabel={usage?.subscription?.currentPeriodEnd ? `Renews ${formatDate(usage.subscription.currentPeriodEnd)}` : 'On Trial'}
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all ${projectsUsed / projectsLimit > 0.9 ? 'bg-red-500' : 'bg-primary-500'}`}
+                      style={{ width: `${projectsUnlimited ? 0 : Math.min(100, (projectsUsed / projectsLimit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              }
+              icon={<FolderKanban />}
+              accent="primary"
             />
             <MetricCard
-              label="In progress"
-              value={String(inProgressCount)}
-              sublabel="Active projects"
+              label="Pending Review"
+              value={inProgressCount}
+              sublabel="Active reconciliation cycles"
+              icon={<FileCheck />}
+              accent="amber"
             />
             <MetricCard
-              label="Completed"
-              value={String(completedCount)}
-              sublabel="Archived reports"
+              label="Monthly Transactions"
+              value={usage?.usage?.transactionsUsed ?? 0}
+              sublabel={
+                <div className="mt-4">
+                  <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
+                    <span>Usage</span>
+                    <span>{transactionsUsed} / {transactionsUnlimited ? '∞' : transactionsLimit}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all ${transactionsUsed / transactionsLimit > 0.9 ? 'bg-red-500' : 'bg-green-500'}`}
+                      style={{ width: `${transactionsUnlimited ? 0 : Math.min(100, (transactionsUsed / transactionsLimit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              }
+              icon={<LayoutDashboard />}
+              accent="green"
+            />
+            <MetricCard
+              label="Team Members"
+              value={usage?.usage?.currentMembers ?? 1}
+              sublabel="Active firm accounts"
+              icon={<Users />}
+              accent="indigo"
             />
           </>
         )}
@@ -226,50 +256,6 @@ export default function Dashboard() {
                 className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 View full changelog
-              </Link>
-            </div>
-          </Card>
-
-          <Card title="Go-live checklist">
-            <p className="text-sm text-gray-600 mb-3">
-              Use this quick checklist when onboarding a new customer team.
-            </p>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-primary-600">-</span>
-                <span>Review user onboarding steps in the manual.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-primary-600">-</span>
-                <span>Assign member roles (`admin`, `reviewer`, `preparer`, `viewer`).</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-primary-600">-</span>
-                <span>Configure branding and billing before client training.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-primary-600">-</span>
-                <span>Create a pilot project and run one full reconciliation cycle.</span>
-              </li>
-            </ul>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                to="/manual"
-                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                Open manual
-              </Link>
-              <Link
-                to="/settings/members"
-                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                Manage members
-              </Link>
-              <Link
-                to="/projects/new"
-                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                Create pilot project
               </Link>
             </div>
           </Card>
@@ -341,19 +327,6 @@ export default function Dashboard() {
             </Link>
             )}
           </div>
-          {auditData?.logs?.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-border">
-              <h3 className="text-sm font-semibold tracking-tight text-gray-800 mb-2">Recent activity</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
-                {auditData.logs.slice(0, 5).map((l: { id: string; actionLabel: string; details?: unknown; createdAt: string }) => (
-                  <li key={l.id}>
-                    {l.actionLabel} — {formatDate(l.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </li>
-                ))}
-              </ul>
-              <Link to="/audit" className="inline-block mt-2 text-sm text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">View full audit →</Link>
-            </div>
-          )}
         </Card>
       )}
 

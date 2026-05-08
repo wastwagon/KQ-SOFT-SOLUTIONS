@@ -41,8 +41,12 @@ export default function Clients() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight text-gray-900">Clients</h1>
       <p className="text-sm text-gray-600 max-w-2xl">
-        Add clients and assign them when creating a project. {!features.multi_client && (
-          <span className="text-amber-600">Filter projects by client (multi-client view) requires Firm plan.</span>
+        <strong>Clients</strong> are the external entities or customer accounts you are reconciling for. 
+        To add team members (your employees) to your firm, go to <Link to="/settings/members" className="text-primary-600 font-medium hover:underline">Administration &gt; Members</Link>.
+      </p>
+      <p className="text-xs text-gray-500 max-w-2xl">
+        Add clients here and assign them when creating a project. {!features.multi_client && (
+          <span className="text-amber-600 font-medium">Filter projects by client (multi-client view) requires Firm plan.</span>
         )}
       </p>
 

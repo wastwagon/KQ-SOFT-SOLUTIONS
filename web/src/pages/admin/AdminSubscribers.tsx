@@ -25,8 +25,6 @@ export default function AdminSubscribers() {
   const [planFilter, setPlanFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkPlan, setBulkPlan] = useState('')
-  const [overridePlan, setOverridePlan] = useState<{ slug: string; name: string; currentPlan: string } | null>(null)
-  const [newPlan, setNewPlan] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'subscribers', page, search, planFilter],
@@ -58,7 +56,6 @@ export default function AdminSubscribers() {
       api(`/admin/organizations/${slug}`, { method: 'PATCH', body: JSON.stringify({ plan }) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'subscribers'] })
-      setOverridePlan(null)
     },
   })
 
@@ -111,7 +108,7 @@ export default function AdminSubscribers() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Subscribers — filter by plan, manage, override plan, export.
+            Subscribers — filter by plan, manage, export.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -149,78 +146,6 @@ export default function AdminSubscribers() {
         </div>
       </div>
 
-      {overridePlan && (
-        <Card className="mb-6 p-4">
-          <h3 className="font-medium text-gray-900 mb-2">Override plan: {overridePlan.name}</h3>
-          <p className="text-sm text-gray-500 mb-3">Current: {overridePlan.currentPlan}</p>
-          <div className="flex gap-4 items-center">
-            <select
-              value={newPlan}
-              onChange={(e) => setNewPlan(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-            >
-              {plans.map((p) => (
-                <option key={p.slug} value={p.slug}>{p.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                if (newPlan) overrideMutation.mutate({ slug: overridePlan.slug, plan: newPlan })
-              }}
-              disabled={overrideMutation.isPending || !newPlan}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-            >
-              {overrideMutation.isPending ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOverridePlan(null)}
-              className="px-4 py-2 border border-border rounded-lg text-gray-700 hover:bg-surface"
-            >
-              Cancel
-            </button>
-          </div>
-        </Card>
-      )}
-
-      {selectedIds.size > 0 && (
-        <Card className="mb-6 p-4 flex items-center gap-4 flex-wrap">
-          <span className="text-sm font-medium text-gray-900">
-            {selectedIds.size} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <select
-              value={bulkPlan}
-              onChange={(e) => setBulkPlan(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-            >
-              <option value="">Change plan to...</option>
-              {plans.map((p) => (
-                <option key={p.slug} value={p.slug}>{p.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                if (bulkPlan) bulkMutation.mutate({ organizationIds: Array.from(selectedIds), plan: bulkPlan })
-              }}
-              disabled={!bulkPlan || bulkMutation.isPending}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-            >
-              {bulkMutation.isPending ? 'Updating...' : 'Apply'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="px-4 py-2 border border-border rounded-lg text-gray-700 hover:bg-surface"
-            >
-              Clear
-            </button>
-          </div>
-        </Card>
-      )}
-
       <Card noPadding className="overflow-hidden">
         <div className="overflow-x-auto">
         <table className="min-w-full">
@@ -237,11 +162,8 @@ export default function AdminSubscribers() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Last payment</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total paid</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Members</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Projects</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
@@ -273,28 +195,9 @@ export default function AdminSubscribers() {
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600 capitalize">{o.plan}</td>
-                <td className="px-6 py-4 text-right text-sm text-gray-600">
-                  {o.lastPayment ? (
-                    <span title={formatDate(o.lastPayment.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}>
-                      {fmt(o.lastPayment.amount)}<br />
-                      <span className="text-xs text-gray-500">{formatDate(o.lastPayment.createdAt)}</span>
-                    </span>
-                  ) : (
-                    '—'
-                  )}
-                </td>
                 <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">{fmt(o.totalPaid)}</td>
                 <td className="px-6 py-4 text-right text-sm text-gray-600">{o._count.members}</td>
-                <td className="px-6 py-4 text-right text-sm text-gray-600">{o._count.projects}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{formatDate(o.createdAt)}</td>
-                <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => { setOverridePlan({ slug: o.slug, name: o.name, currentPlan: o.plan }); setNewPlan(o.plan) }}
-                    className="text-primary-600 hover:underline text-sm"
-                  >
-                    Override plan
-                  </button>
+                <td className="px-6 py-4 text-right">
                   <Link
                     to={`/platform-admin/organizations/${o.slug}`}
                     className="text-primary-600 hover:underline text-sm"
