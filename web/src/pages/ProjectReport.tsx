@@ -254,7 +254,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const matchedPairs = data.matchedPairs || []
   const matchedReceiptsVsCredits = data.matchedReceiptsVsCredits || []
   const matchedPaymentsVsDebits = data.matchedPaymentsVsDebits || []
-  const paidOutVarianceBreakdown = data.paidOutVarianceBreakdown
   const unmatchedReceipts = data.unmatchedReceipts || []
   const unmatchedPayments = data.unmatchedPayments || []
   const broughtForwardItems = data.broughtForwardItems || []
