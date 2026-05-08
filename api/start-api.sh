@@ -78,12 +78,32 @@ try_p3009_rolled_back() {
 LOG=$(mktemp)
 trap 'rm -f "$LOG"' EXIT
 
+seed_plans() {
+  # Idempotent — keeps existing admin-edited rows. Disable with SEED_PLANS_ON_BOOT=0.
+  # Force-reset to defaults with FORCE_PLAN_RESET=1.
+  if [ "${SEED_PLANS_ON_BOOT:-1}" = "0" ]; then
+    return 0
+  fi
+  if [ ! -f prisma/seed-plans.ts ]; then
+    echo "start-api: seed-plans.ts not found — skipping plan seed" >&2
+    return 0
+  fi
+  echo "start-api: seeding canonical subscription plans (idempotent)" >&2
+  if ! npx tsx prisma/seed-plans.ts >&2; then
+    # Don't fail the deploy if seeding plans hiccups — landing page falls back
+    # to PLAN_PRICES config and frontend has its own static catalogue.
+    echo "start-api: WARN — seed-plans failed; continuing with config fallback" >&2
+  fi
+}
+
 round=0
 while [ "$round" -lt "$MAX_ROUNDS" ]; do
   if run_migrate >"$LOG" 2>&1; then
     rm -f "$LOG"
     trap - EXIT
-    echo "start-api: prisma migrate deploy OK — starting Node on port ${PORT:-9001}" >&2
+    echo "start-api: prisma migrate deploy OK" >&2
+    seed_plans
+    echo "start-api: starting Node on port ${PORT:-9001}" >&2
     exec node dist/index.js
   fi
 

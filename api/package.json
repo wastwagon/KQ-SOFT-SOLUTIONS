@@ -13,6 +13,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:seed-plans": "npx tsx prisma/seed-plans.ts",
     "test": "prisma generate && vitest run",
     "test:licl-qtest": "vitest run --run src/routes/report.qtest-licl-golden.test.ts",
     "test:watch": "vitest"
