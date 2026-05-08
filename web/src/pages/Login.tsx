@@ -11,6 +11,7 @@ import AuthLayout, {
   authLabelClass,
   authPrimaryButtonClass,
 } from '../components/AuthLayout'
+import { useToast } from '../components/ui/Toast'
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -22,6 +23,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuth((s) => s.setAuth)
+  const toast = useToast()
 
   if (isAuthenticated && !sessionExpired) {
     return <Navigate to="/dashboard" replace />
@@ -36,7 +38,9 @@ export default function Login() {
       setAuth(user, org, token, role, isPlatformAdmin)
       navigate(isPlatformAdmin ? '/platform-admin' : '/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      const msg = err instanceof Error ? err.message : 'Login failed'
+      setError(msg)
+      toast.error('Sign in failed', msg)
     } finally {
       setLoading(false)
     }

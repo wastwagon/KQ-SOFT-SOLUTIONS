@@ -6,12 +6,14 @@ import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import { useConfirm } from '../../components/ui/ConfirmDialog'
 
 const ROLES = ['admin', 'reviewer', 'preparer', 'viewer', 'member'] as const
 
 export default function AdminOrgDetail() {
   const { slug } = useParams<{ slug: string }>()
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [overridePlan, setOverridePlan] = useState('')
   const [newPlan, setNewPlan] = useState('')
   const [editingName, setEditingName] = useState(false)
@@ -380,9 +382,15 @@ export default function AdminOrgDetail() {
             />
             <Button
               size="sm"
-              onClick={() => {
+              onClick={async () => {
                 if (!trialEndsAt || trialReason.trim().length < 3) return
-                if (!window.confirm('Confirm trial end override update?')) return
+                const ok = await confirm({
+                  title: 'Update trial end override?',
+                  description: `Trial will end on ${new Date(trialEndsAt).toLocaleDateString()}. Reason: "${trialReason.trim()}".`,
+                  confirmLabel: 'Update trial end',
+                  tone: 'warning',
+                })
+                if (!ok) return
                 setTrialMutation.mutate({ trialEndsAt: new Date(trialEndsAt).toISOString(), reason: trialReason.trim() })
               }}
               disabled={setTrialMutation.isPending}
@@ -399,9 +407,15 @@ export default function AdminOrgDetail() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 if (clearTrialReason.trim().length < 3) return
-                if (!window.confirm('Clear trial override and restore computed trial window?')) return
+                const ok = await confirm({
+                  title: 'Clear trial override?',
+                  description: 'The computed trial window will be restored. This action will be audit-logged.',
+                  confirmLabel: 'Clear override',
+                  tone: 'warning',
+                })
+                if (!ok) return
                 clearTrialMutation.mutate({ reason: clearTrialReason.trim() })
               }}
               disabled={clearTrialMutation.isPending}
@@ -430,9 +444,15 @@ export default function AdminOrgDetail() {
             />
             <Button
               size="sm"
-              onClick={() => {
+              onClick={async () => {
                 if (statusReason.trim().length < 3) return
-                if (!window.confirm(`Set subscription status override to "${manualStatus}"?`)) return
+                const ok = await confirm({
+                  title: 'Apply status override?',
+                  description: `Subscription status will be set to "${manualStatus}". Reason: "${statusReason.trim()}".`,
+                  confirmLabel: 'Apply override',
+                  tone: 'warning',
+                })
+                if (!ok) return
                 setStatusMutation.mutate({ status: manualStatus, reason: statusReason.trim() })
               }}
               disabled={setStatusMutation.isPending}
@@ -449,9 +469,15 @@ export default function AdminOrgDetail() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 if (clearStatusReason.trim().length < 3) return
-                if (!window.confirm('Clear status override and restore computed status?')) return
+                const ok = await confirm({
+                  title: 'Clear status override?',
+                  description: 'The computed subscription status will be restored.',
+                  confirmLabel: 'Clear override',
+                  tone: 'warning',
+                })
+                if (!ok) return
                 clearStatusMutation.mutate({ reason: clearStatusReason.trim() })
               }}
               disabled={clearStatusMutation.isPending}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
 import { projects, clients, subscription, settings } from '../lib/api'
+import { useToast } from '../components/ui/Toast'
 
 function SelectWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -27,6 +28,7 @@ export default function ProjectNew() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const { data: usageData } = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
@@ -53,9 +55,14 @@ export default function ProjectNew() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
+      toast.success('Project created', `"${name.trim() || data.slug}" is ready — upload your statements to start matching.`)
       navigate(`/projects/${data.slug}`)
     },
-    onError: (err) => setError(err instanceof Error ? err.message : 'Failed'),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Failed'
+      setError(msg)
+      toast.error('Could not create project', msg)
+    },
   })
 
   function handleSubmit(e: React.FormEvent) {

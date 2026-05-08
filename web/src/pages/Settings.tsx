@@ -6,10 +6,12 @@ import { settings, subscription, bankRules as bankRulesApi, apiKeys as apiKeysAp
 import { canEditBranding, canManageBilling, canEditBankRules, canManageMembers } from '../lib/permissions'
 import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../lib/brandColors'
 import Card from '../components/ui/Card'
+import { useToast } from '../components/ui/Toast'
 
 export default function Settings() {
   const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
+  const toast = useToast()
   const [logoUrl, setLogoUrl] = useState('')
   const [primaryColor, setPrimaryColor] = useState(BRAND_PRIMARY_HEX)
   const [secondaryColor, setSecondaryColor] = useState(BRAND_SECONDARY_HEX)
@@ -17,7 +19,6 @@ export default function Settings() {
   const [reportTitle, setReportTitle] = useState('Bank Reconciliation Statement')
   const [footer, setFooter] = useState('')
   const [approvalThresholdAmount, setApprovalThresholdAmount] = useState('')
-  const [saved, setSaved] = useState(false)
   const [logoLoadError, setLogoLoadError] = useState(false)
 
   const { data, isLoading } = useQuery({
@@ -51,8 +52,10 @@ export default function Settings() {
       settings.updateBranding(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+      toast.success('Branding saved', 'Your changes are live across the app and reports.')
+    },
+    onError: (err) => {
+      toast.error('Could not save branding', err instanceof Error ? err.message : undefined)
     },
   })
 
@@ -62,6 +65,10 @@ export default function Settings() {
       setLogoUrl(data.logoUrl)
       setLogoLoadError(false)
       queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })
+      toast.success('Logo uploaded', 'Save branding to apply it to reports.')
+    },
+    onError: (err) => {
+      toast.error('Logo upload failed', err instanceof Error ? err.message : undefined)
     },
   })
 
@@ -303,9 +310,6 @@ export default function Settings() {
               >
                 Reset to platform default
               </button>
-              )}
-              {saved && (
-                <span className="text-sm text-green-600">Saved.</span>
               )}
             </div>
           </form>

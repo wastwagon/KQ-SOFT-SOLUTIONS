@@ -9,11 +9,13 @@ import AuthLayout, {
   authLabelClass,
   authPrimaryButtonClass,
 } from '../components/AuthLayout'
+import { useToast } from '../components/ui/Toast'
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
   const navigate = useNavigate()
+  const toast = useToast()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -39,9 +41,12 @@ export default function ResetPassword() {
     try {
       await auth.resetPassword(token, password)
       setSuccess(true)
+      toast.success('Password updated', 'You’ll be redirected to sign in.')
       setTimeout(() => navigate('/login'), 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reset failed')
+      const msg = err instanceof Error ? err.message : 'Reset failed'
+      setError(msg)
+      toast.error('Could not reset password', msg)
     } finally {
       setLoading(false)
     }

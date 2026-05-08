@@ -9,8 +9,10 @@ import AuthLayout, {
   authLabelClass,
   authPrimaryButtonClass,
 } from '../components/AuthLayout'
+import { useToast } from '../components/ui/Toast'
 
 export default function ForgotPassword() {
+  const toast = useToast()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
@@ -23,8 +25,11 @@ export default function ForgotPassword() {
     try {
       await auth.forgotPassword(email)
       setSent(true)
+      toast.success('Reset link sent', 'Check your inbox — and your spam folder if it doesn’t arrive within a minute.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed')
+      const msg = err instanceof Error ? err.message : 'Request failed'
+      setError(msg)
+      toast.error('Could not send reset link', msg)
     } finally {
       setLoading(false)
     }

@@ -58,6 +58,25 @@
 
 /* Single premium light theme — dark mode removed */
 
+/* Toast / dialog enter animations.  Honours `prefers-reduced-motion`. */
+@keyframes kq-toast-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+@keyframes kq-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes kq-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes kq-toast-in    { from { opacity: 1; } to { opacity: 1; } }
+  @keyframes kq-overlay-in  { from { opacity: 1; } to { opacity: 1; } }
+  @keyframes kq-dialog-in   { from { opacity: 1; } to { opacity: 1; } }
+}
+
 /* Touch targets: larger checkboxes/radios on touch devices (WCAG 2.5.5) */
 @media (pointer: coarse) {
   input[type="checkbox"],

@@ -10,6 +10,7 @@ import AuthLayout, {
   authLabelClass,
   authPrimaryButtonClass,
 } from '../components/AuthLayout'
+import { useToast } from '../components/ui/Toast'
 
 export default function Register() {
   const isAuthenticated = useAuth((s) => !!s.token)
@@ -21,6 +22,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuth((s) => s.setAuth)
+  const toast = useToast()
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
@@ -38,9 +40,12 @@ export default function Register() {
         orgName,
       })
       setAuth(user, org, token, role, isPlatformAdmin)
+      toast.success('Workspace created', `Welcome to KQ-SOFT, ${name || email.split('@')[0]}.`)
       navigate('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      const msg = err instanceof Error ? err.message : 'Registration failed'
+      setError(msg)
+      toast.error('Could not create workspace', msg)
     } finally {
       setLoading(false)
     }

@@ -4,9 +4,11 @@ import { Plus } from 'lucide-react'
 import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import { useConfirm } from '../../components/ui/ConfirmDialog'
 
 export default function AdminPlans() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [editing, setEditing] = useState<{ id: string; slug: string; name: string; projectsPerMonth: number; transactionsPerMonth: number; monthlyGhs: number; yearlyGhs: number } | null>(null)
   const [showNew, setShowNew] = useState(false)
 
@@ -119,7 +121,15 @@ export default function AdminPlans() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => (confirm('Delete this plan?') ? deleteMutation.mutate(p.id) : null)}
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: `Delete the "${p.name}" plan?`,
+                          description: 'Existing subscribers on this plan will not be removed, but no new sign-ups will be able to choose it. You can re-create it later if needed.',
+                          confirmLabel: 'Delete plan',
+                          tone: 'danger',
+                        })
+                        if (ok) deleteMutation.mutate(p.id)
+                      }}
                       className="text-red-600 hover:underline"
                     >
                       Delete

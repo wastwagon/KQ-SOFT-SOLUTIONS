@@ -5,6 +5,8 @@ import { report, projects, attachments, subscription, currency as currencyApi, g
 import { canSubmitForReview, canApprove, canUploadDocuments, canDeleteAttachment, canReopenProject, canExportReport } from '../lib/permissions'
 import { formatDate, formatDateBRSTitle } from '../lib/format'
 import BrsHelp from '../components/BrsHelp'
+import { useConfirm } from '../components/ui/ConfirmDialog'
+import { useToast } from '../components/ui/Toast'
 
 interface ProjectReportProps {
   projectId: string
@@ -48,6 +50,8 @@ interface ReportReversalCandidate {
 export default function ProjectReport({ projectId, onGoToReview, onReopen, onRollForward, canExport = true, canReopen = true }: ProjectReportProps) {
   const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
+  const confirm = useConfirm()
+  const toast = useToast()
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [attachmentType, setAttachmentType] = useState<'bank_statement' | 'approval' | 'other'>('other')
@@ -124,13 +128,24 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const isLargeReport = totalTransactions > 200
 
   const handleExport = async (format: 'excel' | 'pdf') => {
-    if (isLargeReport && !window.confirm(`This report has ${totalTransactions} transactions. Export may take 30-60 seconds. Continue?`)) return
+    if (isLargeReport) {
+      const ok = await confirm({
+        title: `Export ${format.toUpperCase()} for ${totalTransactions.toLocaleString()} transactions?`,
+        description: 'Large reports can take 30–60 seconds to generate. You can keep working in another tab while this runs.',
+        confirmLabel: `Export ${format.toUpperCase()}`,
+        tone: 'info',
+      })
+      if (!ok) return
+    }
     setExportError('')
     setExporting(true)
     try {
       await (format === 'pdf' ? report.exportPdf : report.exportExcel)(projectId, bankAccountId || undefined, signedAmountMode)
+      toast.success(`${format.toUpperCase()} export ready`, 'Your download should start automatically.')
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Export failed')
+      const msg = err instanceof Error ? err.message : 'Export failed'
+      setExportError(msg)
+      toast.error('Export failed', msg)
     } finally {
       setExporting(false)
     }

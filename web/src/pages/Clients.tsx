@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { clients, subscription } from '../lib/api'
+import { useToast } from '../components/ui/Toast'
 
 export default function Clients() {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [name, setName] = useState('')
   const [error, setError] = useState('')
 
@@ -20,12 +22,17 @@ export default function Clients() {
 
   const createMutation = useMutation({
     mutationFn: clients.create,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setName('')
       setError('')
+      toast.success('Client added', `"${variables.name}" is ready to be assigned to a project.`)
     },
-    onError: (err) => setError(err instanceof Error ? err.message : 'Failed'),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Failed'
+      setError(msg)
+      toast.error('Could not add client', msg)
+    },
   })
 
   function handleSubmit(e: React.FormEvent) {
