@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
 import BrandLogo from '../components/BrandLogo'
 
 export default function Register() {
+  const isAuthenticated = useAuth((s) => !!s.token)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -13,6 +14,10 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuth((s) => s.setAuth)
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +31,7 @@ export default function Register() {
         orgName,
       })
       setAuth(user, org, token, role, isPlatformAdmin)
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {

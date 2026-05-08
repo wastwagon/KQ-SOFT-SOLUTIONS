@@ -19,6 +19,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import authRoutes from './routes/auth.js';
+import publicRoutes from './routes/public.js';
 import adminRoutes from './routes/admin/index.js';
 import clientRoutes from './routes/clients.js';
 import projectsRoutes from './routes/projects.js';
@@ -91,10 +92,12 @@ app.get('/api/v1', (_, res) => {
   res.json({
     name: 'Bank Reconciliation SaaS API',
     version: '1.0',
-    endpoints: { auth: '/api/v1/auth', admin: '/api/v1/admin', clients: '/api/v1/clients', projects: '/api/v1/projects', upload: '/api/v1/upload', attachments: '/api/v1/attachments', documents: '/api/v1/documents', reconcile: '/api/v1/reconcile', report: '/api/v1/report', subscription: '/api/v1/subscription', audit: '/api/v1/audit', settings: '/api/v1/settings', apiKeys: '/api/v1/api-keys', bankRules: '/api/v1/bank-rules', bankAccounts: '/api/v1/bank-accounts' },
+    endpoints: { public: '/api/v1/public', auth: '/api/v1/auth', admin: '/api/v1/admin', clients: '/api/v1/clients', projects: '/api/v1/projects', upload: '/api/v1/upload', attachments: '/api/v1/attachments', documents: '/api/v1/documents', reconcile: '/api/v1/reconcile', report: '/api/v1/report', subscription: '/api/v1/subscription', audit: '/api/v1/audit', settings: '/api/v1/settings', apiKeys: '/api/v1/api-keys', bankRules: '/api/v1/bank-rules', bankAccounts: '/api/v1/bank-accounts' },
   });
 });
 
+// Public, unauthenticated marketing endpoints (plan list etc.).
+app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/clients', clientRoutes);

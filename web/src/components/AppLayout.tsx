@@ -103,7 +103,7 @@ export default function AppLayout() {
 
         {/* Main nav (desktop) */}
         <nav className="hidden md:flex items-center gap-1 ml-6" aria-label="Main navigation">
-          <NavLink to="/" end className={navLinkClass}>
+          <NavLink to="/dashboard" end className={navLinkClass}>
             <LayoutDashboard className="w-4 h-4 opacity-80" />
             Dashboard
           </NavLink>
@@ -351,7 +351,7 @@ export default function AppLayout() {
                     <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Main</p>
                   </div>
                   <NavLink
-                    to="/"
+                    to="/dashboard"
                     end
                     onClick={() => {
                       setMenuOpen(false)

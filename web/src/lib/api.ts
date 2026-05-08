@@ -416,6 +416,27 @@ export const subscription = {
     api('/subscription/initialize', { method: 'POST', body: JSON.stringify(body) }),
 }
 
+export interface PublicPlan {
+  id: string
+  name: string
+  monthlyGhs: number
+  yearlyGhs: number
+  projectsPerMonth: number
+  transactionsPerMonth: number
+}
+
+/**
+ * Marketing/landing-page facing client. These endpoints do not require auth
+ * and must never include user/org-scoped data.
+ */
+export const publicApi = {
+  getPlans: async (): Promise<{ plans: PublicPlan[] }> => {
+    const res = await fetch(`${API_URL}/api/v1/public/plans`)
+    if (!res.ok) throw new Error('Failed to load plans')
+    return res.json()
+  },
+}
+
 export const currency = {
   getRates: () => api('/currency/rates') as Promise<{ rates: { GHS: number; USD: number; EUR: number }; attribution?: string }>,
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
 import BrandLogo from '../components/BrandLogo'
@@ -7,12 +7,19 @@ import BrandLogo from '../components/BrandLogo'
 export default function Login() {
   const [searchParams] = useSearchParams()
   const sessionExpired = searchParams.get('session') === 'expired'
+  const isAuthenticated = useAuth((s) => !!s.token)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuth((s) => s.setAuth)
+
+  // Already signed in? Skip the form. (Stale "session=expired" urls are
+  // ignored — the user clearly has a fresh session if !!token is true.)
+  if (isAuthenticated && !sessionExpired) {
+    return <Navigate to="/dashboard" replace />
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,7 +28,7 @@ export default function Login() {
     try {
       const { user, org, token, role, isPlatformAdmin } = await auth.login({ email, password })
       setAuth(user, org, token, role, isPlatformAdmin)
-      navigate(isPlatformAdmin ? '/platform-admin' : '/')
+      navigate(isPlatformAdmin ? '/platform-admin' : '/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {

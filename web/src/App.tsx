@@ -6,7 +6,9 @@ import AdminLayout from './components/AdminLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformAdminRoute from './components/PlatformAdminRoute'
 import AuthHydrator from './components/AuthHydrator'
+import { useAuth } from './store/auth'
 
+const Landing = lazy(() => import('./pages/Landing'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'))
 const AdminPlans = lazy(() => import('./pages/admin/AdminPlans'))
@@ -32,6 +34,21 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 const queryClient = new QueryClient()
 
+/**
+ * Root path resolver:
+ *   - Logged-in visitors are sent to their dashboard.
+ *   - Everyone else sees the public landing page.
+ *
+ * Kept inside <BrowserRouter> so <Navigate> works.
+ */
+function HomeRoute() {
+  const isAuthenticated = useAuth((s) => !!s.token)
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return <Landing />
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -39,10 +56,14 @@ function App() {
       <BrowserRouter>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-gray-600">Loading page...</div>}>
           <Routes>
+            {/* Public marketing & auth pages */}
+            <Route path="/" element={<HomeRoute />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Platform admin */}
             <Route path="/platform-admin" element={<ProtectedRoute><PlatformAdminRoute><AdminLayout /></PlatformAdminRoute></ProtectedRoute>}>
               <Route index element={<AdminOverview />} />
               <Route path="organizations/:slug" element={<AdminOrgDetail />} />
@@ -56,18 +77,22 @@ function App() {
               <Route path="generation-settings" element={<AdminGenerationSettings />} />
               <Route path="database" element={<AdminDatabase />} />
             </Route>
-            <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route index element={<Dashboard />} />
-              <Route path="projects" element={<Projects />} />
-              <Route path="projects/new" element={<ProjectNew />} />
-              <Route path="projects/:slug" element={<ProjectDetail />} />
-              <Route path="reports" element={<Projects initialStatus="completed" />} />
-              <Route path="audit" element={<Audit />} />
-              <Route path="clients" element={<Clients />} />
-              <Route path="manual" element={<UserManual />} />
-              <Route path="settings" element={<Navigate to="/settings/branding" replace />} />
-              <Route path="settings/:tab" element={<Settings />} />
+
+            {/* Authenticated app — same root-level paths as before, plus
+                /dashboard for the index. Public landing now owns "/". */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/new" element={<ProjectNew />} />
+              <Route path="/projects/:slug" element={<ProjectDetail />} />
+              <Route path="/reports" element={<Projects initialStatus="completed" />} />
+              <Route path="/audit" element={<Audit />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/manual" element={<UserManual />} />
+              <Route path="/settings" element={<Navigate to="/settings/branding" replace />} />
+              <Route path="/settings/:tab" element={<Settings />} />
             </Route>
+
             <Route path="/admin" element={<Navigate to="/platform-admin" replace />} />
             <Route path="/admin/*" element={<Navigate to="/platform-admin" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
