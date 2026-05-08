@@ -428,12 +428,24 @@ export interface PublicPlan {
 /**
  * Marketing/landing-page facing client. These endpoints do not require auth
  * and must never include user/org-scoped data.
+ *
+ * NOTE: `getPlans` is intentionally non-throwing. The landing page has a
+ * complete static plan catalogue (`web/src/lib/plans.ts`) and only uses
+ * the API to override pricing/limits. If the API is unreachable we just
+ * return `{ plans: [] }` so the page renders the static defaults.
  */
 export const publicApi = {
   getPlans: async (): Promise<{ plans: PublicPlan[] }> => {
-    const res = await fetch(`${API_URL}/api/v1/public/plans`)
-    if (!res.ok) throw new Error('Failed to load plans')
-    return res.json()
+    try {
+      const res = await fetch(`${API_URL}/api/v1/public/plans`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) return { plans: [] }
+      const data = (await res.json()) as { plans?: PublicPlan[] }
+      return { plans: Array.isArray(data.plans) ? data.plans : [] }
+    } catch {
+      return { plans: [] }
+    }
   },
 }
 

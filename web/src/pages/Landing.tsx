@@ -6,17 +6,22 @@ import {
   Check,
   ChevronDown,
   Database,
+  Facebook,
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
+  Linkedin,
   LineChart,
   Lock,
   Mail,
   MapPin,
   Menu,
+  Minus,
   Phone,
+  Send,
   ShieldCheck,
   Sparkles,
+  Twitter,
   Upload,
   Users,
   Workflow,
@@ -24,23 +29,31 @@ import {
   Zap,
 } from 'lucide-react'
 import BrandLogo from '../components/BrandLogo'
-import { publicApi, type PublicPlan } from '../lib/api'
+import { publicApi } from '../lib/api'
+import {
+  FEATURE_GROUPS,
+  formatGhs,
+  mergeWithApiPlans,
+  type MarketingPlan,
+} from '../lib/plans'
 
 /* ---------------------------------------------------------------------------
  * Premium SaaS landing page — KQ-SOFT Bank Reconciliation
  *
  * Sections:
+ *   0. Announcement bar (intro offer, dismissible)
  *   1. Sticky glass-morphism navigation
  *   2. Hero (headline + dual CTA + animated dashboard mockup)
  *   3. Trust strip (Ghana banks supported)
  *   4. Stat band
  *   5. Features grid (6 cards)
  *   6. How it works (3 steps)
- *   7. Live pricing pulled from /api/v1/public/plans
- *   8. Testimonials
- *   9. FAQ accordion
- *  10. Final CTA banner
- *  11. Footer
+ *   7. Dashboard showcase
+ *   8. Pricing (static catalogue, 4 tiers + comparison table)
+ *   9. Testimonials
+ *  10. FAQ accordion
+ *  11. Final CTA banner
+ *  12. Footer (dark, multi-column, with newsletter + social)
  *
  * Visual treatment:
  *   - Brand palette: primary blue (#0473ea) + accent green (#38d200)
@@ -49,6 +62,11 @@ import { publicApi, type PublicPlan } from '../lib/api'
  *   - Smooth fade-in on scroll via IntersectionObserver
  *   - Built entirely with Tailwind utilities + a small inline <style>
  *     block for keyframes; no extra dependencies.
+ *
+ * Pricing data flow:
+ *   - Static catalogue lives in src/lib/plans.ts and ALWAYS renders.
+ *   - Optional API call to /api/v1/public/plans overrides price/limits in-place.
+ *   - This guarantees the pricing section never appears empty on production.
  * ------------------------------------------------------------------------- */
 
 const FEATURES = [
@@ -170,95 +188,22 @@ const FAQS = [
   },
 ] as const
 
-function formatGhs(amount: number): string {
-  if (!Number.isFinite(amount) || amount <= 0) return 'Contact us'
-  try {
-    return new Intl.NumberFormat('en-GH', {
-      style: 'currency',
-      currency: 'GHS',
-      maximumFractionDigits: 0,
-    }).format(amount)
-  } catch {
-    return `GHS ${amount.toLocaleString('en-GH')}`
-  }
-}
-
-function formatLimit(n: number): string {
-  if (n < 0) return 'Unlimited'
-  return n.toLocaleString('en-GH')
-}
-
-const PLAN_HIGHLIGHTS: Record<string, { tagline: string; badge?: string; bullets: string[] }> = {
-  basic: {
-    tagline: 'For solo accountants getting started.',
-    bullets: [
-      'Core matching engine',
-      'Excel, CSV, and PDF imports',
-      'Branded BRS export (default branding)',
-      '1 user account',
-    ],
-  },
-  standard: {
-    tagline: 'For small teams and growing practices.',
-    badge: 'Most popular',
-    bullets: [
-      'Everything in Basic',
-      'Bulk match (up to 50 pairs)',
-      'AI suggestions, audit trail, discrepancies',
-      'Bank rules engine',
-      'Up to 3 users',
-    ],
-  },
-  premium: {
-    tagline: 'For firms reconciling at scale.',
-    bullets: [
-      'Everything in Standard',
-      '1-to-many & many-to-many matches',
-      'Roll-forward across periods',
-      'Threshold approvals & full branding',
-      'Up to 5 users',
-    ],
-  },
-  firm: {
-    tagline: 'For accounting firms and large practices.',
-    bullets: [
-      'Everything in Premium',
-      'Unlimited projects & transactions',
-      'Multi-client workspace',
-      'Public REST API access',
-      'Unlimited users',
-    ],
-  },
-}
-
-const PLAN_DISPLAY_ORDER = ['basic', 'standard', 'premium', 'firm'] as const
-
 export default function Landing() {
   const [navOpen, setNavOpen] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const [showAnnouncement, setShowAnnouncement] = useState(true)
+  const [showCompare, setShowCompare] = useState(false)
 
   const { data: plansData } = useQuery({
     queryKey: ['public', 'plans'],
     queryFn: publicApi.getPlans,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    retry: 0,
   })
 
-  // Order plans for display, falling back to API order if a slug is unknown.
-  const orderedPlans = useMemo(() => {
-    const list = plansData?.plans ?? []
-    const byId = new Map(list.map((p) => [p.id, p]))
-    const ordered: PublicPlan[] = []
-    for (const slug of PLAN_DISPLAY_ORDER) {
-      const p = byId.get(slug)
-      if (p) ordered.push(p)
-    }
-    for (const p of list) {
-      if (!ordered.find((x) => x.id === p.id)) ordered.push(p)
-    }
-    return ordered
-  }, [plansData])
+  // Static catalogue is the source of truth — API only overrides price/limits.
+  const plans = useMemo(() => mergeWithApiPlans(plansData?.plans), [plansData])
 
   // Smooth fade-in on scroll for any element marked with [data-reveal].
   useEffect(() => {
@@ -297,6 +242,10 @@ export default function Landing() {
           0%, 100% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
         }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
         .animate-blob { animation: blob 18s ease-in-out infinite; }
         .animate-blob-slow { animation: blob 26s ease-in-out infinite; }
         .animate-pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
@@ -305,6 +254,11 @@ export default function Landing() {
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
+        }
+        .nav-shimmer {
+          background: linear-gradient(120deg, #0473ea 0%, #2563eb 40%, #0473ea 80%);
+          background-size: 220% 100%;
+          animation: shimmer 6s linear infinite;
         }
         .marquee-track { animation: marquee 38s linear infinite; }
         @keyframes marquee {
@@ -326,8 +280,15 @@ export default function Landing() {
             linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
           background-size: 56px 56px;
         }
+        .grid-overlay-dark {
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+          background-size: 56px 56px;
+        }
       `}</style>
 
+      <AnnouncementBar visible={showAnnouncement} onDismiss={() => setShowAnnouncement(false)} />
       <Nav navOpen={navOpen} setNavOpen={setNavOpen} />
       <Hero />
       <BankStrip />
@@ -336,9 +297,11 @@ export default function Landing() {
       <HowItWorks />
       <DashboardShowcase />
       <Pricing
-        plans={orderedPlans}
+        plans={plans}
         billingPeriod={billingPeriod}
         setBillingPeriod={setBillingPeriod}
+        showCompare={showCompare}
+        setShowCompare={setShowCompare}
       />
       <Testimonials />
       <Faq openFaq={openFaq} setOpenFaq={setOpenFaq} />
@@ -349,7 +312,46 @@ export default function Landing() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Navigation
+ * Section 0: Announcement bar
+ * ------------------------------------------------------------------------- */
+
+function AnnouncementBar({
+  visible,
+  onDismiss,
+}: {
+  visible: boolean
+  onDismiss: () => void
+}) {
+  if (!visible) return null
+  return (
+    <div className="relative z-40 nav-shimmer text-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 sm:px-6 lg:px-8 py-2 text-center text-xs sm:text-sm">
+        <span aria-hidden className="hidden sm:inline">🇬🇭</span>
+        <span className="font-medium">
+          Welcome offer · <span className="font-bold">50% off your first 2 months</span> on any paid plan
+        </span>
+        <Link
+          to="/register"
+          className="hidden sm:inline-flex items-center gap-1 ml-2 px-2.5 py-0.5 rounded-full bg-white/15 hover:bg-white/25 font-semibold transition-colors"
+        >
+          Claim it
+          <ArrowRight className="w-3 h-3" />
+        </Link>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="ml-3 inline-flex w-6 h-6 rounded-full hover:bg-white/15 items-center justify-center transition-colors flex-shrink-0"
+          aria-label="Dismiss announcement"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * Section 1: Navigation
  * ------------------------------------------------------------------------- */
 
 function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolean) => void }) {
@@ -360,10 +362,14 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
     { label: 'FAQ', href: '#faq' },
   ]
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/40 bg-white/70 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
-        <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="KQ-SOFT home">
-          <BrandLogo className="h-9 w-auto" />
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200/60 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16 sm:h-18">
+        <Link
+          to="/"
+          className="flex items-center gap-2 shrink-0 group"
+          aria-label="KQ-SOFT home"
+        >
+          <BrandLogo className="h-10 w-auto transition-transform group-hover:scale-105" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-1" aria-label="Primary">
@@ -371,9 +377,10 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
             <a
               key={l.href}
               href={l.href}
-              className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
+              className="relative px-3 py-2 text-sm font-semibold text-gray-700 hover:text-primary-700 rounded-lg transition-colors group"
             >
               {l.label}
+              <span className="absolute left-3 right-3 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-primary-500 to-green-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
             </a>
           ))}
         </nav>
@@ -381,16 +388,16 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
         <div className="hidden md:flex items-center gap-2">
           <Link
             to="/login"
-            className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-primary-700 rounded-lg hover:bg-primary-50/60 transition-colors"
           >
             Sign in
           </Link>
           <Link
             to="/register"
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-lg shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
           >
             Start free
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
 
@@ -440,13 +447,12 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Hero
+ * Section 2: Hero
  * ------------------------------------------------------------------------- */
 
 function Hero() {
   return (
     <section className="relative isolate overflow-hidden">
-      {/* Mesh gradient + animated colour blobs */}
       <div aria-hidden className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-primary-50/60 via-white to-white" />
         <div className="absolute inset-0 grid-overlay opacity-60" />
@@ -498,7 +504,6 @@ function Hero() {
           </p>
         </div>
 
-        {/* Hero dashboard mockup */}
         <div data-reveal className="relative mt-14 sm:mt-20 mx-auto max-w-5xl">
           <div className="absolute -inset-4 sm:-inset-6 rounded-[2rem] bg-gradient-to-br from-primary-200/40 via-white/0 to-green-200/40 blur-2xl" aria-hidden />
           <DashboardMockup />
@@ -508,14 +513,11 @@ function Hero() {
   )
 }
 
-/* ---------------------------------------------------------------------------
- * Stylised dashboard preview — a product mockup built from real components.
- * ------------------------------------------------------------------------- */
+/* Stylised dashboard preview — a product mockup built from real components. */
 
 function DashboardMockup() {
   return (
     <div className="relative rounded-2xl border border-gray-200/80 bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-      {/* Window chrome */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/80">
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
@@ -530,9 +532,7 @@ function DashboardMockup() {
         <div className="w-12" />
       </div>
 
-      {/* Sidebar + main */}
       <div className="grid grid-cols-12 min-h-[420px]">
-        {/* Sidebar */}
         <div className="hidden sm:flex flex-col col-span-3 lg:col-span-2 border-r border-gray-100 bg-gray-50/50 p-4 gap-1">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-primary-600 grid place-items-center text-white text-xs font-bold">
@@ -564,7 +564,6 @@ function DashboardMockup() {
           })}
         </div>
 
-        {/* Main content */}
         <div className="col-span-12 sm:col-span-9 lg:col-span-10 p-4 sm:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -577,7 +576,6 @@ function DashboardMockup() {
             </div>
           </div>
 
-          {/* Metric cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {[
               { label: 'Projects', value: '24', accent: 'bg-primary-500' },
@@ -602,7 +600,6 @@ function DashboardMockup() {
             ))}
           </div>
 
-          {/* Match suggestion table */}
           <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
               <span className="text-xs font-bold text-gray-700">
@@ -618,19 +615,16 @@ function DashboardMockup() {
                   cb: 'Cheque 002145 · ZK Logistics',
                   bank: 'CHQ 2145 ECOB CR',
                   amount: 'GHS 12,400.00',
-                  pct: 99,
                 },
                 {
                   cb: 'Mobile money · Pay Bola',
                   bank: 'MOMO 0240XXX5891',
                   amount: 'GHS 850.00',
-                  pct: 96,
                 },
                 {
                   cb: 'Wire · Tema Office Supply',
                   bank: 'EFT 81203 / TOS',
                   amount: 'GHS 4,250.00',
-                  pct: 92,
                 },
               ].map((row, i) => (
                 <div
@@ -654,7 +648,6 @@ function DashboardMockup() {
         </div>
       </div>
 
-      {/* Floating "match" pill */}
       <div className="hidden sm:flex absolute -right-4 top-28 lg:top-24 items-center gap-2 px-3 py-2 rounded-xl bg-white shadow-lg ring-1 ring-black/5 border border-gray-100">
         <span className="w-7 h-7 rounded-full bg-green-100 grid place-items-center">
           <Check className="w-4 h-4 text-green-600" />
@@ -673,11 +666,10 @@ function DashboardMockup() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Bank trust strip (marquee)
+ * Section 3: Bank trust strip (marquee)
  * ------------------------------------------------------------------------- */
 
 function BankStrip() {
-  // Duplicate the list so the marquee can loop seamlessly with translate -50%.
   const items = [...BANKS_SUPPORTED, ...BANKS_SUPPORTED]
   return (
     <section className="border-y border-gray-100 bg-white py-10">
@@ -706,7 +698,7 @@ function BankStrip() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Stat band
+ * Section 4: Stat band
  * ------------------------------------------------------------------------- */
 
 function StatBand() {
@@ -737,7 +729,7 @@ function StatBand() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Features
+ * Section 5: Features
  * ------------------------------------------------------------------------- */
 
 function Features() {
@@ -784,7 +776,7 @@ function Features() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: How it works
+ * Section 6: How it works
  * ------------------------------------------------------------------------- */
 
 function HowItWorks() {
@@ -829,7 +821,7 @@ function HowItWorks() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Dashboard showcase (split layout)
+ * Section 7: Dashboard showcase
  * ------------------------------------------------------------------------- */
 
 function DashboardShowcase() {
@@ -932,30 +924,41 @@ function DashboardShowcase() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Pricing
+ * Section 8: Pricing — 4 tiers + comparison table
+ *
+ * Renders directly from the static catalogue (always available), with API
+ * data merged in to override price/limits when reachable.
  * ------------------------------------------------------------------------- */
 
 function Pricing({
   plans,
   billingPeriod,
   setBillingPeriod,
+  showCompare,
+  setShowCompare,
 }: {
-  plans: PublicPlan[]
+  plans: MarketingPlan[]
   billingPeriod: 'monthly' | 'yearly'
   setBillingPeriod: (p: 'monthly' | 'yearly') => void
+  showCompare: boolean
+  setShowCompare: (b: boolean) => void
 }) {
   return (
-    <section id="pricing" className="py-20 sm:py-28 bg-gray-50/40">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="pricing" className="relative py-20 sm:py-28 bg-gray-50/40 overflow-hidden">
+      <div aria-hidden className="absolute -top-32 right-0 h-[420px] w-[420px] rounded-full bg-primary-200/25 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-32 left-0 h-[420px] w-[420px] rounded-full bg-green-200/20 blur-3xl" />
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
             Pricing
           </p>
           <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
-            Plans that grow with your practice.
+            Simple, transparent pricing in Ghana cedis.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-gray-600">
-            All prices in Ghana cedis (GHS). Switch monthly or save with annual.
+            Start free. Pay monthly or save ~17% with annual billing. Upgrade,
+            downgrade, or cancel any time.
           </p>
 
           {/* Billing period toggle */}
@@ -981,9 +984,13 @@ function Pricing({
               }`}
             >
               Yearly
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                billingPeriod === 'yearly' ? 'bg-white text-primary-700' : 'bg-green-100 text-green-700'
-              }`}>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  billingPeriod === 'yearly'
+                    ? 'bg-white text-primary-700'
+                    : 'bg-green-100 text-green-700'
+                }`}
+              >
                 save ~17%
               </span>
             </button>
@@ -991,108 +998,275 @@ function Pricing({
         </div>
 
         <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {plans.length > 0 ? (
-            plans.map((p) => <PlanCard key={p.id} plan={p} period={billingPeriod} />)
-          ) : (
-            <PlanFallback />
-          )}
+          {plans.map((p) => (
+            <PlanCard key={p.slug} plan={p} period={billingPeriod} />
+          ))}
         </div>
 
+        {/* Trust line */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-gray-600">
+          <span className="inline-flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-green-600" />
+            Secure payment via Paystack
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Check className="w-4 h-4 text-green-600" />
+            Cancel any time
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            50% off your first 2 months
+          </span>
+        </div>
+
+        {/* Comparison table toggle */}
+        <div className="mt-10 text-center">
+          <button
+            type="button"
+            onClick={() => setShowCompare(!showCompare)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-700 bg-white border border-primary-200 hover:bg-primary-50 rounded-lg transition-colors"
+            aria-expanded={showCompare}
+          >
+            {showCompare ? 'Hide full comparison' : 'Compare all features'}
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${showCompare ? 'rotate-180' : ''}`}
+            />
+          </button>
+        </div>
+
+        {showCompare && <ComparisonTable plans={plans} />}
+
         <p className="mt-10 text-center text-sm text-gray-500">
-          Need something custom? <a href="#contact" className="font-semibold text-primary-600 hover:underline">Talk to us</a> about firm and enterprise plans.
+          Need something custom?{' '}
+          <a
+            href="mailto:info@kqsoftwaresolutions.com?subject=KQ-SOFT%20enterprise%20enquiry"
+            className="font-semibold text-primary-600 hover:underline"
+          >
+            Talk to us
+          </a>{' '}
+          about firm and enterprise plans.
         </p>
       </div>
     </section>
   )
 }
 
-function PlanCard({ plan, period }: { plan: PublicPlan; period: 'monthly' | 'yearly' }) {
-  const meta = PLAN_HIGHLIGHTS[plan.id] ?? {
-    tagline: '',
-    bullets: [],
-  }
-  const isHighlight = !!meta.badge
+function PlanCard({
+  plan,
+  period,
+}: {
+  plan: MarketingPlan
+  period: 'monthly' | 'yearly'
+}) {
+  const isHighlight = !!plan.highlight
+  const isCustom = plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
   const amount = period === 'yearly' ? plan.yearlyGhs : plan.monthlyGhs
-  const isCustom = amount === 0
+  const monthlyEq = period === 'yearly' ? plan.yearlyGhs / 12 : null
+  const isInternalCta = plan.ctaHref.startsWith('/')
+
   return (
     <div
       data-reveal
-      className={`relative rounded-2xl p-6 flex flex-col ${
+      className={`relative rounded-2xl p-6 flex flex-col transition-all duration-300 ${
         isHighlight
-          ? 'border-2 border-primary-500 bg-white shadow-2xl shadow-primary-600/10 ring-1 ring-primary-100'
-          : 'border border-gray-200 bg-white shadow-sm'
+          ? 'border-2 border-primary-500 bg-white shadow-2xl shadow-primary-600/15 ring-1 ring-primary-100 scale-[1.02] lg:scale-[1.04]'
+          : 'border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:border-primary-200'
       }`}
     >
-      {meta.badge && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary-600 text-white text-[11px] font-bold uppercase tracking-wider shadow">
-          <Sparkles className="w-3 h-3" />
-          {meta.badge}
+      {plan.badge && (
+        <span
+          className={`absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider shadow ${
+            isHighlight
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-900 text-white'
+          }`}
+        >
+          {isHighlight && <Sparkles className="w-3 h-3" />}
+          {plan.badge}
         </span>
       )}
-      <h3 className="text-lg font-bold text-gray-900 capitalize">{plan.name}</h3>
-      <p className="mt-1 text-sm text-gray-500 min-h-[2.5rem]">{meta.tagline}</p>
+
+      <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+      <p className="mt-1 text-sm text-gray-500 min-h-[2.5rem]">{plan.tagline}</p>
 
       <div className="mt-5">
         {isCustom ? (
           <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-gray-900">Custom</span>
+            <span className="text-4xl font-bold text-gray-900">Custom</span>
           </div>
         ) : (
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-gray-900 tabular-nums">
-              {formatGhs(amount)}
-            </span>
-            <span className="text-sm text-gray-500">/ {period === 'yearly' ? 'year' : 'month'}</span>
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-bold text-gray-900 tabular-nums">
+                {formatGhs(amount)}
+              </span>
+              <span className="text-sm text-gray-500">
+                / {period === 'yearly' ? 'year' : 'month'}
+              </span>
+            </div>
+            {monthlyEq !== null && (
+              <p className="mt-1 text-[11px] text-gray-500">
+                ≈ {formatGhs(Math.round(monthlyEq))} / month, billed annually
+              </p>
+            )}
           </div>
-        )}
-        {!isCustom && (
-          <p className="mt-1 text-[11px] text-gray-500">
-            {plan.projectsPerMonth < 0 ? 'Unlimited' : formatLimit(plan.projectsPerMonth)} projects ·{' '}
-            {formatLimit(plan.transactionsPerMonth)} transactions / month
-          </p>
         )}
       </div>
 
-      <ul className="mt-6 space-y-2.5 flex-1">
-        {meta.bullets.map((b) => (
+      {plan.inheritsFromLabel && (
+        <p className="mt-5 text-xs font-bold uppercase tracking-wider text-primary-700">
+          {plan.inheritsFromLabel}
+        </p>
+      )}
+
+      <ul className={`${plan.inheritsFromLabel ? 'mt-3' : 'mt-6'} space-y-2.5 flex-1`}>
+        {plan.bullets.map((b) => (
           <li key={b} className="flex items-start gap-2.5 text-sm text-gray-700">
-            <Check className={`mt-0.5 w-4 h-4 flex-shrink-0 ${isHighlight ? 'text-primary-600' : 'text-green-600'}`} />
+            <Check
+              className={`mt-0.5 w-4 h-4 flex-shrink-0 ${
+                isHighlight ? 'text-primary-600' : 'text-green-600'
+              }`}
+            />
             <span>{b}</span>
           </li>
         ))}
       </ul>
 
-      <Link
-        to="/register"
-        className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
-          isHighlight
-            ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20'
-            : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
-        }`}
-      >
-        {isCustom ? 'Contact sales' : 'Start free trial'}
-        <ArrowRight className="w-4 h-4" />
-      </Link>
+      {isInternalCta ? (
+        <Link
+          to={plan.ctaHref}
+          className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
+            isHighlight
+              ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20 hover:shadow-lg'
+              : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
+          }`}
+        >
+          {plan.ctaLabel}
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      ) : (
+        <a
+          href={plan.ctaHref}
+          className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
+            isHighlight
+              ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20'
+              : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
+          }`}
+        >
+          {plan.ctaLabel}
+          <ArrowRight className="w-4 h-4" />
+        </a>
+      )}
     </div>
   )
 }
 
-function PlanFallback() {
+/** Side-by-side feature comparison across all 4 plans, grouped by capability. */
+function ComparisonTable({ plans }: { plans: MarketingPlan[] }) {
   return (
-    <div className="md:col-span-2 lg:col-span-4 rounded-2xl border border-dashed border-gray-200 p-8 text-center bg-white">
-      <p className="text-sm text-gray-500">
-        Live pricing temporarily unavailable.{' '}
-        <Link to="/register" className="font-semibold text-primary-600 hover:underline">
-          Create an account
-        </Link>{' '}
-        to view current plans.
-      </p>
+    <div data-reveal className="mt-12 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="bg-gradient-to-r from-gray-50 to-white">
+              <th className="text-left px-5 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 w-1/3">
+                Feature
+              </th>
+              {plans.map((p) => (
+                <th
+                  key={p.slug}
+                  className={`px-5 py-4 text-center text-sm font-bold ${
+                    p.highlight ? 'text-primary-700' : 'text-gray-900'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span>{p.name}</span>
+                    {p.badge && (
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          p.highlight
+                            ? 'bg-primary-100 text-primary-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {p.badge}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {FEATURE_GROUPS.map((group) => (
+              <FragmentGroup key={group.title} group={group} plans={plans} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
+  )
+}
+
+function FragmentGroup({
+  group,
+  plans,
+}: {
+  group: (typeof FEATURE_GROUPS)[number]
+  plans: MarketingPlan[]
+}) {
+  return (
+    <>
+      <tr className="bg-gray-50/70 border-t border-gray-200">
+        <td
+          colSpan={1 + plans.length}
+          className="px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500"
+        >
+          {group.title}
+        </td>
+      </tr>
+      {group.features.map((feature) => (
+        <tr key={feature.id} className="border-t border-gray-100">
+          <td className="px-5 py-3 text-gray-700">{feature.label}</td>
+          {plans.map((p) => {
+            const v = p.features[feature.id]
+            return (
+              <td
+                key={p.slug}
+                className={`px-5 py-3 text-center ${
+                  p.highlight ? 'bg-primary-50/40' : ''
+                }`}
+              >
+                <FeatureCell value={v} highlight={!!p.highlight} />
+              </td>
+            )
+          })}
+        </tr>
+      ))}
+    </>
+  )
+}
+
+function FeatureCell({ value, highlight }: { value: boolean | string | undefined; highlight: boolean }) {
+  if (value === true) {
+    return (
+      <Check
+        className={`mx-auto w-5 h-5 ${highlight ? 'text-primary-600' : 'text-green-600'}`}
+      />
+    )
+  }
+  if (value === false || value === undefined) {
+    return <Minus className="mx-auto w-4 h-4 text-gray-300" />
+  }
+  return (
+    <span className="inline-block text-xs font-semibold text-gray-700 tabular-nums">
+      {value}
+    </span>
   )
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Testimonials
+ * Section 9: Testimonials
  * ------------------------------------------------------------------------- */
 
 function Testimonials() {
@@ -1138,7 +1312,7 @@ function Testimonials() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: FAQ
+ * Section 10: FAQ
  * ------------------------------------------------------------------------- */
 
 function Faq({
@@ -1201,7 +1375,7 @@ function Faq({
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Final CTA
+ * Section 11: Final CTA
  * ------------------------------------------------------------------------- */
 
 function FinalCta() {
@@ -1244,47 +1418,109 @@ function FinalCta() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section: Footer
+ * Section 12: Footer (dark, premium, multi-column)
  * ------------------------------------------------------------------------- */
 
 function Footer() {
   return (
-    <footer id="contact" className="border-t border-gray-200 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
-          <div className="col-span-2">
-            <BrandLogo className="h-9 w-auto" />
-            <p className="mt-4 text-sm text-gray-600 leading-relaxed max-w-sm">
+    <footer
+      id="contact"
+      className="relative overflow-hidden bg-gray-900 text-gray-300"
+    >
+      <div aria-hidden className="absolute inset-0 grid-overlay-dark opacity-50" />
+      <div aria-hidden className="absolute -top-24 left-1/4 w-96 h-96 rounded-full bg-primary-700/20 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-32 right-1/4 w-[420px] h-[420px] rounded-full bg-green-700/15 blur-3xl" />
+
+      {/* Newsletter strip */}
+      <div className="relative border-b border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+          <div>
+            <h3 className="text-xl font-bold text-white">
+              Stay close to the project.
+            </h3>
+            <p className="mt-2 text-sm text-gray-400 max-w-md">
+              Product updates, new bank parsers, and reconciliation tips —
+              straight to your inbox. No spam, unsubscribe in one click.
+            </p>
+          </div>
+          <form
+            className="flex flex-col sm:flex-row gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const form = e.currentTarget
+              const email = (form.elements.namedItem('email') as HTMLInputElement | null)?.value
+              if (email) {
+                window.location.href = `mailto:info@kqsoftwaresolutions.com?subject=Subscribe%20to%20updates&body=Please%20add%20${encodeURIComponent(email)}%20to%20the%20product-updates%20mailing%20list.`
+              }
+            }}
+            aria-label="Subscribe to updates"
+          >
+            <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+            <input
+              id="newsletter-email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="you@firm.com"
+              className="flex-1 px-4 py-2.5 text-sm rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            <button
+              type="submit"
+              className="inline-flex justify-center items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-primary-600 hover:bg-primary-500 rounded-lg shadow-md shadow-primary-600/30 transition-colors whitespace-nowrap"
+            >
+              Subscribe
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Main grid */}
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-14 pb-10">
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-10">
+          {/* Brand + contact */}
+          <div className="col-span-2 md:col-span-5">
+            <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2">
+              <BrandLogo className="h-9 w-auto" />
+            </div>
+            <p className="mt-5 text-sm text-gray-400 leading-relaxed max-w-md">
               Bank reconciliation built for Ghanaian accountants and finance
               teams. Match faster, report cleaner, audit better.
             </p>
-            <ul className="mt-6 space-y-2.5 text-sm text-gray-600">
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-primary-600 flex-shrink-0" />
+            <ul className="mt-6 space-y-3 text-sm">
+              <li className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
+                  <Mail className="w-4 h-4 text-primary-400" />
+                </span>
                 <a
                   href="mailto:info@kqsoftwaresolutions.com"
-                  className="hover:text-gray-900 break-all"
+                  className="text-gray-300 hover:text-white break-all transition-colors"
                 >
                   info@kqsoftwaresolutions.com
                 </a>
               </li>
-              <li className="flex items-start gap-2">
-                <Phone className="w-4 h-4 mt-0.5 text-primary-600 flex-shrink-0" />
-                <span className="flex flex-col">
-                  <a href="tel:+233302512596" className="hover:text-gray-900">
+              <li className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
+                  <Phone className="w-4 h-4 text-primary-400" />
+                </span>
+                <span className="flex flex-col gap-0.5 leading-snug">
+                  <a href="tel:+233302512596" className="text-gray-300 hover:text-white transition-colors">
                     0302 512 596
                   </a>
-                  <a href="tel:+233275762180" className="hover:text-gray-900">
+                  <a href="tel:+233275762180" className="text-gray-300 hover:text-white transition-colors">
                     0275 762 180
                   </a>
-                  <a href="tel:+233245396813" className="hover:text-gray-900">
+                  <a href="tel:+233245396813" className="text-gray-300 hover:text-white transition-colors">
                     0245 396 813
                   </a>
                 </span>
               </li>
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 text-primary-600 flex-shrink-0" />
-                <span>
+              <li className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 text-primary-400" />
+                </span>
+                <span className="leading-snug text-gray-300">
                   USS No. NS 12, Third Gate
                   <br />
                   Madina, Accra
@@ -1293,52 +1529,149 @@ function Footer() {
                 </span>
               </li>
             </ul>
+
+            {/* Social */}
+            <div className="mt-7 flex items-center gap-2">
+              {[
+                {
+                  href: 'https://www.linkedin.com/',
+                  label: 'LinkedIn',
+                  Icon: Linkedin,
+                },
+                {
+                  href: 'https://twitter.com/',
+                  label: 'X / Twitter',
+                  Icon: Twitter,
+                },
+                {
+                  href: 'https://www.facebook.com/',
+                  label: 'Facebook',
+                  Icon: Facebook,
+                },
+              ].map((s) => (
+                <a
+                  key={s.label}
+                  href={s.href}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label={s.label}
+                  className="inline-flex w-9 h-9 rounded-lg bg-white/5 border border-white/10 hover:bg-primary-600 hover:border-primary-500 items-center justify-center transition-colors"
+                >
+                  <s.Icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
           </div>
 
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400">
-              Product
-            </p>
-            <ul className="mt-4 space-y-2 text-sm">
-              <li><a href="#features" className="text-gray-600 hover:text-gray-900">Features</a></li>
-              <li><a href="#how-it-works" className="text-gray-600 hover:text-gray-900">How it works</a></li>
-              <li><a href="#pricing" className="text-gray-600 hover:text-gray-900">Pricing</a></li>
-              <li><a href="#faq" className="text-gray-600 hover:text-gray-900">FAQ</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400">
-              Account
-            </p>
-            <ul className="mt-4 space-y-2 text-sm">
-              <li><Link to="/login" className="text-gray-600 hover:text-gray-900">Sign in</Link></li>
-              <li><Link to="/register" className="text-gray-600 hover:text-gray-900">Create account</Link></li>
-              <li><Link to="/forgot-password" className="text-gray-600 hover:text-gray-900">Forgot password</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400">
-              Resources
-            </p>
-            <ul className="mt-4 space-y-2 text-sm">
-              <li><a href="/user-manual.md" className="text-gray-600 hover:text-gray-900">User manual</a></li>
-              <li><a href="mailto:info@kqsoftwaresolutions.com" className="text-gray-600 hover:text-gray-900">Support</a></li>
-            </ul>
-          </div>
+          {/* Link columns */}
+          <FooterColumn
+            title="Product"
+            links={[
+              { label: 'Features', href: '#features' },
+              { label: 'How it works', href: '#how-it-works' },
+              { label: 'Pricing', href: '#pricing' },
+              { label: 'FAQ', href: '#faq' },
+            ]}
+          />
+          <FooterColumn
+            title="Account"
+            links={[
+              { label: 'Sign in', href: '/login', internal: true },
+              { label: 'Create account', href: '/register', internal: true },
+              { label: 'Forgot password', href: '/forgot-password', internal: true },
+            ]}
+          />
+          <FooterColumn
+            title="Resources"
+            links={[
+              { label: 'User manual', href: '/user-manual.md' },
+              { label: 'Support', href: 'mailto:info@kqsoftwaresolutions.com' },
+              { label: 'Status', href: '#contact' },
+            ]}
+          />
+          <FooterColumn
+            title="Company"
+            links={[
+              { label: 'About', href: 'mailto:info@kqsoftwaresolutions.com?subject=About%20KQ-SOFT' },
+              { label: 'Contact sales', href: 'mailto:info@kqsoftwaresolutions.com?subject=Sales%20enquiry' },
+            ]}
+          />
         </div>
 
-        <div className="mt-12 pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        {/* Trust row */}
+        <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-400">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-green-400" />
+            <span>Encrypted at rest · HTTPS in transit</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-green-400" />
+            <span>Role-based access control · Full audit trail</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span>Designed and built in Accra, Ghana</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom legal row */}
+      <div className="relative border-t border-white/10 bg-black/20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <p className="text-xs text-gray-500">
             © {new Date().getFullYear()} KQ-SOFT Solutions. All rights reserved.
           </p>
-          <p className="text-xs text-gray-500 flex items-center gap-2">
-            <span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse-dot" />
-            Service operational
-          </p>
+          <div className="flex items-center gap-5 text-xs text-gray-500">
+            <a
+              href="mailto:info@kqsoftwaresolutions.com?subject=Privacy%20policy"
+              className="hover:text-gray-300 transition-colors"
+            >
+              Privacy
+            </a>
+            <a
+              href="mailto:info@kqsoftwaresolutions.com?subject=Terms%20of%20service"
+              className="hover:text-gray-300 transition-colors"
+            >
+              Terms
+            </a>
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-dot" />
+              Service operational
+            </span>
+          </div>
         </div>
       </div>
     </footer>
+  )
+}
+
+function FooterColumn({
+  title,
+  links,
+}: {
+  title: string
+  links: { label: string; href: string; internal?: boolean }[]
+}) {
+  return (
+    <div className="md:col-span-2">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">{title}</p>
+      <ul className="mt-4 space-y-2.5 text-sm">
+        {links.map((l) =>
+          l.internal ? (
+            <li key={l.label}>
+              <Link to={l.href} className="text-gray-400 hover:text-white transition-colors">
+                {l.label}
+              </Link>
+            </li>
+          ) : (
+            <li key={l.label}>
+              <a href={l.href} className="text-gray-400 hover:text-white transition-colors">
+                {l.label}
+              </a>
+            </li>
+          )
+        )}
+      </ul>
+    </div>
   )
 }
