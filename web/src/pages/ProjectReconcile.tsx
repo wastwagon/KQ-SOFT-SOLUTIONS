@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { reconcile, subscription } from '../lib/api'
+import { reconcile, subscription, attachments } from '../lib/api'
 import { formatAmount, formatAmountNumber, formatDateCompact } from '../lib/format'
 import { getCurrencySymbol } from '../lib/currency'
 import BrsHelp from '../components/BrsHelp'
@@ -21,6 +21,13 @@ interface SuggestedMatch {
   confidence: number
   reason: string
   duplicateWarning?: boolean
+}
+
+interface SuggestedSplitMatch {
+  cashBookTxs: Tx[]
+  bankTxs: Tx[]
+  confidence: number
+  reason: string
 }
 
 type ProjectReconcileProps = { projectId: string; canReconcile?: boolean; onProceedToReview?: () => void }
@@ -301,15 +308,15 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
   const matches: { matchId: string; cbTx: Tx; bankTx: Tx; attachments?: any[] }[] = data.matches || []
   const matchesForView = useMemo(() => {
     if (view === 'all') return matches
-    const receiptIds = new Set(receipts.map(r => r.id))
-    const creditIds = new Set(credits.map(c => c.id))
-    const paymentIds = new Set(payments.map(p => p.id))
-    const debitIds = new Set(debits.map(d => d.id))
+    const receiptIds = new Set(receipts.map((r: Tx) => r.id))
+    const creditIds = new Set(credits.map((c: Tx) => c.id))
+    const paymentIds = new Set(payments.map((p: Tx) => p.id))
+    const debitIds = new Set(debits.map((d: Tx) => d.id))
 
     if (view === 'receipts') {
-      return matches.filter(m => receiptIds.has(m.cbTx.id) && creditIds.has(m.bankTx.id))
+      return matches.filter((m) => receiptIds.has(m.cbTx.id) && creditIds.has(m.bankTx.id))
     }
-    return matches.filter(m => paymentIds.has(m.cbTx.id) && debitIds.has(m.bankTx.id))
+    return matches.filter((m) => paymentIds.has(m.cbTx.id) && debitIds.has(m.bankTx.id))
   }, [view, matches, receipts, credits, payments, debits])
 
   const cbArr = Array.from(selectedCbIds)
@@ -686,11 +693,11 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
               <button
                 key={i}
                 onClick={() => {
-                  setSelectedCbIds(new Set(s.cashBookTxs.map(t => t.id)))
-                  setSelectedBankIds(new Set(s.bankTxs.map(t => t.id)))
+                  setSelectedCbIds(new Set(s.cashBookTxs.map((t: Tx) => t.id)))
+                  setSelectedBankIds(new Set(s.bankTxs.map((t: Tx) => t.id)))
                 }}
                 className={`flex flex-col gap-1 w-full text-left px-4 py-3 rounded-xl border transition-all ${
-                  s.cashBookTxs.every(t => selectedCbIds.has(t.id)) && s.bankTxs.every(t => selectedBankIds.has(t.id))
+                  s.cashBookTxs.every((t: Tx) => selectedCbIds.has(t.id)) && s.bankTxs.every((t: Tx) => selectedBankIds.has(t.id))
                     ? 'border-primary-400 bg-primary-100 shadow-sm'
                     : 'border-primary-200/50 bg-white hover:bg-primary-50'
                 }`}
@@ -704,7 +711,7 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
                    <div className="font-semibold">Bank: {s.bankTxs.length} item(s)</div>
                 </div>
                 <div className="mt-2 pt-2 border-t border-primary-100 flex justify-between items-center">
-                  <span className="text-xs font-bold text-primary-900">{formatAmount(s.cashBookTxs.reduce((sum, t) => sum + t.amount, 0), currency)}</span>
+                  <span className="text-xs font-bold text-primary-900">{formatAmount(s.cashBookTxs.reduce((sum: number, t: Tx) => sum + t.amount, 0), currency)}</span>
                   <span className="text-[10px] text-primary-600 font-medium italic">Click to match group</span>
                 </div>
               </button>

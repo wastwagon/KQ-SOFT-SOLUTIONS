@@ -81,8 +81,6 @@ export default function Dashboard() {
   const transactionsUsed = usage?.usage?.transactionsUsed ?? 0
   const transactionsLimit = usage?.usage?.transactionsLimit ?? 2000
   const transactionsUnlimited = usage?.usage?.transactionsUnlimited ?? false
-  const projectsRemaining = projectsUnlimited ? null : Math.max(0, projectsLimit - projectsUsed)
-  const transactionsRemaining = transactionsUnlimited ? null : Math.max(0, transactionsLimit - transactionsUsed)
   const inProgressCount = projectsList.filter((p: { status: string }) => p.status !== 'completed').length
   const completedCount = projectsList.filter((p: { status: string }) => p.status === 'completed').length
 
