@@ -1453,7 +1453,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     const drawTable = (
       title: string,
       rows: Array<{ date: string; ref: string; details: string; amount: number }>,
-      opts?: { allowEmptyText?: string; refLabel?: string }
+      opts?: { allowEmptyText?: string; refLabel?: string; hideAmount?: boolean }
     ) => {
       const x = margin
       const tableWidth = contentWidth
