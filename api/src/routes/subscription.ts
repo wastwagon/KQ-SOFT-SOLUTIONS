@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import express from 'express'
 import { Router } from 'express'
 import { Prisma } from '@prisma/client'
+import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { getUsageWithLimits } from '../services/usage.js'
@@ -9,6 +10,17 @@ import { getPlanBySlug } from '../services/plan.js'
 import { PLAN_PRICES } from '../config/subscription.js'
 import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
+
+const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
+const PLAN_RANK: Record<(typeof PAYABLE_PLANS)[number], number> = {
+  basic: 1,
+  standard: 2,
+  premium: 3,
+}
+const initializeSchema = z.object({
+  plan: z.enum(PAYABLE_PLANS),
+  period: z.enum(['monthly', 'yearly']),
+})
 
 const PLAN_FEATURES: PlanFeature[] = [
   'bank_rules', 'bulk_match', 'ai_suggestions', 'audit_trail',
@@ -142,9 +154,16 @@ router.post('/initialize', authMiddleware, async (req: AuthRequest, res) => {
   if (!PAYSTACK_SECRET) {
     return res.status(503).json({ error: 'Billing not configured. Contact support to upgrade.' })
   }
-  const { plan, period } = req.body as { plan: string; period: 'monthly' | 'yearly' }
+  const parsed = initializeSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Invalid plan or period.',
+      details: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+    })
+  }
+  const { plan, period } = parsed.data
   const planData = await getPlanBySlug(plan)
-  if (!planData || plan === 'firm' || (planData.monthlyGhs <= 0 && planData.yearlyGhs <= 0)) {
+  if (!planData || (planData.monthlyGhs <= 0 && planData.yearlyGhs <= 0)) {
     return res.status(400).json({ error: 'Invalid plan. Use basic, standard, or premium.' })
   }
   let amountGhs = period === 'yearly' ? planData.yearlyGhs : planData.monthlyGhs
@@ -155,6 +174,17 @@ router.post('/initialize', authMiddleware, async (req: AuthRequest, res) => {
     include: { members: { include: { user: true } } },
   })
   if (!org) return res.status(404).json({ error: 'Organization not found' })
+
+  // Block downgrades through self-service billing — admins who need to switch
+  // plans should contact support so we can prorate / reconcile entitlements.
+  const currentRank = (PLAN_RANK as Record<string, number | undefined>)[org.plan]
+  const targetRank = PLAN_RANK[plan]
+  if (currentRank && targetRank < currentRank) {
+    return res.status(400).json({
+      error: 'Plan downgrades are not supported via self-service. Contact support to switch to a lower tier.',
+    })
+  }
+
   const email = org.members[0]?.user?.email
   if (!email) {
     return res.status(400).json({ error: 'No billing email found for organization. Add a member email before upgrading.' })

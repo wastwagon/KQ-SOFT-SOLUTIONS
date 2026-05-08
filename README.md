@@ -87,7 +87,7 @@ cd api && npm run test:watch   # Watch mode
 ```
 
 Tests cover matching engine, Ghana bank parsers (Ecobank, GCB, Access), and reference extraction.
-Current API test suite status: `13 files / 72 tests` (includes webhook handler, reconcile conflict, auth secret, API key limiter hardening, subscription lifecycle transition tests, CSV ingestion edge cases, OCR language resolution, and OCR table line splitting heuristics including dual debit/credit columns).
+Current API test suite status: `15 files / 83 tests` (includes webhook handler, reconcile conflict, auth secret, API key limiter hardening, subscription lifecycle transition tests, CSV ingestion edge cases, OCR language resolution, and OCR table line splitting heuristics including dual debit/credit columns).
 
 **Features:** Multi-bank (one project with multiple bank accounts), native PDF text extraction with OCR fallback, Ghana bank auto-detection (Ecobank, GCB, Access, Stanbic, Fidelity, UBA, Absa). **Premium report & dashboard:** Ghana-acceptable BRS layout, design tokens, narrative summary, preparer/reviewer comments, white-label branding; see `docs/PREMIUM_GHANA_IMPLEMENTATION_PLAN.md` and `docs/DESIGN_TOKENS.md`.
 

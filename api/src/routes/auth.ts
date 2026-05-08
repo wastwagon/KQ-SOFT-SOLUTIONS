@@ -8,7 +8,7 @@ import { prisma } from '../lib/prisma.js'
 import { sendPasswordReset } from '../services/email.js'
 import { isPlatformAdmin } from '../lib/platformAdmin.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
-import { authMiddleware } from '../middleware/auth.js'
+import { authMiddleware, requireJwtSecret } from '../middleware/auth.js'
 import type { AuthRequest } from '../middleware/auth.js'
 
 const router = Router()
@@ -21,13 +21,6 @@ const authLimiter = rateLimit({
   standardHeaders: true,
 })
 router.use(authLimiter)
-function requireJwtSecret(): string {
-  const secret = process.env.JWT_SECRET
-  if (!secret && process.env.NODE_ENV !== 'test') {
-    throw new Error('JWT_SECRET is required')
-  }
-  return secret || 'test-secret'
-}
 const JWT_SECRET = requireJwtSecret()
 const SALT_ROUNDS = 10
 

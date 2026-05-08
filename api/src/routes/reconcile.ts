@@ -508,30 +508,31 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
         error: `Maximum ${BULK_MATCH_LIMIT} matches per bulk request. You sent ${body.matches.length}.`,
       })
     }
-    // Validate all pairs first
-    const toCreate: { cbTx: { id: string }; bankTx: { id: string } }[] = []
+    // Validate all pairs in a single round-trip rather than 2 queries per pair.
     const requestedTxIds = new Set<string>()
     for (const pair of body.matches) {
       requestedTxIds.add(pair.cashBookTransactionId)
       requestedTxIds.add(pair.bankTransactionId)
-      const cbTx = await prisma.transaction.findFirst({
-        where: { id: pair.cashBookTransactionId },
-        include: { document: true },
-      })
-      const bankTx = await prisma.transaction.findFirst({
-        where: { id: pair.bankTransactionId },
-        include: { document: true },
-      })
+    }
+    if (requestedTxIds.size !== body.matches.length * 2) {
+      return res.status(409).json({ error: 'Bulk payload contains duplicate transaction IDs across pairs' })
+    }
+    const txRows = await prisma.transaction.findMany({
+      where: { id: { in: Array.from(requestedTxIds) } },
+      select: { id: true, document: { select: { projectId: true } } },
+    })
+    const txById = new Map(txRows.map((t) => [t.id, t]))
+    const toCreate: { cbTx: { id: string }; bankTx: { id: string } }[] = []
+    for (const pair of body.matches) {
+      const cbTx = txById.get(pair.cashBookTransactionId)
+      const bankTx = txById.get(pair.bankTransactionId)
       if (!cbTx || !bankTx) {
         return res.status(400).json({ error: `Transaction not found: ${pair.cashBookTransactionId}/${pair.bankTransactionId}` })
       }
       if (cbTx.document.projectId !== projectId || bankTx.document.projectId !== projectId) {
         return res.status(400).json({ error: 'Transaction not in project' })
       }
-      toCreate.push({ cbTx, bankTx })
-    }
-    if (requestedTxIds.size !== body.matches.length * 2) {
-      return res.status(409).json({ error: 'Bulk payload contains duplicate transaction IDs across pairs' })
+      toCreate.push({ cbTx: { id: cbTx.id }, bankTx: { id: bankTx.id } })
     }
     const alreadyMatched = await findAlreadyMatchedIds(projectId, Array.from(requestedTxIds))
     if (alreadyMatched.length > 0) {

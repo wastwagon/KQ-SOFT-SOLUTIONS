@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { api } from '../../lib/api'
-import { formatDate } from '../../lib/format'
+import { useAuth } from '../../store/auth'
 import Card from '../../components/ui/Card'
 
 type Org = {
@@ -19,12 +19,10 @@ type Org = {
 }
 
 export default function AdminSubscribers() {
-  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bulkPlan, setBulkPlan] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'subscribers', page, search, planFilter],
@@ -37,34 +35,12 @@ export default function AdminSubscribers() {
       }>,
   })
 
-  const { data: plans = [] } = useQuery({
-    queryKey: ['admin', 'plans'],
-    queryFn: () => api('/admin/plans') as Promise<{ slug: string; name: string }[]>,
-  })
-
-  const bulkMutation = useMutation({
-    mutationFn: (body: { organizationIds: string[]; plan: string }) =>
-      api('/admin/organizations/bulk-plan', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'subscribers'] })
-      setSelectedIds(new Set())
-    },
-  })
-
-  const overrideMutation = useMutation({
-    mutationFn: ({ slug, plan }: { slug: string; plan: string }) =>
-      api(`/admin/organizations/${slug}`, { method: 'PATCH', body: JSON.stringify({ plan }) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'subscribers'] })
-    },
-  })
-
   const [exporting, setExporting] = useState(false)
 
   const handleExport = async () => {
     const base = import.meta.env.VITE_API_URL || ''
     const url = `${base}/api/v1/admin/organizations/export/csv${planFilter ? `?plan=${encodeURIComponent(planFilter)}` : ''}`
-    const token = localStorage.getItem('brs_token')
+    const token = useAuth.getState().token
     setExporting(true)
     try {
       const r = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })

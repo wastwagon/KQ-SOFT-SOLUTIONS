@@ -5,14 +5,15 @@
   "description": "Bank Reconciliation SaaS API",
   "main": "dist/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "npx tsx prisma/seed.ts",
-    "test": "vitest run",
+    "test": "prisma generate && vitest run",
     "test:licl-qtest": "vitest run --run src/routes/report.qtest-licl-golden.test.ts",
     "test:watch": "vitest"
   },

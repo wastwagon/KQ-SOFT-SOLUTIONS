@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, FolderKanban } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { projects, clients, bankAccounts, uploadCashBook, uploadBankStatement } from '../lib/api'
 import { canDeleteProject, canEditProject, canUploadDocuments, canReopenProject, canExportReport, canReconcile, canMapDocuments } from '../lib/permissions'
@@ -576,7 +576,6 @@ export default function ProjectDetail() {
                 Proceed to Map →
               </button>
             </div>
-          </div>
         </div>
       )}
       {step === 1 && (

@@ -15,6 +15,36 @@ interface ProjectReportProps {
   canReopen?: boolean
 }
 
+interface ReportTransaction {
+  date?: string | null
+  description?: string | null
+  amount?: number | null
+}
+
+interface ReportDiscrepancy {
+  cbName?: string | null
+  cbDate?: string | null
+  cbAmountReceived?: number | null
+  cbAmountPaid?: number | null
+  cbAmount?: number | null
+  bankDescription?: string | null
+  bankDate?: string | null
+  bankAmount?: number | null
+  amountVariance?: number | null
+  dateVarianceDays?: number | null
+}
+
+interface ReportReversalCandidate {
+  reference: string
+  stream: 'cash_book' | 'bank'
+  amount: number
+  incomingDate?: string | null
+  incomingNarration?: string | null
+  outgoingDate?: string | null
+  outgoingNarration?: string | null
+  dayDiff: number
+}
+
 export default function ProjectReport({ projectId, onGoToReview, onReopen, onRollForward, canExport = true, canReopen = true }: ProjectReportProps) {
   const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
@@ -1154,11 +1184,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       {(data.unmatchedDebits || []).length === 0 ? (
                         <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                       ) : (
-                        (data.unmatchedDebits || []).map((t: any, i: number) => (
+                        (data.unmatchedDebits || []).map((t: ReportTransaction, i: number) => (
                           <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                            <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                            <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description}>{t.description}</td>
-                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
+                            <td className="px-2 py-1.5">{fmt(t.date ?? '')}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description ?? undefined}>{t.description}</td>
+                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount ?? 0)}</td>
                           </tr>
                         ))
                       )}
@@ -1181,11 +1211,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       {(data.unmatchedCredits || []).length === 0 ? (
                         <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                       ) : (
-                        (data.unmatchedCredits || []).map((t: any, i: number) => (
+                        (data.unmatchedCredits || []).map((t: ReportTransaction, i: number) => (
                           <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                            <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                            <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description}>{t.description}</td>
-                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
+                            <td className="px-2 py-1.5">{fmt(t.date ?? '')}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description ?? undefined}>{t.description}</td>
+                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount ?? 0)}</td>
                           </tr>
                         ))
                       )}
@@ -1363,13 +1393,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                         </tr>
                       </thead>
                       <tbody>
-                        {(data.discrepancies || []).map((d: any, i: number) => (
+                        {(data.discrepancies || []).map((d: ReportDiscrepancy, i: number) => (
                           <tr key={i} className={`border-t border-amber-100 ${i % 2 === 1 ? 'bg-amber-50/20' : ''}`}>
-                            <td className="px-2 py-1.5 truncate max-w-[150px]" title={d.cbName}>{fmt(d.cbDate)} • {d.cbName}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[150px]" title={d.cbName ?? ''}>{fmt(d.cbDate ?? '')} • {d.cbName}</td>
                             <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.cbAmountReceived ?? d.cbAmountPaid ?? d.cbAmount ?? 0)}</td>
-                            <td className="px-2 py-1.5 truncate max-w-[150px]" title={d.bankDescription}>{fmt(d.bankDate)} • {d.bankDescription}</td>
-                            <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.bankAmount)}</td>
-                            <td className="px-2 py-1.5 text-right font-bold text-amber-700">{fmtSignedReportAmt(d.amountVariance)}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[150px]" title={d.bankDescription ?? undefined}>{fmt(d.bankDate ?? '')} • {d.bankDescription}</td>
+                            <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.bankAmount ?? 0)}</td>
+                            <td className="px-2 py-1.5 text-right font-bold text-amber-700">{fmtSignedReportAmt(d.amountVariance ?? 0)}</td>
                             <td className="px-2 py-1.5 text-right text-gray-600">{d.dateVarianceDays?.toFixed(0) ?? 0} days</td>
                           </tr>
                         ))}
@@ -1402,7 +1432,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     </tr>
                   </thead>
                   <tbody>
-                    {(data.reversalCandidates || []).map((r: any, i: number) => (
+                    {(data.reversalCandidates || []).map((r: ReportReversalCandidate, i: number) => (
                       <tr key={i} className={`border-t border-primary-50 ${i % 2 === 1 ? 'bg-primary-50/10' : ''}`}>
                         <td className="px-2 py-1.5 font-mono text-xs">{r.reference}</td>
                         <td className="px-2 py-1.5 text-xs">{r.stream === 'cash_book' ? 'Cash book' : 'Bank'}</td>

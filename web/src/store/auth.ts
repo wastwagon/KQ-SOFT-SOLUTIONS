@@ -25,6 +25,25 @@ interface AuthState {
   isAdmin: () => boolean
 }
 
+// Single-source-of-truth token storage:
+// The zustand `persist` middleware already mirrors the entire auth state to
+// `localStorage` under the `brs-auth` key. We no longer maintain a separate
+// `brs_token` mirror; reads go through `useAuth.getState().token` and the
+// store handles persistence. A one-shot migration below upgrades existing
+// users from the previous dual-storage layout.
+function migrateLegacyToken(): string | null {
+  try {
+    const legacy = localStorage.getItem('brs_token')
+    if (legacy) {
+      localStorage.removeItem('brs_token')
+      return legacy
+    }
+  } catch {
+    // localStorage unavailable (private mode, etc.) — fall through.
+  }
+  return null
+}
+
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -34,7 +53,6 @@ export const useAuth = create<AuthState>()(
       token: null,
       isPlatformAdmin: false,
       setAuth: (user, org, token, role, isPlatformAdmin) => {
-        localStorage.setItem('brs_token', token)
         set({ user, org, token, role: role ?? null, isPlatformAdmin: !!isPlatformAdmin })
       },
       refreshSession: (data) => {
@@ -46,12 +64,26 @@ export const useAuth = create<AuthState>()(
         })
       },
       logout: () => {
-        localStorage.removeItem('brs_token')
         set({ user: null, org: null, role: null, token: null, isPlatformAdmin: false })
       },
       isAuthenticated: () => !!get().token,
       isAdmin: () => get().role === 'admin',
     }),
-    { name: 'brs-auth' }
+    {
+      name: 'brs-auth',
+      onRehydrateStorage: () => (state) => {
+        // If the persisted store has no token but the legacy `brs_token`
+        // key still exists, copy it across so the user stays logged in.
+        if (state && !state.token) {
+          const legacy = migrateLegacyToken()
+          if (legacy) {
+            state.token = legacy
+          }
+        } else {
+          // We have a token in the store — drop any stale legacy mirror.
+          migrateLegacyToken()
+        }
+      },
+    }
   )
 )

@@ -47,7 +47,10 @@ export default function Projects({ initialStatus }: ProjectsProps) {
     queryKey: ['projects', effectiveClientFilter || null, offset],
     queryFn: () => projects.list(effectiveClientFilter ? { clientId: effectiveClientFilter, limit, offset } : { limit, offset }),
   })
-  const projectsList = projectsData?.projects || []
+  const projectsList = useMemo(
+    () => projectsData?.projects || [],
+    [projectsData?.projects]
+  )
   const totalProjects = projectsData?.total || 0
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients'],

@@ -3,7 +3,15 @@ import express from 'express';
 
 // Production safety: require JWT_SECRET
 const isProd = process.env.NODE_ENV === 'production';
-if (isProd && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret')) {
+const INSECURE_JWT_SECRETS = new Set([
+  '',
+  'dev-secret',
+  'dev-secret-change-in-production',
+  'change-me',
+  'changeme',
+  'test-secret',
+]);
+if (isProd && (!process.env.JWT_SECRET || INSECURE_JWT_SECRETS.has(process.env.JWT_SECRET))) {
   console.error('FATAL: JWT_SECRET must be set to a strong, unique value in production.');
   process.exit(1);
 }
@@ -41,21 +49,25 @@ else if (trustProxyEnv) {
 app.set('trust proxy', trustProxySetting)
 
 const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) || [];
-const allowedOrigins = [
+const devOrigins = [
   'http://localhost:9000',
   'http://localhost:9100',
   'http://127.0.0.1:9000',
   'http://127.0.0.1:9100',
-  ...corsOrigins,
-].filter(Boolean) as string[];
-if (isProd && corsOrigins.length === 0) {
-  console.warn('WARN: CORS_ORIGIN not set. Add your frontend URL(s) for production.');
+];
+// In production we only allow explicitly configured origins. In development we
+// also allow the default Vite/Express ports for local work.
+const allowedOrigins = (isProd ? [...corsOrigins] : [...devOrigins, ...corsOrigins]).filter(Boolean) as string[];
+if (isProd && allowedOrigins.length === 0) {
+  console.warn('WARN: CORS_ORIGIN not set. Cross-origin requests from a browser will be rejected.');
 }
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) cb(null, origin || true);
-    else cb(null, false);
+    // Same-origin / non-browser callers (origin === undefined) are always allowed.
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, origin);
+    return cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

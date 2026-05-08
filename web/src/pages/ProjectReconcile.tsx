@@ -31,6 +31,20 @@ interface SuggestedSplitMatch {
   reason: string
 }
 
+interface AttachmentInfo {
+  id: string
+  filename: string
+  mimeType?: string | null
+  size?: number | null
+}
+
+interface MatchedPair {
+  matchId: string
+  cbTx: Tx
+  bankTx: Tx
+  attachments?: AttachmentInfo[]
+}
+
 type ProjectReconcileProps = { projectId: string; canReconcile?: boolean; onProceedToReview?: () => void }
 export default function ProjectReconcile({ projectId, canReconcile = true, onProceedToReview }: ProjectReconcileProps) {
   const queryClient = useQueryClient()
@@ -85,7 +99,6 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     try {
       const saved = localStorage.getItem(`brs_last_bank_account_${projectId}`)
       if (saved && bankAccounts.some((a) => a.id === saved)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBankAccountId(saved)
         bankAccountRestoredRef.current = true
       }
@@ -184,7 +197,7 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
       queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
       setActionMessage('Evidence uploaded successfully.')
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setActionMessage(`Upload failed: ${err.message}`)
     },
   })
@@ -203,6 +216,28 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     },
   })
 
+  const matches = useMemo<MatchedPair[]>(
+    () => (data?.matches || []) as MatchedPair[],
+    [data?.matches]
+  )
+  const receiptsRaw = useMemo<Tx[]>(() => data?.receipts?.transactions || [], [data?.receipts?.transactions])
+  const creditsRaw = useMemo<Tx[]>(() => data?.credits?.transactions || [], [data?.credits?.transactions])
+  const paymentsRaw = useMemo<Tx[]>(() => data?.payments?.transactions || [], [data?.payments?.transactions])
+  const debitsRaw = useMemo<Tx[]>(() => data?.debits?.transactions || [], [data?.debits?.transactions])
+
+  const matchesForView = useMemo(() => {
+    if (view === 'all') return matches
+    const receiptIds = new Set(receiptsRaw.map((r) => r.id))
+    const creditIds = new Set(creditsRaw.map((c) => c.id))
+    const paymentIds = new Set(paymentsRaw.map((p) => p.id))
+    const debitIds = new Set(debitsRaw.map((d) => d.id))
+
+    if (view === 'receipts') {
+      return matches.filter((m) => receiptIds.has(m.cbTx.id) && creditIds.has(m.bankTx.id))
+    }
+    return matches.filter((m) => paymentIds.has(m.cbTx.id) && debitIds.has(m.bankTx.id))
+  }, [view, matches, receiptsRaw, creditsRaw, paymentsRaw, debitsRaw])
+
   if (isLoading || !data) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -212,10 +247,10 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
   }
 
   const currency = (data.project as { currency?: string })?.currency || 'GHS'
-  const receipts = data.receipts?.transactions || []
-  const credits = data.credits?.transactions || []
-  const payments = data.payments?.transactions || []
-  const debits = data.debits?.transactions || []
+  const receipts = receiptsRaw
+  const credits = creditsRaw
+  const payments = paymentsRaw
+  const debits = debitsRaw
   const anyTruncated = data.receipts?.truncated || data.credits?.truncated || data.payments?.truncated || data.debits?.truncated
 
   const matchedCbIds = new Set(data.matchedCashBookIds || data.matchedReceiptIds || [])
@@ -306,20 +341,6 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
     if (view === 'receipts') return 'No matching cash book receipt'
     return 'No matching cash book payment'
   }
-
-  const matches: { matchId: string; cbTx: Tx; bankTx: Tx; attachments?: any[] }[] = data.matches || []
-  const matchesForView = useMemo(() => {
-    if (view === 'all') return matches
-    const receiptIds = new Set(receipts.map((r: Tx) => r.id))
-    const creditIds = new Set(credits.map((c: Tx) => c.id))
-    const paymentIds = new Set(payments.map((p: Tx) => p.id))
-    const debitIds = new Set(debits.map((d: Tx) => d.id))
-
-    if (view === 'receipts') {
-      return matches.filter((m) => receiptIds.has(m.cbTx.id) && creditIds.has(m.bankTx.id))
-    }
-    return matches.filter((m) => paymentIds.has(m.cbTx.id) && debitIds.has(m.bankTx.id))
-  }, [view, matches, receipts, credits, payments, debits])
 
   const cbArr = Array.from(selectedCbIds)
   const bankArr = Array.from(selectedBankIds)
@@ -721,7 +742,7 @@ export default function ProjectReconcile({ projectId, canReconcile = true, onPro
           <h3 className="text-base font-bold text-green-900 tracking-tight mb-1">Confirmed matches</h3>
           <p className="text-sm text-green-800/90 mb-4">{canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}</p>
           <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-            {matchesForView.map((m: { matchId: string; cbTx: Tx; bankTx: Tx; attachments?: any[] }) => (
+            {matchesForView.map((m: MatchedPair) => (
               <div
                 key={m.matchId}
                 className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-green-200/70 bg-white shadow-sm"

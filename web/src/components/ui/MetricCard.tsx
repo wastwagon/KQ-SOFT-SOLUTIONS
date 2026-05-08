@@ -6,8 +6,8 @@ interface MetricCardProps {
   sublabel?: ReactNode
   /** Optional icon or trend (e.g. Lucide icon) */
   icon?: ReactNode
-  /** Optional accent: 'primary' (green bar) or 'muted' (neutral). Default: primary */
-  accent?: 'primary' | 'muted' | 'none'
+  /** Left accent bar colour. Default: primary */
+  accent?: 'primary' | 'muted' | 'amber' | 'green' | 'indigo' | 'none'
   className?: string
 }
 

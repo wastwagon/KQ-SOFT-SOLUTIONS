@@ -282,7 +282,7 @@ export function getLogoDisplayUrl(logoUrl: string | undefined): string {
 }
 
 function getToken(): string | null {
-  return localStorage.getItem('brs_token')
+  return useAuth.getState().token
 }
 
 function getHeaders(): HeadersInit {

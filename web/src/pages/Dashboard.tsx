@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { FolderKanban, X } from 'lucide-react'
-import { projects, subscription, audit } from '../lib/api'
+import { FileCheck, FolderKanban, LayoutDashboard, Users, X } from 'lucide-react'
+import { projects, subscription, settings as settingsApi } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
@@ -14,7 +14,6 @@ import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
 const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
 
 export default function Dashboard() {
-  const org = useAuth((s) => s.org)
   const role = useAuth((s) => s.role)
   const isAdmin = useAuth((s) => s.isAdmin())
   const [getStartedDismissed, setGetStartedDismissed] = useState(() => {
@@ -70,11 +69,12 @@ export default function Dashboard() {
     queryFn: subscription.getUsage,
   })
   const features = (usage?.features || {}) as Record<string, boolean>
-  const { data: auditData } = useQuery({
-    queryKey: ['audit', { limit: 5 }],
-    queryFn: () => audit.list({ limit: 5 }),
-    enabled: isAdmin && features.audit_trail,
+  const { data: membersData } = useQuery({
+    queryKey: ['settings', 'members'],
+    queryFn: settingsApi.getMembers,
+    enabled: isAdmin,
   })
+  const memberCount = membersData?.currentCount ?? 1
   const projectsUsed = usage?.usage?.projectsUsed ?? projectsList.length
   const projectsLimit = usage?.usage?.projectsLimit ?? 20
   const projectsUnlimited = usage?.usage?.projectsUnlimited ?? false
@@ -223,7 +223,7 @@ export default function Dashboard() {
             />
             <MetricCard
               label="Team Members"
-              value={usage?.usage?.currentMembers ?? 1}
+              value={memberCount}
               sublabel="Active firm accounts"
               icon={<Users />}
               accent="indigo"
