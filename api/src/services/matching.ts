@@ -237,20 +237,38 @@ export function suggestMatches(
       }
       continue
     }
-    // No unique tie-breaker -> block all auto-suggestions for this bank transaction.
+    // No unique tie-breaker. 
+    // If we're NOT in a strict mode (i.e. user is looking for broader matches),
+    // we should keep the suggestions but they will be flagged as duplicates later.
+    if (!useDate && !useDocRef && !useChequeNo) {
+      // Amount-only mode: Keep them all, user will pick.
+      continue
+    }
+
+    // Otherwise, block them to stay safe.
     for (const s of list) {
       excluded.add(`${s.cashBookTx.id}::${s.bankTx.id}`)
     }
   }
   const filtered = suggestions.filter((s) => !excluded.has(`${s.cashBookTx.id}::${s.bankTx.id}`))
-  // Duplicate detection: flag when multiple bank txns match same cash book (amount+date)
+  // Duplicate detection: flag when multiple bank txns match same cash book (or vice-versa)
   const byCbId = new Map<string, SuggestedMatch[]>()
+  const byBankIdFinal = new Map<string, SuggestedMatch[]>()
   for (const s of filtered) {
-    const key = s.cashBookTx.id
-    if (!byCbId.has(key)) byCbId.set(key, [])
-    byCbId.get(key)!.push(s)
+    const cbKey = s.cashBookTx.id
+    if (!byCbId.has(cbKey)) byCbId.set(cbKey, [])
+    byCbId.get(cbKey)!.push(s)
+
+    const bkKey = s.bankTx.id
+    if (!byBankIdFinal.has(bkKey)) byBankIdFinal.set(bkKey, [])
+    byBankIdFinal.get(bkKey)!.push(s)
   }
   for (const list of byCbId.values()) {
+    if (list.length > 1) {
+      for (const s of list) s.duplicateWarning = true
+    }
+  }
+  for (const list of byBankIdFinal.values()) {
     if (list.length > 1) {
       for (const s of list) s.duplicateWarning = true
     }
