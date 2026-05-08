@@ -1476,19 +1476,56 @@ function Footer() {
         </div>
       </div>
 
-      {/* Main grid */}
+      {/* Main grid — five columns on large screens: Brand · Contact · Product · Account · Resources */}
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-14 pb-10">
-        <div className="grid grid-cols-2 md:grid-cols-12 gap-10">
-          {/* Brand + contact */}
-          <div className="col-span-2 md:col-span-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
+          {/* Column 1: Brand + social */}
+          <div>
             <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2">
               <BrandLogo className="h-9 w-auto" />
             </div>
-            <p className="mt-5 text-sm text-gray-400 leading-relaxed max-w-md">
+            <p className="mt-5 text-sm text-gray-400 leading-relaxed max-w-md lg:max-w-none">
               Bank reconciliation built for Ghanaian accountants and finance
               teams. Match faster, report cleaner, audit better.
             </p>
-            <ul className="mt-6 space-y-3 text-sm">
+            <div className="mt-7 flex items-center gap-2">
+              {[
+                {
+                  href: 'https://www.linkedin.com/',
+                  label: 'LinkedIn',
+                  Icon: Linkedin,
+                },
+                {
+                  href: 'https://twitter.com/',
+                  label: 'X / Twitter',
+                  Icon: Twitter,
+                },
+                {
+                  href: 'https://www.facebook.com/',
+                  label: 'Facebook',
+                  Icon: Facebook,
+                },
+              ].map((s) => (
+                <a
+                  key={s.label}
+                  href={s.href}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label={s.label}
+                  className="inline-flex w-9 h-9 rounded-lg bg-white/5 border border-white/10 hover:bg-primary-600 hover:border-primary-500 items-center justify-center transition-colors"
+                >
+                  <s.Icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Column 2: Contact only */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">
+              Contact
+            </p>
+            <ul className="mt-4 space-y-3 text-sm">
               <li className="flex items-center gap-3">
                 <span className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
                   <Mail className="w-4 h-4 text-primary-400" />
@@ -1529,41 +1566,8 @@ function Footer() {
                 </span>
               </li>
             </ul>
-
-            {/* Social */}
-            <div className="mt-7 flex items-center gap-2">
-              {[
-                {
-                  href: 'https://www.linkedin.com/',
-                  label: 'LinkedIn',
-                  Icon: Linkedin,
-                },
-                {
-                  href: 'https://twitter.com/',
-                  label: 'X / Twitter',
-                  Icon: Twitter,
-                },
-                {
-                  href: 'https://www.facebook.com/',
-                  label: 'Facebook',
-                  Icon: Facebook,
-                },
-              ].map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  aria-label={s.label}
-                  className="inline-flex w-9 h-9 rounded-lg bg-white/5 border border-white/10 hover:bg-primary-600 hover:border-primary-500 items-center justify-center transition-colors"
-                >
-                  <s.Icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
           </div>
 
-          {/* Link columns */}
           <FooterColumn
             title="Product"
             links={[
@@ -1581,21 +1585,18 @@ function Footer() {
               { label: 'Forgot password', href: '/forgot-password', internal: true },
             ]}
           />
-          <FooterColumn
-            title="Resources"
-            links={[
-              { label: 'User manual', href: '/user-manual.md' },
-              { label: 'Support', href: 'mailto:info@kqsoftwaresolutions.com' },
-              { label: 'Status', href: '#contact' },
-            ]}
-          />
-          <FooterColumn
-            title="Company"
-            links={[
-              { label: 'About', href: 'mailto:info@kqsoftwaresolutions.com?subject=About%20KQ-SOFT' },
-              { label: 'Contact sales', href: 'mailto:info@kqsoftwaresolutions.com?subject=Sales%20enquiry' },
-            ]}
-          />
+          <div className="sm:col-span-2 lg:col-span-1">
+            <FooterColumn
+              title="Resources"
+              links={[
+                { label: 'User manual', href: '/user-manual.md' },
+                { label: 'Support', href: 'mailto:info@kqsoftwaresolutions.com' },
+                { label: 'Status', href: '#contact' },
+                { label: 'About', href: 'mailto:info@kqsoftwaresolutions.com?subject=About%20KQ-SOFT' },
+                { label: 'Contact sales', href: 'mailto:info@kqsoftwaresolutions.com?subject=Sales%20enquiry' },
+              ]}
+            />
+          </div>
         </div>
 
         {/* Trust row */}
@@ -1653,7 +1654,7 @@ function FooterColumn({
   links: { label: string; href: string; internal?: boolean }[]
 }) {
   return (
-    <div className="md:col-span-2">
+    <div>
       <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">{title}</p>
       <ul className="mt-4 space-y-2.5 text-sm">
         {links.map((l) =>
