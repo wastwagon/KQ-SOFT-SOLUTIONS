@@ -931,64 +931,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           </div>
         </div>}
 
-        {/* Brought forward unpresented cheques from previous period BRS */}
-        {(data.broughtForwardItems || []).length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-base font-semibold mb-3 text-blue-900">Brought forward unpresented cheques (from previous period BRS)</h3>
-            <p className="text-sm text-gray-500 mb-2">These items are from the previous period BRS, carried forward from: {data.broughtForwardItems?.[0]?.fromProject || 'previous period'}</p>
-            <div className="border border-blue-200 rounded-lg overflow-auto max-h-40">
-              <table className="min-w-full text-sm text-slate-900">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left text-gray-700">Date</th>
-                    <th className="px-2 py-1.5 text-left text-gray-700">Cheque No</th>
-                    <th className="px-2 py-1.5 text-left text-gray-700">Name</th>
-                    <th className="px-2 py-1.5 text-right text-gray-700">Amount ({effectiveDisplayCurrency})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.broughtForwardItems || []).map((t: { date: string; name: string; chqNo?: string | null; amount: number }, i: number) => (
-                    <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                      <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                      <td className="px-2 py-1.5 font-mono text-gray-600">{t.chqNo || '—'}</td>
-                      <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.name}>{t.name}</td>
-                      <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        {data.broughtForwardLodgments?.length ? (
-          <div className="mb-6">
-            <h3 className="text-base font-semibold mb-3 text-green-900">Brought forward uncredited lodgments</h3>
-            <div className="border border-green-200 rounded-lg overflow-auto max-h-40">
-              <table className="min-w-full text-sm text-slate-900">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left">Date</th>
-                    <th className="px-2 py-1.5 text-left">Source</th>
-                    <th className="px-2 py-1.5 text-left">Name</th>
-                    <th className="px-2 py-1.5 text-left">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.broughtForwardLodgments || []).map((t, i) => (
-                    <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                      <td className="px-2 py-1.5">{fmt(t.date)}</td>
-                      <td className="px-2 py-1.5 text-xs">{t.source.replace('_', ' ')}</td>
-                      <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.name}>{t.name}</td>
-                      <td className="px-2 py-1.5 font-mono text-xs">{t.docRef || '—'}</td>
-                      <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null}
 
         {/* Phase 6: Missing Cheques Report — single section id for anchor linking */}
         <div id="missing-cheques-report" className="mb-6 scroll-mt-4">
@@ -1058,196 +1000,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           )}
         </div>
 
-        {/* Phase 6: Reconciliation Discrepancy Report — single section id for anchor linking */}
-        <div id="discrepancy-report" className="mb-6 scroll-mt-4">
-          <h3 className="text-base font-semibold mb-3 text-amber-900">Reconciliation Discrepancy Report</h3>
-          {features.discrepancy_report ? (
-            (data?.discrepancies || []).length > 0 ? (
-              <>
-                <p className="text-sm text-gray-500 mb-2">Matched pairs with amount or date variance</p>
-                {data.discrepancySummary && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                    <div>
-                      <p className="text-xs font-medium text-amber-700 mb-1">By amount variance</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(data.discrepancySummary?.byAmountBand || []).map((b, i) => (
-                          <span key={i} className="px-2 py-1 bg-amber-100 rounded text-xs">
-                            {b.band}: {b.count} pair{b.count !== 1 ? 's' : ''} • {fmtSignedReportAmt(b.totalVariance)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-amber-700 mb-1">By date variance</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(data.discrepancySummary?.byDateBand || []).map((b, i) => (
-                          <span key={i} className="px-2 py-1 bg-amber-100 rounded text-xs">
-                            {b.band}: {b.count} pair{b.count !== 1 ? 's' : ''}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="border border-amber-200 rounded-lg overflow-auto max-h-48 print:border-slate-300">
-                  <table className="min-w-full text-sm text-slate-900">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left">Cash book</th>
-                        <th className="px-2 py-1.5 text-right">Cash book amount ({effectiveDisplayCurrency})</th>
-                        <th className="px-2 py-1.5 text-left">Bank</th>
-                        <th className="px-2 py-1.5 text-right">Bank amount ({effectiveDisplayCurrency})</th>
-                        <th className="px-2 py-1.5 text-right">Variance ({effectiveDisplayCurrency})</th>
-                        <th className="px-2 py-1.5 text-right">Date diff</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(data.discrepancies || []).map((d: { cbDate: string; cbName: string; cbChqNo?: string | null; cbDocRef?: string | null; cbAmount: number; cbAmountReceived?: number | null; cbAmountPaid?: number | null; bankDate: string; bankDescription: string; bankChqNo?: string | null; bankDocRef?: string | null; bankAmount: number; amountVariance: number; dateVarianceDays: number }, i: number) => (
-                        <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                          <td className="px-2 py-1.5" title={d.cbName}>{fmt(d.cbDate)} • {d.cbName.slice(0, 25)}{d.cbName.length > 25 ? '…' : ''}</td>
-                          <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt((d.cbAmountReceived ?? d.cbAmountPaid ?? d.cbAmount ?? 0) as number)}</td>
-                          <td className="px-2 py-1.5" title={d.bankDescription}>{fmt(d.bankDate)} • {d.bankDescription.slice(0, 25)}{d.bankDescription.length > 25 ? '…' : ''}</td>
-                          <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.bankAmount)}</td>
-                          <td className="px-2 py-1.5 text-right font-medium text-amber-700">{fmtSignedReportAmt(d.amountVariance)}</td>
-                          <td className="px-2 py-1.5 text-right text-gray-600">{d.dateVarianceDays?.toFixed(0) ?? 0} days</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {!!paidOutVarianceBreakdown && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 print:bg-white print:border-slate-300">
-                      <p className="text-sm font-medium text-amber-800 mb-1">Paid-out non-cancelled: more in CB than BS</p>
-                      <p className="text-xs text-amber-700">{paidOutVarianceBreakdown.moreInCbThanBs?.length || 0} row(s)</p>
-                    </div>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 print:bg-white print:border-slate-300">
-                      <p className="text-sm font-medium text-amber-800 mb-1">Paid-out non-cancelled: more in BS than CB</p>
-                      <p className="text-xs text-amber-700">{paidOutVarianceBreakdown.moreInBsThanCb?.length || 0} row(s)</p>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No amount or date variances in matched pairs.</p>
-            )
-          ) : (
-            <p className="text-sm text-amber-600">Discrepancy report requires Standard plan or higher. Upgrade to see matched pairs with amount or date variance.</p>
-          )}
-        </div>
 
-        {/* Reversal candidates */}
-        <div className="mb-6">
-          <h3 className="text-base font-semibold mb-3 text-primary-900">Reversal candidates</h3>
-          {(data.reversalCandidates || []).length > 0 ? (
-            <>
-              <p className="text-sm text-gray-500 mb-2">
-                Potential reversal pairs detected by same reference/cheque/narration with opposite signs and similar amounts.
-              </p>
-              <div className="border border-primary-200 rounded-lg overflow-auto max-h-48">
-                <table className="min-w-full text-sm text-slate-900">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="px-2 py-1.5 text-left">Reference key</th>
-                      <th className="px-2 py-1.5 text-left">Stream</th>
-                      <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
-                      <th className="px-2 py-1.5 text-left">Incoming entry</th>
-                      <th className="px-2 py-1.5 text-left">Outgoing entry</th>
-                      <th className="px-2 py-1.5 text-right">Day diff</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.reversalCandidates || []).map((r, i) => (
-                      <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                        <td className="px-2 py-1.5 font-mono text-xs">{r.reference}</td>
-                        <td className="px-2 py-1.5 text-xs">{r.stream === 'cash_book' ? 'Cash book' : 'Bank'}</td>
-                        <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(r.amount)}</td>
-                        <td className="px-2 py-1.5">{r.incomingDate ? `${fmt(r.incomingDate)} • ${r.incomingNarration || '—'}` : '—'}</td>
-                        <td className="px-2 py-1.5">{r.outgoingDate ? `${fmt(r.outgoingDate)} • ${r.outgoingNarration || '—'}` : '—'}</td>
-                        <td className="px-2 py-1.5 text-right">{r.dayDiff}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-500">No reversal candidates detected.</p>
-          )}
-        </div>
-
-        {/* Matched pairs */}
-        <div className="mb-6">
-          <h3 className="text-base font-semibold mb-3 text-slate-900">Matched transactions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-            <div className="text-xs rounded border border-green-200 bg-green-50 px-2 py-1 text-green-800">
-              Receipts vs credits: {matchedReceiptsVsCredits.length}
-            </div>
-            <div className="text-xs rounded border border-blue-200 bg-blue-50 px-2 py-1 text-blue-800">
-              Payments vs debits: {matchedPaymentsVsDebits.length}
-            </div>
-          </div>
-          <div className="border border-slate-200 rounded-lg overflow-auto max-h-64">
-            <table className="min-w-full text-sm text-slate-900">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="px-3 py-2 text-left text-slate-700">Cash book</th>
-                  <th className="px-3 py-2 text-right text-slate-700">Cash book amount ({effectiveDisplayCurrency})</th>
-                  <th className="px-3 py-2 text-left text-slate-700">Bank</th>
-                  <th className="px-3 py-2 text-right text-slate-700">Bank amount ({effectiveDisplayCurrency})</th>
-                  <th className="px-3 py-2 text-right text-slate-700">Variance ({effectiveDisplayCurrency})</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matchedPairs.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No matched transactions</td>
-                  </tr>
-                ) : (
-                  matchedPairs.map((p, i: number) => (
-                    <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
-                      <td className="px-3 py-2 max-w-[260px] truncate" title={`${fmt(p.cbDate)} • ${p.cbName}`}>
-                        {fmt(p.cbDate)} • {p.cbName}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium">
-                        {fmtSignedReportAmt((p.cbAmountReceived ?? p.cbAmountPaid ?? p.cbAmount ?? 0) as number)}
-                      </td>
-                      <td className="px-3 py-2 max-w-[260px] truncate" title={`${fmt(p.bankDate)} • ${p.bankDescription}`}>
-                        {fmt(p.bankDate)} • {p.bankDescription}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium">{fmtSignedReportAmt(p.bankAmount)}</td>
-                      <td className="px-3 py-2 text-right font-medium text-amber-700">
-                        {fmtSignedReportAmt(Math.abs(((p.cbAmountReceived ?? p.cbAmountPaid ?? p.cbAmount ?? 0) as number) - p.bankAmount))}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="border border-green-200 rounded-lg p-3 bg-green-50/40">
-              <h4 className="text-sm font-medium text-green-800 mb-2">Receipts vs credits (cancel out)</h4>
-              <div className="max-h-40 overflow-auto text-xs text-slate-700 space-y-1">
-                {matchedReceiptsVsCredits.length === 0 ? (
-                  <p>No matched receipt-to-credit rows.</p>
-                ) : matchedReceiptsVsCredits.map((p, i) => (
-                  <p key={i}>{fmt(p.cbDate)} {p.cbName} {'->'} {fmtSignedReportAmt(p.bankAmount)}</p>
-                ))}
-              </div>
-            </div>
-            <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/40">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">Payments vs debits (cancel out)</h4>
-              <div className="max-h-40 overflow-auto text-xs text-slate-700 space-y-1">
-                {matchedPaymentsVsDebits.length === 0 ? (
-                  <p>No matched payment-to-debit rows.</p>
-                ) : matchedPaymentsVsDebits.map((p, i) => (
-                  <p key={i}>{fmt(p.cbDate)} {p.cbName} {'->'} {fmtSignedReportAmt(p.bankAmount)}</p>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Exceptions — BRS sections */}
         <div className="flex flex-col gap-6">
@@ -1380,6 +1133,69 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </div>
           </div>
           </div>
+          {/* 3. Bank-only items */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-5 print:bg-white print:border-slate-300">
+            <h3 className="font-semibold mb-3 text-amber-900">3. BANK-ONLY ITEMS</h3>
+            <p className="text-sm text-amber-800 mb-4">
+              Transactions appearing on the bank statement that are not yet recorded in the cash book.
+            </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2 text-gray-800">3a. Bank-only debits (Add)</h4>
+                <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
+                  <table className="min-w-full text-sm text-slate-900">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left">Date</th>
+                        <th className="px-2 py-1.5 text-left">Description</th>
+                        <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.unmatchedDebits || []).length === 0 ? (
+                        <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
+                      ) : (
+                        (data.unmatchedDebits || []).map((t: any, i: number) => (
+                          <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
+                            <td className="px-2 py-1.5">{fmt(t.date)}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description}>{t.description}</td>
+                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium mb-2 text-gray-800">3b. Bank-only credits (Deduct)</h4>
+                <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
+                  <table className="min-w-full text-sm text-slate-900">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left">Date</th>
+                        <th className="px-2 py-1.5 text-left">Description</th>
+                        <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.unmatchedCredits || []).length === 0 ? (
+                        <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
+                      ) : (
+                        (data.unmatchedCredits || []).map((t: any, i: number) => (
+                          <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
+                            <td className="px-2 py-1.5">{fmt(t.date)}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description}>{t.description}</td>
+                            <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
 
         </div>
 
@@ -1465,6 +1281,145 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </table>
             </div>
           )}
+        </div>
+
+        {/* INTERNAL AUDIT WORKING PAPERS */}
+        <div className="mt-12 pt-8 border-t-2 border-dashed border-slate-300 print:mt-8 print:pt-4">
+          <h2 className="text-xl font-bold mb-4 text-slate-800 flex items-center gap-2">
+            <span className="p-1 bg-slate-100 rounded">📋</span>
+            INTERNAL AUDIT WORKING PAPERS (DIAGNOSTICS)
+          </h2>
+          <p className="text-sm text-slate-600 mb-6 italic">
+            This section contains internal reconciliation working papers, matched audit logs, and diagnostic reports. It is intended for internal review and audit trail validation.
+          </p>
+
+          {/* Matched pairs */}
+          <div className="mb-8">
+            <h3 className="text-base font-semibold mb-3 text-slate-900">Matched transactions (Audit Log)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+              <div className="text-xs rounded border border-green-200 bg-green-50 px-2 py-1 text-green-800">
+                Receipts vs credits matched: {matchedReceiptsVsCredits.length}
+              </div>
+              <div className="text-xs rounded border border-blue-200 bg-blue-50 px-2 py-1 text-blue-800">
+                Payments vs debits matched: {matchedPaymentsVsDebits.length}
+              </div>
+            </div>
+            <div className="border border-slate-200 rounded-lg overflow-auto max-h-64 shadow-sm bg-white">
+              <table className="min-w-full text-sm text-slate-900">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-slate-700">Cash book</th>
+                    <th className="px-3 py-2 text-right text-slate-700">CB Amt ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-left text-slate-700">Bank</th>
+                    <th className="px-3 py-2 text-right text-slate-700">Bank Amt ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-right text-slate-700">Var. ({effectiveDisplayCurrency})</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matchedPairs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-center text-gray-500 italic">No matched transactions in this period.</td>
+                    </tr>
+                  ) : (
+                    matchedPairs.map((p, i: number) => (
+                      <tr key={i} className={`border-t border-slate-100 ${i % 2 === 1 ? 'bg-slate-50/30' : ''}`}>
+                        <td className="px-3 py-2 max-w-[200px] truncate" title={`${fmt(p.cbDate)} • ${p.cbName}`}>
+                          {fmt(p.cbDate)} • {p.cbName}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium">
+                          {fmtSignedReportAmt((p.cbAmountReceived ?? p.cbAmountPaid ?? p.cbAmount ?? 0) as number)}
+                        </td>
+                        <td className="px-3 py-2 max-w-[200px] truncate" title={`${fmt(p.bankDate)} • ${p.bankDescription}`}>
+                          {fmt(p.bankDate)} • {p.bankDescription}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium">{fmtSignedReportAmt(p.bankAmount)}</td>
+                        <td className="px-3 py-2 text-right font-medium text-amber-700">
+                          {fmtSignedReportAmt(Math.abs(((p.cbAmountReceived ?? p.cbAmountPaid ?? p.cbAmount ?? 0) as number) - p.bankAmount))}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Phase 6: Reconciliation Discrepancy Report */}
+          <div id="discrepancy-report-audit" className="mb-8 scroll-mt-4">
+            <h3 className="text-base font-semibold mb-3 text-amber-900">Reconciliation Discrepancy Report</h3>
+            {features.discrepancy_report ? (
+              (data?.discrepancies || []).length > 0 ? (
+                <>
+                  <p className="text-sm text-gray-500 mb-2">Matched pairs with amount or date variance detected during reconciliation.</p>
+                  <div className="border border-amber-200 rounded-lg overflow-auto max-h-64 shadow-sm bg-white">
+                    <table className="min-w-full text-sm text-slate-900">
+                      <thead className="bg-amber-50">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left">Cash book</th>
+                          <th className="px-2 py-1.5 text-right">CB Amt ({effectiveDisplayCurrency})</th>
+                          <th className="px-2 py-1.5 text-left">Bank</th>
+                          <th className="px-2 py-1.5 text-right">Bank Amt ({effectiveDisplayCurrency})</th>
+                          <th className="px-2 py-1.5 text-right text-amber-800 font-bold">Variance ({effectiveDisplayCurrency})</th>
+                          <th className="px-2 py-1.5 text-right text-gray-600">Date diff</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(data.discrepancies || []).map((d: any, i: number) => (
+                          <tr key={i} className={`border-t border-amber-100 ${i % 2 === 1 ? 'bg-amber-50/20' : ''}`}>
+                            <td className="px-2 py-1.5 truncate max-w-[150px]" title={d.cbName}>{fmt(d.cbDate)} • {d.cbName}</td>
+                            <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.cbAmountReceived ?? d.cbAmountPaid ?? d.cbAmount ?? 0)}</td>
+                            <td className="px-2 py-1.5 truncate max-w-[150px]" title={d.bankDescription}>{fmt(d.bankDate)} • {d.bankDescription}</td>
+                            <td className="px-2 py-1.5 text-right">{fmtSignedReportAmt(d.bankAmount)}</td>
+                            <td className="px-2 py-1.5 text-right font-bold text-amber-700">{fmtSignedReportAmt(d.amountVariance)}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-600">{d.dateVarianceDays?.toFixed(0) ?? 0} days</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No amount or date variances in matched pairs.</p>
+              )
+            ) : (
+              <p className="text-sm text-amber-600 italic">Discrepancy report requires Standard plan or higher.</p>
+            )}
+          </div>
+
+          {/* Reversal candidates */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold mb-3 text-primary-900">Reversal candidates</h3>
+            {(data.reversalCandidates || []).length > 0 ? (
+              <div className="border border-primary-100 rounded-lg overflow-auto max-h-48 shadow-sm bg-white">
+                <table className="min-w-full text-sm text-slate-900">
+                  <thead className="bg-primary-50">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left">Reference key</th>
+                      <th className="px-2 py-1.5 text-left">Stream</th>
+                      <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                      <th className="px-2 py-1.5 text-left">Incoming entry</th>
+                      <th className="px-2 py-1.5 text-left">Outgoing entry</th>
+                      <th className="px-2 py-1.5 text-right">Day diff</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.reversalCandidates || []).map((r: any, i: number) => (
+                      <tr key={i} className={`border-t border-primary-50 ${i % 2 === 1 ? 'bg-primary-50/10' : ''}`}>
+                        <td className="px-2 py-1.5 font-mono text-xs">{r.reference}</td>
+                        <td className="px-2 py-1.5 text-xs">{r.stream === 'cash_book' ? 'Cash book' : 'Bank'}</td>
+                        <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(r.amount)}</td>
+                        <td className="px-2 py-1.5">{r.incomingDate ? `${fmt(r.incomingDate)} • ${r.incomingNarration || '—'}` : '—'}</td>
+                        <td className="px-2 py-1.5">{r.outgoingDate ? `${fmt(r.outgoingDate)} • ${r.outgoingNarration || '—'}` : '—'}</td>
+                        <td className="px-2 py-1.5 text-right">{r.dayDiff}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 italic">No reversal candidates detected.</p>
+            )}
+          </div>
         </div>
 
         {data.organization?.branding?.footer && (

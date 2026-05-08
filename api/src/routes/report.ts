@@ -137,6 +137,17 @@ function toTx(t: { id: string; date: Date | null; name: string | null; details: 
   }
 }
 
+function dedupeTransactions<T extends TxLike>(txs: T[]): T[] {
+  const seen = new Set<string>()
+  return txs.filter((t) => {
+    const dStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : ''
+    const key = `${dStr}|${Number(t.amount).toFixed(2)}|${(t.chqNo || '').toLowerCase()}|${(t.docRef || '').toLowerCase()}|${(t.name || t.details || '').toLowerCase().trim()}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export function normalizeRefToken(value: string | null | undefined): string {
   return (value || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
 }
@@ -378,6 +389,20 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
+  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
+  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
+  const creditsDocs = project.documents.filter(
+    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+  const debitsDocs = project.documents.filter(
+    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+
+  const receipts = dedupeTransactions(receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const payments = dedupeTransactions(paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const credits = dedupeTransactions(creditsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const debits = dedupeTransactions(debitsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+
   let broughtForwardItems: { date: string; name: string; chqNo: string | null; amount: number; fromProject: string }[] = []
   let broughtForwardLodgments: { date: string; name: string; docRef: string | null; amount: number; fromProject: string; source: 'cash_book_receipts' | 'bank_credits' }[] = []
   if (project.rollForwardFromProjectId && project.rollForwardFrom) {
@@ -412,47 +437,50 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       const prevUnmatchedReceipts = prevReceipts.filter((t) => !prevMatchedCbIds.has(t.id))
       const prevUnmatchedCredits = prevCredits.filter((t) => !prevMatchedBankIds.has(t.id))
       const prevFmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
-      broughtForwardItems = prevUnmatchedPayments.map((t) => ({
-        date: prevFmt(t.date),
-        name: t.name || t.details || '—',
-        chqNo: t.chqNo || null,
-        amount: t.amount,
-        fromProject: prevProject.name,
-      }))
+      
+      const isAlreadyInCurrent = (t: TxLike, currentSet: TxLike[]) => {
+        const dStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : ''
+        const key = `${dStr}|${Number(t.amount).toFixed(2)}|${(t.chqNo || '').toLowerCase()}|${(t.docRef || '').toLowerCase()}|${(t.name || t.details || '').toLowerCase().trim()}`
+        return currentSet.some(c => {
+          const cdStr = c.date ? new Date(c.date).toISOString().slice(0, 10) : ''
+          const cKey = `${cdStr}|${Number(c.amount).toFixed(2)}|${(c.chqNo || '').toLowerCase()}|${(c.docRef || '').toLowerCase()}|${(c.name || c.details || '').toLowerCase().trim()}`
+          return key === cKey
+        })
+      }
+
+      broughtForwardItems = prevUnmatchedPayments
+        .filter(t => !isAlreadyInCurrent(t, payments))
+        .map((t) => ({
+          date: prevFmt(t.date),
+          name: t.name || t.details || '—',
+          chqNo: t.chqNo || null,
+          amount: t.amount,
+          fromProject: prevProject.name,
+        }))
       broughtForwardLodgments = [
-        ...prevUnmatchedReceipts.map((t) => ({
-          date: prevFmt(t.date),
-          name: t.name || t.details || '—',
-          docRef: t.docRef || null,
-          amount: t.amount,
-          fromProject: prevProject.name,
-          source: 'cash_book_receipts' as const,
-        })),
-        ...prevUnmatchedCredits.map((t) => ({
-          date: prevFmt(t.date),
-          name: t.name || t.details || '—',
-          docRef: t.docRef || null,
-          amount: t.amount,
-          fromProject: prevProject.name,
-          source: 'bank_credits' as const,
-        })),
+        ...prevUnmatchedReceipts
+          .filter(t => !isAlreadyInCurrent(t, receipts))
+          .map((t) => ({
+            date: prevFmt(t.date),
+            name: t.name || t.details || '—',
+            docRef: t.docRef || null,
+            amount: t.amount,
+            fromProject: prevProject.name,
+            source: 'cash_book_receipts' as const,
+          })),
+        ...prevUnmatchedCredits
+          .filter(t => !isAlreadyInCurrent(t, credits))
+          .map((t) => ({
+            date: prevFmt(t.date),
+            name: t.name || t.details || '—',
+            docRef: t.docRef || null,
+            amount: t.amount,
+            fromProject: prevProject.name,
+            source: 'bank_credits' as const,
+          })),
       ]
     }
   }
-
-  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
-  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
-  const creditsDocs = project.documents.filter(
-    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
-  )
-  const debitsDocs = project.documents.filter(
-    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
-  )
-
-  const receipts = receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const payments = paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const credits = creditsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const debits = debitsDocs.flatMap((d) => (d.transactions || []).map(toTx))
   const reversalCandidates = detectReversalCandidates(receipts, payments, credits, debits)
 
   const matchedCbIds = new Set<string>()
@@ -934,6 +962,20 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
+  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
+  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
+  const creditsDocs = project.documents.filter(
+    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+  const debitsDocs = project.documents.filter(
+    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+
+  const receipts = dedupeTransactions(receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const payments = dedupeTransactions(paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const credits = dedupeTransactions(creditsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const debits = dedupeTransactions(debitsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+
   let broughtForwardItemsExport: { date: string; name: string; chqNo: string | null; amount: number; fromProject: string }[] = []
   let broughtForwardLodgmentsExport: { amount: number; source: 'cash_book_receipts' | 'bank_credits' }[] = []
   if (project.rollForwardFromProjectId && project.rollForwardFrom) {
@@ -965,8 +1007,20 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         }
       }
       const prevFmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
+      
+      const isAlreadyInCurrent = (t: TxLike, currentSet: TxLike[]) => {
+        const dStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : ''
+        const key = `${dStr}|${Number(t.amount).toFixed(2)}|${(t.chqNo || '').toLowerCase()}|${(t.docRef || '').toLowerCase()}|${(t.name || t.details || '').toLowerCase().trim()}`
+        return currentSet.some(c => {
+          const cdStr = c.date ? new Date(c.date).toISOString().slice(0, 10) : ''
+          const cKey = `${cdStr}|${Number(c.amount).toFixed(2)}|${(c.chqNo || '').toLowerCase()}|${(c.docRef || '').toLowerCase()}|${(c.name || c.details || '').toLowerCase().trim()}`
+          return key === cKey
+        })
+      }
+
       broughtForwardItemsExport = prevPayments
         .filter((t) => !prevMatchedCbIds.has(t.id))
+        .filter(t => !isAlreadyInCurrent(t, payments))
         .map((t) => ({
           date: prevFmt(t.date),
           name: t.name || t.details || '—',
@@ -977,27 +1031,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       broughtForwardLodgmentsExport = [
         ...prevReceipts
           .filter((t) => !prevMatchedCbIds.has(t.id))
+          .filter(t => !isAlreadyInCurrent(t, receipts))
           .map((t) => ({ amount: t.amount, source: 'cash_book_receipts' as const })),
         ...prevCredits
           .filter((t) => !prevMatchedBankIds.has(t.id))
+          .filter(t => !isAlreadyInCurrent(t, credits))
           .map((t) => ({ amount: t.amount, source: 'bank_credits' as const })),
       ]
     }
   }
-
-  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
-  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
-  const creditsDocs = project.documents.filter(
-    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
-  )
-  const debitsDocs = project.documents.filter(
-    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
-  )
-
-  const receipts = receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const payments = paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const credits = creditsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const debits = debitsDocs.flatMap((d) => (d.transactions || []).map(toTx))
 
   const matchedCbIds = new Set<string>()
   const matchedBankIds = new Set<string>()
@@ -1224,8 +1266,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     bankStatementClosingBalance: bankStatementClosingBalanceExport,
   })
   const epsComposition = 0.005
-  const unpresentedCurrentCashBookPeriodExport =
-    unmatchedPaymentsTotalExport - unmatchedPaymentsWithoutDetailsTotalExport
+  const unpresentedCurrentCashBookPeriodExport = unmatchedPaymentsTotalExport
   const timingUncreditedCurrentPeriodExport = unmatchedReceiptsTotalExport
   const timingUncreditedBroughtForwardPriorExport = broughtForwardReceiptLodgmentsTotalExport
   const unpresentedBroughtForwardPriorExport = broughtForwardChequesTotalExport
@@ -1316,53 +1357,28 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     XLSX.utils.book_append_sheet(wb, additionalInformationSheet, 'NOTES')
     const generatedAt = new Date()
     const reportCompletedAt = project.approvedAt || project.reviewedAt || project.preparedAt || generatedAt
-    const header = [
-      [`${project.organization.name} - ${reportTitle}`],
-      [project.name],
-      ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
-      [`Report completed: ${formatGeneratedAt(reportCompletedAt)} (Africa/Accra)`],
-      [`Print date: ${formatGeneratedAt(generatedAt)} (Africa/Accra)`],
-      [],
-    ]
-    const matchedSheet = XLSX.utils.aoa_to_sheet(header)
-    const matchedDataOrigin = bankAccountHeaderLineExport ? 'A6' : 'A5'
-    if (matchedRows.length) {
-      XLSX.utils.sheet_add_json(matchedSheet, matchedRows, { skipHeader: false, origin: matchedDataOrigin })
-    } else {
-      XLSX.utils.sheet_add_aoa(matchedSheet, [['No matched transactions']], { origin: matchedDataOrigin })
-    }
-    XLSX.utils.book_append_sheet(wb, matchedSheet, 'MATCHED')
-    const unmatchedIn = unmatchedReceipts
-    if (unmatchedIn.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedIn), 'UNMATCHED RECEIPTS IN CASH BOOK')
-    }
-    const unmatchedOut = unmatchedPayments
-    if (unmatchedOut.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'UNMATCHED PAYMENTS IN CASH BOOK')
-    }
     if (hasMissingChequesReportExport && missingChequesAgeingExport.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingChequesAgeingExport), 'Missing Cheques Ageing')
     }
+    
+    // --- AUDIT WORKING PAPERS (INTERNAL USE) ---
+    if (unmatchedIn.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedIn), 'UNMATCHED RECEIPTS')
+    }
+    if (unmatchedOut.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedOut), 'UNMATCHED PAYMENTS')
+    }
+    if (unmatchedDebits.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedDebits), 'BANK-ONLY DEBITS (ADD)')
+    }
+    if (unmatchedCredits.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedCredits), 'BANK-ONLY CREDITS (DEDUCT)')
+    }
+    if (matchedRows.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matchedRows), 'MATCHED AUDIT LOG')
+    }
     if (hasDiscrepancyReportExport && discrepancies.length) {
-      const discWithBands = matchPairs.filter((p) => {
-        const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
-        const cbDate = p.cb.date ? new Date(p.cb.date) : null
-        const bankDate = p.bank.date ? new Date(p.bank.date) : null
-        const dateDiffDays = cbDate && bankDate ? Math.abs((cbDate.getTime() - bankDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
-        return amountDiff > 0.01 || dateDiffDays > 0
-      }).map((p) => {
-        const amountVariance = Math.abs(p.cb.amount - p.bank.amount)
-        const dateVarianceDays = p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0
-        return {
-          'Cash Book': `${fmt(p.cb.date)} - ${(p.cb.name || p.cb.details || '').slice(0, 40)}`,
-          [`Cash Book Amount (${curr})`]: p.cb.amount,
-          'Bank': `${fmt(p.bank.date)} - ${(p.bank.name || p.bank.details || '').slice(0, 40)}`,
-          [`Bank Amount (${curr})`]: p.bank.amount,
-          [`Amount Variance (${curr})`]: amountVariance,
-          'Date Diff Days': dateVarianceDays,
-        }
-      })
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discWithBands), 'Discrepancies')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discrepancies), 'DISCREPANCIES')
     }
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
     const filename = `BRS_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
@@ -1379,7 +1395,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   }
 
   if (format === 'pdf') {
-    const doc = new PDFDocument({ margin: 50, bufferPages: true })
+    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true })
     const filename = `BRS_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
@@ -1421,9 +1437,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     doc.moveDown(0.45)
     const dividerY = doc.y + 2
     doc.save()
-    doc.moveTo(0, dividerY).lineTo(pageWidth, dividerY).lineWidth(2).strokeColor(primaryColor).stroke()
+    doc.moveTo(margin, dividerY).lineTo(pageWidth - margin, dividerY).lineWidth(1.5).strokeColor(primaryColor).stroke()
     doc.restore()
-    doc.y = dividerY + 10
+    doc.y = dividerY + 15
 
     const amtNum = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
     const fmtPdfDate = (d: string) => {
@@ -1483,7 +1499,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         ensureRoom(rowH + 8, true)
         if (idx % 2 === 1) {
           doc.save()
-          doc.rect(x, doc.y, tableWidth, rowH).fill('#FAFAFA')
+          doc.rect(x, doc.y, tableWidth, rowH).fill('#F1F5F9')
           doc.restore()
         }
         const y = doc.y + 4
@@ -1674,7 +1690,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
     const exportNarrative =
       (project as { reportNarrative?: string | null }).reportNarrative ||
-      `This reconciliation shows ${matchPairs.length} matched transaction(s). Currency: ${curr}. Unpresented cheques total ${amtNum(unpresentedChequesTotal)}; uncredited lodgments total ${amtNum(uncreditedLodgmentsTimingTotalExport)}.`
+      `Matched: ${matchPairs.length} transaction(s). Unpresented Cheques: ${amtNum(Math.abs(unpresentedChequesTotal))}. Uncredited Lodgments: ${amtNum(uncreditedLodgmentsTimingTotalExport)}.`
     doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: 495 }).fillColor('#000000').moveDown(0.5)
     const prepComment = (project as { preparerComment?: string | null }).preparerComment
     const revComment = (project as { reviewerComment?: string | null }).reviewerComment
@@ -1686,46 +1702,77 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     if (prepComment?.trim() || revComment?.trim()) doc.moveDown(0.5)
 
+    // --- INTERNAL AUDIT WORKING PAPERS (DIAGNOSTICS) ---
+    doc.addPage()
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1E293B').text('INTERNAL AUDIT WORKING PAPERS (DIAGNOSTICS)')
+    doc.moveDown(0.2)
+    doc.fontSize(8).font('Helvetica-Oblique').fillColor('#64748B').text('This section contains detailed reconciliation evidence and diagnostic reports for internal audit purposes.')
+    doc.moveDown(1)
+
     const matchedTableRows = matchPairs.map((p) => ({
       date: fmt(p.cb.date),
       ref: p.cb.docRef || p.cb.chqNo || p.bank.docRef || p.bank.chqNo || '',
-      details: p.cb.name || p.cb.details || p.bank.name || p.bank.details || '—',
+      details: (p.cb.name || p.cb.details || p.bank.name || p.bank.details || '—').slice(0, 60),
       amount: p.cb.amount,
     }))
-    drawTable('MATCHED', matchedTableRows, { allowEmptyText: 'None', refLabel: 'DOC REF / CHQ NO' })
+    drawTable('MATCHED AUDIT LOG', matchedTableRows, { allowEmptyText: 'None', refLabel: 'DOC REF / CHQ NO' })
+
+    if (discrepancies.length) {
+      const discRows = discrepancies.map((d: any) => ({
+        date: d['Cash Book Date'],
+        ref: d['Cash Book Chq No'] || d['DOC REF'] || '',
+        details: (d['Cash Book Desc'] + ' -> ' + d['Bank Desc']).slice(0, 60),
+        amount: Number(d[`Amount Variance (${curr})`] || 0),
+      }))
+      drawTable('DISCREPANCY AUDIT LOG', discRows, { allowEmptyText: 'None', refLabel: 'REF' })
+    }
+
     const pickField = (row: Record<string, unknown>, prefix: string): unknown => {
       const key = Object.keys(row).find((k) => k === prefix || k.startsWith(`${prefix} (`))
       return key ? row[key] : undefined
     }
     const unmatchedReceiptRows = unmatchedReceipts.map((t) => ({
       date: (t as { Date: string }).Date,
-      ref:
-        String(pickField(t as Record<string, unknown>, 'DOC REF') || '') ||
-        String(pickField(t as Record<string, unknown>, 'Chq No') || ''),
-      details: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
-      amount: Number(pickField(t as Record<string, unknown>, 'AMT RECEIVED') || 0),
+      ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
+      details: (t as { Details?: string }).Details || '—',
+      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
     }))
     drawTable('UNMATCHED RECEIPTS IN CASH BOOK', unmatchedReceiptRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
+
     const unmatchedPaymentRows = unmatchedPayments.map((t) => ({
       date: (t as { Date: string }).Date,
-      ref:
-        String(pickField(t as Record<string, unknown>, 'DOC REF') || '') ||
-        String(pickField(t as Record<string, unknown>, 'CHQ NO') || ''),
-      details: ((t as { Name?: string }).Name || (t as { Description?: string }).Description || '—'),
-      amount: Number(pickField(t as Record<string, unknown>, 'AMT PAID') || 0),
+      ref: String(pickField(t as Record<string, unknown>, 'CHQ NO') || pickField(t as Record<string, unknown>, 'DOC REF') || ''),
+      details: (t as { Details?: string }).Details || '—',
+      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
     }))
     drawTable('UNMATCHED PAYMENTS IN CASH BOOK', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
+
+    const unmatchedDebitRows = unmatchedDebits.map((t) => ({
+      date: (t as { Date: string }).Date,
+      ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
+      details: (t as { Description?: string }).Description || '—',
+      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
+    }))
+    drawTable('BANK-ONLY DEBITS (ADD)', unmatchedDebitRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
+
+    const unmatchedCreditRows = unmatchedCredits.map((t) => ({
+      date: (t as { Date: string }).Date,
+      ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
+      details: (t as { Description?: string }).Description || '—',
+      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
+    }))
+    drawTable('BANK-ONLY CREDITS (DEDUCT)', unmatchedCreditRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
     const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
     const range = doc.bufferedPageRange()
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i)
       const y = doc.page.height - 34
-      doc.moveTo(margin, y - 8).lineTo(doc.page.width - margin, y - 8).strokeColor('#E5E7EB').lineWidth(0.8).stroke()
+      doc.moveTo(margin, y - 8).lineTo(doc.page.width - margin, y - 8).strokeColor('#E2E8F0').lineWidth(0.5).stroke()
       if (footerText) {
-        doc.fontSize(8).fillColor('#666666').text(footerText, margin, y, { width: contentWidth, align: 'left' })
+        doc.fontSize(7).fillColor('#64748B').text(footerText, margin, y, { width: contentWidth, align: 'left' })
       }
-      doc.fontSize(8).fillColor('#666666').text(`Page ${i + 1} of ${range.count}`, margin, y, { width: contentWidth, align: 'right' })
+      doc.fontSize(7).fillColor('#64748B').text(`Page ${i + 1} of ${range.count}`, margin, y, { width: contentWidth, align: 'right' })
       doc.fillColor('#000000')
     }
     doc.end()
