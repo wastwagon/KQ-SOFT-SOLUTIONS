@@ -626,7 +626,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const broughtForwardTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
   // Manual-template alignment:
   // "Unpresented cheques" excludes rows parked as unmatched payments with blank details.
-  const unpresentedChequesTotal = unmatchedPaymentsTotal - unmatchedPaymentsWithoutDetailsTotal + broughtForwardTotal
+  const unpresentedChequesTotal = unmatchedPaymentsTotal + broughtForwardTotal
   const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebits
     .filter((d) => payments.some((p) => hasChequeOrRefLink(p, d)))
     .reduce((s, t) => s + t.amount, 0)
@@ -636,7 +636,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const asAtUnpresentedTotal = unmatchedPaymentsTotal
   const bankOnlyCreditsNotInCashBookTotal = unmatchedCreditsTotal + broughtForwardBankCreditsTotal
   // Debits with cheque/ref linkage to cash-book payments are not treated as "bank-only" in manual workbook style.
-  const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal - unmatchedDebitsLinkedToCashBookTotal
+  const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal
   const bankStatementClosingBalanceValue =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
@@ -654,7 +654,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal,
     bankStatementClosingBalance: bankStatementClosingBalanceValue,
   })
-  const unpresentedCurrentCashBookPeriod = unmatchedPaymentsTotal - unmatchedPaymentsWithoutDetailsTotal
+  const unpresentedCurrentCashBookPeriod = unmatchedPaymentsTotal
   const timingUncreditedCurrentPeriod = unmatchedReceiptsTotal
   const timingUncreditedBroughtForwardPrior = broughtForwardReceiptLodgmentsTotal
   const unpresentedBroughtForwardPrior = broughtForwardTotal
@@ -1200,14 +1200,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
   const unpresentedChequesTotal =
-    unmatchedPaymentsTotalExport -
-    unmatchedPaymentsWithoutDetailsTotalExport +
+    unmatchedPaymentsTotalExport +
     broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
   const broughtForwardChequesTotalExport = broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
   const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport
   const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport
   const bankOnlyCreditsNotInCashBookTotalExport = unmatchedCreditsTotalExport + broughtForwardBankCreditsTotalExport
-  const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport - unmatchedDebitsLinkedToCashBookTotalExport
+  const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport
   const bankStatementClosingBalanceExport =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
@@ -1281,7 +1280,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [exportLabels.closingBankStatementBalance, wbAmt(bankClosingBalance)],
       [exportLabels.addUncreditedLodgments, wbAmt(uncreditedLodgmentsTimingTotalExport)],
       [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
-      [exportLabels.cashBookBalanceEnd, wbAmt(balancePerCashBook)],
+      [exportLabels.addBankOnlyDebitsNotInCashBookLine, wbAmt(bankOnlyDebitsNotInCashBookTotalExport)],
+      [exportLabels.deductBankOnlyCreditsNotInCashBookLine, wbAmt(bankOnlyCreditsNotInCashBookTotalExport)],
+      [exportLabels.cashBookBalanceEnd, wbAmt(workbookScheduleDerivedCashBookExport)],
       [],
       [
         'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES sheet and supporting schedules.',
@@ -1621,8 +1622,18 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         workbookStyle: true,
       },
       {
+        label: exportLabels.addBankOnlyDebitsNotInCashBookLine,
+        amount: bankOnlyDebitsNotInCashBookTotalExport,
+        workbookStyle: true,
+      },
+      {
+        label: exportLabels.deductBankOnlyCreditsNotInCashBookLine,
+        amount: bankOnlyCreditsNotInCashBookTotalExport,
+        workbookStyle: true,
+      },
+      {
         label: exportLabels.cashBookBalanceEnd,
-        amount: balancePerCashBook,
+        amount: workbookScheduleDerivedCashBookExport,
         workbookStyle: true,
         bold: true,
       },

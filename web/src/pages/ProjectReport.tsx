@@ -686,7 +686,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr className="border-b border-slate-400">
                     <td className="py-2 pr-6 text-base font-bold text-slate-900">{labels.cashBookBalanceEnd}</td>
                     <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
-                      {fmtBaseReportAmt(brsStatement.balancePerCashBook)}
+                      {fmtBaseReportAmt(brsStatement.workbookScheduleDerivedCashBook)}
                     </td>
                   </tr>
                 </tbody>
