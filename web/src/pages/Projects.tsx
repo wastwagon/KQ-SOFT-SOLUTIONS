@@ -10,6 +10,7 @@ import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
+import ProjectStatusPill from '../components/project/ProjectStatusPill'
 
 const preloadProjectDetailPage = () => import('./ProjectDetail')
 
@@ -91,8 +92,6 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       completed: list.filter((p) => p.status === 'completed').length,
     }
   }, [projectsList])
-
-  const statusLabel = (s: string) => STATUS_OPTIONS.find((o) => o.value === s)?.label || s
 
   return (
     <div className="space-y-8">
@@ -267,21 +266,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">{p.client?.name || '—'}</td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        p.status === 'completed'
-                          ? 'bg-green-100 text-green-800'
-                          : p.status === 'approved'
-                          ? 'bg-green-100 text-green-800'
-                          : p.status === 'submitted_for_review'
-                          ? 'bg-blue-100 text-blue-800'
-                          : p.status === 'draft'
-                          ? 'bg-gray-100 text-gray-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {statusLabel(p.status)}
-                    </span>
+                    <ProjectStatusPill status={p.status} size="sm" />
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {formatDate(p.createdAt)}

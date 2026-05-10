@@ -1,612 +1,196 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, FolderKanban } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { clients, projects } from '../lib/api'
+import {
+  canDeleteProject,
+  canEditProject,
+  canExportReport,
+  canMapDocuments,
+  canReconcile,
+  canReopenProject,
+} from '../lib/permissions'
 import { useAuth } from '../store/auth'
-import { projects, clients, bankAccounts, uploadCashBook, uploadBankStatement } from '../lib/api'
-import { canDeleteProject, canEditProject, canUploadDocuments, canReopenProject, canExportReport, canReconcile, canMapDocuments } from '../lib/permissions'
-import ErrorFallback from '../components/ErrorFallback'
+import { useToast } from '../components/ui/Toast'
+import ProjectHeader, { type ProjectHeaderProject } from '../components/project/ProjectHeader'
+import ProjectStepNav, { type ProjectStep } from '../components/project/ProjectStepNav'
+import ProjectStageCard from '../components/project/ProjectStageCard'
+import ProjectUploadStep from '../components/project/ProjectUploadStep'
+import Skeleton from '../components/ui/Skeleton'
 import ProjectMap from './ProjectMap'
 import ProjectReconcile from './ProjectReconcile'
 import ProjectReview from './ProjectReview'
 import ProjectReport from './ProjectReport'
 
-const STEPS = ['Upload', 'Map', 'Reconcile', 'Review', 'Report']
-const STEP_HASHES = ['upload', 'map', 'reconcile', 'review', 'report']
-const HASH_TO_STEP: Record<string, number> = Object.fromEntries(STEP_HASHES.map((h, i) => [h, i]))
+const STEPS: readonly ProjectStep[] = [
+  { id: 'upload', label: 'Upload' },
+  { id: 'map', label: 'Map' },
+  { id: 'reconcile', label: 'Reconcile' },
+  { id: 'review', label: 'Review' },
+  { id: 'report', label: 'Report' },
+]
 
-function SelectWrapper({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
-  return (
-    <div className="relative inline-block min-w-0">
-      {children}
-      <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none ${compact ? 'w-4 h-4' : 'w-5 h-5'}`} aria-hidden />
-    </div>
-  )
+const HASH_TO_STEP: Record<string, number> = Object.fromEntries(
+  STEPS.map((s, i) => [s.id, i])
+)
+
+interface ProjectResponse extends ProjectHeaderProject {
+  documents?: { filename: string; type: string }[]
 }
 
+/**
+ * Project workflow shell.  Acts as an orchestrator only — header, step nav,
+ * and the upload step live in dedicated components under
+ * `web/src/components/project/`.  The four downstream steps (Map, Reconcile,
+ * Review, Report) are mounted inside <ProjectStageCard> which provides the
+ * shared chrome and per-stage error boundary.
+ */
 export default function ProjectDetail() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const role = useAuth((s) => s.role)
   const location = useLocation()
+  const role = useAuth((s) => s.role)
   const queryClient = useQueryClient()
+  const toast = useToast()
+
   const [step, setStepState] = useState(() => {
     if (typeof window === 'undefined') return 0
     const h = window.location.hash.slice(1).toLowerCase()
     return HASH_TO_STEP[h] ?? 0
   })
 
-  // Sync URL hash -> step on mount and when hash changes (so #review etc. works when opening link directly)
+  // Sync URL hash → step so deep links like /projects/foo#review still work.
   const syncHashToStep = useCallback(() => {
-    const h = (typeof window !== 'undefined' ? window.location.hash : location.hash).slice(1).toLowerCase()
+    const h = (typeof window !== 'undefined' ? window.location.hash : location.hash)
+      .slice(1)
+      .toLowerCase()
     const idx = HASH_TO_STEP[h]
     if (idx !== undefined) setStepState(idx)
   }, [location.hash])
+
   useEffect(() => {
     window.addEventListener('hashchange', syncHashToStep)
     return () => window.removeEventListener('hashchange', syncHashToStep)
   }, [syncHashToStep])
 
-  const setStep = (i: number) => {
-    setStepState(i)
-    const newHash = STEP_HASHES[i]
-    if (newHash) {
-      const url = `${location.pathname}${location.search}#${newHash}`
-      window.history.replaceState(null, '', url)
-    }
-  }
-  const [cbFiles, setCbFiles] = useState<File[]>([])
-  const [cbUseAs, setCbUseAs] = useState<'receipts' | 'payments' | 'both'>('both')
-  const [bsFiles, setBsFiles] = useState<File[]>([])
-  const [bsUseAs, setBsUseAs] = useState<'credits' | 'debits' | 'both'>('both')
-  const [bankAccountId, setBankAccountId] = useState<string>('')
-  const [bankAccountName, setBankAccountName] = useState('')
-  const [bankAccountNo, setBankAccountNo] = useState('')
-  const [uploadError, setUploadError] = useState('')
-  const [uploadingCount, setUploadingCount] = useState(0)
-  const [uploadTotal, setUploadTotal] = useState(0)
-  const [editing, setEditing] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [editClientId, setEditClientId] = useState('')
-  const [editCurrency, setEditCurrency] = useState<'GHS' | 'USD' | 'EUR'>('GHS')
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-
-  const { data: project, isLoading } = useQuery({
-    queryKey: ['project', slug],
-    queryFn: () => projects.get(slug!),
-    enabled: !!slug,
-  })
-
-  const uploadCbMutation = useMutation({
-    mutationFn: async (data: { files: File[]; useAs: 'receipts' | 'payments' | 'both' }) => {
-      setUploadError('')
-      const types: ('receipts' | 'payments')[] = data.useAs === 'both' ? ['receipts', 'payments'] : [data.useAs]
-      let n = 0
-      const total = data.files.length * types.length
-      setUploadTotal(total)
-      for (const file of data.files) {
-        for (const type of types) {
-          n += 1
-          setUploadingCount(n)
-          await uploadCashBook(slug!, file, type)
-        }
+  const setStep = useCallback(
+    (i: number) => {
+      setStepState(i)
+      const newHash = STEPS[i]?.id
+      if (newHash) {
+        const url = `${location.pathname}${location.search}#${newHash}`
+        window.history.replaceState(null, '', url)
       }
-      setUploadingCount(0)
-      setUploadTotal(0)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', slug] })
-      setCbFiles([])
-    },
-    onError: (err) => {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed')
-      setUploadingCount(0)
-      setUploadTotal(0)
-    },
+    [location.pathname, location.search]
+  )
+
+  const { data: project, isLoading } = useQuery<ProjectResponse>({
+    queryKey: ['project', slug],
+    queryFn: () => projects.get(slug!) as Promise<ProjectResponse>,
+    enabled: !!slug,
   })
 
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
   })
+
+  const updateMutation = useMutation({
+    mutationFn: (body: {
+      name: string
+      clientId: string | null
+      currency: 'GHS' | 'USD' | 'EUR'
+    }) => projects.update(slug!, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', slug] })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project updated')
+    },
+    onError: (err) => {
+      toast.error('Could not update project', err instanceof Error ? err.message : undefined)
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: () => projects.delete(slug!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deleted')
       navigate('/projects')
     },
-  })
-  const updateMutation = useMutation({
-    mutationFn: (body: { name?: string; clientId?: string | null; currency?: 'GHS' | 'USD' | 'EUR' }) =>
-      projects.update(slug!, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', slug] })
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      setEditing(false)
-    },
-  })
-
-  const { data: bankAccountsList = [] } = useQuery({
-    queryKey: ['bankAccounts', slug],
-    queryFn: () => bankAccounts.list(slug!),
-    enabled: !!slug,
-  })
-  const uploadBsMutation = useMutation({
-    mutationFn: async (data: { files: File[]; useAs: 'credits' | 'debits' | 'both'; bankAccountId?: string; accountName?: string; accountNo?: string }) => {
-      setUploadError('')
-      const types: ('credits' | 'debits')[] = data.useAs === 'both' ? ['credits', 'debits'] : [data.useAs]
-      const opts = {
-        bankAccountId: data.bankAccountId || undefined,
-        accountName: data.accountName || undefined,
-        accountNo: data.accountNo || undefined,
-      }
-      let n = 0
-      const total = data.files.length * types.length
-      setUploadTotal(total)
-      for (const file of data.files) {
-        for (const type of types) {
-          n += 1
-          setUploadingCount(n)
-          await uploadBankStatement(slug!, file, type, opts)
-        }
-      }
-      setUploadingCount(0)
-      setUploadTotal(0)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', slug] })
-      queryClient.invalidateQueries({ queryKey: ['bankAccounts', slug] })
-      setBsFiles([])
-      setBankAccountNo('')
-    },
     onError: (err) => {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed')
-      setUploadingCount(0)
-      setUploadTotal(0)
+      toast.error('Could not delete project', err instanceof Error ? err.message : undefined)
     },
   })
 
   if (!slug || (isLoading && !project)) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px] p-8">
-        <p className="text-gray-600 font-medium">Loading project…</p>
-      </div>
-    )
+    return <ProjectDetailSkeleton />
   }
   if (!project) {
     return (
-      <div className="flex items-center justify-center min-h-[200px] p-8">
-        <p className="text-gray-900 font-medium">Project not found</p>
+      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+        <h1 className="text-lg font-semibold text-gray-900">Project not found</h1>
+        <p className="mt-2 text-sm text-gray-500">
+          The project may have been deleted or you may not have permission to view it.
+        </p>
       </div>
     )
   }
 
-  const documents = project.documents || []
-  const cashBookDocs = documents.filter((d: { type: string }) => d.type.startsWith('cash_book_'))
-  const bankDocs = documents.filter((d: { type: string }) => d.type.startsWith('bank_'))
-  const uniqueCashBookFiles = new Set(cashBookDocs.map((d: { filename: string }) => d.filename)).size
-  const uniqueBankFiles = new Set(bankDocs.map((d: { filename: string }) => d.filename)).size
-  const groupedCashBookFiles: Array<[string, Set<string>]> = Array.from(
-    cashBookDocs.reduce((acc: Map<string, Set<string>>, d: { filename: string; type: string }) => {
-      if (!acc.has(d.filename)) acc.set(d.filename, new Set())
-      acc.get(d.filename)!.add(d.type)
-      return acc
-    }, new Map<string, Set<string>>())
-  )
-  const groupedBankFiles: Array<[string, Set<string>]> = Array.from(
-    bankDocs.reduce((acc: Map<string, Set<string>>, d: { filename: string; type: string }) => {
-      if (!acc.has(d.filename)) acc.set(d.filename, new Set())
-      acc.get(d.filename)!.add(d.type)
-      return acc
-    }, new Map<string, Set<string>>())
-  )
-
-  const inputClass =
-    'w-full min-h-[44px] px-4 py-3 border border-gray-200 rounded-xl bg-gray-50/80 text-gray-900 text-sm placeholder:text-gray-400 shadow-sm hover:border-gray-300 hover:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:bg-white focus:outline-none transition-all duration-200'
-  const selectClass =
-    'w-full min-h-[44px] pl-4 pr-11 py-3 border border-gray-200 rounded-xl bg-gray-50/80 text-gray-900 text-sm shadow-sm hover:border-gray-300 hover:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:bg-white focus:outline-none appearance-none cursor-pointer transition-all duration-200'
-  const isUploading = uploadCbMutation.isPending || uploadBsMutation.isPending
-
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <button
-            type="button"
-            onClick={() => navigate('/projects')}
-            className="text-sm font-medium text-gray-500 hover:text-gray-700 mb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg transition-colors"
-          >
-            ← Back to projects
-          </button>
-          {editing && canEditProject(role) ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className={inputClass}
-              />
-              <select
-                value={editClientId}
-                onChange={(e) => setEditClientId(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">— None —</option>
-                {(clientsList as { id: string; name: string }[]).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <select
-                value={editCurrency}
-                onChange={(e) => setEditCurrency(e.target.value as 'GHS' | 'USD' | 'EUR')}
-                className={selectClass}
-              >
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => updateMutation.mutate({ name: editName, clientId: editClientId || null, currency: editCurrency })}
-                disabled={updateMutation.isPending}
-                className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 transition-all"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => { setEditing(false); setEditName(project.name); setEditClientId(project.client?.id || ''); setEditCurrency((project.currency as 'GHS' | 'USD' | 'EUR') || 'GHS') }}
-                className="px-5 py-2.5 border border-gray-200 rounded-xl font-medium text-gray-700 bg-white shadow-sm hover:bg-gray-50 transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900">{project.name}</h1>
-              {project.client && (
-                <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-lg font-medium">
-                  {project.client.name}
-                </span>
-              )}
-              {canEditProject(role) && (
-                <button
-                  type="button"
-                  onClick={() => { setEditing(true); setEditName(project.name); setEditClientId(project.client?.id || ''); setEditCurrency((project.currency as 'GHS' | 'USD' | 'EUR') || 'GHS') }}
-                  className="text-sm font-medium text-primary-600 hover:text-primary-700"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        {canDeleteProject(role) && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-4 py-2.5 rounded-xl transition-colors"
-            >
-              Delete project
-            </button>
-          </div>
-        )}
-      </div>
+    <div className="space-y-6">
+      <ProjectHeader
+        project={project}
+        clients={clientsList as { id: string; name: string }[]}
+        canEdit={canEditProject(role)}
+        canDelete={canDeleteProject(role)}
+        isUpdating={updateMutation.isPending}
+        isDeleting={deleteMutation.isPending}
+        onSave={(body) => updateMutation.mutate(body)}
+        onDelete={() => deleteMutation.mutate()}
+      />
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full border border-gray-200 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete project?</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              This will permanently delete &quot;{project.name}&quot; and all its data (documents, transactions, matches).
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-5 py-2.5 border border-gray-200 rounded-xl font-medium text-gray-700 bg-white shadow-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
-                className="px-5 py-2.5 bg-red-600 text-white rounded-xl font-medium shadow-sm hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProjectStepNav steps={STEPS} current={step} onChange={setStep} />
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {STEPS.map((s, i) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setStep(i)}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap text-xs font-medium transition-all ${
-              step === i
-                ? 'bg-primary-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-            }`}
-          >
-            {i + 1}. {s}
-          </button>
-        ))}
-      </div>
       {step === 0 && (
-        <div className="space-y-6">
-          <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center">
-                <FolderKanban className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Upload documents</h2>
-                <p className="text-sm text-gray-600 max-w-3xl leading-relaxed">
-                  To begin reconciliation, upload your <strong>Cash Book</strong> and <strong>Bank Statement</strong>. 
-                  If your files contain both receipts and payments in a single document, select &quot;Both&quot; during upload. 
-                  Our system will automatically detect and suggest column mappings in the next step.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2 text-xs font-medium text-primary-700 bg-white px-3 py-1.5 rounded-lg border border-primary-100">
-                    <span className="w-2 h-2 rounded-full bg-primary-500" />
-                    Cash book date required
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-medium text-blue-700 bg-white px-3 py-1.5 rounded-lg border border-blue-100">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    Excel, CSV, and PDF supported
-                  </div>
-                </div>
-              </div>
-            </div>
-            {!canUploadDocuments(role) && (
-              <p className="mt-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                View-only access. Contact an administrator to upload documents.
-              </p>
-            )}
-            {uploadError && (
-              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium border border-red-100">
-                {uploadError}
-              </div>
-            )}
-          </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Cash book */}
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-                <h3 className="text-sm font-semibold text-gray-800">Cash book</h3>
-                {canUploadDocuments(role) ? (
-                  <>
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wider block mb-1">Use as</label>
-                      <SelectWrapper compact>
-                        <select
-                          value={cbUseAs}
-                          onChange={(e) => setCbUseAs(e.target.value as 'receipts' | 'payments' | 'both')}
-                          className="min-h-[36px] pl-3 pr-9 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm w-full focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 appearance-none cursor-pointer"
-                        >
-                          <option value="both">Both (receipts + payments) — one document</option>
-                          <option value="receipts">Receipts only</option>
-                          <option value="payments">Payments only</option>
-                        </select>
-                      </SelectWrapper>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="file"
-                        multiple
-                        accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.tiff"
-                        onChange={(e) => setCbFiles(Array.from(e.target.files || []))}
-                        className="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 file:text-xs file:cursor-pointer"
-                      />
-                      {cbFiles.length > 0 && <span className="text-xs text-gray-500">{cbFiles.length} file(s)</span>}
-                      <button
-                        onClick={() => uploadCbMutation.mutate({ files: cbFiles, useAs: cbUseAs })}
-                        disabled={cbFiles.length === 0 || isUploading}
-                        className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
-                      >
-                        {uploadCbMutation.isPending ? (uploadTotal ? `${uploadingCount}/${uploadTotal}` : '…') : 'Upload'}
-                      </button>
-                    </div>
-                    {cashBookDocs.length > 0 && (
-                      <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
-                        ✓ {uniqueCashBookFiles} file(s) uploaded
-                        {cashBookDocs.length > uniqueCashBookFiles
-                          ? ` (${cashBookDocs.length} mapped side records — one file used for receipts and payments)`
-                          : ''}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  cashBookDocs.length > 0
-                    ? (
-                      <p className="text-xs text-gray-500">
-                        ✓ {uniqueCashBookFiles} file(s) uploaded
-                        {cashBookDocs.length > uniqueCashBookFiles
-                          ? ` (${cashBookDocs.length} mapped side records — one file used for receipts and payments)`
-                          : ''}
-                      </p>
-                      )
-                    : <p className="text-xs text-gray-500">No cash book uploaded.</p>
-                )}
-              </div>
-
-              {/* Bank statement */}
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-                <h3 className="text-sm font-semibold text-gray-800">Bank statement</h3>
-                {canUploadDocuments(role) ? (
-                  <>
-                    {(bankAccountsList.length > 0 || bankAccountId === '') && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {bankAccountsList.length > 0 && (
-                          <SelectWrapper compact>
-                            <select
-                              value={bankAccountId}
-                              onChange={(e) => setBankAccountId(e.target.value)}
-                              className="min-h-[36px] pl-3 pr-9 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm max-w-[180px] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 appearance-none cursor-pointer"
-                            >
-                              <option value="">All accounts</option>
-                              {bankAccountsList.map((a: { id: string; name: string }) => (
-                                <option key={a.id} value={a.id}>{a.name}</option>
-                              ))}
-                            </select>
-                          </SelectWrapper>
-                        )}
-                        {bankAccountId === '' && (
-                          <>
-                            <input
-                              type="text"
-                              placeholder="Account name (optional)"
-                              value={bankAccountName}
-                              onChange={(e) => setBankAccountName(e.target.value)}
-                              className="min-h-[36px] max-w-[160px] px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Account number (optional)"
-                              value={bankAccountNo}
-                              onChange={(e) => setBankAccountNo(e.target.value)}
-                              className="min-h-[36px] max-w-[180px] px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary-500/20"
-                            />
-                          </>
-                        )}
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wider block mb-1">Use as</label>
-                      <SelectWrapper compact>
-                        <select
-                          value={bsUseAs}
-                          onChange={(e) => setBsUseAs(e.target.value as 'credits' | 'debits' | 'both')}
-                          className="min-h-[36px] pl-3 pr-9 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm w-full focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 appearance-none cursor-pointer"
-                        >
-                          <option value="both">Both (credits + debits) — one statement</option>
-                          <option value="credits">Credits only</option>
-                          <option value="debits">Debits only</option>
-                        </select>
-                      </SelectWrapper>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="file"
-                        multiple
-                        accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.tiff"
-                        onChange={(e) => setBsFiles(Array.from(e.target.files || []))}
-                        className="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 file:text-xs file:cursor-pointer"
-                      />
-                      {bsFiles.length > 0 && <span className="text-xs text-gray-500">{bsFiles.length} file(s)</span>}
-                      <button
-                        onClick={() => uploadBsMutation.mutate({
-                          files: bsFiles,
-                          useAs: bsUseAs,
-                          bankAccountId: bankAccountId || undefined,
-                          accountName: bankAccountId ? undefined : bankAccountName || undefined,
-                          accountNo: bankAccountId ? undefined : bankAccountNo || undefined,
-                        })}
-                        disabled={bsFiles.length === 0 || isUploading}
-                        className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
-                      >
-                        {uploadBsMutation.isPending ? (uploadTotal ? `${uploadingCount}/${uploadTotal}` : '…') : 'Upload'}
-                      </button>
-                    </div>
-                    {bankDocs.length > 0 && (
-                      <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
-                        ✓ {uniqueBankFiles} file(s) uploaded
-                        {bankDocs.length > uniqueBankFiles
-                          ? ` (${bankDocs.length} mapped side records — one file used for credits and debits)`
-                          : ''}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  bankDocs.length > 0
-                    ? (
-                      <p className="text-xs text-gray-500">
-                        ✓ {uniqueBankFiles} file(s) uploaded
-                        {bankDocs.length > uniqueBankFiles
-                          ? ` (${bankDocs.length} mapped side records — one file used for credits and debits)`
-                          : ''}
-                      </p>
-                      )
-                    : <p className="text-xs text-gray-500">No bank statement uploaded.</p>
-                )}
-              </div>
-            </div>
-
-            {(cashBookDocs.length + bankDocs.length) > 0 && (
-              <details className="mt-5 pt-4 border-t border-gray-100">
-                <summary className="text-[11px] font-medium text-gray-400 uppercase tracking-wider cursor-pointer">Uploaded files</summary>
-                <ul className="mt-2 space-y-1.5 text-xs text-gray-600">
-                  {groupedCashBookFiles.map(([filename, types]) => {
-                    const hasReceipts = types.has('cash_book_receipts')
-                    const hasPayments = types.has('cash_book_payments')
-                    const label = hasReceipts && hasPayments ? 'receipts + payments' : hasReceipts ? 'receipts' : 'payments'
-                    return (
-                      <li key={`cb-${filename}`}>Cash book ({label}): {filename}</li>
-                    )
-                  })}
-                  {groupedBankFiles.map(([filename, types]) => {
-                    const hasCredits = types.has('bank_credits')
-                    const hasDebits = types.has('bank_debits')
-                    const label = hasCredits && hasDebits ? 'credits + debits' : hasCredits ? 'credits' : 'debits'
-                    return (
-                      <li key={`bank-${filename}`}>Bank ({label}): {filename}</li>
-                    )
-                  })}
-                </ul>
-              </details>
-            )}
-
-            <div className="mt-6 pt-5 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-gray-600">
-                {cashBookDocs.length + bankDocs.length > 0
-                  ? 'Documents uploaded. Map columns next, then reconcile.'
-                  : 'Upload at least one cash book and one bank statement to continue.'}
-              </p>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                disabled={cashBookDocs.length === 0 || bankDocs.length === 0}
-                className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                Proceed to Map →
-              </button>
-            </div>
-        </div>
+        <ProjectUploadStep
+          projectSlug={slug}
+          documents={project.documents ?? []}
+          role={role}
+          onProceed={() => setStep(1)}
+        />
       )}
       {step === 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8">
-          <ErrorFallback>
-            <ProjectMap projectId={slug} canMap={canMapDocuments(role)} onProceedToReconcile={() => setStep(2)} />
-          </ErrorFallback>
-        </div>
+        <ProjectStageCard ariaLabel="Map columns">
+          <ProjectMap
+            projectId={slug}
+            canMap={canMapDocuments(role)}
+            onProceedToReconcile={() => setStep(2)}
+          />
+        </ProjectStageCard>
       )}
       {step === 2 && (
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8">
-          <ErrorFallback>
-            <ProjectReconcile projectId={slug} canReconcile={canReconcile(role)} onProceedToReview={() => setStep(3)} />
-          </ErrorFallback>
-        </div>
+        <ProjectStageCard ariaLabel="Reconcile transactions">
+          <ProjectReconcile
+            projectId={slug}
+            canReconcile={canReconcile(role)}
+            onProceedToReview={() => setStep(3)}
+          />
+        </ProjectStageCard>
       )}
       {step === 3 && (
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8">
-          <ErrorFallback>
-            <ProjectReview
-              projectId={slug}
-              onGoToReconcile={() => setStep(2)}
-              onGoToReport={() => setStep(4)}
-            />
-          </ErrorFallback>
-        </div>
+        <ProjectStageCard ariaLabel="Review and approve">
+          <ProjectReview
+            projectId={slug}
+            onGoToReconcile={() => setStep(2)}
+            onGoToReport={() => setStep(4)}
+          />
+        </ProjectStageCard>
       )}
       {step === 4 && (
-        <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8">
-          <ErrorFallback>
-            <ProjectReport
+        <ProjectStageCard ariaLabel="Report">
+          <ProjectReport
             projectId={slug}
             onGoToReview={() => setStep(3)}
             onReopen={() => setStep(2)}
@@ -616,9 +200,26 @@ export default function ProjectDetail() {
             canExport={canExportReport(role)}
             canReopen={canReopenProject(role)}
           />
-          </ErrorFallback>
-        </div>
+        </ProjectStageCard>
       )}
+    </div>
+  )
+}
+
+/** Branded skeleton shown while the project query resolves. */
+function ProjectDetailSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading project">
+      <div className="space-y-3">
+        <Skeleton className="h-3 w-32" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+        <Skeleton className="h-4 w-44" />
+      </div>
+      <Skeleton className="h-16 w-full rounded-2xl" />
+      <Skeleton className="h-72 w-full rounded-2xl" />
     </div>
   )
 }
