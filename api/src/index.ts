@@ -35,6 +35,10 @@ import currencyRoutes from './routes/currency.js';
 import auditRoutes from './routes/audit.js';
 import settingsRoutes from './routes/settings.js';
 import apiKeysRoutes from './routes/api-keys.js';
+import { securityMiddleware } from './middleware/security.js';
+import { httpLogger, logger, REQUEST_ID_HEADER } from './middleware/logging.js';
+import { livenessHandler, readinessHandler } from './middleware/readiness.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 const app = express();
 const PORT = process.env.PORT || 9001;
@@ -49,6 +53,19 @@ else if (trustProxyEnv) {
 }
 app.set('trust proxy', trustProxySetting)
 
+// Security headers come before everything else so even error responses carry
+// them.  Helmet sets CSP, HSTS, X-Content-Type-Options, Referrer-Policy, etc.
+app.use(securityMiddleware());
+
+// Structured per-request logging.  This also assigns/propagates an
+// X-Request-Id which the error handler echoes back in error payloads.
+app.use(httpLogger);
+app.use((req, res, next) => {
+  const id = (req as unknown as { id?: string | number }).id
+  if (id) res.setHeader(REQUEST_ID_HEADER, String(id))
+  next()
+})
+
 const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) || [];
 const devOrigins = [
   'http://localhost:9000',
@@ -60,7 +77,7 @@ const devOrigins = [
 // also allow the default Vite/Express ports for local work.
 const allowedOrigins = (isProd ? [...corsOrigins] : [...devOrigins, ...corsOrigins]).filter(Boolean) as string[];
 if (isProd && allowedOrigins.length === 0) {
-  console.warn('WARN: CORS_ORIGIN not set. Cross-origin requests from a browser will be rejected.');
+  logger.warn('CORS_ORIGIN not set. Cross-origin requests from a browser will be rejected.');
 }
 
 app.use(cors({
@@ -72,7 +89,8 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', REQUEST_ID_HEADER],
+  exposedHeaders: [REQUEST_ID_HEADER],
 }));
 // Paystack webhook — no auth; must be before subscription router
 app.post('/api/v1/subscription/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => {
@@ -84,9 +102,15 @@ app.post('/api/v1/subscription/webhook', express.raw({ type: 'application/json' 
 });
 app.use(express.json());
 
-app.get('/health', (_, res) => {
-  res.json({ status: 'ok', service: 'brs-api' });
-});
+// Liveness / readiness probes.
+//  - /health and /healthz are equivalent and intentionally cheap.  Prefer
+//    /healthz for new callers — the un-suffixed form is kept for backwards
+//    compatibility with existing Coolify health checks.
+//  - /readyz pings the DB and returns 503 if anything required is unhealthy,
+//    so orchestrators can do safe rolling restarts.
+app.get('/health', livenessHandler);
+app.get('/healthz', livenessHandler);
+app.get('/readyz', readinessHandler);
 
 app.get('/api/v1', (_, res) => {
   res.json({
@@ -129,19 +153,12 @@ app.get('/api/v1/uploads/branding/:filename', (req, res) => {
   res.sendFile(fullPath);
 });
 
-// Global error handler — catches multer and other errors
-app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const msg = err instanceof Error ? err.message : 'Request failed'
-  const code = err && typeof err === 'object' && 'code' in err ? (err as { code?: string }).code : undefined
-  let status = 500
-  if (msg.includes('File type') || msg.includes('not allowed')) status = 400
-  else if (code === 'LIMIT_FILE_SIZE' || msg.includes('too large')) {
-    status = 413
-    return res.status(413).json({ error: `File too large. Max ${process.env.MAX_UPLOAD_SIZE_MB || '10'}MB.` })
-  }
-  res.status(status).json({ error: msg })
-})
+// 404 for any unmatched route — same shape as other error responses.
+app.use(notFoundHandler);
+
+// Central error handler — catches Zod, Prisma, multer, and unexpected errors.
+app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`BRS API running at http://localhost:${PORT}`);
+  logger.info({ port: PORT }, `BRS API listening`);
 });

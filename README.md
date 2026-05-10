@@ -87,7 +87,7 @@ cd api && npm run test:watch   # Watch mode
 ```
 
 Tests cover matching engine, Ghana bank parsers (Ecobank, GCB, Access), and reference extraction.
-Current API test suite status: `16 files / 87 tests` (includes webhook handler, reconcile conflict, auth secret, API key limiter hardening, subscription lifecycle transition tests, CSV ingestion edge cases, OCR language resolution, OCR table line splitting heuristics including dual debit/credit columns, and the public `/api/v1/public/plans` contract that always returns the four canonical tiers).
+Current API test suite status: `19 files / 108 tests` (includes webhook handler, reconcile conflict, auth secret, API key limiter hardening, subscription lifecycle transition tests, CSV ingestion edge cases, OCR language resolution, OCR table line splitting heuristics including dual debit/credit columns, the public `/api/v1/public/plans` contract that always returns the four canonical tiers, the `/healthz` and `/readyz` probes with DB-timeout handling, the central error handler's Zod / Prisma / multer translation and production stack-leak guard, and the helmet security headers contract including CSP, HSTS, and `cross-origin-resource-policy`).
 
 **Features:** Multi-bank (one project with multiple bank accounts), native PDF text extraction with OCR fallback, Ghana bank auto-detection (Ecobank, GCB, Access, Stanbic, Fidelity, UBA, Absa). **Premium report & dashboard:** Ghana-acceptable BRS layout, design tokens, narrative summary, preparer/reviewer comments, white-label branding; see `docs/PREMIUM_GHANA_IMPLEMENTATION_PLAN.md` and `docs/DESIGN_TOKENS.md`.
 
@@ -194,6 +194,24 @@ Operational behavior now enforced:
 - Webhook signature verification uses raw request bytes.
 - Duplicate Paystack references are treated as idempotent webhook retries.
 - A transaction can only be part of one reconciliation match (DB + API conflict handling).
+- Helmet sets CSP, HSTS (prod only), `X-Content-Type-Options`, `Referrer-Policy`, and related headers on every response.
+- Per-IP rate limits: 30 req / 15 min on `/api/v1/auth/*`, 10 req / 1 hr on `/auth/forgot-password` and `/auth/reset-password`. Per-org limit: 30 calls / 1 hr to `/api/v1/subscription/initialize` (Paystack init).
+- Zod validation, Prisma `P2002`/`P2025`/`P2003`, and Multer errors now map to friendly 4xx responses; production payloads never echo Prisma stack traces.
+- Every response carries an `X-Request-Id` header (honoured if upstream proxy already set one) and every error JSON body includes the same `requestId` so a customer screenshot maps to a single log entry.
+
+### Health & readiness endpoints
+
+| Path | Purpose | When to use |
+|------|---------|-------------|
+| `GET /health` (alias `GET /healthz`) | Liveness — is the Node process up? Never touches the DB. | Coolify / k8s **liveness** probe. |
+| `GET /readyz` | Readiness — is the DB reachable? Returns `503` with a `checks` object on failure. | Coolify / k8s **readiness** probe; load balancer health check. |
+
+Tunables (`api/.env`):
+
+- `LOG_LEVEL` — `trace` / `debug` / `info` / `warn` / `error` / `fatal` / `silent` (default `info`, `debug` in dev).
+- `LOG_PRETTY=1` — force pretty-printed logs (default on in dev, off in prod).
+- `READINESS_DB_TIMEOUT_MS` — ms before `/readyz` declares the DB dead (default `1500`).
+- `HELMET_DISABLE_CSP=1` — escape hatch if a deployment must embed assets from an unexpected origin.
 
 ---
 

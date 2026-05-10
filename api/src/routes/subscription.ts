@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import express from 'express'
 import { Router } from 'express'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
@@ -10,6 +11,7 @@ import { getPlanBySlug } from '../services/plan.js'
 import { PLAN_PRICES } from '../config/subscription.js'
 import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
+import { logger } from '../middleware/logging.js'
 
 const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
 const PLAN_RANK: Record<(typeof PAYABLE_PLANS)[number], number> = {
@@ -34,6 +36,28 @@ const INTRO_OFFER_ENABLED = process.env.INTRO_OFFER_ENABLED === 'true' || proces
 const INTRO_OFFER_DISCOUNT = 0.5 // 50% off first payment
 const router = Router()
 router.use(authMiddleware)
+
+/**
+ * Rate limit Paystack initialization.  Each call hits Paystack and creates a
+ * pending payment row, so a runaway client (or a credential-stuffed account)
+ * could otherwise exhaust our Paystack quota and pollute the payments table.
+ *
+ * Keyed by org id when authenticated so a noisy single user can't lock out
+ * the rest of the firm.
+ */
+const initializeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,
+  standardHeaders: true,
+  message: { error: 'Too many payment attempts. Please wait a few minutes and try again.' },
+  keyGenerator: (req) => {
+    const orgId = (req as AuthRequest).auth?.orgId
+    if (orgId) return `org:${orgId}`
+    // Fall back to the library helper which correctly subnet-masks IPv6
+    // addresses so a single client cannot bypass limits via random ::1234.
+    return `ip:${ipKeyGenerator(req.ip || 'unknown')}`
+  },
+})
 
 async function getSubscriptionOverrides(orgId: string) {
   const [trialOverride, statusOverride] = await Promise.all([
@@ -149,7 +173,7 @@ router.get('/plans', async (req: AuthRequest, res) => {
   })
 })
 
-router.post('/initialize', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
   if (!PAYSTACK_SECRET) {
     return res.status(503).json({ error: 'Billing not configured. Contact support to upgrade.' })
@@ -223,7 +247,7 @@ router.post('/initialize', authMiddleware, async (req: AuthRequest, res) => {
       introOfferApplied: introOfferApplied || undefined,
     })
   } catch (err) {
-    console.error('[Paystack] Initialize error:', err)
+    logger.error({ err }, 'paystack: initialize failed')
     res.status(502).json({ error: 'Payment service unavailable' })
   }
 })

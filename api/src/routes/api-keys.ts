@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
@@ -8,6 +9,23 @@ import { generateApiKey, hashApiKey, getKeyPrefix } from '../lib/apiKey.js'
 
 const router = Router()
 router.use(authMiddleware)
+
+/**
+ * Rate-limit API key creation per org.  A stolen admin JWT could otherwise
+ * mint hundreds of long-lived API keys in seconds; capping creation gives
+ * the audit log + admin a chance to react.
+ */
+const createApiKeyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  standardHeaders: true,
+  message: { error: 'Too many API keys created recently. Try again in an hour.' },
+  keyGenerator: (req) => {
+    const orgId = (req as AuthRequest).auth?.orgId
+    if (orgId) return `org:${orgId}`
+    return `ip:${ipKeyGenerator(req.ip || 'unknown')}`
+  },
+})
 
 async function requireApiAccessPlan(req: AuthRequest, res: import('express').Response): Promise<boolean> {
   const org = await prisma.organization.findUnique({
@@ -41,7 +59,7 @@ router.get('/', async (req: AuthRequest, res) => {
   res.json(keys)
 })
 
-router.post('/', async (req: AuthRequest, res) => {
+router.post('/', createApiKeyLimiter, async (req: AuthRequest, res) => {
   if (!(await requireApiAccessPlan(req, res))) return
   const role = req.auth!.role
   if (!canManageBilling(role)) {

@@ -3,6 +3,7 @@
  * Set RESEND_API_KEY and EMAIL_FROM in .env for production.
  * EMAIL_FROM must be a verified domain (or onboarding@resend.dev for testing).
  */
+import { logger } from '../middleware/logging.js'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const EMAIL_FROM = process.env.EMAIL_FROM || 'BRS <onboarding@resend.dev>'
@@ -28,20 +29,19 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions): 
         text: text || html.replace(/<[^>]*>/g, ''),
       })
       if (error) {
-        console.error('[Email] Resend error:', error)
+        logger.error({ err: error, to, subject }, 'email: Resend API returned error')
         return false
       }
       return true
     } catch (err) {
-      console.error('[Email] Send failed:', err)
+      logger.error({ err, to, subject }, 'email: send failed')
       return false
     }
   }
-  // Fallback: log in development
+  // Fallback: log in development so engineers can see reset links without Resend.
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[Email] (no RESEND_API_KEY) Would send to ${to}:`)
-    console.log(`  Subject: ${subject}`)
-    console.log(`  Link: ${html.match(/https?:\/\/[^\s"'<>]+/)?.[0] || '(no URL)'}`)
+    const link = html.match(/https?:\/\/[^\s"'<>]+/)?.[0] || '(no URL)'
+    logger.info({ to, subject, link }, 'email: would send (no RESEND_API_KEY)')
   }
   return true
 }

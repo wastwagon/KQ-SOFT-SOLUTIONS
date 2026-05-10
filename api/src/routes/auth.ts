@@ -10,16 +10,28 @@ import { isPlatformAdmin } from '../lib/platformAdmin.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { authMiddleware, requireJwtSecret } from '../middleware/auth.js'
 import type { AuthRequest } from '../middleware/auth.js'
+import { logger } from '../middleware/logging.js'
 
 const router = Router()
 
-// Rate limit auth endpoints (per IP)
+// Default per-IP limiter for /login, /register, /me etc.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
   max: 30, // 30 requests per window
   message: { error: 'Too many attempts. Please try again later.' },
   standardHeaders: true,
 })
+
+// Tighter limiter for password recovery — prevents using us as an email-bomber
+// or brute-forcing reset tokens.  Applied per-IP because the email is the
+// thing the attacker is enumerating.
+const passwordRecoveryLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: { error: 'Too many password recovery attempts. Try again in an hour.' },
+  standardHeaders: true,
+})
+
 router.use(authLimiter)
 const JWT_SECRET = requireJwtSecret()
 const SALT_ROUNDS = 10
@@ -131,7 +143,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       isPlatformAdmin: isPlatformAdmin(user.email),
     })
   } catch (e) {
-    console.error('[auth/me]', e)
+    logger.error({ err: e }, 'auth/me failed')
     res.status(500).json({ error: 'Failed to fetch session' })
   }
 })
@@ -172,14 +184,14 @@ router.post('/login', async (req, res) => {
     if (e instanceof z.ZodError) {
       return res.status(400).json({ error: e.errors[0]?.message })
     }
-    console.error('[auth/login]', e)
+    logger.error({ err: e }, 'auth/login failed')
     res.status(500).json({ error: 'Login failed' })
   }
 })
 
 const RESET_TOKEN_EXPIRY_HOURS = 1
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', passwordRecoveryLimiter, async (req, res) => {
   try {
     const body = forgotSchema.parse(req.body)
     const user = await prisma.user.findUnique({
@@ -214,7 +226,7 @@ router.post('/forgot-password', async (req, res) => {
   }
 })
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', passwordRecoveryLimiter, async (req, res) => {
   try {
     const body = resetSchema.parse(req.body)
     const record = await prisma.passwordResetToken.findUnique({
