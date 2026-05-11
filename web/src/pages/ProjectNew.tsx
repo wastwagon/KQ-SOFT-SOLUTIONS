@@ -34,6 +34,8 @@ export default function ProjectNew() {
   const [clientId, setClientId] = useState('')
   const [reconciliationDate, setReconciliationDate] = useState('')
   const [rollForwardFromProjectId, setRollForwardFromProjectId] = useState('')
+  const [primaryBankName, setPrimaryBankName] = useState('')
+  const [primaryAccountNo, setPrimaryAccountNo] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -92,6 +94,12 @@ export default function ProjectNew() {
       reconciliationDate: reconciliationDate ? `${reconciliationDate}T00:00:00.000Z` : undefined,
       rollForwardFromProjectId: rollForwardFromProjectId || undefined,
       currency,
+      ...(primaryBankName.trim() || primaryAccountNo.trim()
+        ? {
+            primaryBankName: primaryBankName.trim() || undefined,
+            primaryAccountNo: primaryAccountNo.trim() || undefined,
+          }
+        : {}),
     })
   }
 
@@ -106,9 +114,9 @@ export default function ProjectNew() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
-          <p className="mt-1 text-sm text-gray-600 max-w-xl">
-            Create a bank reconciliation project once your subscription is active.
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New reconciliation project</h1>
+          <p className="mt-2 text-sm text-gray-600 max-w-xl leading-relaxed">
+            Spin up a workspace for one client or period. When your subscription is active you can upload statements and match straight away.
           </p>
         </div>
         <SubscriptionRenewalPanel />
@@ -121,9 +129,9 @@ export default function ProjectNew() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
-          <p className="mt-1 text-sm text-gray-600 max-w-xl">
-            Create a bank reconciliation project. You can copy settings from an existing project or start from scratch.
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New reconciliation project</h1>
+          <p className="mt-2 text-sm text-gray-600 max-w-xl leading-relaxed">
+            Create a project as soon as data loads. Copy settings from an older job or start clean.
           </p>
         </div>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
@@ -147,9 +155,10 @@ export default function ProjectNew() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
-        <p className="mt-1 text-sm text-gray-600 max-w-xl">
-          Create a bank reconciliation project. You can copy settings from an existing project or start from scratch.
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">New reconciliation project</h1>
+        <p className="mt-2 text-base text-gray-600 max-w-xl leading-relaxed">
+          Give this engagement a clear name, link an optional client, and—if you like—save your bank label and account number now.
+          They appear on the signed-off Bank Reconciliation Statement next to your firm letterhead, so reviewers see which account the rec covers at a glance.
         </p>
       </div>
       {platformDefaultsFailed && (
@@ -166,7 +175,7 @@ export default function ProjectNew() {
       )}
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8 max-w-lg space-y-5"
+        className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8 max-w-2xl space-y-5"
       >
         {error && (
           <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100">
@@ -214,6 +223,44 @@ export default function ProjectNew() {
               ))}
             </select>
           </SelectWrapper>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50/90 to-white p-5 space-y-4 ring-1 ring-gray-100">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-primary-600">Bank details for reports</p>
+            <p className="mt-1 text-sm text-gray-600 leading-relaxed">
+              Optional. Shown on your final BRS letterhead (with your logo and address) as the account line—same wording many firms put under the title on the worksheet.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="primary-bank-name" className={labelClass}>
+                Bank name
+              </label>
+              <input
+                id="primary-bank-name"
+                type="text"
+                value={primaryBankName}
+                onChange={(e) => setPrimaryBankName(e.target.value)}
+                placeholder="e.g. Ecobank Ghana PLC"
+                autoComplete="organization"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="primary-account-no" className={labelClass}>
+                Account number
+              </label>
+              <input
+                id="primary-account-no"
+                type="text"
+                value={primaryAccountNo}
+                onChange={(e) => setPrimaryAccountNo(e.target.value)}
+                placeholder="e.g. 0150123456789"
+                autoComplete="off"
+                className={inputClass}
+              />
+            </div>
+          </div>
         </div>
         <div>
           <label className={labelClass}>Reconciliation date (optional)</label>

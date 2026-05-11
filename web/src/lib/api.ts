@@ -460,8 +460,16 @@ export const projects = {
     return api(`/projects${q.toString() ? `?${q}` : ''}`) as Promise<ProjectListPayload>
   },
   get: (id: string) => api(`/projects/${id}`),
-  create: (body: { name: string; clientId?: string; reconciliationDate?: string; rollForwardFromProjectId?: string; currency?: 'GHS' | 'USD' | 'EUR' }) =>
-    api('/projects', { method: 'POST', body: JSON.stringify(body) }),
+  create: (body: {
+    name: string
+    clientId?: string
+    reconciliationDate?: string
+    rollForwardFromProjectId?: string
+    currency?: 'GHS' | 'USD' | 'EUR'
+    /** Shown on BRS letterhead when set; creates primary bank account record */
+    primaryBankName?: string
+    primaryAccountNo?: string
+  }) => api('/projects', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: { name?: string; clientId?: string | null; currency?: 'GHS' | 'USD' | 'EUR' }) =>
     api(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (id: string) =>

@@ -677,6 +677,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <p className="text-sm text-slate-600 mt-1">{data.organization.branding.letterheadAddress}</p>
           )}
           <p className="text-lg font-medium text-slate-700 mt-1">{data.project?.name}</p>
+          {accountReferenceLine ? (
+            <p className="mt-3 text-sm font-semibold text-slate-800 tracking-tight border-l-4 border-primary-400 pl-3 py-2 bg-slate-50/90 rounded-r-md print:border-slate-300 print:bg-white">
+              {accountReferenceLine}
+            </p>
+          ) : null}
           {(data?.project?.status === 'completed') && (() => {
             const p = data.project
             return p?.approvedBy && p?.approvedAt ? (

@@ -31,6 +31,9 @@ const createSchema = z.object({
   reconciliationDate: z.string().datetime().optional(),
   rollForwardFromProjectId: z.string().optional(),
   currency: z.enum(['GHS', 'USD', 'EUR']).optional(),
+  /** Optional primary bank — creates first BankAccount for BRS letterhead / workbook header */
+  primaryBankName: z.string().max(100).optional(),
+  primaryAccountNo: z.string().max(50).optional(),
 })
 
 router.get('/', async (req: AuthRequest, res) => {
@@ -111,6 +114,19 @@ router.post('/', async (req: AuthRequest, res) => {
         currency: body.currency || 'GHS',
       },
     })
+    const pb = (body.primaryBankName ?? '').trim()
+    const pa = (body.primaryAccountNo ?? '').trim()
+    if (pb || pa) {
+      const displayName = pb || (pa ? `Account ${pa}` : 'Primary bank account')
+      await prisma.bankAccount.create({
+        data: {
+          projectId: project.id,
+          name: displayName.slice(0, 200),
+          bankName: pb || null,
+          accountNo: pa || null,
+        },
+      })
+    }
     await incrementProjects(orgId)
     res.status(201).json(project)
   } catch (e) {
