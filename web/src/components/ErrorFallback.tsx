@@ -52,7 +52,7 @@ export default class ErrorFallback extends Component<Props, State> {
     if (this.props.variant === 'page') {
       return (
         <div className="min-h-screen bg-surface flex items-center justify-center px-4 py-10">
-          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
             <div className="flex items-start gap-4">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
                 <AlertTriangle className="h-6 w-6 text-amber-600" aria-hidden="true" />

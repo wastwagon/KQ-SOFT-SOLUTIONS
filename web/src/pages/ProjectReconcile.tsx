@@ -10,6 +10,8 @@ import SplitSuggestionsPanel from '../components/reconcile/SplitSuggestionsPanel
 import SuggestedMatchesPanel from '../components/reconcile/SuggestedMatchesPanel'
 import { useReconcileSession } from '../components/reconcile/useReconcileSession'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
+import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 
 /**
@@ -94,13 +96,13 @@ export default function ProjectReconcile({
 
   if (reconcileLoadFailed) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
         <p className="font-medium text-red-900">Could not load reconciliation data</p>
         <p className="mt-1">Check your connection and try again.</p>
         <button
           type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
-          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-xl bg-white border border-red-300 text-red-900 hover:bg-red-100"
         >
           Retry
         </button>
@@ -109,11 +111,7 @@ export default function ProjectReconcile({
   }
 
   if (isLoading || !data) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-sm font-medium text-gray-500">Loading reconciliation data…</p>
-      </div>
-    )
+    return <WorkflowStepSkeleton bodyRows={4} />
   }
 
   const currency = (data.project as { currency?: string })?.currency || 'GHS'
@@ -184,14 +182,17 @@ export default function ProjectReconcile({
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-sm text-gray-600 max-w-2xl leading-relaxed">
-          This step <strong>matches your cash book entries</strong> (receipts or payments) to{' '}
-          <strong>bank statement entries</strong> (credits or debits). Use the suggested matches
-          for speed, or select rows in the tables below and click Match. When you're done, proceed
-          to Review to finalise.
-        </p>
-      </div>
+      <WorkflowStepIntro
+        eyebrow="Match"
+        title="Reconcile transactions"
+        subtitle={
+          <>
+            This step <strong>matches your cash book entries</strong> (receipts or payments) to{' '}
+            <strong>bank statement entries</strong> (credits or debits). Use the suggested matches for speed, or select
+            rows in the tables below and click Match. When you&apos;re done, proceed to Review to finalise.
+          </>
+        }
+      />
 
       <BrsHelp variant="reconcile" />
 
@@ -204,7 +205,7 @@ export default function ProjectReconcile({
           <button
             type="button"
             onClick={loadMore}
-            className="px-4 py-2 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-xl transition-colors"
           >
             Load more
           </button>
@@ -244,7 +245,7 @@ export default function ProjectReconcile({
       )}
 
       {canReconcile && (
-        <p className="text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
+        <p className="text-xs text-slate-600 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
           <strong>Best practice:</strong> For cheques, match only when the amount (and reference if
           present) matches the bank.
         </p>

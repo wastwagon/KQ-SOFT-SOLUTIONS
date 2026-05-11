@@ -17,6 +17,7 @@ import SettingsTabNav from '../components/settings/SettingsTabNav'
 import { useBrandingSettings } from '../components/settings/useBrandingSettings'
 import Card from '../components/ui/Card'
 import { useToast } from '../components/ui/Toast'
+import PageHeader from '../components/layout/PageHeader'
 
 /**
  * Organisation settings hub (branding, billing, members, API keys, bank rules).
@@ -26,6 +27,7 @@ export default function Settings() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const role = useAuth((s) => s.role)
+  const org = useAuth((s) => s.org)
 
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -76,14 +78,25 @@ export default function Settings() {
   }
 
   if (branding.isLoading) {
-    return <div className="text-gray-500 py-8">Loading settings...</div>
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Administration"
+          title="Settings"
+          subtitle={<p className="text-gray-500">Loading your organisation preferences…</p>}
+        />
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm max-w-md">
+          Loading settings…
+        </div>
+      </div>
+    )
   }
 
   if (branding.brandingLoadFailed) {
     return (
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">Settings</h1>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+      <div className="space-y-8">
+        <PageHeader eyebrow="Administration" title="Settings" />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
           <p className="font-medium text-red-900">Could not load branding</p>
           <p className="mt-1">
             {branding.brandingLoadError != null && branding.brandingLoadError instanceof Error
@@ -108,13 +121,21 @@ export default function Settings() {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">Settings</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Manage branding, billing, and bank rules for your organisation.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Administration"
+        title="Settings"
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p className="text-gray-500">
+              Branding, billing, team, API keys, and bank rules — everything that applies across projects.
+            </p>
+          </>
+        }
+      />
       {subscriptionSidebarFailed && (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 max-w-2xl">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 max-w-7xl">
           <p className="font-medium">Plan or usage information could not be loaded.</p>
           <p className="mt-1 text-amber-900/90">Billing amounts and feature flags may be incomplete until this succeeds.</p>
           <button
@@ -130,7 +151,7 @@ export default function Settings() {
         </div>
       )}
       <SettingsTabNav showApiKeys={!!features.api_access} showBankRules={!!features.bank_rules} />
-      <div className="max-w-2xl">
+      <div className="w-full max-w-7xl">
         {activeTab === 'branding' && (
           <SettingsBrandingTab role={role} features={features} branding={branding} />
         )}

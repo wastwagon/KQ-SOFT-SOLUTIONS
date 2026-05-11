@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
-import { X, FolderKanban } from 'lucide-react'
+import { X, FolderKanban, ChevronRight } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { projects, clients, subscription, isSubscriptionInactiveError } from '../lib/api'
 import { canCreateProject } from '../lib/permissions'
@@ -12,6 +12,7 @@ import Button from '../components/ui/Button'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import PageHeader from '../components/layout/PageHeader'
 
 const preloadProjectDetailPage = () => import('./ProjectDetail')
 
@@ -30,6 +31,9 @@ type ProjectsProps = { initialStatus?: string }
 export default function Projects({ initialStatus }: ProjectsProps) {
   const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
+  const org = useAuth((s) => s.org)
+  /** `/reports` renders this page with completed status pre-selected */
+  const isReportsView = initialStatus === 'completed'
   const [searchParams, setSearchParams] = useSearchParams()
   const clientFromUrl = searchParams.get('clientId') || ''
   const statusFromUrl = searchParams.get('status') || ''
@@ -105,9 +109,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
   if (paywallBlocked) {
     return (
       <div className="space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projects</h1>
-        </div>
+        <PageHeader eyebrow="Work" title={isReportsView ? 'Reports' : 'Projects'} />
         <SubscriptionRenewalPanel />
       </div>
     )
@@ -117,10 +119,8 @@ export default function Projects({ initialStatus }: ProjectsProps) {
     const err = projectsQuery.error ?? clientsQuery.error
     return (
       <div className="space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projects</h1>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <PageHeader eyebrow="Work" title={isReportsView ? 'Reports' : 'Projects'} />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
           <p className="font-medium text-red-900">Could not load projects</p>
           <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
           <button
@@ -139,18 +139,31 @@ export default function Projects({ initialStatus }: ProjectsProps) {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projects</h1>
-        {canCreateProject(role) && (
-          <Link
-            to="/projects/new"
-            className="inline-flex items-center justify-center font-medium px-4 py-2.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 shadow-sm hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-all"
-          >
-            + New Project
-          </Link>
-        )}
-      </div>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Work"
+        title={isReportsView ? 'Reports' : 'Projects'}
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p className="text-gray-500">
+              {isReportsView
+                ? 'Finished jobs — open a project to review files and download BRS exports. The list defaults to completed; use chips or search to widen the view.'
+                : 'Open, filter, and resume reconciliation jobs. Status chips below match your workflow stages.'}
+            </p>
+          </>
+        }
+        actions={
+          canCreateProject(role) ? (
+            <Link
+              to="/projects/new"
+              className="inline-flex items-center justify-center font-medium px-4 py-2.5 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-all"
+            >
+              + New project
+            </Link>
+          ) : undefined
+        }
+      />
 
       {features.multi_client && clientFilter && (
         <div className="flex items-center gap-2 flex-wrap">
@@ -199,7 +212,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
           placeholder="Search by project name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0 sm:min-w-[200px] px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white transition-colors"
+          className="flex-1 min-w-0 sm:min-w-[200px] px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50/50 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white transition-colors"
         />
         {features.multi_client ? (
           <select
@@ -214,7 +227,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                 return p
               })
             }}
-            className="px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors"
+            className="px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50/50 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors min-h-[44px]"
           >
             <option value="">All clients</option>
             {(clientsList as { id: string; name: string }[]).map((c) => (
@@ -259,7 +272,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                 action={
                   <Link
                     to="/projects/new"
-                    className="inline-flex items-center justify-center font-medium px-4 py-2.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 shadow-sm focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all"
+                    className="inline-flex items-center justify-center font-medium px-4 py-2.5 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-sm focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all"
                   >
                     + New Project
                   </Link>
@@ -305,7 +318,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
             </thead>
             <tbody className="divide-y divide-border-muted bg-white">
               {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-surface/50 transition-colors">
+                <tr key={p.id} className="hover:bg-gray-50/90 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-medium text-gray-900">{p.name}</p>
                   </td>
@@ -321,9 +334,12 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                       to={`/projects/${p.slug ?? p.id}`}
                       onMouseEnter={preloadProjectDetailPage}
                       onFocus={preloadProjectDetailPage}
-                      className="text-primary-600 hover:text-primary-700 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                      className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg group/link"
                     >
-                      {(p.status === 'completed' || p.status === 'approved' || p.status === 'submitted_for_review') ? 'View' : 'Resume'}
+                      {(p.status === 'completed' || p.status === 'approved' || p.status === 'submitted_for_review')
+                        ? 'View'
+                        : 'Resume'}
+                      <ChevronRight className="w-4 h-4 opacity-70 group-hover/link:translate-x-0.5 transition-transform" aria-hidden />
                     </Link>
                   </td>
                 </tr>
@@ -335,7 +351,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       </Card>
 
       {totalProjects > limit && (
-        <div className="flex items-center justify-between gap-4 py-4 px-2">
+        <div className="flex items-center justify-between gap-4 py-4 px-4 rounded-xl border border-gray-200 bg-white shadow-sm">
           <p className="text-sm text-gray-500">
             Showing <span className="font-medium">{offset + 1}</span> to <span className="font-medium">{Math.min(offset + limit, totalProjects)}</span> of <span className="font-medium">{totalProjects}</span> projects
           </p>

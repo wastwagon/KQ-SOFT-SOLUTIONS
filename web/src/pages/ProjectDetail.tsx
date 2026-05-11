@@ -146,7 +146,7 @@ export default function ProjectDetail() {
     const err = projectQuery.error ?? clientsQuery.error
     return (
       <div className="space-y-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
           <p className="font-medium text-red-900">Could not load project</p>
           <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
           <button
@@ -155,7 +155,7 @@ export default function ProjectDetail() {
               void queryClient.invalidateQueries({ queryKey: ['project', slug] })
               void queryClient.invalidateQueries({ queryKey: ['clients'] })
             }}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
           >
             Retry
           </button>
@@ -168,7 +168,7 @@ export default function ProjectDetail() {
   }
   if (!project) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
         <h1 className="text-lg font-semibold text-gray-900">Project not found</h1>
         <p className="mt-2 text-sm text-gray-500">
           The project may have been deleted or you may not have permission to view it.
@@ -249,16 +249,16 @@ export default function ProjectDetail() {
 function ProjectDetailSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading project">
-      <div className="space-y-3">
-        <Skeleton className="h-3 w-32" />
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-7 w-64" />
-          <Skeleton className="h-6 w-24 rounded-full" />
+      <div className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white shadow-sm px-5 py-5 sm:px-7 sm:py-6 space-y-4">
+        <Skeleton className="h-4 w-36 rounded-xl" />
+        <div className="flex flex-wrap items-center gap-3">
+          <Skeleton className="h-9 w-56 sm:w-72 rounded-xl" />
+          <Skeleton className="h-8 w-28 rounded-full" />
         </div>
-        <Skeleton className="h-4 w-44" />
+        <Skeleton className="h-4 w-52 rounded-xl" />
       </div>
-      <Skeleton className="h-16 w-full rounded-2xl" />
-      <Skeleton className="h-72 w-full rounded-2xl" />
+      <Skeleton className="h-14 w-full rounded-xl shadow-sm" />
+      <Skeleton className="h-72 w-full rounded-xl shadow-sm" />
     </div>
   )
 }

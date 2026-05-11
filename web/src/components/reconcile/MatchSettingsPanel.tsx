@@ -103,7 +103,7 @@ function PresetButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+      className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
         active
           ? 'border-amber-500 bg-amber-200 text-amber-950'
           : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'

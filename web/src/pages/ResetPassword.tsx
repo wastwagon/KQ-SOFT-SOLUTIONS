@@ -4,7 +4,6 @@ import { Lock } from 'lucide-react'
 import { auth } from '../lib/api'
 import AuthLayout, {
   authAlertErrorClass,
-  authCardClass,
   authFieldClass,
   authLabelClass,
   authPrimaryButtonClass,
@@ -58,7 +57,7 @@ export default function ResetPassword() {
       title="Choose a new password"
       subtitle="Pick a strong password you haven’t used elsewhere."
     >
-      <form onSubmit={handleSubmit} className={`${authCardClass} space-y-5`}>
+      <form onSubmit={handleSubmit} className="space-y-5">
         {success ? (
           <div className="space-y-3 text-center">
             <p className="text-sm font-medium text-green-700">

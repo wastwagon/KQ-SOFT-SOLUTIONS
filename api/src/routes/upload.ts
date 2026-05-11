@@ -284,7 +284,7 @@ router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRe
   res.status(201).json(attachment)
 })
 
-// Branding logo upload (org-level) — Premium+ (full_branding)
+// Branding logo upload (org-level) — Standard+ (full_branding)
 router.post('/branding-logo', logoUpload.single('file'), async (req: AuthRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
   const role = req.auth!.role
@@ -299,7 +299,7 @@ router.post('/branding-logo', logoUpload.single('file'), async (req: AuthRequest
   })
   const { hasPlanFeature } = await import('../config/planFeatures.js')
   if (!org || !hasPlanFeature(org.plan, 'full_branding')) {
-    return res.status(403).json({ error: 'Logo upload requires Premium plan or higher.' })
+    return res.status(403).json({ error: 'Logo upload requires Standard plan or higher.' })
   }
   const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 9001}`
   const logoUrl = `${baseUrl}/api/v1/uploads/branding/${path.basename(req.file.path)}`

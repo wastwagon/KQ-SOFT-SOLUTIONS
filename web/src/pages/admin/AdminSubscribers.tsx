@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../store/auth'
 import Card from '../../components/ui/Card'
+import PageHeader from '../../components/layout/PageHeader'
 
 type Org = {
   id: string
@@ -72,57 +73,71 @@ export default function AdminSubscribers() {
   }
 
   if (isLoading || !data) {
-    return <p className="text-gray-500">Loading organizations...</p>
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Organizations"
+          subtitle={<p className="text-gray-500">Subscribers — filter by plan, manage, export.</p>}
+        />
+        <p className="text-gray-500 text-sm">Loading organizations…</p>
+      </div>
+    )
   }
 
   const { organizations, pagination } = data
   const fmt = (n: number) => new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(n)
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Subscribers — filter by plan, manage, export.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={planFilter}
-            onChange={(e) => { setPlanFilter(e.target.value); setPage(1) }}
-            className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-          >
-            <option value="">All plans</option>
-            <option value="paid">Paid (basic/standard/premium)</option>
-            <option value="basic">Basic</option>
-            <option value="standard">Standard</option>
-            <option value="premium">Premium</option>
-            <option value="firm">Firm</option>
-          </select>
-          <div className="relative">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Search by name..."
-              className="pl-9 pr-3 py-2 w-56 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500"
-            />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Organizations"
+        subtitle={<p className="text-gray-500">Subscribers — filter by plan, manage, export.</p>}
+        actions={
+          <div className="flex flex-wrap items-center gap-3 justify-end w-full lg:w-auto">
+            <select
+              value={planFilter}
+              onChange={(e) => {
+                setPlanFilter(e.target.value)
+                setPage(1)
+              }}
+              className="px-3 py-2.5 border border-border rounded-xl bg-white text-gray-900 text-sm min-h-[44px] shadow-sm"
+            >
+              <option value="">All plans</option>
+              <option value="paid">Paid (basic/standard/premium)</option>
+              <option value="basic">Basic</option>
+              <option value="standard">Standard</option>
+              <option value="premium">Premium</option>
+              <option value="firm">Firm</option>
+            </select>
+            <div className="relative min-w-[200px] flex-1 sm:flex-initial sm:w-56">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search by name..."
+                className="pl-9 pr-3 py-2.5 w-full border border-border rounded-xl bg-white text-gray-900 placeholder-gray-500 shadow-sm min-h-[44px]"
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 border border-border rounded-xl text-gray-700 hover:bg-surface disabled:opacity-50 text-sm font-medium shadow-sm bg-white min-h-[44px]"
+            >
+              <Download className="w-4 h-4" />
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={exporting}
-            className="inline-flex items-center gap-1.5 px-4 py-2 border border-border rounded-lg text-gray-700 hover:bg-surface disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </button>
-        </div>
-      </div>
+        }
+      />
 
-      <Card noPadding className="overflow-hidden">
+      <Card noPadding className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
         <table className="min-w-full">
           <thead className="bg-surface border-b border-border">

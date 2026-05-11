@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import Card from '../ui/Card'
 import { getLogoDisplayUrl } from '../../lib/api'
 import { canEditBranding } from '../../lib/permissions'
@@ -39,8 +40,12 @@ export default function SettingsBrandingTab({ role, features, branding: b }: Set
           <label className="block text-sm font-semibold text-gray-700 mb-1">Logo</label>
           {!features.full_branding && (
             <p className="text-sm text-amber-600 mb-2">
-              Logo on reports requires Premium plan or higher. Basic and Standard plans can customise
-              colours and text.
+              Logo on reports requires Standard plan or higher. The Basic plan can customise colours and
+              text only —{' '}
+              <Link to="/settings/billing" className="font-semibold underline hover:no-underline">
+                upgrade your subscription
+              </Link>{' '}
+              to add your logo to PDF letterheads.
             </p>
           )}
           {features.full_branding && (

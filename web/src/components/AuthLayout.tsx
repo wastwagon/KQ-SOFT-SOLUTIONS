@@ -78,7 +78,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
       </aside>
 
       {/* Mobile / tablet: compact brand strip */}
-      <div className="lg:hidden border-b border-gray-100 bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-5 text-center">
+      <div className="lg:hidden border-b border-gray-100 bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-5 text-center shadow-sm">
         <Link
           to="/"
           className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-2 shadow-md"
@@ -91,41 +91,38 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
       </div>
 
       {/* Form column */}
-      <main className="flex flex-1 flex-col justify-center px-4 py-10 sm:px-8 sm:py-14 lg:px-12 xl:px-20 bg-surface">
+      <main className="flex flex-1 flex-col justify-center px-4 py-10 sm:px-8 sm:py-14 lg:px-12 xl:px-20 bg-surface lg:border-l lg:border-gray-200/80">
         <div className="mx-auto w-full max-w-md">
           <Link
             to="/"
-            className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+            className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to home
           </Link>
 
-          <div className="lg:mb-2">
+          <div className="rounded-xl border border-gray-200/90 border-l-4 border-l-primary-500 bg-gradient-to-br from-white via-slate-50/80 to-white px-5 py-6 shadow-sm sm:px-8 sm:py-8">
             {eyebrow && (
-              <p className="text-xs font-bold uppercase tracking-[0.15em] text-primary-600">
-                {eyebrow}
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">{eyebrow}</p>
             )}
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+            <h2
+              className={`text-2xl font-bold tracking-tight text-gray-900 sm:text-[1.75rem] ${eyebrow ? 'mt-1' : ''}`}
+            >
               {title}
             </h2>
             {subtitle && (
-              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                {subtitle}
-              </p>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">{subtitle}</p>
             )}
+            <div className="mt-5 border-t border-gray-100/90 pt-5 sm:mt-6 sm:pt-6">{children}</div>
           </div>
 
-          <div className="mt-8">{children}</div>
-
-          <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-500 lg:justify-start">
+          <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 rounded-xl border border-gray-200/80 bg-white/60 px-4 py-3 text-xs text-gray-500 shadow-sm lg:justify-start">
             <li className="flex items-center gap-1.5">
-              <Check className="h-3.5 w-3.5 text-green-600" />
+              <Check className="h-3.5 w-3.5 shrink-0 text-green-600" aria-hidden />
               <span>HTTPS & encrypted sessions</span>
             </li>
             <li className="flex items-center gap-1.5">
-              <Check className="h-3.5 w-3.5 text-green-600" />
+              <Check className="h-3.5 w-3.5 shrink-0 text-green-600" aria-hidden />
               <span>Your data stays in your org</span>
             </li>
           </ul>
@@ -142,13 +139,10 @@ export const authFieldClass =
 export const authLabelClass = 'mb-1.5 block text-sm font-medium text-gray-700'
 
 export const authPrimaryButtonClass =
-  'w-full rounded-xl bg-primary-600 py-3 px-4 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 transition-all hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50'
-
-export const authCardClass =
-  'rounded-2xl border border-gray-200/80 bg-white p-7 shadow-[0_8px_30px_rgb(0,0,0,0.06)] sm:p-8'
+  'w-full min-h-[48px] rounded-xl bg-primary-600 py-3 px-4 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 transition-all hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50'
 
 export const authAlertErrorClass =
-  'rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700'
+  'rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm'
 
 export const authAlertWarnClass =
-  'rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900'
+  'rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm'

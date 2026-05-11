@@ -5,7 +5,6 @@ import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
 import AuthLayout, {
   authAlertErrorClass,
-  authCardClass,
   authFieldClass,
   authLabelClass,
   authPrimaryButtonClass,
@@ -57,7 +56,7 @@ export default function Register() {
       title="Create your workspace"
       subtitle="One organisation per account. You can invite teammates from Settings after you sign up."
     >
-      <form onSubmit={handleSubmit} className={`${authCardClass} space-y-5`}>
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <div className={authAlertErrorClass} role="alert">
             {error}

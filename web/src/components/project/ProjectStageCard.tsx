@@ -24,7 +24,7 @@ export default function ProjectStageCard({
   return (
     <section
       aria-label={ariaLabel}
-      className={`overflow-hidden rounded-2xl border border-gray-200 border-l-4 border-l-primary-500 bg-white p-6 shadow-sm sm:p-8 ${className}`}
+      className={`overflow-hidden rounded-xl border border-gray-200 border-l-4 border-l-primary-500 bg-white p-6 shadow-sm sm:p-8 ${className}`}
     >
       <ErrorFallback>{children}</ErrorFallback>
     </section>

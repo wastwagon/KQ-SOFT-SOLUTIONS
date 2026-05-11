@@ -64,7 +64,7 @@ export default function SuggestedMatchesPanel({
           type="button"
           onClick={() => setShowSettings((v) => !v)}
           aria-expanded={showSettings}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
             showSettings ? 'bg-amber-200 text-amber-900' : 'bg-white/80 text-amber-700 hover:bg-white'
           } border border-amber-200`}
         >

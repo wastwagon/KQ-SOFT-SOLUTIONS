@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
+import PageHeader from '../../components/layout/PageHeader'
 
 export default function AdminUsers() {
   const [page, setPage] = useState(1)
@@ -19,33 +20,44 @@ export default function AdminUsers() {
   })
 
   if (isLoading || !data) {
-    return <p className="text-gray-500">Loading users...</p>
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Users"
+          subtitle={<p className="text-gray-500">View and manage platform accounts.</p>}
+        />
+        <p className="text-gray-500 text-sm">Loading users…</p>
+      </div>
+    )
   }
 
   const { users, pagination } = data
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            View and manage platform users.
-          </p>
-        </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Search by email or name..."
-            className="w-full pl-9 pr-3 py-2 border border-border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500"
-          />
-        </div>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Users"
+        subtitle={<p className="text-gray-500">View and manage platform accounts.</p>}
+        actions={
+          <div className="relative w-full sm:w-72 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Search by email or name..."
+              className="w-full pl-9 pr-3 py-2.5 border border-border rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 shadow-sm min-h-[44px]"
+            />
+          </div>
+        }
+      />
 
-      <Card noPadding>
+      <Card noPadding className="shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
         <table className="min-w-full">
           <thead className="bg-surface">

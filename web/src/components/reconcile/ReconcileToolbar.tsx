@@ -1,9 +1,8 @@
 import type { ReconcileView } from './types'
 
 /**
- * Top toolbar for the reconcile workflow.  Renders the title, the bank
- * account scope dropdown, and the three view tabs (Receipts / Payments /
- * Cash book all).  Pure-presentational; the page above owns the state.
+ * Reconcile toolbar: bank account scope and view tabs (Receipts / Payments / Cash book all).
+ * The step title lives in the parent page intro (see WorkflowStepIntro).
  */
 interface ReconcileToolbarProps {
   view: ReconcileView
@@ -27,8 +26,7 @@ export default function ReconcileToolbar({
   onBankAccountChange,
 }: ReconcileToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <h2 className="text-xl font-bold text-gray-900 tracking-tight">Reconcile transactions</h2>
+    <div className="flex flex-wrap items-center justify-end gap-4">
       <div className="flex flex-wrap items-center gap-3">
         {bankAccounts.length > 0 && (
           <select
@@ -58,7 +56,7 @@ export default function ReconcileToolbar({
                 role="tab"
                 aria-selected={active}
                 onClick={() => onViewChange(v.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${
                   active ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
                 }`}
               >

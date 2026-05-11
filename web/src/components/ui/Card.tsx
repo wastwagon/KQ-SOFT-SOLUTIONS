@@ -14,7 +14,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className = '', title, sublabel, actions, noPadding, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={`bg-white rounded-lg border border-border shadow-card overflow-hidden ${className}`}
+      className={`bg-white rounded-xl border border-border shadow-card overflow-hidden ${className}`}
       {...props}
     >
       {(title || actions) && (

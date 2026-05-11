@@ -211,6 +211,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       'Bank rules engine',
       'Discrepancy report',
       'Full audit trail',
+      'Logo & full report branding on PDF exports',
       'Email support',
     ],
     features: {
@@ -232,7 +233,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       roll_forward: false,
       threshold_approval: false,
       basic_branding: true,
-      full_branding: false,
+      full_branding: true,
       multi_client: false,
       api_access: false,
       email_support: true,
@@ -259,7 +260,6 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       'One-to-many & many-to-many matches',
       'Roll forward across periods',
       'Threshold approval workflow',
-      'Full branding (logo, colours, footer)',
       'Priority support',
     ],
     features: {

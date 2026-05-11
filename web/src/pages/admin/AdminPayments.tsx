@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
+import PageHeader from '../../components/layout/PageHeader'
 
 type Payment = {
   id: string
@@ -39,20 +40,30 @@ export default function AdminPayments() {
     new Intl.NumberFormat('en-GH', { style: 'currency', currency, minimumFractionDigits: 2 }).format(n)
 
   if (isLoading || !data) {
-    return <p className="text-gray-500">Loading payments...</p>
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Payments"
+          subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
+        />
+        <p className="text-gray-500 text-sm">Loading payments…</p>
+      </div>
+    )
   }
 
   const { payments, pagination } = data
   const { page: p, totalPages, total } = pagination
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Payments</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        All subscription payments across the platform.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Payments"
+        subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
+      />
 
-      <Card>
+      <Card className="shadow-sm">
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <input
             type="text"

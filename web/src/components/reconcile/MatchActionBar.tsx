@@ -27,7 +27,7 @@ export default function MatchActionBar({
       aria-label="Confirm reconcile match"
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300"
     >
-      <div className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-800 p-2 pl-6 flex items-center gap-6 backdrop-blur-md bg-opacity-90">
+      <div className="flex items-center gap-6 border border-gray-800 bg-gray-900 bg-opacity-90 p-2 pl-6 text-white shadow-2xl backdrop-blur-md rounded-xl">
         <div className="flex items-center gap-4 py-2">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">

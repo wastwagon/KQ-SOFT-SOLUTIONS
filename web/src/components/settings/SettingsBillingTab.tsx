@@ -84,7 +84,7 @@ export default function SettingsBillingTab({
         </div>
       )}
       {canManageBilling(role) && plansData?.paystackConfigured ? (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {(plansData.plans || []).map((p) => {
             const introEligible = plansData?.introOffer?.eligible
             const firstMonthGhs = introEligible ? Math.round(p.monthlyGhs * 0.5 * 100) / 100 : null
@@ -93,7 +93,7 @@ export default function SettingsBillingTab({
             return (
               <div
                 key={p.id}
-                className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow transition-shadow"
+                className="border border-gray-200 rounded-xl p-6 sm:p-7 min-w-0 bg-white shadow-sm hover:shadow transition-shadow flex flex-col"
               >
                 <h3 className="font-semibold tracking-tight text-gray-900">{p.name}</h3>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -109,12 +109,12 @@ export default function SettingsBillingTab({
                   or GH₵{p.yearlyGhs}/yr (17% off)
                   {firstYearGhs != null && ` · First payment: GH₵${firstYearGhs}`}
                 </p>
-                <div className="mt-4 flex flex-col gap-2">
+                <div className="mt-5 flex flex-col gap-3 flex-1 justify-end">
                   <button
                     type="button"
                     onClick={() => onUpgrade(p.id, 'monthly')}
                     disabled={initializing === `${p.id}-monthly`}
-                    className="w-full px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow transition-all"
+                    className="w-full px-5 py-3 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow transition-all"
                   >
                     {initializing === `${p.id}-monthly`
                       ? 'Redirecting...'
@@ -126,7 +126,7 @@ export default function SettingsBillingTab({
                     type="button"
                     onClick={() => onUpgrade(p.id, 'yearly')}
                     disabled={initializing === `${p.id}-yearly`}
-                    className="w-full px-4 py-2.5 font-medium border border-gray-300 text-gray-800 bg-white rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm shadow-sm transition-all"
+                    className="w-full px-5 py-3 font-medium border border-gray-300 text-gray-800 bg-white rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm shadow-sm transition-all leading-snug"
                   >
                     {initializing === `${p.id}-yearly`
                       ? 'Redirecting...'

@@ -194,7 +194,7 @@ function ConfirmDialogView({
         aria-hidden="true"
       />
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5"
+        className="relative w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5"
         style={{ animation: 'kq-dialog-in 200ms ease-out both' }}
       >
         <div className="p-6 sm:p-7">

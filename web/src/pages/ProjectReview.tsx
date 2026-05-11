@@ -7,6 +7,8 @@ import { getCurrencySymbol } from '../lib/currency'
 import { canSubmitForReview, canApprove } from '../lib/permissions'
 import BrsHelp from '../components/BrsHelp'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
+import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import { useToast } from '../components/ui/Toast'
 
 interface Tx {
@@ -58,11 +60,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
   })
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px] p-8">
-        <p className="text-gray-600 font-medium">Loading review data…</p>
-      </div>
-    )
+    return <WorkflowStepSkeleton bodyRows={3} />
   }
   if (isError || !data) {
     if (isSubscriptionInactiveError(error)) {
@@ -73,7 +71,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       )
     }
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-red-900 mb-2">Could not load review data</h2>
         <p className="text-sm text-red-800">
           {error instanceof Error ? error.message : 'Something went wrong. Try again or go back to Reconcile.'}
@@ -159,33 +157,37 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-gray-900">Review & exceptions</h2>
+      <WorkflowStepIntro
+        eyebrow="Review"
+        title="Review & exceptions"
+        subtitle="Confirm unmatched items and workflow status before generating the BRS. Submit for review or approve when your firm’s process allows."
+      />
 
       <BrsHelp variant="full" />
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 shadow-sm">
           <p className="text-sm text-green-700 font-medium">Matched</p>
           <p className="text-xl font-bold text-green-800">{data.existingMatches ?? 0}</p>
           <p className="text-xs text-green-700 mt-1">
             Receipts/Credits: {data.summary?.matchedReceiptsCreditsCount ?? 0} · Payments/Debits: {data.summary?.matchedPaymentsDebitsCount ?? 0}
           </p>
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
           <p className="text-sm text-amber-700 font-medium">Unmatched cash book</p>
           <p className="text-xl font-bold text-amber-800">
             {unmatchedReceipts.length + unmatchedPayments.length}
           </p>
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
           <p className="text-sm text-amber-700 font-medium">Unmatched bank</p>
           <p className="text-xl font-bold text-amber-800">
             {unmatchedCredits.length + unmatchedDebits.length}
           </p>
         </div>
         <div
-          className="bg-gray-50 border border-gray-200 rounded-lg p-4 cursor-help"
+          className="cursor-help rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
           title="Difference between total unmatched cash book amounts and total unmatched bank amounts (reconciliation discrepancy indicator)"
         >
           <p className="text-sm text-gray-700 font-medium">Variance</p>
@@ -197,8 +199,8 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
 
       {/* Recommendations */}
       <div
-        className={`rounded-lg p-4 border ${
-          hasUnmatched ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'
+        className={`rounded-xl border p-4 shadow-sm ${
+          hasUnmatched ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'
         }`}
       >
         <h3 className="font-medium mb-2 text-gray-900">
@@ -213,7 +215,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
               {onGoToReconcile && (
                 <button
                   onClick={onGoToReconcile}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
                 >
                   Go to Reconcile
                 </button>
@@ -221,7 +223,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
               {onGoToReport && (
                 <button
                   onClick={onGoToReport}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50"
                 >
                   Proceed to Report (with exceptions)
                 </button>
@@ -231,7 +233,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
         ) : (
           <>
             <p className="text-sm mb-3 text-gray-700">All transactions are matched. You can submit for review, approve, or generate the BRS report.</p>
-            <p className="text-xs text-slate-600 mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
+            <p className="text-xs text-slate-600 mb-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
               <strong>Draft vs final:</strong> What you see now is the draft report. After <strong>Submit for review</strong> and <strong>Approve</strong>, the report is final and date/time stamped.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -239,7 +241,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                 <button
                   onClick={() => submitMutation.mutate()}
                   disabled={submitMutation.isPending}
-                  className="px-4 py-2 border border-blue-300 text-blue-800 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+                  className="px-4 py-2 border border-blue-300 text-blue-800 rounded-xl hover:bg-blue-50 disabled:opacity-50"
                   title="Submit for review (locks editing)"
                 >
                   {submitMutation.isPending ? 'Submitting...' : 'Submit for review'}
@@ -250,7 +252,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                   <button
                     onClick={() => approveMutation.mutate()}
                     disabled={approveMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50"
                     title="Approve BRS"
                   >
                     {approveMutation.isPending ? 'Approving...' : 'Approve'}
@@ -263,7 +265,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
               {onGoToReport && (
                 <button
                   onClick={onGoToReport}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
                 >
                   Generate report
                 </button>
@@ -283,7 +285,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
         <div className="flex flex-col gap-6">
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Cash Book</h4>
-            <div className="border border-gray-200 rounded-lg overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
@@ -345,7 +347,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Bank Statement</h4>
-            <div className="border border-gray-200 rounded-lg overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
@@ -411,7 +413,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Cash Book</h4>
-            <div className="border border-gray-200 rounded-lg overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
@@ -473,7 +475,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Bank Statement</h4>
-            <div className="border border-gray-200 rounded-lg overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>

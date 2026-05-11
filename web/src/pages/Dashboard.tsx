@@ -1,7 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { FileCheck, FolderKanban, LayoutDashboard, Users, X } from 'lucide-react'
+import {
+  FileCheck,
+  FolderKanban,
+  LayoutDashboard,
+  Users,
+  X,
+  ChevronRight,
+  CheckCircle2,
+  CircleDot,
+  Palette,
+  CreditCard,
+  Key,
+  Landmark,
+  Shield,
+} from 'lucide-react'
 import { projects, subscription, settings as settingsApi, isSubscriptionInactiveError } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { canCreateProject } from '../lib/permissions'
@@ -11,12 +25,14 @@ import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import PageHeader from '../components/layout/PageHeader'
 
 const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
 
 export default function Dashboard() {
   const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
+  const org = useAuth((s) => s.org)
   const isAdmin = useAuth((s) => s.isAdmin())
   const [getStartedDismissed, setGetStartedDismissed] = useState(() => {
     try {
@@ -98,10 +114,8 @@ export default function Dashboard() {
   if (projectsLoadFailed) {
     return (
       <div className="space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <PageHeader eyebrow="Overview" title="Dashboard" />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
           <p className="font-medium text-red-900">Could not load projects</p>
           <p className="mt-1">
             {projectsError instanceof Error ? projectsError.message : 'Something went wrong.'}
@@ -118,27 +132,59 @@ export default function Dashboard() {
     )
   }
 
+  const roleLabel =
+    role === 'admin'
+      ? 'Admin'
+      : role === 'reviewer'
+        ? 'Reviewer'
+        : role === 'preparer'
+          ? 'Preparer'
+          : role === 'viewer'
+            ? 'Viewer'
+            : role ?? 'Member'
+
+  const projectsBarPct = projectsUnlimited
+    ? 0
+    : Math.min(100, (projectsUsed / Math.max(1, projectsLimit)) * 100)
+  const transactionsBarPct = transactionsUnlimited
+    ? 0
+    : Math.min(100, (transactionsUsed / Math.max(1, transactionsLimit)) * 100)
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/manual"
-            className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            Help / User Manual
-          </Link>
-            <span className={`px-2.5 py-1 text-xs font-bold rounded-lg uppercase tracking-wider ${
-              isAdmin ? 'bg-primary-100 text-primary-800' : 
-              role === 'reviewer' ? 'bg-green-100 text-green-800' :
-              role === 'preparer' ? 'bg-blue-100 text-blue-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {role}
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Overview"
+        title="Dashboard"
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p className="text-gray-500">Track projects, usage, and team activity in one place.</p>
+          </>
+        }
+        actions={
+          <>
+            <Link
+              to="/manual"
+              className="inline-flex items-center justify-center font-medium px-4 py-2 text-sm rounded-xl border border-primary-200 bg-white text-primary-700 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 shadow-sm transition-colors"
+            >
+              Help / User Manual
+            </Link>
+            <span
+              className={`px-3 py-1.5 text-xs font-semibold rounded-full tracking-wide ${
+                isAdmin
+                  ? 'bg-primary-100 text-primary-800'
+                  : role === 'reviewer'
+                    ? 'bg-green-100 text-green-800'
+                    : role === 'preparer'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              {roleLabel}
             </span>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {showSubscriptionPaywallBanner && (
         <div
@@ -225,7 +271,11 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+      <section aria-labelledby="dashboard-metrics-heading">
+        <h2 id="dashboard-metrics-heading" className="sr-only">
+          Key metrics
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
         {usageLoading ? (
           <>
             <MetricCardSkeleton />
@@ -245,9 +295,9 @@ export default function Dashboard() {
                     <span>{projectsUsed} / {projectsUnlimited ? '∞' : projectsLimit}</span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all ${projectsUsed / projectsLimit > 0.9 ? 'bg-red-500' : 'bg-primary-500'}`}
-                      style={{ width: `${projectsUnlimited ? 0 : Math.min(100, (projectsUsed / projectsLimit) * 100)}%` }}
+                    <div
+                      className={`h-full transition-all ${projectsBarPct > 90 ? 'bg-red-500' : 'bg-primary-500'}`}
+                      style={{ width: `${projectsBarPct}%` }}
                     />
                   </div>
                 </div>
@@ -272,9 +322,9 @@ export default function Dashboard() {
                     <span>{transactionsUsed} / {transactionsUnlimited ? '∞' : transactionsLimit}</span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all ${transactionsUsed / transactionsLimit > 0.9 ? 'bg-red-500' : 'bg-green-500'}`}
-                      style={{ width: `${transactionsUnlimited ? 0 : Math.min(100, (transactionsUsed / transactionsLimit) * 100)}%` }}
+                    <div
+                      className={`h-full transition-all ${transactionsBarPct > 90 ? 'bg-red-500' : 'bg-green-500'}`}
+                      style={{ width: `${transactionsBarPct}%` }}
                     />
                   </div>
                 </div>
@@ -291,11 +341,12 @@ export default function Dashboard() {
             />
           </>
         )}
-      </div>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <Card title="What’s new">
+          <Card title="What’s new" className="shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 {latestRelease ? (
@@ -323,7 +374,7 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-6">
-          <Card title="Plan features">
+          <Card title="Plan features" className="shadow-sm">
             <p className="text-xs text-gray-500 mb-5 uppercase font-bold tracking-widest">Included in your plan</p>
             <ul className="space-y-3">
               {[
@@ -333,18 +384,29 @@ export default function Dashboard() {
                 { id: 'discrepancy_report', label: 'Discrepancy Reporting' },
                 { id: 'full_branding', label: 'Custom Branding' },
                 { id: 'multi_client', label: 'Multi-Client Support' },
-              ].map(f => (
-                <li key={f.id} className={`flex items-center gap-2.5 text-sm ${features[f.id] ? 'text-gray-900' : 'text-gray-400 grayscale opacity-60'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${features[f.id] ? 'bg-primary-500' : 'bg-gray-300'}`} />
-                  {f.label}
-                  {!features[f.id] && <span className="ml-auto text-[10px] font-bold text-gray-400">UPGRADE</span>}
+              ].map((f) => (
+                <li
+                  key={f.id}
+                  className={`flex items-center gap-3 text-sm ${features[f.id] ? 'text-gray-900' : 'text-gray-400'}`}
+                >
+                  {features[f.id] ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" aria-hidden />
+                  ) : (
+                    <CircleDot className="w-4 h-4 shrink-0 text-gray-300" aria-hidden />
+                  )}
+                  <span className="flex-1 min-w-0">{f.label}</span>
+                  {!features[f.id] && (
+                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                      Upgrade
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
             {isAdmin && (
-              <Link 
-                to="/settings/billing" 
-                className="mt-6 block w-full text-center px-4 py-2 text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors border border-primary-200"
+              <Link
+                to="/settings/billing"
+                className="mt-6 block w-full text-center px-4 py-2.5 text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl transition-colors border border-primary-200 shadow-sm"
               >
                 Manage subscription
               </Link>
@@ -354,69 +416,137 @@ export default function Dashboard() {
       </div>
 
       {isAdmin && (
-        <Card title="Manage app & settings">
-          <p className="text-sm text-gray-600 mb-5">Control branding, billing, bank rules, API keys, and view activity.</p>
+        <Card title="Manage app & settings" className="shadow-sm">
+          <p className="text-sm text-gray-600 mb-5">
+            Control branding, billing, bank rules, API keys, and view activity.
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <Link to="/settings/branding" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link
+              to="/settings/branding"
+              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                <Palette className="w-4 h-4" aria-hidden />
+              </span>
               <span className="font-semibold tracking-tight text-gray-900">Branding</span>
-              <span className="text-xs text-gray-500 mt-0.5">Logo, colours, report title</span>
+              <span className="text-xs text-gray-500 leading-snug">Logo, colours, report title</span>
             </Link>
-            <Link to="/settings/billing" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link
+              to="/settings/billing"
+              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                <CreditCard className="w-4 h-4" aria-hidden />
+              </span>
               <span className="font-semibold tracking-tight text-gray-900">Billing</span>
-              <span className="text-xs text-gray-500 mt-0.5">Plan & payment</span>
+              <span className="text-xs text-gray-500 leading-snug">Plan & payment</span>
             </Link>
-            <Link to="/settings/members" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link
+              to="/settings/members"
+              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                <Users className="w-4 h-4" aria-hidden />
+              </span>
               <span className="font-semibold tracking-tight text-gray-900">Members</span>
-              <span className="text-xs text-gray-500 mt-0.5">Add & manage team</span>
+              <span className="text-xs text-gray-500 leading-snug">Add & manage team</span>
             </Link>
             {features.api_access && (
-            <Link to="/settings/api-keys" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-              <span className="font-semibold tracking-tight text-gray-900">API keys</span>
-              <span className="text-xs text-gray-500 mt-0.5">Create & manage API access</span>
-            </Link>
+              <Link
+                to="/settings/api-keys"
+                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                  <Key className="w-4 h-4" aria-hidden />
+                </span>
+                <span className="font-semibold tracking-tight text-gray-900">API keys</span>
+                <span className="text-xs text-gray-500 leading-snug">Create & manage API access</span>
+              </Link>
             )}
             {features.bank_rules && (
-            <Link to="/settings/bank-rules" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-              <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
-              <span className="text-xs text-gray-500 mt-0.5">Auto-suggest & flag rules</span>
-            </Link>
+              <Link
+                to="/settings/bank-rules"
+                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                  <Landmark className="w-4 h-4" aria-hidden />
+                </span>
+                <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
+                <span className="text-xs text-gray-500 leading-snug">Auto-suggest & flag rules</span>
+              </Link>
             )}
             {features.audit_trail && (
-            <Link to="/audit" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-              <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
-              <span className="text-xs text-gray-500 mt-0.5">All actions & exports</span>
-            </Link>
+              <Link
+                to="/audit"
+                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                  <Shield className="w-4 h-4" aria-hidden />
+                </span>
+                <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
+                <span className="text-xs text-gray-500 leading-snug">All actions & exports</span>
+              </Link>
             )}
           </div>
         </Card>
       )}
 
       {!isAdmin && (
-        <Card title="Settings">
+        <Card title="Settings" className="shadow-sm">
           <p className="text-sm text-gray-600 mb-5">Branding, billing, and team — manage your organisation.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Link to="/settings/branding" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link
+              to="/settings/branding"
+              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                <Palette className="w-4 h-4" aria-hidden />
+              </span>
               <span className="font-semibold tracking-tight text-gray-900">Branding</span>
-              <span className="text-xs text-gray-500 mt-0.5">Logo, colours, report title</span>
+              <span className="text-xs text-gray-500 leading-snug">Logo, colours, report title</span>
             </Link>
-            <Link to="/settings/billing" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link
+              to="/settings/billing"
+              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                <CreditCard className="w-4 h-4" aria-hidden />
+              </span>
               <span className="font-semibold tracking-tight text-gray-900">Billing</span>
-              <span className="text-xs text-gray-500 mt-0.5">Plan & payment</span>
+              <span className="text-xs text-gray-500 leading-snug">Plan & payment</span>
             </Link>
-            <Link to="/settings/members" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Link
+              to="/settings/members"
+              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                <Users className="w-4 h-4" aria-hidden />
+              </span>
               <span className="font-semibold tracking-tight text-gray-900">Members</span>
-              <span className="text-xs text-gray-500 mt-0.5">Add & manage team</span>
+              <span className="text-xs text-gray-500 leading-snug">Add & manage team</span>
             </Link>
             {features.bank_rules && (
-              <Link to="/settings/bank-rules" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <Link
+                to="/settings/bank-rules"
+                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                  <Landmark className="w-4 h-4" aria-hidden />
+                </span>
                 <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
-                <span className="text-xs text-gray-500 mt-0.5">Auto-suggest & flag rules</span>
+                <span className="text-xs text-gray-500 leading-snug">Auto-suggest & flag rules</span>
               </Link>
             )}
             {features.audit_trail && (
-              <Link to="/audit" className="flex flex-col p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <Link
+                to="/audit"
+                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+                  <Shield className="w-4 h-4" aria-hidden />
+                </span>
                 <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
-                <span className="text-xs text-gray-500 mt-0.5">Actions & exports</span>
+                <span className="text-xs text-gray-500 leading-snug">Actions & exports</span>
               </Link>
             )}
           </div>
@@ -425,23 +555,24 @@ export default function Dashboard() {
 
       <Card
         id="recent-projects"
-        title="Recent Projects"
+        title="Recent projects"
         sublabel={projectsList.length > 0 ? `${inProgressCount} in progress · ${completedCount} completed` : undefined}
+        className="shadow-sm"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link
               to="/projects"
-              className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-border bg-white text-gray-700 hover:bg-surface shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500"
+              className="inline-flex items-center justify-center font-medium px-3 py-2 text-sm rounded-xl border border-border bg-white text-gray-700 hover:bg-surface shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-colors"
             >
               View all
             </Link>
             {canCreateProject(role) && (
-            <Link
-              to="/projects/new"
-              className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500"
-            >
-              + New Project
-            </Link>
+              <Link
+                to="/projects/new"
+                className="inline-flex items-center justify-center font-medium px-3 py-2 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-colors"
+              >
+                + New project
+              </Link>
             )}
           </div>
         }
@@ -481,20 +612,33 @@ export default function Dashboard() {
             />
           ) : (
             projectsList.map((p: { id: string; name: string; slug: string; status: string; createdAt: string }) => (
-              <div key={p.id} className="px-6 py-5 flex justify-between items-center hover:bg-surface/50 transition-colors">
-                <div>
-                  <p className="font-medium text-gray-900">{p.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {p.status} • {formatDate(p.createdAt)}
+              <Link
+                key={p.id}
+                to={`/projects/${p.slug ?? p.id}`}
+                className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-gray-50/90 transition-colors group focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 group-hover:text-primary-800 transition-colors truncate">
+                    {p.name}
                   </p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        p.status === 'completed'
+                          ? 'bg-green-50 text-green-800 ring-1 ring-inset ring-green-600/15'
+                          : 'bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-600/15'
+                      }`}
+                    >
+                      {p.status === 'completed' ? 'Completed' : 'In progress'}
+                    </span>
+                    <span className="text-sm text-gray-500">{formatDate(p.createdAt)}</span>
+                  </div>
                 </div>
-                <Link
-                  to={`/projects/${p.slug ?? p.id}`}
-                  className="text-primary-600 hover:text-primary-700 text-sm font-medium shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
-                >
-                  {p.status === 'completed' ? 'View' : 'Resume'}
-                </Link>
-              </div>
+                <ChevronRight
+                  className="w-5 h-5 text-gray-400 shrink-0 group-hover:text-primary-600 transition-colors"
+                  aria-hidden
+                />
+              </Link>
             ))
           )}
         </div>

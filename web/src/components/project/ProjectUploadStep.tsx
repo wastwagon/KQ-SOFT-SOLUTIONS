@@ -12,6 +12,8 @@ import { PROJECT_UPLOAD_LIMITS_SUMMARY, validateProjectUploadFiles } from '../..
 import { canUploadDocuments } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
 import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
+import WorkflowStepIntro from './WorkflowStepIntro'
+import WorkflowStepSkeleton from './WorkflowStepSkeleton'
 
 /**
  * Upload step of the project workflow.  Lifted out of ProjectDetail so the
@@ -165,13 +167,13 @@ export default function ProjectUploadStep({
     const err = bankAccountsQuery.error
     return (
       <div className="space-y-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
           <p className="font-medium text-red-900">Could not load bank accounts</p>
           <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
           <button
             type="button"
             onClick={() => queryClient.invalidateQueries({ queryKey: ['bankAccounts', projectSlug] })}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
           >
             Retry
           </button>
@@ -181,42 +183,30 @@ export default function ProjectUploadStep({
   }
 
   if (bankAccountsLoading) {
-    return (
-      <div className="space-y-6">
-        <p className="text-sm text-gray-500">Loading upload options…</p>
-      </div>
-    )
+    return <WorkflowStepSkeleton bodyRows={2} />
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-primary-100 bg-primary-50/50 p-6 shadow-sm">
-        <div className="flex items-start gap-4">
-          <span
-            aria-hidden="true"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700"
-          >
-            <FolderKanban className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold tracking-tight text-gray-900">
-              Upload documents
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-600">
-              To begin reconciliation, upload your <strong>Cash Book</strong> and{' '}
-              <strong>Bank Statement</strong>. If a single document contains both
-              receipts and payments, choose &quot;Both&quot;. We will detect and
-              suggest column mappings in the next step.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Hint dotColor="bg-primary-500" text="Cash book date required" />
-              <Hint dotColor="bg-blue-500" text="Excel, CSV, PDF, and images supported" />
-            </div>
-            <p className="mt-3 text-xs text-gray-500 max-w-3xl">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
-          </div>
+      <WorkflowStepIntro
+        eyebrow="Upload"
+        title="Upload documents"
+        subtitle={
+          <>
+            To begin reconciliation, upload your <strong>Cash Book</strong> and{' '}
+            <strong>Bank Statement</strong>. If a single document contains both receipts and payments, choose
+            &quot;Both&quot;. We will detect and suggest column mappings in the next step.
+          </>
+        }
+      />
+      <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-4 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <Hint dotColor="bg-primary-500" text="Cash book date required" />
+          <Hint dotColor="bg-blue-500" text="Excel, CSV, PDF, and images supported" />
         </div>
+        <p className="mt-3 max-w-3xl text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
         {!canUpload && (
-          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
             View-only access. Contact an administrator to upload documents.
           </p>
         )}
@@ -290,14 +280,14 @@ export default function ProjectUploadStep({
                       placeholder="Account name (optional)"
                       value={bankAccountName}
                       onChange={(e) => setBankAccountName(e.target.value)}
-                      className="min-h-[40px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                      className="min-h-[40px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                     />
                     <input
                       type="text"
                       placeholder="Account number (optional)"
                       value={bankAccountNo}
                       onChange={(e) => setBankAccountNo(e.target.value)}
-                      className="min-h-[40px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                      className="min-h-[40px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                     />
                   </div>
                 )}
@@ -425,7 +415,7 @@ function progressLabel(
 
 function Hint({ dotColor, text }: { dotColor: string; text: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-lg border border-primary-100 bg-white px-3 py-1.5 text-xs font-medium text-primary-700">
+    <span className="inline-flex items-center gap-2 rounded-xl border border-primary-100 bg-white px-3 py-1.5 text-xs font-medium text-primary-700 shadow-sm">
       <span className={`h-2 w-2 rounded-full ${dotColor}`} aria-hidden="true" />
       {text}
     </span>
@@ -450,11 +440,11 @@ function UploadCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-600"
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-600"
         >
           <Icon className="h-4.5 w-4.5" />
         </span>
@@ -501,7 +491,7 @@ function SelectField({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="min-h-[40px] w-full appearance-none rounded-lg border border-gray-200 bg-white pl-3 pr-9 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+          className="min-h-[40px] w-full appearance-none rounded-xl border border-gray-200 bg-white pl-3 pr-9 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>
@@ -538,7 +528,7 @@ function FilePickerRow({
         multiple
         accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
         onChange={(e) => onFiles(Array.from(e.target.files || []))}
-        className="text-xs text-gray-500 file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:text-primary-700"
+        className="text-xs text-gray-500 file:mr-2 file:cursor-pointer file:rounded-xl file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:text-primary-700"
       />
       {files.length > 0 && (
         <span className="text-xs text-gray-500">
@@ -549,7 +539,7 @@ function FilePickerRow({
         type="button"
         onClick={onSubmit}
         disabled={disabled}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
       >
         <Upload className="h-3.5 w-3.5" aria-hidden="true" />
         {buttonLabel}

@@ -12,6 +12,8 @@ import {
 } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import PageHeader from '../components/layout/PageHeader'
+import { useAuth } from '../store/auth'
 
 function SelectWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -23,6 +25,7 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function ProjectNew() {
+  const org = useAuth((s) => s.org)
   const [name, setName] = useState('')
   const [currencyOverride, setCurrencyOverride] = useState<'GHS' | 'USD' | 'EUR' | null>(null)
   const platformDefaultsQuery = useQuery({
@@ -112,13 +115,16 @@ export default function ProjectNew() {
 
   if (paywallBlocked) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New reconciliation project</h1>
-          <p className="mt-2 text-sm text-gray-600 max-w-xl leading-relaxed">
-            Spin up a workspace for one client or period. When your subscription is active you can upload statements and match straight away.
-          </p>
-        </div>
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Work"
+          title="New reconciliation project"
+          subtitle={
+            <p className="text-gray-500">
+              Spin up a workspace for one client or period. When your subscription is active you can upload statements and match straight away.
+            </p>
+          }
+        />
         <SubscriptionRenewalPanel />
       </div>
     )
@@ -127,14 +133,13 @@ export default function ProjectNew() {
   if (listLoadFailed) {
     const err = projectsQuery.error ?? clientsQuery.error
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New reconciliation project</h1>
-          <p className="mt-2 text-sm text-gray-600 max-w-xl leading-relaxed">
-            Create a project as soon as data loads. Copy settings from an older job or start clean.
-          </p>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Work"
+          title="New reconciliation project"
+          subtitle={<p className="text-gray-500">Create a project as soon as data loads. Copy settings from an older job or start clean.</p>}
+        />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
           <p className="font-medium text-red-900">Could not load data for new project</p>
           <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
           <button
@@ -153,14 +158,19 @@ export default function ProjectNew() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">New reconciliation project</h1>
-        <p className="mt-2 text-base text-gray-600 max-w-xl leading-relaxed">
-          Give this engagement a clear name, link an optional client, and—if you like—save your bank label and account number now.
-          They appear on the signed-off Bank Reconciliation Statement next to your firm letterhead, so reviewers see which account the rec covers at a glance.
-        </p>
-      </div>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Work"
+        title="New reconciliation project"
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p className="text-gray-500">
+              Give this engagement a clear name, link an optional client, and optionally save bank label and account number for your BRS letterhead.
+            </p>
+          </>
+        }
+      />
       {platformDefaultsFailed && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 max-w-2xl">
           <span>Workspace defaults could not be loaded; new projects use GHS until this succeeds. </span>

@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import PageHeader from '../../components/layout/PageHeader'
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>()
@@ -59,21 +60,21 @@ export default function AdminUserDetail() {
   const suspended = user.suspendedAt != null
 
   return (
-    <div>
+    <div className="space-y-8">
       <Link
         to="/platform-admin/users"
-        className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Users
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{user.name || user.email}</h1>
-          <p className="text-sm text-gray-500 mt-1">{user.email}</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        eyebrow="Platform admin"
+        title={user.name || user.email}
+        subtitle={<p className="text-gray-500 font-mono text-sm">{user.email}</p>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
           {suspended ? (
             <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">
               Suspended
@@ -105,8 +106,9 @@ export default function AdminUserDetail() {
               {updateMutation.isPending ? 'Suspending...' : 'Suspend'}
             </Button>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="p-4">

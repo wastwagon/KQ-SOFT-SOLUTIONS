@@ -3,6 +3,7 @@ import { DollarSign, TrendingUp, CreditCard, ArrowUpRight, ArrowDownRight } from
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
+import PageHeader from '../../components/layout/PageHeader'
 
 export default function AdminRevenue() {
   const { data, isLoading } = useQuery({
@@ -19,19 +20,29 @@ export default function AdminRevenue() {
   })
 
   if (isLoading || !data) {
-    return <p className="text-gray-500">Loading revenue...</p>
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Revenue analytics"
+          subtitle={<p className="text-gray-500">Platform revenue, MRR, and payment history.</p>}
+        />
+        <p className="text-gray-500 text-sm">Loading revenue…</p>
+      </div>
+    )
   }
 
   const fmt = (n: number) => new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(n)
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Revenue Analytics</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Platform revenue, MRR, and payment history.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Revenue analytics"
+        subtitle={<p className="text-gray-500">Platform revenue, MRR, and payment history.</p>}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary-100">

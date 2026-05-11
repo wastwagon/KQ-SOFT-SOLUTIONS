@@ -93,7 +93,7 @@ export default function ProjectHeader({
   }
 
   return (
-    <header className="space-y-3">
+    <header className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white shadow-sm px-5 py-5 sm:px-7 sm:py-6 space-y-4">
       <nav aria-label="Breadcrumb" className="text-sm">
         <ol className="flex items-center gap-1 text-gray-500">
           <li>

@@ -14,7 +14,7 @@ export default function PageLoader() {
       aria-label="Loading page"
       className="min-h-screen w-full bg-surface flex flex-col items-center justify-center gap-6 px-4"
     >
-      <div className="flex items-center justify-center rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-100">
+      <div className="flex items-center justify-center rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-100">
         <BrandLogo className="h-9 w-auto" />
       </div>
       <div className="flex items-center gap-3 text-sm text-gray-500">

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '../store/auth'
 import { FileCheck, Download } from 'lucide-react'
 import { audit, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { formatDate } from '../lib/format'
@@ -10,6 +11,7 @@ import Button from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import PageHeader from '../components/layout/PageHeader'
 
 const PAGE_SIZE = 20
 
@@ -29,6 +31,7 @@ interface AuditLog {
 export default function Audit() {
   const queryClient = useQueryClient()
   const toast = useToast()
+  const org = useAuth((s) => s.org)
   const [projectFilter, setProjectFilter] = useState('')
   const [page, setPage] = useState(0)
   const [exporting, setExporting] = useState(false)
@@ -73,8 +76,8 @@ export default function Audit() {
 
   if (paywallBlocked) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Audit log</h1>
+      <div className="space-y-8">
+        <PageHeader eyebrow="Administration" title="Audit log" />
         <SubscriptionRenewalPanel />
       </div>
     )
@@ -83,9 +86,9 @@ export default function Audit() {
   if (auditLoadFailed) {
     const err = auditQuery.error ?? projectsQuery.error
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Audit log</h1>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+      <div className="space-y-8">
+        <PageHeader eyebrow="Administration" title="Audit log" />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
           <p className="font-medium text-red-900">Could not load audit log</p>
           <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
           <button
@@ -104,19 +107,30 @@ export default function Audit() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight text-gray-900">Audit log</h1>
-      <p className="text-sm text-gray-600 max-w-2xl">
-        Actions logged for compliance: uploads, mappings, matches, and report exports.
-      </p>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Administration"
+        title="Audit log"
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p className="text-gray-500">
+              Compliance trail for uploads, mappings, matches, approvals, and report exports.
+            </p>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="font-medium text-gray-700">Project</span>
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
+        <label className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm min-w-0 flex-1">
+          <span className="font-semibold text-gray-700 shrink-0">Project</span>
           <select
             value={projectFilter}
-            onChange={(e) => { setProjectFilter(e.target.value); setPage(0) }}
-            className="w-full sm:w-auto sm:min-w-[200px] px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50/50 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors"
+            onChange={(e) => {
+              setProjectFilter(e.target.value)
+              setPage(0)
+            }}
+            className="w-full sm:w-auto sm:min-w-[220px] px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50/50 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors min-h-[44px]"
           >
             <option value="">All projects</option>
             {projectsList.map((p) => (
@@ -185,7 +199,7 @@ export default function Audit() {
               </thead>
               <tbody className="divide-y divide-border-muted bg-white">
                 {paginated.map((l) => (
-                  <tr key={l.id} className="hover:bg-surface/50 transition-colors">
+                  <tr key={l.id} className="hover:bg-gray-50/90 transition-colors">
                     <td className="px-6 py-3 text-gray-500 whitespace-nowrap">{formatDate(l.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-6 py-3 font-medium text-gray-900">{l.actionLabel}</td>
                     <td className="px-6 py-3 text-gray-600">

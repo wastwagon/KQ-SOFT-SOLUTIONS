@@ -25,6 +25,19 @@ export default function MetricCard({ label, value, sublabel, icon, accent = 'pri
               ? 'border-l-4 border-l-indigo-500'
               : ''
 
+  const iconWrap =
+    accent === 'primary'
+      ? 'bg-primary-50 text-primary-600'
+      : accent === 'muted'
+        ? 'bg-gray-100 text-gray-500'
+        : accent === 'amber'
+          ? 'bg-amber-50 text-amber-600'
+          : accent === 'green'
+            ? 'bg-green-50 text-green-600'
+            : accent === 'indigo'
+              ? 'bg-indigo-50 text-indigo-600'
+              : 'bg-gray-50 text-gray-400'
+
   return (
     <div
       className={`bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 sm:p-6 ${accentBorder} ${className}`}
@@ -44,7 +57,10 @@ export default function MetricCard({ label, value, sublabel, icon, accent = 'pri
           )}
         </div>
         {icon && (
-          <div className="flex-shrink-0 text-gray-400/60 [&>svg]:w-5 [&>svg]:h-5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
+          <div
+            className={`flex-shrink-0 rounded-xl p-2.5 [&>svg]:w-5 [&>svg]:h-5 sm:[&>svg]:w-6 sm:[&>svg]:h-6 ${iconWrap}`}
+            aria-hidden
+          >
             {icon}
           </div>
         )}

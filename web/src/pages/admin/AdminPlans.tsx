@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
+import PageHeader from '../../components/layout/PageHeader'
 
 export default function AdminPlans() {
   const queryClient = useQueryClient()
@@ -42,25 +43,35 @@ export default function AdminPlans() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] }),
   })
 
-  if (isLoading) return <p className="text-gray-500">Loading plans...</p>
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Plans"
+          subtitle={<p className="text-gray-500">Manage subscription tiers: limits and pricing.</p>}
+        />
+        <p className="text-gray-500 text-sm">Loading plans…</p>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Plans</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage subscription tiers: limits and pricing.
-          </p>
-        </div>
-        <Button onClick={() => setShowNew(true)}>
-          <Plus className="w-4 h-4 mr-1.5" />
-          New plan
-        </Button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Plans"
+        subtitle={<p className="text-gray-500">Manage subscription tiers: limits and pricing.</p>}
+        actions={
+          <Button onClick={() => setShowNew(true)}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            New plan
+          </Button>
+        }
+      />
 
       {showNew && (
-        <Card className="mb-6 p-4">
+        <Card className="mb-6 p-4 shadow-sm border-l-4 border-l-primary-500">
           <h3 className="font-medium text-gray-900 mb-4">New plan</h3>
           <PlanForm
             onSubmit={(b) => createMutation.mutate(b)}
@@ -71,7 +82,7 @@ export default function AdminPlans() {
         </Card>
       )}
 
-      <Card noPadding>
+      <Card noPadding className="shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
         <table className="min-w-full">
           <thead className="bg-surface">

@@ -6,7 +6,6 @@ import { useAuth } from '../store/auth'
 import AuthLayout, {
   authAlertErrorClass,
   authAlertWarnClass,
-  authCardClass,
   authFieldClass,
   authLabelClass,
   authPrimaryButtonClass,
@@ -52,7 +51,7 @@ export default function Login() {
       title="Sign in"
       subtitle="Use your organisation email to access projects, reconciliations, and reports."
     >
-      <form onSubmit={handleSubmit} className={`${authCardClass} space-y-5`}>
+      <form onSubmit={handleSubmit} className="space-y-5">
         {sessionExpired && (
           <div className={authAlertWarnClass} role="alert">
             Your session expired. Please sign in again.

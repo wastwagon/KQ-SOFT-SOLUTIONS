@@ -95,7 +95,7 @@ export default function AdminLayout() {
         </nav>
       </aside>
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 flex items-center justify-between gap-4 px-4 lg:px-6 border-b border-border bg-white">
+        <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-4 lg:px-6 border-b border-border bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}

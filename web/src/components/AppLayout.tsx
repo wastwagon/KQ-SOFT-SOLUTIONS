@@ -114,7 +114,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Top header bar: logo + nav + user */}
-      <header className="sticky top-0 z-40 flex items-center h-14 px-4 sm:px-6 lg:px-8 bg-white border-b border-border shadow-sm">
+      <header className="sticky top-0 z-40 flex items-center h-14 px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur-md border-b border-border shadow-sm supports-[backdrop-filter]:bg-white/90">
         {/* Logo */}
         <NavLink
           to="/"

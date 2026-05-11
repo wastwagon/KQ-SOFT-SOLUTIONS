@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { Building2, ChevronRight } from 'lucide-react'
 import { clients, subscription, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
+import { useAuth } from '../store/auth'
+import Card from '../components/ui/Card'
+import EmptyState from '../components/ui/EmptyState'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import PageHeader from '../components/layout/PageHeader'
 
 export default function Clients() {
   const queryClient = useQueryClient()
   const toast = useToast()
+  const org = useAuth((s) => s.org)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
 
@@ -51,8 +57,8 @@ export default function Clients() {
 
   if (paywallBlocked) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Clients</h1>
+      <div className="space-y-8">
+        <PageHeader eyebrow="Work" title="Clients" />
         <SubscriptionRenewalPanel />
       </div>
     )
@@ -60,9 +66,9 @@ export default function Clients() {
 
   if (isError && clientsListError) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Clients</h1>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+      <div className="space-y-8">
+        <PageHeader eyebrow="Work" title="Clients" />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
           <p className="font-medium text-red-900">Could not load clients</p>
           <p className="mt-1">
             {clientsListError instanceof Error ? clientsListError.message : 'Something went wrong.'}
@@ -80,19 +86,34 @@ export default function Clients() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight text-gray-900">Clients</h1>
-      <p className="text-sm text-gray-600 max-w-2xl">
-        <strong>Clients</strong> are the external entities or customer accounts you are reconciling for. 
-        To add team members (your employees) to your firm, go to <Link to="/settings/members" className="text-primary-600 font-medium hover:underline">Administration &gt; Members</Link>.
-      </p>
-      <p className="text-xs text-gray-500 max-w-2xl">
-        Add clients here and assign them when creating a project. {!features.multi_client && (
-          <span className="text-amber-600 font-medium">Filter projects by client (multi-client view) requires Firm plan.</span>
-        )}
-      </p>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Work"
+        title="Clients"
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p>
+              <strong className="text-gray-800">Clients</strong> are the entities you reconcile for. Team
+              employees are managed under{' '}
+              <Link to="/settings/members" className="font-medium text-primary-600 hover:underline">
+                Administration → Members
+              </Link>
+              .
+            </p>
+            <p className="text-xs text-gray-500">
+              Assign clients when creating a project.{' '}
+              {!features.multi_client && (
+                <span className="text-amber-700 font-medium">
+                  Filtering the project list by client requires the Firm plan.
+                </span>
+              )}
+            </p>
+          </>
+        }
+      />
 
-      <form onSubmit={handleSubmit} className="flex gap-3 max-w-md">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-xl">
         <input
           type="text"
           value={name}
@@ -108,41 +129,54 @@ export default function Clients() {
           {createMutation.isPending ? 'Adding...' : 'Add client'}
         </button>
       </form>
-      {error && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm max-w-md">{error}</div>}
+      {error && (
+        <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm max-w-xl border border-red-100">{error}</div>
+      )}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200 border-l-4 border-l-primary-500">
+      <Card noPadding className="overflow-hidden border-l-4 border-l-primary-500 shadow-sm">
         {isLoading ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
+          <div className="px-6 py-12 text-center text-sm text-gray-500">Loading clients…</div>
         ) : list.length === 0 ? (
-          <div className="px-6 py-14 text-center">
-            <p className="text-lg font-semibold tracking-tight text-gray-900">No clients yet</p>
-            <p className="mt-2 text-sm text-gray-600">Add your first client above.</p>
+          <div className="py-14 px-6">
+            <EmptyState
+              icon={<Building2 className="w-7 h-7" />}
+              title="No clients yet"
+              description="Add a client above, then attach them when you create a reconciliation project."
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-surface border-b border-border">
-              <tr>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Projects</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted bg-white">
-              {list.map((c) => (
-                <tr key={c.id} className="hover:bg-surface/50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    <Link to={`/projects?clientId=${c.id}`} className="text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
-                      {c._count?.projects ?? 0} project(s)
-                    </Link>
-                  </td>
+            <table className="min-w-full">
+              <thead className="bg-surface border-b border-border">
+                <tr>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Client
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Projects
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border-muted bg-white">
+                {list.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50/90 transition-colors">
+                    <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <Link
+                        to={`/projects?clientId=${c.id}`}
+                        className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg group/row"
+                      >
+                        {c._count?.projects ?? 0} project{(c._count?.projects ?? 0) === 1 ? '' : 's'}
+                        <ChevronRight className="w-4 h-4 opacity-70 group-hover/row:translate-x-0.5 transition-transform" aria-hidden />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

@@ -86,7 +86,7 @@ export default function SubscriptionFxReference({
   }, [plans, billingPeriod, unitPerGhs])
 
   return (
-    <div className="mt-10 rounded-2xl border border-gray-200/80 bg-white/90 backdrop-blur-sm p-5 sm:p-6 shadow-sm ring-1 ring-gray-100">
+    <div className="mt-10 rounded-xl border border-gray-200/80 bg-white/90 backdrop-blur-sm p-5 sm:p-6 shadow-sm ring-1 ring-gray-100">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">

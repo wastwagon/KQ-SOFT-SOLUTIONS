@@ -25,7 +25,7 @@ export default function ProjectStepNav({ steps, current, onChange }: ProjectStep
   const progressPct = steps.length <= 1 ? 100 : (safeCurrent / (steps.length - 1)) * 100
 
   return (
-    <nav aria-label="Project workflow steps" className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+    <nav aria-label="Project workflow steps" className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
       {/* Progress track — desktop only; the rail itself doubles as the row of step pills. */}
       <div className="relative">
         <div

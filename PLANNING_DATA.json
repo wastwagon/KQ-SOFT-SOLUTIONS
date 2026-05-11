@@ -41,7 +41,7 @@
       "projects_per_month": 20,
       "transactions_per_month": 2000,
       "users": 3,
-      "features": ["all_basic", "bank_rules", "bulk_match", "ai_suggestions", "audit_trail", "discrepancy_report"]
+      "features": ["all_basic", "bank_rules", "bulk_match", "ai_suggestions", "audit_trail", "discrepancy_report", "full_branding"]
     },
     "premium": {
       "name": "Premium",
@@ -51,7 +51,7 @@
       "projects_per_month": 100,
       "transactions_per_month": 10000,
       "users": 5,
-      "features": ["all_standard", "one_to_many", "many_to_many", "roll_forward", "threshold_approval", "full_branding", "firm_dashboard"]
+      "features": ["all_standard", "one_to_many", "many_to_many", "roll_forward", "threshold_approval", "firm_dashboard"]
     },
     "firm": {
       "name": "Firm",

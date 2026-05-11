@@ -179,7 +179,7 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
       }}
     >
       <div className="flex items-start gap-3 p-4">
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${style.iconBg}`}>
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${style.iconBg}`}>
           <Icon className={`h-5 w-5 ${style.iconColor}`} aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
@@ -191,7 +191,7 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
         <button
           type="button"
           onClick={onDismiss}
-          className="-m-1 inline-flex shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="-m-1 inline-flex shrink-0 rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           aria-label="Dismiss notification"
         >
           <X className="h-4 w-4" aria-hidden="true" />

@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../../lib/brandColors'
+import PageHeader from '../../components/layout/PageHeader'
 
 type GenerationSettings = {
   defaultReportTitle: string
@@ -59,16 +60,34 @@ export default function AdminGenerationSettings() {
     updateMutation.mutate(form)
   }
 
-  if (isLoading) return <p className="text-gray-500">Loading generation settings...</p>
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Generation settings"
+          subtitle={
+            <p className="text-gray-500">Platform-wide defaults for reports, API limits, and new organisations.</p>
+          }
+        />
+        <p className="text-gray-500 text-sm">Loading settings…</p>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Generation settings</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Platform-wide defaults for report generation, API limits, and new organisations.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Generation settings"
+        subtitle={
+          <p className="text-gray-500">
+            Platform-wide defaults for report generation, API limits, and new organisations.
+          </p>
+        }
+      />
 
-      <Card>
+      <Card className="shadow-sm">
         <div className="flex items-center gap-3 mb-6">
           <Settings className="w-6 h-6 text-primary-500" />
           <div>

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useAuth } from '../store/auth'
+import PageHeader from '../components/layout/PageHeader'
 
 export default function UserManual() {
+  const org = useAuth((s) => s.org)
   const [content, setContent] = useState('')
   const [error, setError] = useState('')
 
@@ -31,28 +34,40 @@ export default function UserManual() {
   const lastUpdated = updatedMatch?.[1]?.trim() || null
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">User Manual</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          This page is published with your platform. Update `web/public/user-manual.md` anytime and redeploy to publish changes.
-        </p>
-        {lastUpdated && (
-          <div className="mt-3 inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-800">
-            Last updated: {lastUpdated}
-          </div>
-        )}
-      </div>
+    <div className="max-w-5xl mx-auto space-y-8">
+      <PageHeader
+        eyebrow="Administration"
+        title="User manual"
+        subtitle={
+          <>
+            {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
+            <p className="text-gray-500">
+              In-app help bundled with your deployment. Edit{' '}
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-800">
+                web/public/user-manual.md
+              </code>{' '}
+              and redeploy to publish updates for everyone.
+            </p>
+          </>
+        }
+        actions={
+          lastUpdated ? (
+            <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800 shadow-sm">
+              Last updated: {lastUpdated}
+            </span>
+          ) : undefined
+        }
+      />
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
           {error}
         </div>
       )}
 
       {!error && !content && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-          Loading manual...
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
+          Loading manual…
         </div>
       )}
 

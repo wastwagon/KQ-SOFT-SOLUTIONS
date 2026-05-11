@@ -31,7 +31,7 @@ export default function NotFound() {
 
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-600">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Error 404
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
@@ -42,7 +42,7 @@ export default function NotFound() {
             mistyped.
           </p>
           {location.pathname && (
-            <p className="mx-auto mt-3 max-w-md break-all rounded-lg bg-white px-3 py-2 font-mono text-xs text-gray-500 ring-1 ring-gray-100">
+            <p className="mx-auto mt-3 max-w-md break-all rounded-xl bg-white px-3 py-2 font-mono text-xs text-gray-500 ring-1 ring-gray-100">
               {location.pathname}
             </p>
           )}

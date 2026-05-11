@@ -66,7 +66,7 @@ router.patch('/branding', async (req: AuthRequest, res) => {
       select: { plan: true },
     })
     if (!org || !hasPlanFeature(org.plan, 'full_branding')) {
-      return res.status(403).json({ error: 'Logo requires Premium plan or higher.' })
+      return res.status(403).json({ error: 'Logo requires Standard plan or higher.' })
     }
   }
   const orgForPlan = await prisma.organization.findUnique({

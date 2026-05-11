@@ -12,9 +12,9 @@ const variantClasses: Record<Variant, string> = {
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'px-3 py-2 text-sm rounded-md min-h-[44px]',
-  md: 'px-4 py-2.5 text-sm rounded-lg min-h-[44px]',
-  lg: 'px-5 py-3 text-base rounded-lg min-h-[44px]',
+  sm: 'px-3 py-2 text-sm rounded-xl min-h-[44px]',
+  md: 'px-4 py-2.5 text-sm rounded-xl min-h-[44px]',
+  lg: 'px-5 py-3 text-base rounded-xl min-h-[44px]',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

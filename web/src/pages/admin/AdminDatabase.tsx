@@ -4,6 +4,7 @@ import { Database, RefreshCw, Server } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { platformAdminDatabase, type PlatformDatabaseOpResult } from '../../lib/api'
+import PageHeader from '../../components/layout/PageHeader'
 
 function OutputBlock({ title, result }: { title: string; result: PlatformDatabaseOpResult | null }) {
   if (!result) return null
@@ -46,17 +47,25 @@ export default function AdminDatabase() {
   })
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1 flex items-center gap-2">
-        <Server className="w-7 h-7 text-primary-600" aria-hidden />
-        Database
-      </h1>
-      <p className="text-sm text-gray-500 mb-6 max-w-2xl">
-        Run Prisma against the server&apos;s <code className="px-1 bg-gray-100 rounded text-xs">DATABASE_URL</code>. Use
-        this if startup migrations did not apply (Coolify) or to load seed data (plans, demo accounts) after deploy.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Platform admin"
+        title="Database"
+        subtitle={
+          <p className="text-gray-500 max-w-3xl">
+            Run Prisma against the server&apos;s{' '}
+            <code className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-800">DATABASE_URL</code>. Use
+            this if startup migrations did not apply (Coolify) or to load seed data after deploy.
+          </p>
+        }
+        actions={
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-600 border border-primary-100 shadow-sm" aria-hidden>
+            <Server className="w-5 h-5" />
+          </span>
+        }
+      />
 
-      <div className="p-4 mb-6 rounded-xl border border-amber-200 bg-amber-50/80 text-sm text-amber-900">
+      <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-sm text-amber-900 shadow-sm max-w-4xl">
         <strong>Security:</strong> only platform admins can call these. Seed creates test users and a shared test password
         (see <code className="text-xs">api/prisma/seed.ts</code>); avoid running seed on a production instance with real customers unless you intend to.
       </div>

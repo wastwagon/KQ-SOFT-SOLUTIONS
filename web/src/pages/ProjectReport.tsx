@@ -19,6 +19,8 @@ import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
+import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 
 interface ProjectReportProps {
   projectId: string
@@ -318,7 +320,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const err = reportQuery.error ?? attachmentsQuery.error ?? ratesQueryError
     return (
       <div className="py-8 space-y-4">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
           <p className="font-medium text-red-900">Could not load report</p>
           <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
           <button
@@ -328,7 +330,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               void queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
               void queryClient.invalidateQueries({ queryKey: ['currency', 'rates'] })
             }}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
           >
             Retry
           </button>
@@ -337,7 +339,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     )
   }
 
-  if (isLoading || !data) return <div className="text-gray-600">Loading report...</div>
+  if (isLoading || !data) return <WorkflowStepSkeleton bodyRows={5} />
 
   const currency = (data?.currency as string) || 'GHS'
   const rates = ratesData?.rates ?? { GHS: 1, USD: 0.0925, EUR: 0.0796 }
@@ -467,13 +469,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
   return (
     <div className="space-y-6">
+      <WorkflowStepIntro
+        eyebrow="Report"
+        title="Bank reconciliation statement"
+        subtitle="Live preview of balances, narratives, and attachments. Use the toolbar below for display currency and export; print or save when sign-off is complete."
+      />
       <div className="flex flex-wrap items-center justify-end gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           {bankAccounts.length > 0 && (
             <select
               value={bankAccountId}
               onChange={(e) => setBankAccountId(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm"
+              className="min-h-[40px] rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium text-gray-900 outline-none transition-all focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500"
             >
               <option value="">All bank accounts</option>
               {bankAccounts.map((a) => (
@@ -484,7 +491,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           <select
             value={displayCurrency}
             onChange={(e) => setDisplayCurrency(e.target.value as 'GHS' | 'USD' | 'EUR' | '')}
-            className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm"
+            className="min-h-[40px] rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium text-gray-900 outline-none transition-all focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500"
             title="Display amounts in another currency (converted for display only)"
           >
             <option value="">Display: {currency}</option>
@@ -492,7 +499,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             {currency !== 'USD' && <option value="USD">Display: USD</option>}
             {currency !== 'EUR' && <option value="EUR">Display: EUR</option>}
           </select>
-          <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700">
+          <label className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
             <input
               type="checkbox"
               checked={signedAmountMode}
@@ -505,14 +512,14 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           <button
             onClick={() => handleExport('excel')}
             disabled={exporting}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+            className="rounded-xl bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {exporting ? 'Exporting...' : 'Export Excel'}
           </button>
           <button
             onClick={() => handleExport('pdf')}
             disabled={exporting}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-gray-700 bg-white"
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             Export PDF
           </button>
@@ -520,7 +527,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           )}
           <button
             onClick={handlePrint}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 bg-white"
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
           >
             Print / Save as PDF
           </button>
@@ -528,7 +535,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <button
               onClick={() => submitMutation.mutate()}
               disabled={submitMutation.isPending}
-              className="px-4 py-2 border border-blue-300 text-blue-800 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+              className="rounded-xl border border-blue-300 px-4 py-2 text-blue-800 hover:bg-blue-50 disabled:opacity-50"
               title="Submit for review (locks editing)"
             >
               {submitMutation.isPending ? 'Submitting...' : 'Submit for review'}
@@ -538,7 +545,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <button
               onClick={() => approveMutation.mutate()}
               disabled={approveMutation.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               title="Approve BRS"
             >
               {approveMutation.isPending ? 'Approving...' : 'Approve'}
@@ -547,7 +554,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {onGoToReview && (
             <button
               onClick={onGoToReview}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              className="rounded-xl px-4 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-800"
             >
               ← Back to Review
             </button>
@@ -557,7 +564,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <button
                 onClick={() => rollForwardMutation.mutate()}
                 disabled={rollForwardMutation.isPending}
-                className="px-4 py-2 border border-blue-300 text-blue-800 rounded-lg hover:bg-blue-50 disabled:opacity-50 w-fit"
+                className="w-fit rounded-xl border border-blue-300 px-4 py-2 text-blue-800 hover:bg-blue-50 disabled:opacity-50"
                 title="Uses this report as the previous period BRS; new project will carry forward unpresented cheques"
               >
                 {rollForwardMutation.isPending ? 'Creating...' : 'Create next period (roll forward)'}
@@ -570,7 +577,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <button
                 onClick={() => reopenMutation.mutate()}
                 disabled={reopenMutation.isPending}
-                className="px-4 py-2 border border-amber-300 text-amber-800 rounded-lg hover:bg-amber-50 disabled:opacity-50"
+                className="rounded-xl border border-amber-300 px-4 py-2 text-amber-800 hover:bg-amber-50 disabled:opacity-50"
                 title="Reopen to make more changes to matches"
               >
                 {reopenMutation.isPending ? 'Reopening...' : 'Reopen for editing'}
@@ -579,7 +586,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <button
                   onClick={() => setShowUndoConfirm(true)}
                   disabled={undoReconciliationMutation.isPending}
-                  className="px-4 py-2 border border-red-300 text-red-800 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  className="rounded-xl border border-red-300 px-4 py-2 text-red-800 hover:bg-red-50 disabled:opacity-50"
                   title="Undo reconciliation — clear all matches and reset sign-off"
                 >
                   {undoReconciliationMutation.isPending ? 'Undoing...' : 'Undo reconciliation'}
@@ -590,13 +597,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         </div>
       </div>
       {exportError && (
-        <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm print:hidden">{exportError}</div>
+        <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600 shadow-sm print:hidden">{exportError}</div>
       )}
 
       {/* Phase 8: Undo reconciliation confirmation */}
       {showUndoConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 print:hidden">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Undo reconciliation</h3>
             <p className="text-sm text-gray-600 mb-4">
               This will clear all matches and reset sign-off. You will need to re-match transactions. This action cannot be undone.
@@ -607,13 +614,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               value={undoReason}
               onChange={(e) => setUndoReason(e.target.value)}
               placeholder="e.g. Data correction required"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 mb-4"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 mb-4"
             />
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => { setShowUndoConfirm(false); setUndoReason('') }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-xl"
               >
                 Cancel
               </button>
@@ -621,7 +628,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 type="button"
                 onClick={() => undoReconciliationMutation.mutate(undoReason.trim() || undefined)}
                 disabled={undoReconciliationMutation.isPending}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50"
               >
                 {undoReconciliationMutation.isPending ? 'Undoing...' : 'Confirm undo'}
               </button>
@@ -639,24 +646,24 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       </p>
       {/* Quick links to dedicated reports */}
       <nav className="flex flex-wrap gap-2 print:hidden">
-        <a href="#brs-statement" className="px-3 py-1.5 text-sm rounded-lg bg-primary-100 text-primary-800 hover:bg-primary-200 font-medium">
+        <a href="#brs-statement" className="px-3 py-1.5 text-sm rounded-xl bg-primary-100 text-primary-800 hover:bg-primary-200 font-medium">
           BRS Statement
         </a>
-        <a href="#brs-summary" className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+        <a href="#brs-summary" className="px-3 py-1.5 text-sm rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200">
           BRS Summary
         </a>
-        <a href="#missing-cheques-report" className="px-3 py-1.5 text-sm rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100">
+        <a href="#missing-cheques-report" className="px-3 py-1.5 text-sm rounded-xl bg-blue-50 text-blue-800 hover:bg-blue-100">
           Missing Cheques Report
         </a>
-        <a href="#discrepancy-report" className="px-3 py-1.5 text-sm rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100">
+        <a href="#discrepancy-report" className="px-3 py-1.5 text-sm rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100">
           Discrepancy Report
         </a>
-        <a href="#supporting-documents" className="px-3 py-1.5 text-sm rounded-lg bg-slate-50 text-slate-800 hover:bg-slate-100">
+        <a href="#supporting-documents" className="px-3 py-1.5 text-sm rounded-xl bg-slate-50 text-slate-800 hover:bg-slate-100">
           Supporting Documents
         </a>
       </nav>
 
-      <div id="brs-report" className="bg-white rounded-lg border border-slate-200 print:bg-white print:border-slate-300 overflow-x-auto min-w-0 font-sans print:text-black text-slate-800 shadow-sm">
+      <div id="brs-report" className="bg-white rounded-xl border border-slate-200 print:bg-white print:border-slate-300 overflow-x-auto min-w-0 font-sans print:text-black text-slate-800 shadow-sm">
         {/* Header — letterhead-style for premium/enterprise */}
         <div className="border-b border-slate-200 pb-4 mb-4">
           {data.organization?.branding?.logoUrl && !reportLogoLoadFailed && (
@@ -685,7 +692,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {(data?.project?.status === 'completed') && (() => {
             const p = data.project
             return p?.approvedBy && p?.approvedAt ? (
-              <div className="mt-2 px-3 py-1.5 rounded-lg bg-green-100 border border-green-300 inline-block print:bg-green-50 print:border-green-400">
+              <div className="mt-2 px-3 py-1.5 rounded-xl bg-green-100 border border-green-300 inline-block print:bg-green-50 print:border-green-400">
                 <span className="font-semibold text-green-800 print:text-green-900">Final report</span>
                 <span className="text-green-700 print:text-green-800 text-sm ml-2">Approved {fmt(p.approvedAt)}</span>
               </div>
@@ -735,7 +742,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {/* BRS statement — two-column workbook layout (spreadsheet/manual style) */}
         {brsStatement && (
-          <div id="brs-statement" className="mb-8 rounded-lg border border-slate-200 bg-white p-6 print:border-slate-300 print:bg-white">
+          <div id="brs-statement" className="mb-8 rounded-xl border border-slate-200 bg-white p-6 print:border-slate-300 print:bg-white">
             <p className="text-[15px] leading-snug text-slate-900">{organizationDisplayName}</p>
             <p className="mt-6 text-[15px] font-bold leading-snug text-slate-900">
               Bank Reconciliation Statement as at {formatDateBRSTitle(reconciliationDate)}
@@ -837,7 +844,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </table>
             </div>
             {Math.abs(brsStatement.workbookScheduleTieOutVariance ?? 0) > 0.02 ? (
-              <div className="mt-4 max-w-xl rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
+              <div className="mt-4 max-w-xl rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
                 Workbook tie-out: declared cash book minus schedule =
                 {' '}
                 <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
@@ -871,14 +878,14 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {/* D1: Narrative (executive summary) */}
         {(data.narrative || editingComments) && (
-          <div id="report-narrative" className="mb-6 p-4 rounded-lg border border-slate-200 bg-slate-50/50">
+          <div id="report-narrative" className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
             <h3 className={`text-sm font-semibold mb-2 ${hasBranding ? '' : 'text-slate-700'}`} style={secondaryColor ? { color: secondaryColor } : undefined}>Summary</h3>
             {editingComments ? (
               <textarea
                 value={editNarrative}
                 onChange={(e) => setEditNarrative(e.target.value)}
                 placeholder="Optional executive summary (e.g. This reconciliation shows…)"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-primary-500 min-h-[80px]"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-primary-500 min-h-[80px]"
                 rows={3}
               />
             ) : (
@@ -889,7 +896,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {/* D2: Bank statement closing balance, Preparer / Reviewer comments */}
         {((data?.project?.bankStatementClosingBalance != null) || data.preparerComment || data.reviewerComment || editingComments) && (
-          <div className="mb-6 p-4 rounded-lg border border-slate-200 bg-slate-50/50 space-y-3">
+          <div className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
             <h3 className={`text-sm font-semibold mb-2 ${hasBranding ? '' : 'text-slate-700'}`} style={secondaryColor ? { color: secondaryColor } : undefined}>Notes</h3>
             {editingComments ? (
               <>
@@ -901,7 +908,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     value={editBankStatementClosingBalance}
                     onChange={(e) => setEditBankStatementClosingBalance(e.target.value)}
                     placeholder="e.g. 3950.50"
-                    className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500"
+                    className="w-full max-w-xs px-3 py-2 border border-border rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -910,7 +917,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     value={editPreparerComment}
                     onChange={(e) => setEditPreparerComment(e.target.value)}
                     placeholder="Preparer notes…"
-                    className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 min-h-[60px]"
+                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 min-h-[60px]"
                     rows={2}
                   />
                 </div>
@@ -920,7 +927,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     value={editReviewerComment}
                     onChange={(e) => setEditReviewerComment(e.target.value)}
                     placeholder="Reviewer notes…"
-                    className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 min-h-[60px]"
+                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 min-h-[60px]"
                     rows={2}
                   />
                 </div>
@@ -934,14 +941,14 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       bankStatementClosingBalance: editBankStatementClosingBalance.trim() === '' ? null : (Number.isFinite(parseFloat(editBankStatementClosingBalance)) ? parseFloat(editBankStatementClosingBalance) : null),
                     })}
                     disabled={updateCommentsMutation.isPending}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm font-medium rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
                   >
                     {updateCommentsMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingComments(false)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-border text-gray-700 hover:bg-surface"
+                    className="px-3 py-1.5 text-sm font-medium rounded-xl border border-border text-gray-700 hover:bg-surface"
                   >
                     Cancel
                   </button>
@@ -970,25 +977,25 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {/* Summary */}
         {showExtendedSections && <div id="brs-summary" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 scroll-mt-4">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-3">
             <p className="text-sm text-green-700 font-medium">Matched</p>
             <p className="text-lg font-bold text-green-800">{data.summary?.matchedCount || 0}</p>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
             <p className="text-sm text-amber-700 font-medium">Unmatched receipts</p>
             <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedReceipts || 0}</p>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
             <p className="text-sm text-amber-700 font-medium">Unmatched payments</p>
             <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedPayments || 0}</p>
           </div>
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
             <p className="text-sm text-slate-700 font-medium">Currency</p>
             <p className="text-lg font-bold text-slate-800">{effectiveDisplayCurrency}</p>
           </div>
         </div>}
         {showExtendedSections && !!sourceFilterLogic && canViewDiagnostics && (
-          <div className="mb-6 rounded-lg border border-slate-200 p-4 bg-slate-50/60">
+          <div className="mb-6 rounded-xl border border-slate-200 p-4 bg-slate-50/60">
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-medium text-slate-800">Source filter logic (sign diagnostics)</h3>
               <button
@@ -1024,7 +1031,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             This section separates the reconciliation position as at the reconciliation date from post-period movement carried into this report.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg border border-primary-100 bg-white p-3 overflow-auto">
+            <div className="rounded-xl border border-primary-100 bg-white p-3 overflow-auto">
               <p className="font-medium text-primary-900 mb-2">{labels.asAtReconciliationPosition}</p>
               <p className="text-xs text-primary-700 mb-2">
                 As-at totals show differences existing on the reconciliation date.
@@ -1048,7 +1055,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 </tbody>
               </table>
             </div>
-            <div className="rounded-lg border border-primary-100 bg-white p-3 overflow-auto">
+            <div className="rounded-xl border border-primary-100 bg-white p-3 overflow-auto">
               <p className="font-medium text-primary-900 mb-2">{labels.postPeriodMovement}</p>
               <p className="text-xs text-primary-700 mb-2">
                 Post-period movement shows prior-period items carried into this period.
@@ -1090,7 +1097,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                         if (!s || s.count === 0) return null
                         const labels: Record<string, string> = { band0_30: '0–30 days', band31_60: '31–60 days', band61_90: '61–90 days', band90_plus: '90+ days' }
                         return (
-                          <div key={k} className="bg-blue-50 border border-blue-200 rounded-lg p-2 print:bg-white print:border-slate-300">
+                          <div key={k} className="bg-blue-50 border border-blue-200 rounded-xl p-2 print:bg-white print:border-slate-300">
                             <p className="text-xs text-blue-700">{labels[k]}</p>
                             <p className="text-sm font-bold text-blue-900">{s.count} cheques • {fmtSignedReportAmt(s.total)}</p>
                           </div>
@@ -1098,7 +1105,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       })}
                     </div>
                   )}
-                  <div className="border border-blue-200 rounded-lg overflow-auto max-h-48 print:border-slate-300">
+                  <div className="border border-blue-200 rounded-xl overflow-auto max-h-48 print:border-slate-300">
                     <table className="min-w-full text-sm text-slate-900">
                       <thead className="bg-slate-100">
                         <tr>
@@ -1156,7 +1163,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </p>
           <div>
             <h4 className="text-sm font-medium mb-2 text-gray-800">1a. Unmatched receipts in cash book (deposits not yet in bank)</h4>
-            <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
+            <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
               <table className="min-w-full text-sm text-slate-900">
                 <thead className="bg-slate-100">
                   <tr>
@@ -1190,7 +1197,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-green-200">
-            <div className="border border-slate-200 rounded-lg overflow-auto">
+            <div className="border border-slate-200 rounded-xl overflow-auto">
               <table className="min-w-full text-sm text-slate-900">
                 <tbody>
                   <tr className="border-t-2 border-green-300 bg-green-50/70">
@@ -1213,7 +1220,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </p>
           <div>
             <h4 className="text-sm font-medium mb-2 text-gray-800">2a. Unmatched payments in cash book (payments not yet in bank)</h4>
-            <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
+            <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
               <table className="min-w-full text-sm text-slate-900">
                 <thead className="bg-slate-100">
                   <tr>
@@ -1250,7 +1257,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2 text-gray-800">2b. Brought forward from previous period BRS</h4>
               <p className="text-xs text-gray-600 mb-2">Shown in the table above (Brought forward unpresented cheques section)</p>
-              <div className="border border-slate-200 rounded-lg overflow-auto">
+              <div className="border border-slate-200 rounded-xl overflow-auto">
                 <table className="min-w-full text-sm text-slate-900">
                   <tbody>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
@@ -1263,7 +1270,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </div>
           )}
           <div className="mt-3 pt-3 border-t border-blue-200">
-            <div className="border border-slate-200 rounded-lg overflow-auto">
+            <div className="border border-slate-200 rounded-xl overflow-auto">
               <table className="min-w-full text-sm text-slate-900">
                 <tbody>
                   <tr className="border-t-2 border-blue-300 bg-blue-50/70">
@@ -1286,7 +1293,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <h4 className="text-sm font-medium mb-2 text-gray-800">3a. Bank-only debits (Add)</h4>
-                <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
+                <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
                   <table className="min-w-full text-sm text-slate-900">
                     <thead className="bg-slate-100">
                       <tr>
@@ -1313,7 +1320,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </div>
               <div>
                 <h4 className="text-sm font-medium mb-2 text-gray-800">3b. Bank-only credits (Deduct)</h4>
-                <div className="border border-slate-200 rounded-lg overflow-auto max-h-48">
+                <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
                   <table className="min-w-full text-sm text-slate-900">
                     <thead className="bg-slate-100">
                       <tr>
@@ -1356,7 +1363,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <select
                   value={attachmentType}
                   onChange={(e) => setAttachmentType(e.target.value as 'bank_statement' | 'approval' | 'other')}
-                  className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-primary-500"
+                  className="px-3 py-2 border border-border rounded-xl bg-white text-gray-900 text-sm focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="other">Type: Other</option>
                   <option value="bank_statement">Type: Bank statement</option>
@@ -1381,7 +1388,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {attachmentsList.length === 0 ? (
             <p className="text-sm text-gray-500 italic">No supporting documents attached.</p>
           ) : (
-            <div className="border border-slate-200 rounded-lg overflow-auto shadow-card">
+            <div className="border border-slate-200 rounded-xl overflow-auto shadow-card">
               <table className="min-w-full text-sm text-slate-900">
                 <thead className="bg-slate-100">
                   <tr>
@@ -1454,7 +1461,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 Payments vs debits matched: {matchedPaymentsVsDebits.length}
               </div>
             </div>
-            <div className="border border-slate-200 rounded-lg overflow-auto max-h-64 shadow-sm bg-white">
+            <div className="border border-slate-200 rounded-xl overflow-auto max-h-64 shadow-sm bg-white">
               <table className="min-w-full text-sm text-slate-900">
                 <thead className="bg-slate-50">
                   <tr>
@@ -1501,7 +1508,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               (data?.discrepancies || []).length > 0 ? (
                 <>
                   <p className="text-sm text-gray-500 mb-2">Matched pairs with amount or date variance detected during reconciliation.</p>
-                  <div className="border border-amber-200 rounded-lg overflow-auto max-h-64 shadow-sm bg-white">
+                  <div className="border border-amber-200 rounded-xl overflow-auto max-h-64 shadow-sm bg-white">
                     <table className="min-w-full text-sm text-slate-900">
                       <thead className="bg-amber-50">
                         <tr>
@@ -1540,7 +1547,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           <div className="mb-6">
             <h3 className="text-base font-semibold mb-3 text-primary-900">Reversal candidates</h3>
             {(data.reversalCandidates || []).length > 0 ? (
-              <div className="border border-primary-100 rounded-lg overflow-auto max-h-48 shadow-sm bg-white">
+              <div className="border border-primary-100 rounded-xl overflow-auto max-h-48 shadow-sm bg-white">
                 <table className="min-w-full text-sm text-slate-900">
                   <thead className="bg-primary-50">
                     <tr>

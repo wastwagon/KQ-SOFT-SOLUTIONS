@@ -28,10 +28,10 @@ export default function Forbidden() {
 
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-xl text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 ring-1 ring-amber-100">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-amber-50 ring-1 ring-amber-100">
             <ShieldOff className="h-7 w-7 text-amber-600" aria-hidden="true" />
           </div>
-          <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-amber-700">
+          <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-amber-700">
             Error 403
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">

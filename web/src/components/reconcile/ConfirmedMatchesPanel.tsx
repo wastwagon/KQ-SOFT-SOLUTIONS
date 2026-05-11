@@ -77,7 +77,7 @@ export default function ConfirmedMatchesPanel({
                   type="button"
                   onClick={() => triggerEvidence(m.matchId)}
                   disabled={isUploading}
-                  className="px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+                  className="rounded-xl px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-50 disabled:opacity-50"
                 >
                   {isUploading && uploadingMatchId === m.matchId ? 'Uploading…' : 'Evidence'}
                 </button>
@@ -94,7 +94,7 @@ export default function ConfirmedMatchesPanel({
                     if (ok) onUnmatch(m.matchId)
                   }}
                   disabled={isUnmatching}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                  className="rounded-xl px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                 >
                   Unmatch
                 </button>

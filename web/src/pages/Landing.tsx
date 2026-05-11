@@ -185,7 +185,7 @@ const FAQS = [
   },
   {
     q: 'Can I export BRS reports with my own logo and colours?',
-    a: 'Yes. Premium and Firm include full branding — logo, palette, report title, and footer — so deliverables match your firm template.',
+    a: 'Yes. Standard and above include full branding — logo, palette, report title, and footer — so deliverables match your firm template.',
   },
 ] as const
 
@@ -395,7 +395,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
           </Link>
           <Link
             to="/register"
-            className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-lg shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
+            className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
           >
             Start free
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -434,7 +434,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
               </Link>
               <Link
                 to="/register"
-                className="text-center px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+                className="text-center px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
                 onClick={() => setNavOpen(false)}
               >
                 Start free
@@ -464,15 +464,17 @@ function Hero() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-20 sm:pt-24 sm:pb-28 lg:pt-28 lg:pb-32">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white shadow-sm border border-gray-200 text-xs font-semibold text-gray-600">
-            <span className="relative inline-flex">
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/90 to-white px-4 py-2 shadow-sm ring-1 ring-black/[0.04]">
+            <span className="relative inline-flex shrink-0">
               <span className="absolute inset-0 rounded-full bg-green-500 animate-pulse-dot" />
               <span className="relative h-2 w-2 rounded-full bg-green-500" />
             </span>
-            <span>Modern bank rec for distributed teams</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary-600">
+              Modern bank rec for distributed teams
+            </span>
           </div>
 
-          <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-[1.05]">
+          <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-[1.05] sm:mt-6">
             Bank reconciliation,
             <br className="hidden sm:block" />
             <span className="gradient-text"> automated end to end.</span>
@@ -518,7 +520,7 @@ function Hero() {
 
 function DashboardMockup() {
   return (
-    <div className="relative rounded-2xl border border-gray-200/80 bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+    <div className="relative rounded-xl border border-gray-200/80 bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/80">
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
@@ -673,15 +675,20 @@ function DashboardMockup() {
 function BankStrip() {
   const items = [...BANKS_SUPPORTED, ...BANKS_SUPPORTED]
   return (
-    <section className="border-y border-gray-100 bg-white py-10">
+    <section className="border-y border-gray-100 bg-gray-50/30 py-12 sm:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-          Pre-built statement layouts (examples)
-        </p>
-        <p className="mt-2 text-center text-sm text-gray-500 max-w-2xl mx-auto">
-          Plus generic Excel, CSV, and PDF — tune or extend layouts as your client base grows.
-        </p>
-        <div className="mt-6 relative overflow-hidden">
+        <div className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-7 text-center shadow-sm sm:px-8 sm:py-8">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
+            Bank formats
+          </p>
+          <p className="mt-1 text-lg sm:text-xl font-bold tracking-tight text-gray-900">
+            Pre-built statement layouts (examples)
+          </p>
+          <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+            Plus generic Excel, CSV, and PDF — tune or extend layouts as your client base grows.
+          </p>
+        </div>
+        <div className="mt-10 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-white to-transparent z-10" />
           <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent z-10" />
           <div className="flex gap-10 marquee-track w-max">
@@ -712,9 +719,13 @@ function StatBand() {
     { value: '< 5 min', label: 'from sign-up to first reconciled grid' },
   ]
   return (
-    <section className="py-24 sm:py-28 border-y border-gray-100">
+    <section className="py-24 sm:py-28 border-y border-gray-100 bg-gray-50/30">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div data-reveal className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-10">
+        <div
+          data-reveal
+          className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/70 to-white px-6 py-10 shadow-sm sm:px-10 sm:py-12"
+        >
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-10">
           {stats.map((s, i) => (
             <div
               key={i}
@@ -726,6 +737,7 @@ function StatBand() {
               <p className="mt-2 text-sm text-gray-600 leading-relaxed">{s.label}</p>
             </div>
           ))}
+          </div>
         </div>
       </div>
     </section>
@@ -740,14 +752,17 @@ function Features() {
   return (
     <section id="features" className="py-24 sm:py-32 bg-gray-50/40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div data-reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
+        <div
+          data-reveal
+          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Features
           </p>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
             Everything you need to close a defensible bank rec.
           </h2>
-          <p className="mt-4 text-base sm:text-lg text-gray-600 leading-relaxed">
+          <p className="mt-2 text-base sm:text-lg text-gray-600 leading-relaxed">
             Ingestion, matching, approvals, and client-ready reporting — orchestrated in
             one place so reviewers spend time on exceptions, not formatting.
           </p>
@@ -760,9 +775,9 @@ function Features() {
               <div
                 key={f.title}
                 data-reveal
-                className="group relative rounded-2xl border border-gray-200 bg-white p-7 shadow-sm hover:shadow-xl hover:-translate-y-0.5 hover:border-primary-200 transition-all duration-300"
+                className="group relative rounded-xl border border-gray-200 bg-white p-7 shadow-sm hover:shadow-xl hover:-translate-y-0.5 hover:border-primary-200 transition-all duration-300"
               >
-                <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-primary-500 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-primary-500 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="w-11 h-11 rounded-xl bg-primary-50 grid place-items-center text-primary-600 ring-1 ring-primary-100">
                   <Icon className="w-5 h-5" />
                 </div>
@@ -787,11 +802,14 @@ function HowItWorks() {
   return (
     <section id="how-it-works" className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div data-reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
+        <div
+          data-reveal
+          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             How it works
           </p>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
             Three steps from raw files to a signed-off BRS.
           </h2>
         </div>
@@ -803,7 +821,7 @@ function HowItWorks() {
               <div
                 key={s.title}
                 data-reveal
-                className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+                className="relative rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
               >
                 <div className="flex items-center gap-3">
                   <span className="inline-flex w-9 h-9 rounded-full bg-primary-600 text-white text-sm font-bold items-center justify-center ring-4 ring-primary-100">
@@ -834,13 +852,13 @@ function DashboardShowcase() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div data-reveal>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
               Built for accountants
             </p>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+            <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
               Familiar controls — without the busywork.
             </h2>
-            <p className="mt-4 text-base sm:text-lg text-gray-600 leading-relaxed">
+            <p className="mt-2 text-base sm:text-lg text-gray-600 leading-relaxed">
               The product mirrors how firms already think about bank recs: uncredited
               lodgments, unpresented cheques, brought-forward lines, and discrepancy
               narratives — automated where it helps, transparent where it matters.
@@ -879,7 +897,7 @@ function DashboardShowcase() {
 
           <div data-reveal className="relative">
             <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary-100 via-white to-green-100 blur-2xl opacity-60" aria-hidden />
-            <div className="relative rounded-2xl border border-gray-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
+            <div className="relative rounded-xl border border-gray-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
               <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50 to-white p-5">
                 <h4 className="text-sm font-bold text-gray-900">
                   Bank Reconciliation Statement
@@ -952,14 +970,17 @@ function Pricing({
       <div aria-hidden className="absolute -bottom-32 left-0 h-[420px] w-[420px] rounded-full bg-green-200/20 blur-3xl" />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div data-reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
+        <div
+          data-reveal
+          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Pricing
           </p>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
             Simple pricing — billed in GHS via Paystack.
           </h2>
-          <p className="mt-4 text-base sm:text-lg text-gray-600">
+          <p className="mt-2 text-base sm:text-lg text-gray-600">
             Start free. Pay monthly or save ~17% annually. Checkout is always in{' '}
             <abbr title="Ghana cedis">GHS</abbr> via Paystack; use the reference converter below for USD, EUR, or GBP.
             Each project&apos;s BRS currency (GHS, USD, or EUR) is chosen in the app.
@@ -1075,7 +1096,7 @@ function PlanCard({
   return (
     <div
       data-reveal
-      className={`relative rounded-2xl p-6 flex flex-col transition-all duration-300 ${
+      className={`relative rounded-xl p-6 flex flex-col transition-all duration-300 ${
         isHighlight
           ? 'border-2 border-primary-500 bg-white shadow-2xl shadow-primary-600/15 ring-1 ring-primary-100 scale-[1.02] lg:scale-[1.04]'
           : 'border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:border-primary-200'
@@ -1172,7 +1193,7 @@ function PlanCard({
 /** Side-by-side feature comparison across all 4 plans, grouped by capability. */
 function ComparisonTable({ plans }: { plans: MarketingPlan[] }) {
   return (
-    <div data-reveal className="mt-12 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div data-reveal className="mt-12 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -1281,11 +1302,14 @@ function Testimonials() {
   return (
     <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div data-reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
+        <div
+          data-reveal
+          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Teams worldwide rely on it
           </p>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
             What finance leaders say.
           </h2>
         </div>
@@ -1295,7 +1319,7 @@ function Testimonials() {
             <figure
               key={i}
               data-reveal
-              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm flex flex-col"
+              className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm flex flex-col"
             >
               <div className="flex gap-0.5 text-amber-400" aria-hidden>
                 {Array.from({ length: 5 }).map((_, idx) => (
@@ -1333,11 +1357,14 @@ function Faq({
   return (
     <section id="faq" className="py-24 sm:py-32 bg-gray-50/40">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-        <div data-reveal className="text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
+        <div
+          data-reveal
+          className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             FAQ
           </p>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
             Common questions, answered.
           </h2>
         </div>
@@ -1390,15 +1417,18 @@ function FinalCta() {
   return (
     <section className="py-24 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 p-10 sm:p-14 text-white shadow-2xl">
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 p-10 sm:p-14 text-white shadow-2xl">
           <div aria-hidden className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-green-400/30 blur-3xl" />
           <div aria-hidden className="absolute -bottom-24 -left-10 w-80 h-80 rounded-full bg-primary-300/30 blur-3xl" />
           <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary-200/95">
+                Ready when you are
+              </p>
+              <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight">
                 Close the next period before the inbox piles up.
               </h2>
-              <p className="mt-4 text-base sm:text-lg text-white/85 leading-relaxed max-w-xl">
+              <p className="mt-3 text-base sm:text-lg text-white/85 leading-relaxed max-w-xl">
                 Create a free workspace, drop in a real cash book and bank extract, and
                 watch suggestions populate. Upgrade when volume or branding needs grow.
               </p>

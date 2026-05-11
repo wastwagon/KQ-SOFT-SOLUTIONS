@@ -19,7 +19,7 @@ export default function Skeleton({ className = '', pulse = true, ...props }: Ske
 /** Skeleton that matches a MetricCard layout */
 export function MetricCardSkeleton({ className = '' }: { className?: string }) {
   return (
-    <div className={`bg-white rounded-lg border border-border shadow-card p-6 ${className}`}>
+    <div className={`rounded-xl border border-border bg-white p-6 shadow-card ${className}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <Skeleton className="h-4 w-24 mb-2" />

@@ -32,7 +32,8 @@ const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
   many_to_many: 'premium',
   roll_forward: 'premium',
   threshold_approval: 'premium',
-  full_branding: 'premium',
+  // Logo URL + letterhead branding on PDF reports — Standard+
+  full_branding: 'standard',
   firm_dashboard: 'premium',
   api_access: 'firm',
   multi_client: 'firm',

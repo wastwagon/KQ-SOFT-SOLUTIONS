@@ -4,7 +4,6 @@ import { Mail } from 'lucide-react'
 import { auth } from '../lib/api'
 import AuthLayout, {
   authAlertErrorClass,
-  authCardClass,
   authFieldClass,
   authLabelClass,
   authPrimaryButtonClass,
@@ -41,7 +40,7 @@ export default function ForgotPassword() {
       title="Reset your password"
       subtitle="We’ll email you a secure link if your address is registered."
     >
-      <div className={authCardClass}>
+      <>
         {sent ? (
           <div className="space-y-4 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
@@ -98,7 +97,7 @@ export default function ForgotPassword() {
             </p>
           </form>
         )}
-      </div>
+      </>
     </AuthLayout>
   )
 }
