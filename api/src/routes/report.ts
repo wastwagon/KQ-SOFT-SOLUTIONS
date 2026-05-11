@@ -1687,6 +1687,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     doc.text('Date: _______________________________________')
     doc.moveDown(0.8).fillColor('#000000')
 
+    // Keep the core BRS worksheet + sign-off on page 1; NOTES and narrative start on a fresh page.
+    doc.addPage()
+    doc.x = margin
+    doc.y = 50
+
     doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle)
     doc.moveDown(0.2)
     drawAmountSummaryTable(exportLabels.asAtReconciliationPosition, [
