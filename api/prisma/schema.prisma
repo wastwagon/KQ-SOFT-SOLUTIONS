@@ -233,6 +233,8 @@ model Document {
   filename       String
   filepath       String
   mimeType       String?      @map("mime_type")
+  /// SHA-256 hex of file bytes; duplicate uploads (same project/type/account) are rejected.
+  contentHash    String?      @map("content_hash")
   createdAt      DateTime     @default(now()) @map("created_at")
 
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -240,6 +242,7 @@ model Document {
   transactions Transaction[]
 
   @@index([bankAccountId])
+  @@index([projectId, type, contentHash])
   @@map("documents")
 }
 

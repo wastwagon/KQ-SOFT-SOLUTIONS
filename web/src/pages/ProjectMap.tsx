@@ -1,130 +1,73 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { projects, documents, type MapDocumentResponse } from '../lib/api'
+import {
+  projects,
+  documents,
+  type MapDocumentResponse,
+  type DocumentPreviewResponse,
+  type SignBucket,
+  isSubscriptionInactiveError,
+  unlessSubscriptionInactive,
+} from '../lib/api'
+import {
+  buildSmartSuggestedMapping,
+  getMappingConfidence,
+  type MappingConfidence,
+} from '@brs/suggested-mapping'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 const CASH_BOOK_FIELDS = ['date', 'name', 'details', 'doc_ref', 'chq_no', 'accode', 'amt_received', 'amt_paid']
 const BANK_FIELDS = ['transaction_date', 'description', 'credit', 'debit']
 
-/** Normalise header for matching: lowercase, collapse spaces/underscores */
-function norm(h: string): string {
-  return (h || '').toLowerCase().replace(/[\s_]+/g, ' ').trim()
-}
+type PreviewLike = Pick<DocumentPreviewResponse, 'headers' | 'suggestedMapping'>
 
-/** Phase 2: Broader header detection — same logic for single-doc and Apply to all */
-function buildSuggestedMapping(
+function mergedSuggestedFromPreview(
   headers: string[],
   isCashBook: boolean,
-  existingSuggested: Record<string, number> = {}
+  pre: PreviewLike
 ): Record<string, number> {
-  const out = { ...existingSuggested }
-  const H = headers.map(norm)
-
-  const find = (patterns: RegExp[]): number => {
-    const i = H.findIndex((h) => patterns.some((p) => p.test(h)))
-    return i >= 0 ? i : -1
-  }
-
-  if (isCashBook) {
-    if (out.date == null) {
-      const i = find([/^date$/, /transaction\s*date/, /value\s*date/, /txn\s*date/, /posting\s*date/, /transaction_date/])
-      if (i >= 0) out.date = i
-    }
-    if (out.name == null) {
-      const i = find([/^name$/, /description/, /particulars/, /narrative/, /payee/, /party/])
-      if (i >= 0) out.name = i
-    }
-    if (out.details == null) {
-      const i = find([/^details$/, /particulars/, /narrative/, /memo/, /remarks/])
-      if (i >= 0) out.details = i
-    }
-    if (out.doc_ref == null) {
-      const i = find([/^doc_ref$/, /^ref$/, /reference/, /doc\s*ref/])
-      if (i >= 0) out.doc_ref = i
-    }
-    if (out.chq_no == null) {
-      const i = find([/^chq_no$/, /chq\s*no/, /cheque\s*no/, /cheque\s*number/, /chq$/])
-      if (i >= 0) out.chq_no = i
-    }
-    if (out.accode == null) {
-      const i = find([/^accode$/, /account\s*code/, /ac\s*code/, /code/])
-      if (i >= 0) out.accode = i
-    }
-    if (out.amt_received == null) {
-      const i = find([/amt_received/, /amount\s*received/, /receipts?/, /received/, /credit/, /cr\b/, /deposit/])
-      if (i >= 0) out.amt_received = i
-    }
-    if (out.amt_paid == null) {
-      const i = find([/amt_paid/, /amount\s*paid/, /payments?/, /paid/, /debit/, /dr\b/, /withdrawal/])
-      if (i >= 0) out.amt_paid = i
-    }
-    if (out.amt_received == null && out.amt_paid == null) {
-      const i = find([/^amount$/, /^amt$/, /total/])
-      if (i >= 0) {
-        out.amt_received ??= i
-        out.amt_paid ??= i
-      }
-    }
-  } else {
-    if (out.transaction_date == null && out.date == null) {
-      const i = find([/^date$/, /transaction\s*date/, /value\s*date/, /txn\s*date/, /posting\s*date/, /transaction_date/])
-      if (i >= 0) out.transaction_date = i
-    }
-    if (out.description == null) {
-      const i = find([/^description$/, /particulars/, /narrative/, /details/, /memo/, /remarks/])
-      if (i >= 0) out.description = i
-    }
-    if (out.credit == null) {
-      const i = find([/^credit$/, /^cr\b/, /deposits?/, /in(?:ward)?/])
-      if (i >= 0) out.credit = i
-    }
-    if (out.debit == null) {
-      const i = find([/^debit$/, /^dr\b/, /withdrawals?/, /out(?:ward)?/])
-      if (i >= 0) out.debit = i
-    }
-    if (out.credit == null && out.debit == null) {
-      const i = find([/^amount$/, /^amt$/, /total/])
-      if (i >= 0) {
-        out.credit ??= i
-        out.debit ??= i
-      }
-    }
-  }
-
-  return out
+  const existing =
+    pre.suggestedMapping && Object.keys(pre.suggestedMapping).length > 0
+      ? { ...pre.suggestedMapping }
+      : {}
+  return buildSmartSuggestedMapping(headers || [], isCashBook, existing)
 }
 
-type MappingConfidence = 'high' | 'medium' | 'low'
+function suggestedMappingHasDate(headers: string[], isCashBook: boolean, pre: PreviewLike): boolean {
+  const sug = mergedSuggestedFromPreview(headers, isCashBook, pre)
+  const dateField = isCashBook ? 'date' : 'transaction_date'
+  return sug[dateField] != null
+}
 
-/** Heuristic confidence for the currently selected column per canonical field (updates as user changes mapping). */
-function confidenceForMappedField(field: string, headerText: string): MappingConfidence {
-  const h = norm(headerText)
-  if (!h) return 'low'
-  const STRONG: Record<string, RegExp[]> = {
-    date: [/^date$/, /transaction\s*date/, /value\s*date/, /posting\s*date/],
-    transaction_date: [/^date$/, /transaction\s*date/, /value\s*date/, /posting\s*date/],
-    description: [/^description$/, /particulars/, /narrative/, /details/, /memo/, /remarks/],
-    name: [/^name$/, /payee/, /party/, /description/],
-    details: [/^details$/, /particulars/, /narrative/, /memo/, /remarks/],
-    doc_ref: [/^doc ref$/, /^doc_ref$/, /^ref$/, /reference/, /voucher/],
-    chq_no: [/^chq no$/, /^chq_no$/, /cheque\s*no/, /cheque\s*number/],
-    accode: [/^accode$/, /account\s*code/, /ac\s*code/],
-    amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credit$/, /\bcr\b/],
-    amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debit$/, /\bdr\b/],
-    credit: [/^credit$/, /\bcr\b/, /deposits?/],
-    debit: [/^debit$/, /\bdr\b/, /withdrawals?/],
+/** For Excel: first worksheet whose merged suggestion includes the date field; otherwise 0. */
+async function resolveBestSheetPreview(
+  docId: string,
+  isCashBook: boolean
+): Promise<{ chosenSheet: number; preview: DocumentPreviewResponse }> {
+  const pre0 = await documents.preview(docId)
+  const names = pre0.sheetNames ?? []
+  if (names.length <= 1) return { chosenSheet: 0, preview: pre0 }
+  for (let si = 0; si < names.length; si++) {
+    const p = si === 0 ? pre0 : await documents.preview(docId, { sheetIndex: si })
+    if (suggestedMappingHasDate(p.headers || [], isCashBook, p)) return { chosenSheet: si, preview: p }
   }
-  const SOFT: Record<string, RegExp[]> = {
-    doc_ref: [/ref/, /receipt/, /number/],
-    chq_no: [/chq/, /cheque/, /number/],
-    amt_received: [/received/, /credit/, /deposit/, /amount/, /amt/],
-    amt_paid: [/paid/, /debit/, /withdrawal/, /amount/, /amt/],
-    credit: [/credit/, /deposit/, /amount/, /amt/],
-    debit: [/debit/, /withdrawal/, /amount/, /amt/],
+  return { chosenSheet: 0, preview: pre0 }
+}
+
+/** Same as {@link resolveBestSheetPreview} but reuses an already-fetched sheet-0 preview (fewer round trips). */
+async function resolveBestSheetFromPre0(
+  docId: string,
+  isCashBook: boolean,
+  pre0: DocumentPreviewResponse
+): Promise<number> {
+  const names = pre0.sheetNames ?? []
+  if (names.length <= 1) return 0
+  if (suggestedMappingHasDate(pre0.headers || [], isCashBook, pre0)) return 0
+  for (let si = 1; si < names.length; si++) {
+    const p = await documents.preview(docId, { sheetIndex: si })
+    if (suggestedMappingHasDate(p.headers || [], isCashBook, p)) return si
   }
-  const strong = (STRONG[field] || []).some((p) => p.test(h))
-  if (strong) return 'high'
-  const soft = (SOFT[field] || [/amount/, /date/, /desc/, /ref/, /details/]).some((p) => p.test(h))
-  return soft ? 'medium' : 'low'
+  return 0
 }
 
 type ProjectMapProps = { projectId: string; canMap?: boolean; onProceedToReconcile?: () => void }
@@ -133,25 +76,40 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   const id = projectId
   const queryClient = useQueryClient()
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
+  const [previewSheetIndex, setPreviewSheetIndex] = useState(0)
   const [mapping, setMapping] = useState<Record<string, number>>({})
   const [error, setError] = useState('')
   const [mapResult, setMapResult] = useState<MapDocumentResponse | null>(null)
+  /** Bumps when the user picks another document so stale worksheet auto-pick async exits early. */
+  const worksheetPickSessionRef = useRef(0)
+  /** Prevents re-running Excel worksheet scans for the same document when nothing changes. */
+  const worksheetPickResolvedRef = useRef<string | null>(null)
 
-  const { data: project } = useQuery({
+  const projectQuery = useQuery({
     queryKey: ['project', id],
     queryFn: () => projects.get(id!),
     enabled: !!id,
   })
+  const { data: project, error: projectError, isError: projectQueryFailed, isPending: projectPending } = projectQuery
 
-  const { data: preview, isLoading: previewLoading } = useQuery({
-    queryKey: ['document-preview', selectedDocId],
-    queryFn: () => documents.preview(selectedDocId!),
+  const previewQuery = useQuery({
+    queryKey: ['document-preview', selectedDocId, previewSheetIndex],
+    queryFn: () => documents.preview(selectedDocId!, { sheetIndex: previewSheetIndex }),
     enabled: !!selectedDocId,
   })
+  const {
+    data: preview,
+    isLoading: previewLoading,
+    error: previewError,
+    isError: previewQueryFailed,
+  } = previewQuery
+
+  const paywallBlocked =
+    isSubscriptionInactiveError(projectError) || isSubscriptionInactiveError(previewError)
 
   const mapMutation = useMutation({
     mutationFn: (docId: string) =>
-      documents.map(docId, { mapping, sheetIndex: 0 }),
+      documents.map(docId, { mapping, sheetIndex: previewSheetIndex }),
     onSuccess: (data: MapDocumentResponse) => {
       queryClient.invalidateQueries({ queryKey: ['project', id] })
       queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
@@ -162,69 +120,215 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       const warnings = data.signWarningsCount || 0
       if (warnings === 0) setError('')
     },
-    onError: (err) => setError(err instanceof Error ? err.message : 'Mapping failed'),
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        setError(e instanceof Error ? e.message : 'Mapping failed')
+      ),
   })
 
   const [applyingAll, setApplyingAll] = useState(false)
+  /** Document IDs included in bulk “apply suggested mapping”. New files default on; existing choices survive list refresh. */
+  const [bulkDocIds, setBulkDocIds] = useState<Set<string>>(() => new Set())
+  const bulkSelectionDocKeyRef = useRef('')
+
   const docs = project?.documents || []
   const selectedDoc = docs.find((d: { id: string }) => d.id === selectedDocId)
+
+  useEffect(() => {
+    const idList = (docs as { id: string }[]).map((d) => d.id)
+    const key = idList.slice().sort().join(',')
+    if (key === bulkSelectionDocKeyRef.current) return
+    const oldKey = bulkSelectionDocKeyRef.current
+    bulkSelectionDocKeyRef.current = key
+    const oldIds = new Set(oldKey ? oldKey.split(',') : [])
+    setBulkDocIds((prevSelected) => {
+      if (oldKey === '') return new Set(idList)
+      const next = new Set<string>()
+      for (const id of idList) {
+        if (!oldIds.has(id)) next.add(id)
+        else if (prevSelected.has(id)) next.add(id)
+      }
+      return next
+    })
+  }, [docs])
+
   async function applySuggestedToAll() {
     if (!docs.length) return
+    const selectedDocs = (docs as { id: string; type: string; filename?: string }[]).filter((d) =>
+      bulkDocIds.has(d.id)
+    )
+    if (selectedDocs.length === 0) {
+      setError('Select at least one document in the list below, or use “Select all”.')
+      return
+    }
     setError('')
     setApplyingAll(true)
     let done = 0
     try {
       let totalWarnings = 0
-      for (const doc of docs as { id: string; type: string }[]) {
-        const pre = await documents.preview(doc.id)
-        const headers = pre.headers || []
+      let totalSkippedDup = 0
+      let totalTransactions = 0
+      const signBuckets: Record<SignBucket, number> = {
+        primary: 0,
+        cross_reference: 0,
+        zero: 0,
+        empty: 0,
+      }
+      let mergedWarnings: NonNullable<MapDocumentResponse['signWarningsPreview']> = []
+      for (const doc of selectedDocs) {
         const isCashBook = doc.type.startsWith('cash_book_')
-        const existing = (pre.suggestedMapping && Object.keys(pre.suggestedMapping).length > 0)
-          ? { ...pre.suggestedMapping }
-          : {}
-        const suggested = buildSuggestedMapping(headers, isCashBook, existing)
-        const result = await documents.map(doc.id, { mapping: suggested, sheetIndex: 0 })
+        const { chosenSheet, preview: pre } = await resolveBestSheetPreview(doc.id, isCashBook)
+        const suggested = mergedSuggestedFromPreview(pre.headers || [], isCashBook, pre)
+        const result = await documents.map(doc.id, { mapping: suggested, sheetIndex: chosenSheet })
+        totalTransactions += result.count
         totalWarnings += result.signWarningsCount || 0
+        totalSkippedDup += result.skippedDuplicateRows || 0
+        const s = result.signFilterSummary
+        if (s) {
+          for (const k of ['primary', 'cross_reference', 'zero', 'empty'] as const) {
+            signBuckets[k] += s[k] ?? 0
+          }
+        }
+        if (result.signWarningsPreview?.length) {
+          mergedWarnings = [...mergedWarnings, ...result.signWarningsPreview].slice(0, 25)
+        }
         done++
       }
       queryClient.invalidateQueries({ queryKey: ['project', id] })
       queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
       setMapResult({
-        count: done,
+        count: totalTransactions,
+        documentsMapped: done,
         signWarningsCount: totalWarnings,
+        signFilterSummary: signBuckets,
+        signWarningsPreview: mergedWarnings.length ? mergedWarnings : undefined,
+        skippedDuplicateRows: totalSkippedDup > 0 ? totalSkippedDup : undefined,
       })
       onProceedToReconcile?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to apply to all')
+      unlessSubscriptionInactive(err, (e) => {
+        const base = e instanceof Error ? e.message : 'Failed to apply suggested mapping'
+        setError(
+          done > 0
+            ? `${base} (${done} file(s) in your selection were mapped before this error — refresh the page or map the rest individually.)`
+            : base
+        )
+      })
     } finally {
       setApplyingAll(false)
     }
   }
 
   useEffect(() => {
-    if (preview && !Object.keys(mapping).length && selectedDoc) {
+    if (!preview || selectedDocId !== preview.documentId) return
+    const si = preview.sheetIndex
+    if (si != null && si !== previewSheetIndex) {
+      setPreviewSheetIndex(si)
+      setMapping({})
+      return
+    }
+    if (!Object.keys(mapping).length && selectedDoc) {
       const headers = preview.headers || []
       const isCashBook = (selectedDoc as { type?: string }).type?.startsWith('cash_book_') ?? false
-      const existing = (preview.suggestedMapping && Object.keys(preview.suggestedMapping).length > 0)
-        ? { ...preview.suggestedMapping }
-        : {}
-      const suggested = buildSuggestedMapping(headers, isCashBook, existing)
+      const suggested = mergedSuggestedFromPreview(headers, isCashBook, preview)
       setMapping(suggested)
     }
-  }, [preview, selectedDoc, mapping])
+  }, [preview, selectedDoc, selectedDocId, mapping, previewSheetIndex])
+
+  useEffect(() => {
+    if (!selectedDocId) {
+      setPreviewSheetIndex(0)
+      worksheetPickResolvedRef.current = null
+    }
+  }, [selectedDocId])
+
+  /** Excel: when opening a file, jump to the first worksheet where a date column is suggested (same rule as bulk apply). */
+  useEffect(() => {
+    if (!selectedDocId || !preview || preview.documentId !== selectedDocId) return
+    if (previewLoading) return
+    if (worksheetPickResolvedRef.current === selectedDocId) return
+
+    const names = preview.sheetNames
+    if (!names || names.length <= 1) {
+      worksheetPickResolvedRef.current = selectedDocId
+      return
+    }
+    if (previewSheetIndex !== 0) {
+      worksheetPickResolvedRef.current = selectedDocId
+      return
+    }
+
+    const docMeta = (docs as { id: string; type: string }[]).find((d) => d.id === selectedDocId)
+    if (!docMeta) return
+    const isCashBook = docMeta.type.startsWith('cash_book_')
+    if (suggestedMappingHasDate(preview.headers || [], isCashBook, preview)) {
+      worksheetPickResolvedRef.current = selectedDocId
+      return
+    }
+
+    const session = worksheetPickSessionRef.current
+    let cancelled = false
+    ;(async () => {
+      const best = await resolveBestSheetFromPre0(selectedDocId, isCashBook, preview)
+      if (cancelled || session !== worksheetPickSessionRef.current) return
+      if (best !== 0) {
+        setMapping({})
+        setPreviewSheetIndex(best)
+      }
+      worksheetPickResolvedRef.current = selectedDocId
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedDocId, docs, preview, previewSheetIndex, previewLoading])
 
   const liveConfidence = useMemo(() => {
     if (!preview?.headers) return {} as Record<string, MappingConfidence>
-    const headers = preview.headers as string[]
-    const out: Record<string, MappingConfidence> = {}
-    for (const [field, idx] of Object.entries(mapping)) {
-      const header = headers[idx] ?? ''
-      out[field] = confidenceForMappedField(field, header)
-    }
-    return out
+    return getMappingConfidence(preview.headers as string[], mapping)
   }, [preview, mapping])
 
-  if (!id || !project) return <div>Loading...</div>
+  const documentsWithoutTransactions = useMemo(() => {
+    return (
+      docs as {
+        id: string
+        filename: string
+        type: string
+        _count?: { transactions?: number }
+      }[]
+    ).filter(
+      (d) =>
+        d._count != null &&
+        typeof d._count.transactions === 'number' &&
+        d._count.transactions === 0
+    )
+  }, [docs])
+
+  if (!id) return <div>Loading...</div>
+  if (paywallBlocked) {
+    return (
+      <div className="py-6">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+  if (projectQueryFailed) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <p className="font-medium text-red-900">Could not load project</p>
+        <p className="mt-1">
+          {projectError instanceof Error ? projectError.message : 'Something went wrong.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['project', id] })}
+          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+  if (projectPending || !project) return <div>Loading...</div>
 
   const canonicalFields = selectedDoc?.type?.startsWith('cash_book_')
     ? CASH_BOOK_FIELDS
@@ -234,7 +338,11 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-gray-900">Column mapping</h2>
       <p className="text-sm text-gray-600 max-w-2xl">
-        <strong>One-time setup.</strong> We read your column headers (Date, Amount, Credit, Debit, etc.) and suggest how they map. After this, <strong>Reconcile runs automatically</strong>—matching and suggestions are done for you. Use the button below to apply suggested mappings to all documents in one go, or map each document individually if you need to adjust.
+        <strong>One-time setup.</strong> Uploads can be spreadsheets, PDFs, images, or other supported types—we turn each
+        file into a table of rows, read the detected column headers (Date, Amount, Credit, Debit, etc.), and suggest how
+        they map. After this, <strong>Reconcile runs automatically</strong>—matching and suggestions are done for you.
+        Tick which files to include, then apply suggested mappings in one run, or map each document individually if you
+        need to adjust.
       </p>
       <p className="text-xs text-slate-600 max-w-2xl rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
         <strong>Required:</strong> Map the <strong>date</strong> column for each document so transactions can be matched correctly.
@@ -251,13 +359,28 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       {mapResult && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">
           <p className="text-sm text-slate-700">
-            Mapping complete: <strong>{mapResult.count}</strong> transaction(s) extracted.
+            {mapResult.documentsMapped != null && mapResult.documentsMapped > 1 ? (
+              <>
+                Mapped <strong>{mapResult.documentsMapped}</strong> document(s);{' '}
+                <strong>{mapResult.count}</strong> transaction(s) extracted.
+              </>
+            ) : (
+              <>
+                Mapping complete: <strong>{mapResult.count}</strong> transaction(s) extracted.
+              </>
+            )}
             {(mapResult.signWarningsCount || 0) > 0 && (
               <span className="ml-1 text-amber-700">
                 {mapResult.signWarningsCount} sign warning(s) found.
               </span>
             )}
           </p>
+          {(mapResult.skippedDuplicateRows || 0) > 0 && (
+            <p className="text-sm text-slate-600">
+              Skipped <strong>{mapResult.skippedDuplicateRows}</strong> duplicate row(s) in the source (same date,
+              amount, and narrative as an earlier row).
+            </p>
+          )}
           {mapResult.signFilterSummary && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <div className="rounded border border-green-200 bg-green-50 px-2 py-1">Primary: {mapResult.signFilterSummary.primary ?? 0}</div>
@@ -280,18 +403,66 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       )}
 
       {canMap && docs.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={applySuggestedToAll}
-            disabled={applyingAll}
-            className="px-4 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 disabled:opacity-50"
-          >
-            {applyingAll ? 'Applying to all…' : 'Apply suggested mapping to all documents'}
-          </button>
-          <span className="text-xs text-gray-500">
-            One click — we detect columns from your file headers and apply mapping to every document.
-          </span>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3 max-w-2xl">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Bulk apply — which files?</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Only ticked files are processed (any supported upload—CSV/Excel, PDF, images, etc.). New uploads are ticked
+              automatically; untick any file you want to skip or map by hand below.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setBulkDocIds(new Set((docs as { id: string }[]).map((d) => d.id)))}
+              className="text-primary-700 hover:underline"
+            >
+              Select all
+            </button>
+            <button type="button" onClick={() => setBulkDocIds(new Set())} className="text-gray-600 hover:underline">
+              Clear selection
+            </button>
+          </div>
+          <ul className="space-y-2 max-h-52 overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gray-50/50">
+            {(docs as { id: string; filename: string; type: string }[]).map((d) => (
+              <li key={d.id} className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  checked={bulkDocIds.has(d.id)}
+                  onChange={(e) => {
+                    setBulkDocIds((prev) => {
+                      const next = new Set(prev)
+                      if (e.target.checked) next.add(d.id)
+                      else next.delete(d.id)
+                      return next
+                    })
+                  }}
+                  aria-label={`Include ${d.filename} in bulk mapping`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="text-gray-900 break-words">{d.filename}</span>
+                  <span className="text-gray-500 text-xs"> ({d.type})</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={applySuggestedToAll}
+              disabled={applyingAll || bulkDocIds.size === 0}
+              className="px-4 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {applyingAll ? 'Applying…' : 'Apply suggested mapping to selected'}
+            </button>
+            <span className="text-xs text-gray-500 max-w-md">
+              We detect columns from the extracted table and apply mapping per file. For Excel workbooks with several
+              sheets, we use the <strong>first sheet where a date column is detected</strong>; otherwise the first sheet.
+              PDFs and scans do not have sheets—open each file below if the preview needs a check. To pick another Excel
+              tab, open that file below.
+            </span>
+          </div>
         </div>
       )}
 
@@ -302,7 +473,10 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         <select
           value={selectedDocId || ''}
           onChange={(e) => {
+            worksheetPickSessionRef.current += 1
+            worksheetPickResolvedRef.current = null
             setSelectedDocId(e.target.value || null)
+            setPreviewSheetIndex(0)
             setMapping({})
           }}
           className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
@@ -319,9 +493,53 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         <>
           {previewLoading ? (
             <p className="text-gray-500">Loading preview...</p>
+          ) : previewQueryFailed && previewError && !isSubscriptionInactiveError(previewError) ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+              <p className="font-medium text-red-900">Could not load document preview</p>
+              <p className="mt-1">
+                {previewError instanceof Error ? previewError.message : 'Something went wrong.'}
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: ['document-preview', selectedDocId, previewSheetIndex],
+                  })
+                }
+                className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+              >
+                Retry
+              </button>
+            </div>
           ) : preview ? (
             <div className="bg-white shadow rounded-lg p-4 sm:p-6 space-y-4 border border-gray-200">
               <h3 className="font-medium text-gray-900">{preview.filename}</h3>
+              {preview.sheetNames && preview.sheetNames.length > 1 && (
+                <label className="block max-w-md">
+                  <span className="block text-sm font-medium text-gray-700 mb-1">Worksheet (Excel)</span>
+                  <p className="text-xs text-gray-500 mb-1.5">
+                    When you open a file, we pick the first tab where a date column is detected. You can change the tab
+                    here anytime.
+                  </p>
+                  <select
+                    value={previewSheetIndex}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10)
+                      if (!Number.isNaN(n)) {
+                        setPreviewSheetIndex(n)
+                        setMapping({})
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm"
+                  >
+                    {preview.sheetNames.map((name, i) => (
+                      <option key={i} value={i}>
+                        {name?.trim() ? name : `Sheet ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <p className="text-sm text-gray-500">
                 {preview.totalRows} rows
                 {preview.detectedBankFormat && (
@@ -414,6 +632,18 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             </div>
           ) : null}
         </>
+      )}
+
+      {documentsWithoutTransactions.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 max-w-2xl">
+          <p className="font-medium">Some files have no extracted transactions yet</p>
+          <p className="mt-1 text-amber-900/90">
+            {documentsWithoutTransactions.length === 1
+              ? `${documentsWithoutTransactions[0]!.filename} is not mapped or produced no rows.`
+              : `${documentsWithoutTransactions.length} files still need a successful map (or contain no data).`}{' '}
+            Select each in the list above, apply mapping, then continue.
+          </p>
+        </div>
       )}
 
       {onProceedToReconcile && (

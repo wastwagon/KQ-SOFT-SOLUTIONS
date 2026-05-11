@@ -2,6 +2,52 @@ import { useAuth } from '../store/auth'
 
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
+/** Dispatched when the API returns `code: SUBSCRIPTION_INACTIVE` (see {@link SubscriptionPaywallToastBridge}). */
+export const SUBSCRIPTION_INACTIVE_EVENT = 'brs:subscription-inactive' as const
+
+export type SubscriptionInactiveEventDetail = {
+  message?: string
+  subscriptionStatus?: string
+}
+
+export class ApiError extends Error {
+  readonly status: number
+  readonly code: string
+  /** Present when `code` is `SUBSCRIPTION_INACTIVE` and the API included it. */
+  readonly subscriptionStatus?: string
+
+  constructor(
+    message: string,
+    init: { status: number; code: string; subscriptionStatus?: string }
+  ) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = init.status
+    this.code = init.code
+    this.subscriptionStatus = init.subscriptionStatus
+    Object.setPrototypeOf(this, ApiError.prototype)
+  }
+}
+
+export function isSubscriptionInactiveError(e: unknown): e is ApiError {
+  return e instanceof ApiError && e.code === 'SUBSCRIPTION_INACTIVE'
+}
+
+/**
+ * Use in mutation `onError` or `catch` blocks so generic toasts / inline errors do
+ * not duplicate the paywall toast and renewal messaging.
+ */
+export function unlessSubscriptionInactive(err: unknown, fn: (err: unknown) => void): void {
+  if (isSubscriptionInactiveError(err)) return
+  fn(err)
+}
+
+/** Use with React Query `retry` so paywall 403s do not hammer the API. */
+export function subscriptionPaywallRetry(failureCount: number, err: unknown): boolean {
+  if (isSubscriptionInactiveError(err)) return false
+  return failureCount < 2
+}
+
 export type SignBucket = 'primary' | 'cross_reference' | 'zero' | 'empty'
 
 export interface MapDocumentResponse {
@@ -9,6 +55,10 @@ export interface MapDocumentResponse {
   signFilterSummary?: Record<SignBucket, number>
   signWarningsCount?: number
   signWarningsPreview?: { rowIndex: number; amount: number; bucket: SignBucket; note: string }[]
+  /** Rows skipped because they were exact duplicates (same date, amount, ref, narrative) of an earlier row in this import. */
+  skippedDuplicateRows?: number
+  /** When bulk-mapping several files, number of documents that were mapped (transaction count is still `count`). */
+  documentsMapped?: number
 }
 
 export interface DocumentPreviewResponse {
@@ -18,6 +68,8 @@ export interface DocumentPreviewResponse {
   rows: unknown[][]
   totalRows: number
   sheetNames?: string[]
+  /** Excel only: worksheet index used for this preview (after server clamping). */
+  sheetIndex?: number
   canonicalFields?: string[]
   detectedBankFormat?: string
   suggestedMapping?: Record<string, number>
@@ -249,6 +301,8 @@ export interface ReportResponse {
 
 export interface SubscriptionUsageResponse {
   organization: { id: string; name: string; plan: string }
+  /** True when API has SUBSCRIPTION_PAYWALL=true (core routes blocked for inactive subs). */
+  paywallEnabled?: boolean
   features: Record<string, boolean>
   usage: {
     projectsUsed: number
@@ -292,6 +346,39 @@ function getHeaders(): HeadersInit {
   return headers
 }
 
+/**
+ * Same error handling as {@link api} for non-JSON or blob `fetch` callers that
+ * parse the body themselves (uploads, exports, downloads).
+ */
+function throwFromFailedResponse(res: Response, data: unknown): never {
+  const raw = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+  const msg = raw.error ?? res.statusText ?? 'Request failed'
+  const messageStr = typeof msg === 'string' ? msg : JSON.stringify(msg)
+  const code = typeof raw.code === 'string' ? raw.code : undefined
+  const subscriptionStatusForInactive =
+    code === 'SUBSCRIPTION_INACTIVE' && typeof raw.subscriptionStatus === 'string'
+      ? raw.subscriptionStatus
+      : undefined
+  if (code === 'SUBSCRIPTION_INACTIVE' && typeof window !== 'undefined') {
+    const path = window.location.pathname
+    if (path !== '/dashboard' && path !== '/') {
+      const detail: SubscriptionInactiveEventDetail = {
+        message: messageStr,
+        ...(subscriptionStatusForInactive !== undefined
+          ? { subscriptionStatus: subscriptionStatusForInactive }
+          : {}),
+      }
+      window.dispatchEvent(new CustomEvent(SUBSCRIPTION_INACTIVE_EVENT, { detail }))
+    }
+  }
+  if (code) {
+    const subscriptionStatus =
+      typeof raw.subscriptionStatus === 'string' ? raw.subscriptionStatus : undefined
+    throw new ApiError(messageStr, { status: res.status, code, subscriptionStatus })
+  }
+  throw new Error(messageStr)
+}
+
 export async function api(path: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}/api/v1${path}`, {
     ...options,
@@ -309,8 +396,7 @@ export async function api(path: string, options: RequestInit = {}) {
     return new Promise((_, reject) => reject(new Error('Session expired')))
   }
   if (!res.ok) {
-    const msg = data.error || res.statusText || 'Request failed'
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    throwFromFailedResponse(res, data)
   }
   return data
 }
@@ -328,7 +414,12 @@ export const auth = {
 }
 
 export const documents = {
-  preview: (id: string) => api(`/documents/${id}/preview`) as Promise<DocumentPreviewResponse>,
+  preview: (id: string, opts?: { sheetIndex?: number }) => {
+    const q = new URLSearchParams()
+    if (opts?.sheetIndex != null) q.set('sheetIndex', String(opts.sheetIndex))
+    const suffix = q.toString() ? `?${q}` : ''
+    return api(`/documents/${id}/preview${suffix}`) as Promise<DocumentPreviewResponse>
+  },
   map: (id: string, body: { mapping: Record<string, number>; sheetIndex?: number }) =>
     api(`/documents/${id}/map`, { method: 'POST', body: JSON.stringify(body) }) as Promise<MapDocumentResponse>,
   getTransactions: (id: string) => api(`/documents/${id}/transactions`),
@@ -383,7 +474,7 @@ export const audit = {
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      throw new Error(data.error || res.statusText)
+      throwFromFailedResponse(res, data)
     }
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
@@ -524,7 +615,7 @@ export const settings = {
       body: form,
     }).then(async (res) => {
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || res.statusText)
+      if (!res.ok) throwFromFailedResponse(res, data)
       return data as { logoUrl: string }
     })
   },
@@ -540,7 +631,7 @@ async function reportExport(projectId: string, format: string, bankAccountId?: s
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.error || res.statusText)
+    throwFromFailedResponse(res, data)
   }
   const blob = await res.blob()
   const disp = res.headers.get('Content-Disposition')
@@ -568,7 +659,7 @@ export const attachments = {
       body: form,
     }).then(async (res) => {
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || res.statusText)
+      if (!res.ok) throwFromFailedResponse(res, data)
       return data
     })
   },
@@ -577,7 +668,10 @@ export const attachments = {
     const res = await fetch(`${API_URL}/api/v1/attachments/${id}/download`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-    if (!res.ok) throw new Error('Download failed')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throwFromFailedResponse(res, data)
+    }
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -634,7 +728,7 @@ export function uploadCashBook(projectId: string, file: File, type: 'receipts' |
     body: form,
   }).then(async (res) => {
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data.error || res.statusText)
+    if (!res.ok) throwFromFailedResponse(res, data)
     return data
   })
 }
@@ -658,7 +752,7 @@ export function uploadBankStatement(
     body: form,
   }).then(async (res) => {
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data.error || res.statusText)
+    if (!res.ok) throwFromFailedResponse(res, data)
     return data
   })
 }

@@ -2,12 +2,15 @@ import { Router } from 'express'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
+import crypto from 'node:crypto'
+import type { DocumentType } from '@prisma/client'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { sanitizeFilename } from '../lib/sanitizeFilename.js'
 import { canUploadDocuments, isProjectEditable } from '../lib/permissions.js'
 import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
@@ -41,6 +44,28 @@ const upload = multer({
   },
 })
 
+function sha256FileHex(filepath: string): string {
+  const buf = fs.readFileSync(filepath)
+  return crypto.createHash('sha256').update(buf).digest('hex')
+}
+
+async function findDuplicateDocument(
+  projectId: string,
+  type: DocumentType,
+  contentHash: string,
+  bankAccountId: string | null | undefined
+) {
+  return prisma.document.findFirst({
+    where: {
+      projectId,
+      type,
+      contentHash,
+      bankAccountId: bankAccountId ?? null,
+    },
+    select: { id: true, filename: true },
+  })
+}
+
 const logoStorage = multer.diskStorage({
   destination: (_, __, cb) => {
     cb(null, brandingDir)
@@ -64,6 +89,7 @@ const logoUpload = multer({
 })
 
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
@@ -83,6 +109,29 @@ router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequ
   }
   const type = req.body.type === 'payments' ? 'cash_book_payments' : 'cash_book_receipts'
   const safeFilename = sanitizeFilename(req.file.originalname)
+  let contentHash: string
+  try {
+    contentHash = sha256FileHex(req.file.path)
+  } catch {
+    try {
+      fs.unlinkSync(req.file.path)
+    } catch {
+      /* ignore */
+    }
+    return res.status(400).json({ error: 'Could not read the uploaded file. Try again.' })
+  }
+  const duplicate = await findDuplicateDocument(projectId, type as DocumentType, contentHash, null)
+  if (duplicate) {
+    try {
+      fs.unlinkSync(req.file.path)
+    } catch {
+      /* ignore */
+    }
+    return res.status(409).json({
+      error: `This file is identical to one you already uploaded (${duplicate.filename}). Remove the existing document from the project first, or use a different file.`,
+      existingDocumentId: duplicate.id,
+    })
+  }
   const doc = await prisma.document.create({
     data: {
       projectId,
@@ -90,6 +139,7 @@ router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequ
       filename: safeFilename,
       filepath: req.file.path,
       mimeType: req.file.mimetype,
+      contentHash,
     },
   })
   await logAudit({
@@ -148,6 +198,29 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
     }
   }
   const safeFilename = sanitizeFilename(req.file.originalname)
+  let contentHash: string
+  try {
+    contentHash = sha256FileHex(req.file.path)
+  } catch {
+    try {
+      fs.unlinkSync(req.file.path)
+    } catch {
+      /* ignore */
+    }
+    return res.status(400).json({ error: 'Could not read the uploaded file. Try again.' })
+  }
+  const duplicate = await findDuplicateDocument(projectId, type as DocumentType, contentHash, bankAccountId || null)
+  if (duplicate) {
+    try {
+      fs.unlinkSync(req.file.path)
+    } catch {
+      /* ignore */
+    }
+    return res.status(409).json({
+      error: `This file is identical to one you already uploaded (${duplicate.filename}). Remove the existing document from the project first, or use a different file.`,
+      existingDocumentId: duplicate.id,
+    })
+  }
   const doc = await prisma.document.create({
     data: {
       projectId,
@@ -156,6 +229,7 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
       filename: safeFilename,
       filepath: req.file.path,
       mimeType: req.file.mimetype,
+      contentHash,
     },
   })
   await logAudit({
