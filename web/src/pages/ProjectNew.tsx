@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
 import {
@@ -254,6 +254,14 @@ export default function ProjectNew() {
               <option value="EUR">EUR (€)</option>
             </select>
           </SelectWrapper>
+          <p className={hintClass}>
+            This is the <strong>reporting currency</strong> for this project&apos;s BRS and exports. Your workspace
+            plan is billed in <strong>GHS</strong> via Paystack — see{' '}
+            <Link to="/settings/billing" className="font-medium text-primary-600 hover:underline">
+              Settings → Billing
+            </Link>
+            .
+          </p>
         </div>
         <div>
           <label className={labelClass}>Project name</label>

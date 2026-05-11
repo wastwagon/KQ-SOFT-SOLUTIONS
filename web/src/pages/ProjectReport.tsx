@@ -364,7 +364,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
-      timeZone: 'Africa/Accra',
     })
   }
   const fmtSignedReportAmt = (n: number, opts?: { forceNegative?: boolean }) => {
@@ -440,7 +439,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     lessBankOnlyDebits: profileLabels?.lessBankOnlyDebits || 'Add: Bank-only debits not in cash book',
     lessUnpresentedCheques: profileLabels?.lessUnpresentedCheques || 'Less: Unpresented cheques',
     cashBookBalanceEnd: profileLabels?.cashBookBalanceEnd || 'Cash book balance at end of period',
-    additionalInformationTitle: profileLabels?.additionalInformationTitle || 'Additional information (Ghana BRS language profile)',
+    additionalInformationTitle:
+      profileLabels?.additionalInformationTitle || 'Additional information (BRS terminology profile)',
     asAtReconciliationPosition: profileLabels?.asAtReconciliationPosition || 'As-at reconciliation position',
     postPeriodMovement: profileLabels?.postPeriodMovement || 'Post-period movement (carried forward)',
     uncreditedLodgmentsOrUnclearedDeposits: profileLabels?.uncreditedLodgmentsOrUnclearedDeposits || 'UNCREDITED LODGMENTS',
@@ -690,9 +690,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             Generated {formatDate(data.generatedAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {data.currency}
           </p>
           {data.reportLanguageProfile && (
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-800">
-              <span className="font-medium">{data.reportLanguageProfile?.label}</span>
-              <span className="text-primary-600">({data.reportLanguageProfile?.code || 'GHANA_BRS_V1'})</span>
+            <div
+              className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-800"
+              title={
+                data.reportLanguageProfile.code
+                  ? `Technical profile code: ${data.reportLanguageProfile.code}`
+                  : undefined
+              }
+            >
+              <span className="font-medium">{data.reportLanguageProfile.label}</span>
             </div>
           )}
           <div className="mt-2 text-xs text-slate-700 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-md px-3 py-2 shadow-sm">

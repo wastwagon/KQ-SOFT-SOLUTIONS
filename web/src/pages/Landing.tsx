@@ -29,6 +29,7 @@ import {
   Zap,
 } from 'lucide-react'
 import BrandLogo from '../components/BrandLogo'
+import SubscriptionFxReference from '../components/marketing/SubscriptionFxReference'
 import { publicApi } from '../lib/api'
 import {
   FEATURE_GROUPS,
@@ -44,7 +45,7 @@ import {
  *   0. Announcement bar (intro offer, dismissible)
  *   1. Sticky glass-morphism navigation
  *   2. Hero (headline + dual CTA + animated dashboard mockup)
- *   3. Trust strip (Ghana banks supported)
+ *   3. Trust strip (example bank / statement layouts)
  *   4. Stat band
  *   5. Features grid (6 cards)
  *   6. How it works (3 steps)
@@ -74,37 +75,37 @@ const FEATURES = [
     icon: Zap,
     title: 'Smart matching engine',
     description:
-      'One-to-one, one-to-many, and many-to-many auto-suggestions based on amount, date window, reference, and cheque number. Confirm with a single click.',
+      'One-to-one, one-to-many, and many-to-many suggestions ranked by amount, date window, references, and cheque numbers. Confirm in bulk or one click at a time.',
   },
   {
     icon: Database,
-    title: 'Built for Ghana banks',
+    title: 'Statement layouts that ship ready',
     description:
-      'Pre-tuned parsers for Ecobank, GCB, Access, Stanbic, Fidelity and more. Excel, CSV, PDF, even scanned statements via OCR.',
+      'Pre-built parsers for major regional banks (plus generic Excel, CSV, and PDF). Scanned PDFs and odd columns are handled with OCR and guided mapping.',
   },
   {
     icon: FileText,
     title: 'Audit-ready reports',
     description:
-      'Branded BRS exports in Excel and PDF with reviewer/preparer sign-off, discrepancy reporting, and a full audit trail of every action.',
+      'Branded BRS in Excel and PDF with preparer/reviewer sign-off, discrepancy lines, and an immutable trail of who changed what and when.',
   },
   {
     icon: Users,
     title: 'Multi-client workspace',
     description:
-      'Manage every client in one place. Reconcile, sign off, and roll forward across periods without losing the trail.',
+      'Run every engagement from one hub: separate projects, shared templates, and roll-forward so nothing drops between periods.',
   },
   {
     icon: ShieldCheck,
     title: 'Roles & approvals',
     description:
-      'Preparer → Reviewer → Approver workflow with locked statuses. Threshold approval rules keep large variances reviewed.',
+      'Preparer → Reviewer → Approver with locked states. Threshold rules surface large variances before anything is marked final.',
   },
   {
     icon: Workflow,
     title: 'API & bank rules',
     description:
-      'REST API for firm automation pipelines. Configurable bank rules engine to flag, categorise, or auto-suggest matches.',
+      'Public REST hooks for firm automation. A configurable rules layer flags, tags, or steers the matcher before humans touch the grid.',
   },
 ] as const
 
@@ -113,19 +114,19 @@ const STEPS = [
     icon: Upload,
     title: 'Upload',
     description:
-      'Drop your cash book and bank statement — Excel, CSV, PDF, or scanned. We auto-detect columns and bank format on the fly.',
+      'Bring the cash book and bank file — Excel, CSV, PDF, or scan. Column detection and layout hints get you to a clean grid in minutes.',
   },
   {
     icon: Sparkles,
     title: 'Match',
     description:
-      'The matching engine surfaces suggestions ranked by confidence. Bulk-confirm, split, or unmatch in one click.',
+      'Suggestions are scored and grouped so your team reviews the highest-impact lines first. Split lines, undo, or approve in bulk.',
   },
   {
     icon: FileSpreadsheet,
     title: 'Report',
     description:
-      'Export a branded, audit-ready BRS in Excel and PDF. Sign off, lock the period, and roll balances forward.',
+      'Publish a branded BRS, capture sign-off, lock the period, and roll unresolved items forward without rebuilding from scratch.',
   },
 ] as const
 
@@ -143,48 +144,48 @@ const BANKS_SUPPORTED = [
 const TESTIMONIALS = [
   {
     quote:
-      'Reconciliation that used to take three days now takes about an hour. The Ghana-specific bank parsing was the deciding factor for us.',
+      'Work that stretched across three days now finishes in about an hour. The tuned statement layouts meant we did not have to babysit column mapping.',
     author: 'Senior Accountant',
-    role: 'Audit firm — Tema',
+    role: 'Regional audit firm',
   },
   {
     quote:
-      'The audit trail and sign-off workflow alone justified switching. We can show clients exactly who matched what and when.',
+      'The audit trail and sign-off workflow paid for themselves in the first month. Clients see exactly who approved each match.',
     author: 'Practice Partner',
     role: 'Mid-tier accounting firm',
   },
   {
     quote:
-      'We onboarded our team in an afternoon. The interface is clean, the matching is accurate, and exporting branded BRS reports is effortless.',
+      'We onboarded the team in one afternoon. The UI stays out of the way, matching is dependable, and branded exports look like ours — not generic SaaS.',
     author: 'Finance Manager',
-    role: 'Logistics group',
+    role: 'Logistics & supply chain',
   },
 ] as const
 
 const FAQS = [
   {
-    q: 'Which Ghanaian banks are supported?',
-    a: 'We ship pre-tuned parsers for Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB, and others. We also handle generic Excel, CSV, and PDF formats — and scanned PDFs via OCR. If your bank format is non-standard, we will tune a parser for you on the Standard plan and above.',
+    q: 'Which banks or statement formats are supported?',
+    a: 'We ship parsers tuned for major regional banks (for example Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB) plus generic Excel, CSV, and PDF layouts. Scanned statements are supported with OCR. Non-standard files can be mapped; Standard tier and above includes parser tuning support.',
   },
   {
     q: 'Do I need to install anything?',
-    a: 'No. KQ-SOFT runs in your browser. Sign up, upload, and reconcile. Nothing to download or maintain.',
+    a: 'No. KQ-SOFT runs in the browser. Create an organisation, upload files, and reconcile. There is no desktop agent to maintain.',
   },
   {
     q: 'Can my team collaborate on the same project?',
-    a: 'Yes. Add team members with Preparer, Reviewer, or Approver roles. Every action is captured in the audit trail. Member counts grow with your plan.',
+    a: 'Yes. Invite colleagues as Preparer, Reviewer, or Approver. Every change is written to the audit trail. Seat limits follow the subscription tier.',
   },
   {
-    q: 'How does pricing work?',
-    a: 'Plans are billed monthly or yearly in Ghana cedis (GHS) via Paystack. Limits scale with your tier — projects per month, transactions per month, and feature gates. You can upgrade at any time; downgrades are handled by support to make sure entitlements are reconciled correctly.',
+    q: 'How does pricing and currency work?',
+    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly or annual cycles. The public site shows approximate USD/EUR/GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use its own reporting currency (GHS, USD, or EUR) for BRS and balances.',
   },
   {
     q: 'Is my data secure?',
-    a: 'Documents are stored on encrypted disk inside our managed infrastructure, and access is enforced by per-organisation role-based permissions. Authentication uses signed JWTs over HTTPS. We do not share your data with third parties.',
+    a: 'Files live on encrypted storage inside managed infrastructure. Access is scoped per organisation and role. Sessions use signed JWTs over HTTPS. We do not sell or share customer data with advertisers.',
   },
   {
     q: 'Can I export BRS reports with my own logo and colours?',
-    a: 'Yes — branding (logo, primary and secondary colours, custom report title and footer) is included on the Premium tier and above. Reports look like your firm produced them.',
+    a: 'Yes. Premium and Firm include full branding — logo, palette, report title, and footer — so deliverables match your firm template.',
   },
 ] as const
 
@@ -326,7 +327,7 @@ function AnnouncementBar({
   return (
     <div className="relative z-40 nav-shimmer text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 sm:px-6 lg:px-8 py-2 text-center text-xs sm:text-sm">
-        <span aria-hidden className="hidden sm:inline">🇬🇭</span>
+        <Sparkles className="hidden sm:inline h-4 w-4 shrink-0 text-white/90" aria-hidden />
         <span className="font-medium">
           Welcome offer · <span className="font-bold">50% off your first 2 months</span> on any paid plan
         </span>
@@ -468,19 +469,19 @@ function Hero() {
               <span className="absolute inset-0 rounded-full bg-green-500 animate-pulse-dot" />
               <span className="relative h-2 w-2 rounded-full bg-green-500" />
             </span>
-            <span>Built for Ghana accountants</span>
+            <span>Modern bank rec for distributed teams</span>
           </div>
 
           <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-[1.05]">
             Bank reconciliation,
             <br className="hidden sm:block" />
-            <span className="gradient-text"> automated for Ghana.</span>
+            <span className="gradient-text"> automated end to end.</span>
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
-            Upload your cash book and bank statement. Our matching engine handles
-            cheques, transfers, and split payments — and exports an audit-ready
-            BRS in minutes, not days.
+            Pair the cash book with the bank file in one workspace. Intelligent matching
+            handles cheques, wires, and split lines — then ships a signed-off BRS you can
+            stand behind, without the spreadsheet marathon.
           </p>
 
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -622,7 +623,7 @@ function DashboardMockup() {
                   amount: 'GHS 850.00',
                 },
                 {
-                  cb: 'Wire · Tema Office Supply',
+                  cb: 'Wire · Regional vendor payment',
                   bank: 'EFT 81203 / TOS',
                   amount: 'GHS 4,250.00',
                 },
@@ -675,7 +676,10 @@ function BankStrip() {
     <section className="border-y border-gray-100 bg-white py-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <p className="text-center text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-          Bank statement formats supported
+          Pre-built statement layouts (examples)
+        </p>
+        <p className="mt-2 text-center text-sm text-gray-500 max-w-2xl mx-auto">
+          Plus generic Excel, CSV, and PDF — tune or extend layouts as your client base grows.
         </p>
         <div className="mt-6 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-white to-transparent z-10" />
@@ -703,9 +707,9 @@ function BankStrip() {
 
 function StatBand() {
   const stats = [
-    { value: '10×', label: 'faster than spreadsheet reconciliation' },
-    { value: '98%', label: 'auto-match accuracy on Ghana bank statements' },
-    { value: '< 5 min', label: 'setup — sign up, upload, reconcile' },
+    { value: '10×', label: 'faster than manual spreadsheet reconciliation' },
+    { value: '98%', label: 'typical auto-match rate on tuned statement layouts' },
+    { value: '< 5 min', label: 'from sign-up to first reconciled grid' },
   ]
   return (
     <section className="py-24 sm:py-28 border-y border-gray-100">
@@ -741,11 +745,11 @@ function Features() {
             Features
           </p>
           <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
-            Everything you need to close a clean bank rec.
+            Everything you need to close a defensible bank rec.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-gray-600 leading-relaxed">
-            From document ingestion to branded BRS report — every stage is
-            handled end-to-end inside one workspace.
+            Ingestion, matching, approvals, and client-ready reporting — orchestrated in
+            one place so reviewers spend time on exceptions, not formatting.
           </p>
         </div>
 
@@ -788,7 +792,7 @@ function HowItWorks() {
             How it works
           </p>
           <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
-            Three steps from spreadsheet chaos to signed-off BRS.
+            Three steps from raw files to a signed-off BRS.
           </h2>
         </div>
 
@@ -834,13 +838,12 @@ function DashboardShowcase() {
               Built for accountants
             </p>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
-              The same workflow you do today — only faster.
+              Familiar controls — without the busywork.
             </h2>
             <p className="mt-4 text-base sm:text-lg text-gray-600 leading-relaxed">
-              We modelled the system around how Ghanaian accountants already
-              prepare a bank rec — uncredited lodgments, unpresented cheques,
-              brought-forward items, discrepancy reporting — so there is no
-              relearning required.
+              The product mirrors how firms already think about bank recs: uncredited
+              lodgments, unpresented cheques, brought-forward lines, and discrepancy
+              narratives — automated where it helps, transparent where it matters.
             </p>
             <ul className="mt-7 space-y-3">
               {[
@@ -954,11 +957,12 @@ function Pricing({
             Pricing
           </p>
           <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
-            Simple, transparent pricing in Ghana cedis.
+            Simple pricing — billed in GHS via Paystack.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-gray-600">
-            Start free. Pay monthly or save ~17% with annual billing. Upgrade,
-            downgrade, or cancel any time.
+            Start free. Pay monthly or save ~17% annually. Checkout is always in{' '}
+            <abbr title="Ghana cedis">GHS</abbr> via Paystack; use the reference converter below for USD, EUR, or GBP.
+            Each project&apos;s BRS currency (GHS, USD, or EUR) is chosen in the app.
           </p>
 
           {/* Billing period toggle */}
@@ -997,6 +1001,10 @@ function Pricing({
           </div>
         </div>
 
+        <div className="mt-10 max-w-4xl mx-auto w-full">
+          <SubscriptionFxReference plans={plans} billingPeriod={billingPeriod} />
+        </div>
+
         <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
           {plans.map((p) => (
             <PlanCard key={p.slug} plan={p} period={billingPeriod} />
@@ -1007,7 +1015,7 @@ function Pricing({
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-gray-600">
           <span className="inline-flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-green-600" />
-            Secure payment via Paystack
+            Paystack checkout · charged in GHS
           </span>
           <span className="inline-flex items-center gap-2">
             <Check className="w-4 h-4 text-green-600" />
@@ -1275,10 +1283,10 @@ function Testimonials() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">
-            Loved by accounting teams
+            Teams worldwide rely on it
           </p>
           <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
-            What customers say.
+            What finance leaders say.
           </h2>
         </div>
 
@@ -1388,11 +1396,11 @@ function FinalCta() {
           <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
               <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-                Close your next bank rec in an afternoon, not a week.
+                Close the next period before the inbox piles up.
               </h2>
               <p className="mt-4 text-base sm:text-lg text-white/85 leading-relaxed max-w-xl">
-                Sign up free, upload a sample cash book and statement, and watch
-                the matching engine work. Upgrade only when you are ready.
+                Create a free workspace, drop in a real cash book and bank extract, and
+                watch suggestions populate. Upgrade when volume or branding needs grow.
               </p>
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">
@@ -1436,11 +1444,11 @@ function Footer() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           <div>
             <h3 className="text-xl font-bold text-white">
-              Stay close to the project.
+              Stay ahead of each close.
             </h3>
             <p className="mt-2 text-sm text-gray-400 max-w-md">
-              Product updates, new bank parsers, and reconciliation tips —
-              straight to your inbox. No spam, unsubscribe in one click.
+              Product updates, new statement layouts, and reconciliation playbooks —
+              concise, optional, one-click unsubscribe.
             </p>
           </div>
           <form
@@ -1485,8 +1493,8 @@ function Footer() {
               <BrandLogo className="h-9 w-auto" />
             </div>
             <p className="mt-5 text-sm text-gray-400 leading-relaxed max-w-md lg:max-w-none">
-              Bank reconciliation built for Ghanaian accountants and finance
-              teams. Match faster, report cleaner, audit better.
+              Cloud bank reconciliation for accounting firms and in-house finance teams.
+              Match with confidence, publish polished BRS packs, and preserve the audit trail.
             </p>
             <div className="mt-7 flex items-center gap-2">
               {[
@@ -1611,7 +1619,7 @@ function Footer() {
           </div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>Designed and built in Accra, Ghana</span>
+            <span>Global product · engineering roots in Accra, Ghana</span>
           </div>
         </div>
       </div>

@@ -133,7 +133,7 @@ export default function SettingsBrandingTab({ role, features, branding: b }: Set
           <textarea
             value={b.letterheadAddress}
             onChange={(e) => b.setLetterheadAddress(e.target.value)}
-            placeholder="123 High Street, Accra"
+            placeholder="Suite 100, City, Country"
             rows={2}
             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />

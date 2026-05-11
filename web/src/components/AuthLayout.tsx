@@ -4,7 +4,7 @@ import { ArrowLeft, Check, FileText, ShieldCheck, Zap } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 
 const BENEFITS = [
-  { icon: Zap, text: 'Smart matching for Ghana bank statement formats' },
+  { icon: Zap, text: 'Smart matching tuned for common bank statement layouts' },
   { icon: FileText, text: 'Audit-ready BRS exports in Excel and PDF' },
   { icon: ShieldCheck, text: 'Role-based access and a full activity trail' },
 ] as const
@@ -73,7 +73,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
         </div>
 
         <p className="relative z-10 text-xs text-primary-200/80">
-          Built for Ghanaian accountants and finance teams.
+          Subscriptions in GHS · per-project GHS, USD, or EUR for BRS reporting.
         </p>
       </aside>
 
@@ -86,7 +86,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
           <BrandLogo className="h-9 w-auto" />
         </Link>
         <p className="mt-3 text-xs font-medium uppercase tracking-wider text-primary-100/90">
-          Bank reconciliation · Ghana
+          Bank reconciliation · cloud workspace
         </p>
       </div>
 

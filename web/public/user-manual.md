@@ -3,7 +3,7 @@
 **Product:** KQ Bank Reconciliation System (BRS)  
 **Company:** KQ SOFT SOLUTIONS  
 **Audience:** End users and operations teams  
-**Updated:** May 7, 2026
+**Updated:** May 11, 2026
 
 > Welcome to KQ BRS. This manual is your official guide for onboarding, day-to-day reconciliation, approvals, reporting, and support escalation.  
 > For best results, share this page with all new users during kickoff and role assignment.
@@ -12,6 +12,7 @@
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-11 | 1.2 | FAQ on subscription (GHS) vs project reporting currency; Settings → Billing; New project currency hint; manual cross-references. |
 | 2026-05-07 | 1.1 | Added dedicated in-app online manual page (`/manual`), dashboard help shortcut, and live update process. |
 | 2026-05-01 | 1.0 | Initial commercial user manual release. |
 
@@ -116,8 +117,10 @@ Go to **Projects -> New project**, then set:
 - project name
 - client (optional)
 - reconciliation date
-- currency (`GHS`, `USD`, `EUR`)
+- currency (`GHS`, `USD`, `EUR`) — this is the **project reporting currency** for the BRS and workbook amounts
 - optional roll-forward source (if enabled)
+
+**Billing vs project currency:** Organisation subscriptions are charged in **GHS** via Paystack. Project currency is independent and can be **GHS**, **USD**, or **EUR** per reconciliation job. The same note appears on the **New project** form next to the currency field.
 
 ---
 
@@ -253,6 +256,12 @@ Approval and reopen access are role-based (typically reviewer/admin roles).
 
 ### 6) How do we keep users aligned after UI updates?
 Update this manual changelog every release and announce changes to all active teams.
+
+### 7) Why is our subscription billed in GHS if we reconcile in USD or EUR?
+**Workspace billing** (your organisation's plan) is processed in **Ghana cedis (GHS)** through **Paystack**. That is separate from each **project's reporting currency** (`GHS`, `USD`, or `EUR`), which you set when creating the project and which controls how amounts appear on the BRS and in exports.
+
+### 8) Where do we upgrade, renew, or see subscription status?
+Admins: open **Settings → Billing**. You will see the current plan, subscription status, and Paystack payment buttons when billing is enabled for your deployment. Other roles should ask an organisation admin for plan changes.
 
 ---
 

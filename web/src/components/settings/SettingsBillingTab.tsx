@@ -45,6 +45,11 @@ export default function SettingsBillingTab({
         Current plan:{' '}
         <strong className="capitalize text-gray-900">{usageData?.organization?.plan || 'basic'}</strong>
       </p>
+      <p className="text-xs text-gray-500 mb-4 leading-relaxed border-l-2 border-primary-200 pl-3">
+        Workspace subscriptions are charged in <strong>GHS</strong> via Paystack. Each project&apos;s reporting currency
+        (GHS, USD, or EUR) is chosen under <strong>Projects</strong> when you create or open a job — it affects BRS and
+        workbook amounts only, not what you pay for the plan.
+      </p>
       {usageData?.subscription && (
         <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
           <p>

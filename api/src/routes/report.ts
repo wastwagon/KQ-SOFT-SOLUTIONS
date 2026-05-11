@@ -339,7 +339,7 @@ function resolveBrandingLogoPath(logoUrl: unknown): string | null {
   return fs.existsSync(localPath) ? localPath : null
 }
 
-/** Bank row shown under the BRS title (Ghana manual workbook style). */
+/** Bank row shown under the BRS title (common regional workbook layout). */
 type ReportBankAccountRow = {
   id: string
   name: string
@@ -632,7 +632,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
   const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
 
-  // Legacy Ghana BRS statement block used by current UI consumers.
+  // Legacy BRS statement block (GHANA_BRS_V1 shape) used by current UI consumers.
   // Note: "uncredited lodgments" here includes unmatched bank credits for backward compatibility.
   // Unpresented cheques = unmatched payments (cheques not in bank) + brought forward
   const computedCashBookBalance = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
@@ -720,21 +720,21 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     `This reconciliation shows ${matchPairs.length} matched transaction(s). Unpresented cheques total ${fmtAmt(unpresentedChequesTotal)}; uncredited lodgments total ${fmtAmt(uncreditedLodgmentsTimingTotal)}.`
   const reportLanguageProfile = {
     code: 'GHANA_BRS_V1',
-    label: 'Ghana BRS language profile',
+    label: 'Standard BRS terminology profile',
     signedAmountSupport: true,
     asAtAndPostPeriodMovement: true,
     labels: {
       openingBankStatementBalance: 'As per bank statement (input/source file)',
       closingBankStatementBalance: 'Closing balance per bank statement',
       addUncreditedLodgments: 'Add: Uncredited lodgments / uncleared deposits',
-      /** Main BRS workbook lines — wording matches Ghana manual worksheet layouts. */
+      /** Main BRS workbook lines — wording aligned with common regional worksheet layouts. */
       addBankOnlyDebitsNotInCashBookLine: 'Add: Bank-only debits not in cash book',
       deductBankOnlyCreditsNotInCashBookLine: 'Deduct: Bank-only credits not in cash book',
       addBankOnlyCredits: 'Deduct: Bank-only credits not in cash book',
       lessBankOnlyDebits: 'Add: Bank-only debits not in cash book',
       lessUnpresentedCheques: 'Less: Unpresented cheques',
       cashBookBalanceEnd: 'Cash book balance at end of period',
-      additionalInformationTitle: 'Additional information (Ghana BRS language profile)',
+      additionalInformationTitle: 'Additional information (BRS terminology profile)',
       asAtReconciliationPosition: 'As-at reconciliation position',
       postPeriodMovement: 'Post-period movement (carried forward)',
       uncreditedLodgmentsOrUnclearedDeposits: 'Uncredited lodgments / uncleared deposits',
@@ -1088,7 +1088,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const hasMissingChequesReportExport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
   const reportLanguageProfile = {
     code: 'GHANA_BRS_V1',
-    label: 'Ghana BRS language profile',
+    label: 'Standard BRS terminology profile',
     signedAmountSupport: true,
     asAtAndPostPeriodMovement: true,
     labels: {
@@ -1535,7 +1535,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         label: string
         amount: number
         forceNegative?: boolean
-        /** Plain positive/display magnitudes — Ghana worksheet-style BRS amounts */
+        /** Plain positive/display magnitudes — classic BRS worksheet-style amounts */
         workbookStyle?: boolean
         bold?: boolean
         /** Indented workbook composition line (does not contribute to PDF subtotal totals). */

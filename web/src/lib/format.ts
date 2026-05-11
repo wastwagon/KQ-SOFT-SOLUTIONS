@@ -1,9 +1,9 @@
 /**
- * Ghana-acceptable formatting — single source for dates and amounts.
+ * Display formatting for dates and amounts (DD MMM YYYY style; locale-aware where used).
  * Use across all pages and reports for consistency (DD/MM/YYYY, en-GB numbers).
  */
 
-/** Format date for display — Ghana default: DD MMM YYYY (e.g. 31 Dec 2024) */
+/** Format date for display — DD MMM YYYY (e.g. 31 Dec 2024) */
 export function formatDate(
   date: string | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' }

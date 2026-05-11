@@ -81,7 +81,11 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     features: [
       { id: 'imports', label: 'Excel, CSV & PDF imports' },
       { id: 'ocr', label: 'OCR for scanned bank statements' },
-      { id: 'bank_parsers', label: 'Ghana bank parsers (Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB)' },
+      {
+        id: 'bank_parsers',
+        label:
+          'Pre-built bank statement layouts (e.g. Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB) + generic CSV/Excel/PDF',
+      },
     ],
   },
   {
@@ -151,7 +155,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       '5 projects · 500 transactions / month',
       '1 team member',
       'Excel, CSV & PDF imports + OCR',
-      'Ghana bank statement parsers',
+      'Pre-built regional bank statement layouts',
       'One-to-one auto-matching',
       'BRS export (Excel + PDF)',
       'Default report branding',

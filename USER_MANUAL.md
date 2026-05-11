@@ -1,6 +1,6 @@
 # Bank Reconciliation System — User Manual
 
-**KQ SOFT SOLUTIONS** | Ghana  
+**KQ SOFT SOLUTIONS** | Global product · HQ Ghana  
 **Version 1.0** | March 2026
 
 ---
@@ -28,7 +28,7 @@
 
 ## 1. Introduction
 
-The Bank Reconciliation System (BRS) is a web-based SaaS application designed for accounting firms and businesses in Ghana. It helps you:
+The Bank Reconciliation System (BRS) is a web-based SaaS application for accounting firms and finance teams. It helps you:
 
 - Upload cash books and bank statements (Excel, CSV, PDF, images)
 - Map columns to the correct fields
@@ -36,7 +36,7 @@ The Bank Reconciliation System (BRS) is a web-based SaaS application designed fo
 - Generate professional Bank Reconciliation Statements (BRS) with your branding
 - Export reports as PDF or Excel
 
-The system supports multiple Ghanaian banks with auto-detection of statement formats and offers flexible matching (1-to-1, 1-to-many, many-to-1, many-to-many).
+The system ships pre-built parsers for many regional bank statement layouts (with auto-detection where supported) and offers flexible matching (1-to-1, 1-to-many, many-to-1, many-to-many).
 
 ---
 
@@ -179,7 +179,7 @@ Use the main navigation menu:
 2. Enter:
    - **Name** — e.g. "Ecobank Jan 2025"
    - **Client** (optional) — Select from your clients or leave blank
-   - **Currency** — GHS (default), USD, or EUR
+   - **Currency** — GHS (default), USD, or EUR (reporting currency for this project’s BRS only; workspace subscription remains GHS via Paystack — see Settings → Billing)
    - **Roll-forward from** (optional) — Select a completed project to carry unpresented cheques forward (Premium+)
 3. Click **Create**.
 
@@ -386,6 +386,7 @@ Click **Reset to platform default** to restore platform defaults.
 - View **current plan** and usage (projects, transactions)
 - **Upgrade** — Click to pay via Paystack (GHS)
 - **Intro offer** — 50% off first payment when enabled by platform
+- **Currency note:** Workspace billing is always in **GHS**. Each **project** still uses its own reporting currency (**GHS**, **USD**, or **EUR**) for the BRS — set when you create the project, not in Billing.
 
 ### Members (Admin only)
 
@@ -441,7 +442,7 @@ Create rules to auto-suggest matches:
 
 ## 13. Supported Banks
 
-The system auto-detects these Ghanaian bank statement formats:
+The system auto-detects these bank statement formats (examples; generic CSV/Excel/PDF is also supported):
 
 | Bank | Detection |
 |------|-----------|

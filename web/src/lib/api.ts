@@ -195,7 +195,7 @@ export interface ReportResponse {
   bankAccountId?: string | null
   selectedBankAccountName?: string | null
   selectedBankAccountNo?: string | null
-  /** Ghana workbook-style header line, e.g. "Ecobank Account Number 5565668889" */
+  /** Regional bank workbook-style header line, e.g. "Ecobank Account Number 5565668889" */
   bankAccountHeaderLine?: string | null
   currency?: string
   reportCompletedAt?: string
