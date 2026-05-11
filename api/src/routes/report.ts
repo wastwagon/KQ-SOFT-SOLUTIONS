@@ -946,6 +946,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   }
   const format = (req.query.format as string)?.toLowerCase() || 'excel'
   const bankAccountId = (req.query.bankAccountId as string) || undefined
+  const scopeRaw = ((req.query.scope as string) || 'full').toLowerCase()
+  const brsOnlyExport = scopeRaw === 'brs_only'
   const signedAmounts = String(req.query.signedAmounts || '').toLowerCase()
   const useSignedAmounts = signedAmounts === '1' || signedAmounts === 'true' || signedAmounts === 'yes'
   const orgId = req.auth!.orgId
@@ -1339,6 +1341,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     ]
     const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
     XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BANK RECONCILIATION')
+    if (!brsOnlyExport) {
     const additionalInformationRows: (string | number)[][] = [
       [`${project.organization.name} - ${reportTitle}`],
       [project.name],
@@ -1362,7 +1365,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (hasMissingChequesReportExport && missingChequesAgeingExport.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingChequesAgeingExport), 'Missing Cheques Ageing')
     }
-    
+
     // --- AUDIT WORKING PAPERS (INTERNAL USE) ---
     if (unmatchedReceipts.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedReceipts), 'UNMATCHED RECEIPTS')
@@ -1382,8 +1385,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (hasDiscrepancyReportExport && discrepancies.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discrepancies), 'DISCREPANCIES')
     }
+    }
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-    const filename = `BRS_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    const filenamePrefix = brsOnlyExport ? 'BRS_statement_only_' : 'BRS_'
+    const filename = `${filenamePrefix}${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     await logAudit({
@@ -1391,14 +1396,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       userId: req.auth!.userId,
       projectId,
       action: 'report_exported',
-      details: { format: 'excel' },
+      details: { format: 'excel', scope: brsOnlyExport ? 'brs_only' : 'full' },
     })
     return res.send(buf)
   }
 
   if (format === 'pdf') {
     const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true })
-    const filename = `BRS_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
+    const pdfNamePrefix = brsOnlyExport ? 'BRS_statement_only_' : 'BRS_'
+    const filename = `${pdfNamePrefix}${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     doc.pipe(res)
@@ -1687,37 +1693,40 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     doc.text('Date: _______________________________________')
     doc.moveDown(0.8).fillColor('#000000')
 
-    // Keep the core BRS worksheet + sign-off on page 1; NOTES and narrative start on a fresh page.
-    doc.addPage()
-    doc.x = margin
-    doc.y = 50
+    // Full export: NOTES + narrative on their own page(s); brs_only stops after sign-off.
+    if (!brsOnlyExport) {
+      doc.addPage()
+      doc.x = margin
+      doc.y = 50
 
-    doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle)
-    doc.moveDown(0.2)
-    drawAmountSummaryTable(exportLabels.asAtReconciliationPosition, [
-      { label: exportLabels.uncreditedLodgmentsOrUnclearedDeposits, amount: asAtUncreditedTotalExport },
-      { label: exportLabels.unpresentedChequesOrUnclearedPayments, amount: asAtUnpresentedTotalExport, forceNegative: true },
-    ])
-    drawAmountSummaryTable(exportLabels.postPeriodMovement, [
-      { label: exportLabels.broughtForwardUncreditedLodgments, amount: broughtForwardLodgmentsTotalExport },
-      { label: exportLabels.broughtForwardUnpresentedCheques, amount: broughtForwardChequesTotalExport, forceNegative: true },
-    ])
+      doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle)
+      doc.moveDown(0.2)
+      drawAmountSummaryTable(exportLabels.asAtReconciliationPosition, [
+        { label: exportLabels.uncreditedLodgmentsOrUnclearedDeposits, amount: asAtUncreditedTotalExport },
+        { label: exportLabels.unpresentedChequesOrUnclearedPayments, amount: asAtUnpresentedTotalExport, forceNegative: true },
+      ])
+      drawAmountSummaryTable(exportLabels.postPeriodMovement, [
+        { label: exportLabels.broughtForwardUncreditedLodgments, amount: broughtForwardLodgmentsTotalExport },
+        { label: exportLabels.broughtForwardUnpresentedCheques, amount: broughtForwardChequesTotalExport, forceNegative: true },
+      ])
 
-    const exportNarrative =
-      (project as { reportNarrative?: string | null }).reportNarrative ||
-      `Matched: ${matchPairs.length} transaction(s). Unpresented Cheques: ${amtNum(Math.abs(unpresentedChequesTotal))}. Uncredited Lodgments: ${amtNum(uncreditedLodgmentsTimingTotalExport)}.`
-    doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: 495 }).fillColor('#000000').moveDown(0.5)
-    const prepComment = (project as { preparerComment?: string | null }).preparerComment
-    const revComment = (project as { reviewerComment?: string | null }).reviewerComment
-    if (prepComment?.trim()) {
-      doc.fontSize(8).fillColor('#333333').text('Preparer note: ' + prepComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+      const exportNarrative =
+        (project as { reportNarrative?: string | null }).reportNarrative ||
+        `Matched: ${matchPairs.length} transaction(s). Unpresented Cheques: ${amtNum(Math.abs(unpresentedChequesTotal))}. Uncredited Lodgments: ${amtNum(uncreditedLodgmentsTimingTotalExport)}.`
+      doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: 495 }).fillColor('#000000').moveDown(0.5)
+      const prepComment = (project as { preparerComment?: string | null }).preparerComment
+      const revComment = (project as { reviewerComment?: string | null }).reviewerComment
+      if (prepComment?.trim()) {
+        doc.fontSize(8).fillColor('#333333').text('Preparer note: ' + prepComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+      }
+      if (revComment?.trim()) {
+        doc.fontSize(8).fillColor('#333333').text('Reviewer note: ' + revComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+      }
+      if (prepComment?.trim() || revComment?.trim()) doc.moveDown(0.5)
     }
-    if (revComment?.trim()) {
-      doc.fontSize(8).fillColor('#333333').text('Reviewer note: ' + revComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
-    }
-    if (prepComment?.trim() || revComment?.trim()) doc.moveDown(0.5)
 
     // --- INTERNAL AUDIT WORKING PAPERS (DIAGNOSTICS) ---
+    if (!brsOnlyExport) {
     doc.addPage()
     doc.fontSize(12).font('Helvetica-Bold').fillColor('#1E293B').text('INTERNAL AUDIT WORKING PAPERS (DIAGNOSTICS)')
     doc.moveDown(0.2)
@@ -1794,6 +1803,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       amount: 0
     }))
     drawTable('PROJECT REVISION HISTORY', revisionRows, { allowEmptyText: 'No revisions found', refLabel: 'ACTION', hideAmount: true })
+    }
 
     const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
     const range = doc.bufferedPageRange()
@@ -1813,7 +1823,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       userId: req.auth!.userId,
       projectId,
       action: 'report_exported',
-      details: { format: 'pdf' },
+      details: { format: 'pdf', scope: brsOnlyExport ? 'brs_only' : 'full' },
     })
     return
   }

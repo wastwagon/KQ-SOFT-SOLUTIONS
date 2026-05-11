@@ -650,11 +650,20 @@ export const settings = {
   },
 }
 
-async function reportExport(projectId: string, format: string, bankAccountId?: string, signedAmounts?: boolean) {
+export type ReportExportScope = 'full' | 'brs_only'
+
+export interface ReportExportOptions {
+  bankAccountId?: string
+  signedAmounts?: boolean
+  scope?: ReportExportScope
+}
+
+async function reportExport(projectId: string, format: string, opts?: ReportExportOptions) {
   const token = getToken()
   const q = new URLSearchParams({ format })
-  if (bankAccountId) q.set('bankAccountId', bankAccountId)
-  if (signedAmounts) q.set('signedAmounts', '1')
+  if (opts?.bankAccountId) q.set('bankAccountId', opts.bankAccountId)
+  if (opts?.signedAmounts) q.set('signedAmounts', '1')
+  if (opts?.scope === 'brs_only') q.set('scope', 'brs_only')
   const res = await fetch(`${API_URL}/api/v1/report/${projectId}/export?${q}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
@@ -717,8 +726,8 @@ export const report = {
     const q = params?.bankAccountId ? `?bankAccountId=${params.bankAccountId}` : ''
     return api(`/report/${projectId}${q}`) as Promise<ReportResponse>
   },
-  exportExcel: (projectId: string, bankAccountId?: string, signedAmounts?: boolean) => reportExport(projectId, 'excel', bankAccountId, signedAmounts),
-  exportPdf: (projectId: string, bankAccountId?: string, signedAmounts?: boolean) => reportExport(projectId, 'pdf', bankAccountId, signedAmounts),
+  exportExcel: (projectId: string, opts?: ReportExportOptions) => reportExport(projectId, 'excel', opts),
+  exportPdf: (projectId: string, opts?: ReportExportOptions) => reportExport(projectId, 'pdf', opts),
 }
 
 export const reconcile = {

@@ -82,6 +82,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const [displayCurrency, setDisplayCurrency] = useState<'GHS' | 'USD' | 'EUR' | ''>('')
   const [signedAmountMode, setSignedAmountMode] = useState(false)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
+  const [exportMenu, setExportMenu] = useState('')
 
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -144,8 +145,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const totalTransactions = data?.summary?.totalTransactions ?? 0
   const isLargeReport = totalTransactions > 200
 
-  const handleExport = async (format: 'excel' | 'pdf') => {
-    if (isLargeReport) {
+  const handleExport = async (format: 'excel' | 'pdf', scope: 'full' | 'brs_only' = 'full') => {
+    if (isLargeReport && scope === 'full') {
       const ok = await confirm({
         title: `Export ${format.toUpperCase()} for ${totalTransactions.toLocaleString()} transactions?`,
         description: 'Large reports can take 30–60 seconds to generate. You can keep working in another tab while this runs.',
@@ -157,8 +158,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     setExportError('')
     setExporting(true)
     try {
-      await (format === 'pdf' ? report.exportPdf : report.exportExcel)(projectId, bankAccountId || undefined, signedAmountMode)
-      toast.success(`${format.toUpperCase()} export ready`, 'Your download should start automatically.')
+      const opts = {
+        bankAccountId: bankAccountId || undefined,
+        signedAmounts: signedAmountMode,
+        scope,
+      }
+      if (format === 'pdf') await report.exportPdf(projectId, opts)
+      else await report.exportExcel(projectId, opts)
+      const short =
+        scope === 'brs_only'
+          ? `${format.toUpperCase()} (BRS only)`
+          : `${format.toUpperCase()} (full workbook)`
+      toast.success(`${short} ready`, 'Your download should start automatically.')
     } catch (err) {
       unlessSubscriptionInactive(err, (e) => {
         const msg = e instanceof Error ? e.message : 'Export failed'
@@ -168,6 +179,50 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     } finally {
       setExporting(false)
     }
+  }
+
+  const downloadAllSupportingDocuments = async () => {
+    if (attachmentsList.length === 0) {
+      toast.error('No supporting documents', 'Upload files in Supporting documents below, or use the Upload step.')
+      return
+    }
+    setExporting(true)
+    try {
+      for (const a of attachmentsList) {
+        try {
+          await attachments.download(a.id, a.filename)
+          await new Promise((r) => setTimeout(r, 220))
+        } catch (err) {
+          unlessSubscriptionInactive(err, (e) =>
+            toast.error('Download failed', e instanceof Error ? e.message : undefined)
+          )
+          return
+        }
+      }
+      toast.success(
+        'Downloads started',
+        `${attachmentsList.length} file(s). If your browser blocks multiple files, allow downloads and try again.`
+      )
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const runExportMenuChoice = async (value: string) => {
+    if (value === 'print') {
+      handlePrint()
+      return
+    }
+    if (value === 'attachments') {
+      await downloadAllSupportingDocuments()
+      return
+    }
+    const parts = value.split(':')
+    if (parts.length !== 2) return
+    const fmt = parts[0] as 'excel' | 'pdf'
+    const sc = parts[1] as 'full' | 'brs_only'
+    if (fmt !== 'excel' && fmt !== 'pdf') return
+    await handleExport(fmt, sc === 'brs_only' ? 'brs_only' : 'full')
   }
 
   const handlePrint = () => {
@@ -472,7 +527,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       <WorkflowStepIntro
         eyebrow="Report"
         title="Bank reconciliation statement"
-        subtitle="Live preview of balances, narratives, and attachments. Use the toolbar below for display currency and export; print or save when sign-off is complete."
+        subtitle="Live preview of balances, narratives, and attachments. Use Export & download for Excel/PDF and attachments; adjust bank account and display currency below."
       />
       <div className="flex flex-wrap items-center justify-end gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
@@ -507,30 +562,45 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             />
             Show +/- amounts
           </label>
-          {canExport && (
-            <>
-          <button
-            onClick={() => handleExport('excel')}
-            disabled={exporting}
-            className="rounded-xl bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 disabled:opacity-50"
-          >
-            {exporting ? 'Exporting...' : 'Export Excel'}
-          </button>
-          <button
-            onClick={() => handleExport('pdf')}
-            disabled={exporting}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Export PDF
-          </button>
-            </>
-          )}
-          <button
-            onClick={handlePrint}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            Print / Save as PDF
-          </button>
+          <div className="flex flex-col gap-0.5">
+            <label htmlFor="report-export-menu" className="sr-only">
+              Export and download options
+            </label>
+            <select
+              id="report-export-menu"
+              value={exportMenu}
+              disabled={exporting}
+              onChange={(e) => {
+                const v = e.target.value
+                setExportMenu('')
+                if (!v) return
+                void runExportMenuChoice(v)
+              }}
+              className="min-h-[40px] min-w-[14rem] sm:min-w-[17rem] rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm outline-none transition-all hover:border-primary-300 hover:bg-primary-50/40 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
+            >
+              <option value="">
+                {exporting ? 'Working…' : 'Export & download…'}
+              </option>
+              {canExport && (
+                <>
+                  <optgroup label="Microsoft Excel">
+                    <option value="excel:full">Full workbook (all tabs)</option>
+                    <option value="excel:brs_only">BRS statement only</option>
+                  </optgroup>
+                  <optgroup label="PDF">
+                    <option value="pdf:full">Full report (BRS, notes, audit)</option>
+                    <option value="pdf:brs_only">BRS statement & sign-off only</option>
+                  </optgroup>
+                </>
+              )}
+              <optgroup label="Browser">
+                <option value="print">Print / Save as PDF</option>
+              </optgroup>
+              <optgroup label="Attachments">
+                <option value="attachments">All supporting documents</option>
+              </optgroup>
+            </select>
+          </div>
           {canSubmitForReview(role) && data?.project?.status === 'reconciling' && (
             <button
               onClick={() => submitMutation.mutate()}
