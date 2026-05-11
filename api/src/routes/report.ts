@@ -1410,9 +1410,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     doc.pipe(res)
+    const pdfPrintAt = new Date()
     const pageWidth = doc.page.width
     const margin = 50
     const contentWidth = pageWidth - margin * 2
+    const letterheadCaps = (s: string) => s.toLocaleUpperCase('en-US')
+    /** Keep table/text body above the footer block (rule + prepared + print date + page no.). */
+    const pdfBodyMaxY = doc.page.height - 78
     const logoPath = resolveBrandingLogoPath((branding.logoUrl as string | undefined) || '')
     doc.y = 48
     if (logoPath) {
@@ -1423,27 +1427,21 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         // ignore logo render failures and continue with text header
       }
     }
-    doc.fillColor(primaryColor).fontSize(20).text(`${project.organization.name}`, { align: 'center' }).fillColor('#000000')
+    doc.fillColor(primaryColor).fontSize(20).text(letterheadCaps(`${project.organization.name}`), { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.35)
     const letterhead = branding.letterheadAddress as string | undefined
     if (letterhead) {
-      doc.fontSize(9).fillColor('#444444').text(letterhead, { align: 'center' }).fillColor('#000000').moveDown(0.3)
+      doc.fontSize(9).fillColor('#444444').text(letterheadCaps(letterhead), { align: 'center' }).fillColor('#000000').moveDown(0.3)
     }
-    doc.fontSize(11).text(project.name, { align: 'center' })
-    doc.moveDown(0.25)
-    const curr = project.currency || 'GHS'
-    doc.fontSize(10).font('Helvetica-Bold').text(`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`, { align: 'center' }).font('Helvetica')
+    doc
+      .fontSize(10)
+      .font('Helvetica-Bold')
+      .text(letterheadCaps(`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`), { align: 'center' })
+      .font('Helvetica')
     if (bankAccountHeaderLineExport) {
       doc.moveDown(0.2)
-      doc.fontSize(9).text(bankAccountHeaderLineExport, { align: 'center' })
+      doc.fontSize(9).text(letterheadCaps(bankAccountHeaderLineExport), { align: 'center' })
     }
-    doc.moveDown(0.2)
-    doc.fontSize(9).text(`Currency: ${curr}`, { align: 'center' })
-    doc.fontSize(8).fillColor('#444444').text(`Language profile: ${reportLanguageProfile.label}`, { align: 'center' }).fillColor('#000000')
-    const printAt = new Date()
-    const reportCompletedAtPdf = project.approvedAt || project.reviewedAt || project.preparedAt || printAt
-    doc.fontSize(8).fillColor('#444444').text(`Report completed: ${formatGeneratedAt(reportCompletedAtPdf)} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
-    doc.fontSize(8).fillColor('#444444').text(`Print date: ${formatGeneratedAt(printAt)} (Africa/Accra)`, { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.45)
     const dividerY = doc.y + 2
     doc.save()
@@ -1473,7 +1471,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       const cDesc = tableWidth - cDate - cRef - cAmount
       const rowH = 18
       const ensureRoom = (needed: number, redrawHeader = false) => {
-        if (doc.y + needed < doc.page.height - 60) return
+        if (doc.y + needed < pdfBodyMaxY) return
         doc.addPage()
         doc.x = margin
         doc.y = 50
@@ -1570,7 +1568,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       const hideTitle = !!opts?.hideTitle
       const hideColumnHeaders = !!opts?.hideColumnHeaders
       const ensureRoom = (needed: number, redrawHeader = false) => {
-        if (doc.y + needed < doc.page.height - 60) return
+        if (doc.y + needed < pdfBodyMaxY) return
         doc.addPage()
         doc.x = margin
         doc.y = 50
@@ -1838,13 +1836,20 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
 
     const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
+    const printDateFooter = `Print date: ${formatGeneratedAt(pdfPrintAt)} (Africa/Accra)`
+    /** Footer sits above the physical bottom edge so it is not flush with the page trim. */
+    const footerBlockTop = doc.page.height - 58
     const drawPdfFooter = (pageIndex: number, totalPages: number) => {
-      const y = doc.page.height - 34
-      doc.moveTo(margin, y - 8).lineTo(doc.page.width - margin, y - 8).strokeColor('#E2E8F0').lineWidth(0.5).stroke()
+      doc.x = margin
+      const ruleY = footerBlockTop - 6
+      doc.moveTo(margin, ruleY).lineTo(doc.page.width - margin, ruleY).strokeColor('#E2E8F0').lineWidth(0.5).stroke()
+      const leftColW = contentWidth - 88
+      const textY = footerBlockTop
       if (footerText) {
-        doc.fontSize(7).fillColor('#64748B').text(footerText, margin, y, { width: contentWidth, align: 'left' })
+        doc.fontSize(7).fillColor('#64748B').text(footerText, margin, textY, { width: leftColW, align: 'left' })
       }
-      doc.fontSize(7).fillColor('#64748B').text(`Page ${pageIndex + 1} of ${totalPages}`, margin, y, { width: contentWidth, align: 'right' })
+      doc.fontSize(7).fillColor('#64748B').text(printDateFooter, margin, textY + 9, { width: leftColW, align: 'left' })
+      doc.fontSize(7).fillColor('#64748B').text(`Page ${pageIndex + 1} of ${totalPages}`, margin, textY, { width: contentWidth, align: 'right' })
       doc.fillColor('#000000')
     }
     if (brsOnlyExport) {

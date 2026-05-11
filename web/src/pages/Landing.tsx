@@ -1583,8 +1583,8 @@ function Footer() {
                   <a href="tel:+233302512596" className="text-gray-300 hover:text-white transition-colors">
                     0302 512 596
                   </a>
-                  <a href="tel:+233275762180" className="text-gray-300 hover:text-white transition-colors">
-                    0275 762 180
+                  <a href="tel:+233208915637" className="text-gray-300 hover:text-white transition-colors">
+                    0208 915 637
                   </a>
                   <a href="tel:+233245396813" className="text-gray-300 hover:text-white transition-colors">
                     0245 396 813
@@ -1596,7 +1596,7 @@ function Footer() {
                   <MapPin className="w-4 h-4 text-primary-400" />
                 </span>
                 <span className="leading-snug text-gray-300">
-                  USS No. NS 12, Third Gate
+                  Hse No NS 13, 3rd Gate
                   <br />
                   Madina, Accra
                   <br />
