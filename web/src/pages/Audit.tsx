@@ -13,6 +13,9 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 const PAGE_SIZE = 20
 
+/** Shape of each item in GET /projects → `projects` array */
+type ProjectListItem = { id: string; name: string; slug: string }
+
 interface AuditLog {
   id: string
   action: string
@@ -39,15 +42,12 @@ export default function Audit() {
     queryKey: ['projects'],
     queryFn: () => projects.list(),
   })
-  const { data: projectsData, isError: projectsQueryFailed } = projectsQuery
+  const { data: projectsPayload, isError: projectsQueryFailed } = projectsQuery
   const paywallBlocked =
     isSubscriptionInactiveError(auditQuery.error) || isSubscriptionInactiveError(projectsQuery.error)
   const auditLoadFailed = !paywallBlocked && (auditQueryFailed || projectsQueryFailed)
 
-  const projectsList = useMemo(
-    () => (projectsData as { id: string; name: string; slug: string }[]) || [],
-    [projectsData]
-  )
+  const projectsList = useMemo((): ProjectListItem[] => projectsPayload?.projects ?? [], [projectsPayload?.projects])
   const { projectMap, projectSlugMap } = useMemo(() => {
     const m: Record<string, string> = {}
     const s: Record<string, string> = {}

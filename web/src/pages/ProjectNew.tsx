@@ -53,7 +53,9 @@ export default function ProjectNew() {
     queryKey: ['projects'],
     queryFn: () => projects.list(),
   })
-  const { data: projectsList = [], isError: projectsQueryFailed } = projectsQuery
+  const { data: projectsPayload, isError: projectsQueryFailed } = projectsQuery
+  /** GET /projects returns `{ projects, total, … }`, not a bare array */
+  const projectsList = projectsPayload?.projects ?? []
   const paywallBlocked =
     isSubscriptionInactiveError(clientsQuery.error) || isSubscriptionInactiveError(projectsQuery.error)
   const listLoadFailed = !paywallBlocked && (clientsQueryFailed || projectsQueryFailed)

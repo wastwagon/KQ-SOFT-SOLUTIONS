@@ -430,13 +430,34 @@ export const clients = {
   create: (body: { name: string }) => api('/clients', { method: 'POST', body: JSON.stringify(body) }),
 }
 
+/** Row shape from GET /projects (`projects` array) — matches API select */
+export type ProjectListRow = {
+  id: string
+  name: string
+  slug: string
+  status: string
+  reconciliationDate?: string | null
+  currency?: string
+  createdAt: string
+  updatedAt: string
+  client?: { id: string; name: string } | null
+}
+
+/** GET /projects JSON body — not a bare array */
+export type ProjectListPayload = {
+  projects: ProjectListRow[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export const projects = {
   list: (params?: { clientId?: string; limit?: number; offset?: number }) => {
     const q = new URLSearchParams()
     if (params?.clientId) q.set('clientId', params.clientId)
     if (params?.limit) q.set('limit', String(params.limit))
     if (params?.offset) q.set('offset', String(params.offset))
-    return api(`/projects${q.toString() ? `?${q}` : ''}`)
+    return api(`/projects${q.toString() ? `?${q}` : ''}`) as Promise<ProjectListPayload>
   },
   get: (id: string) => api(`/projects/${id}`),
   create: (body: { name: string; clientId?: string; reconciliationDate?: string; rollForwardFromProjectId?: string; currency?: 'GHS' | 'USD' | 'EUR' }) =>
