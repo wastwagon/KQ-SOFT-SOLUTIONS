@@ -1402,7 +1402,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   }
 
   if (format === 'pdf') {
-    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true })
+    // BRS-only exports are typically one page; buffering + footer iteration has produced
+    // trailing blank pages in some viewers — disable buffering for statement-only PDFs.
+    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: !brsOnlyExport })
     const pdfNamePrefix = brsOnlyExport ? 'BRS_statement_only_' : 'BRS_'
     const filename = `${pdfNamePrefix}${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
     res.setHeader('Content-Type', 'application/pdf')
@@ -1676,22 +1678,40 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       hideColumnHeaders: false,
       leftHeaderLabel: '',
     })
+    const pdfNoteText = brsOnlyExport
+      ? 'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.'
+      : 'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES section below and supporting tables.'
     doc.x = margin
-    doc.fontSize(8).fillColor('#444444').text(
-      'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES section below and supporting tables.',
-      margin,
-      doc.y,
-      { width: contentWidth },
-    ).fillColor('#000000').moveDown(0.6)
-    doc.x = margin
-    doc.fontSize(9).fillColor('#111827').text('Checked By: _______________________________________', { continued: false })
-    doc.moveDown(0.4)
-    doc.x = margin
-    doc.text('Signed off By: _______________________________________')
-    doc.moveDown(0.4)
-    doc.x = margin
-    doc.text('Date: _______________________________________')
-    doc.moveDown(0.8).fillColor('#000000')
+    doc
+      .fontSize(8)
+      .fillColor('#444444')
+      .text(pdfNoteText, margin, doc.y, { width: contentWidth, lineGap: 2 })
+      .fillColor('#000000')
+    doc.moveDown(1)
+
+    const labelColW = 122
+    const gapAfterLabel = 12
+    const lineLeft = margin + labelColW + gapAfterLabel
+    const lineRight = pageWidth - margin
+    const rowStep = 28
+    const ruleDrop = 13
+    const signLabelsPdf = ['Checked By', 'Signed off By', 'Date'] as const
+    let rowY = doc.y
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+    for (const lab of signLabelsPdf) {
+      doc.text(`${lab}:`, margin, rowY, { width: labelColW, align: 'right', lineBreak: false })
+      const ruleY = rowY + ruleDrop
+      doc
+        .moveTo(lineLeft, ruleY)
+        .lineTo(lineRight, ruleY)
+        .strokeColor('#475569')
+        .lineWidth(0.9)
+        .stroke()
+      rowY += rowStep
+    }
+    doc.y = rowY + 4
+    doc.font('Helvetica').fillColor('#000000')
+    doc.moveDown(0.6)
 
     // Full export: NOTES + narrative on their own page(s); brs_only stops after sign-off.
     if (!brsOnlyExport) {
@@ -1806,16 +1826,23 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
 
     const footerText = (branding.footer as string | undefined) || platformDefaults.defaultFooter
-    const range = doc.bufferedPageRange()
-    for (let i = 0; i < range.count; i++) {
-      doc.switchToPage(range.start + i)
+    const drawPdfFooter = (pageIndex: number, totalPages: number) => {
       const y = doc.page.height - 34
       doc.moveTo(margin, y - 8).lineTo(doc.page.width - margin, y - 8).strokeColor('#E2E8F0').lineWidth(0.5).stroke()
       if (footerText) {
         doc.fontSize(7).fillColor('#64748B').text(footerText, margin, y, { width: contentWidth, align: 'left' })
       }
-      doc.fontSize(7).fillColor('#64748B').text(`Page ${i + 1} of ${range.count}`, margin, y, { width: contentWidth, align: 'right' })
+      doc.fontSize(7).fillColor('#64748B').text(`Page ${pageIndex + 1} of ${totalPages}`, margin, y, { width: contentWidth, align: 'right' })
       doc.fillColor('#000000')
+    }
+    if (brsOnlyExport) {
+      drawPdfFooter(0, 1)
+    } else {
+      const range = doc.bufferedPageRange()
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(range.start + i)
+        drawPdfFooter(i, range.count)
+      }
     }
     doc.end()
     await logAudit({

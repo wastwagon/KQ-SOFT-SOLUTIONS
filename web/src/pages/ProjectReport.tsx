@@ -942,10 +942,16 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 ) :
                 null}
             </p>
-            <div className="mt-8 w-full space-y-4 text-sm text-slate-900 print:mt-10">
-              <p>Checked By: _________________________________________</p>
-              <p>Signed off By: _________________________________________</p>
-              <p>Date: _________________________________________</p>
+            <div className="mt-8 w-full space-y-5 text-sm text-slate-900 print:mt-10">
+              {(['Checked By', 'Signed off By', 'Date'] as const).map((label) => (
+                <div key={label} className="flex items-end gap-3">
+                  <span className="w-[7.5rem] shrink-0 text-right font-semibold text-slate-800 sm:w-36">{label}:</span>
+                  <span
+                    className="mb-0.5 min-h-[1.25rem] flex-1 border-b-[1.5px] border-slate-500 print:border-slate-700"
+                    aria-hidden
+                  />
+                </div>
+              ))}
             </div>
           </div>
         )}
