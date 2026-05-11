@@ -76,8 +76,11 @@ const devOrigins = [
 // In production we only allow explicitly configured origins. In development we
 // also allow the default Vite/Express ports for local work.
 const allowedOrigins = (isProd ? [...corsOrigins] : [...devOrigins, ...corsOrigins]).filter(Boolean) as string[];
-if (isProd && allowedOrigins.length === 0) {
-  logger.warn('CORS_ORIGIN not set. Cross-origin requests from a browser will be rejected.');
+if (isProd && corsOrigins.length === 0) {
+  console.error(
+    'FATAL: CORS_ORIGIN must list the SPA origin(s) in production (comma-separated), e.g. https://kqsoftwaresolutions.com — browser requests from the web app will fail CORS without it.',
+  );
+  process.exit(1);
 }
 
 app.use(cors({
