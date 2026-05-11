@@ -38,7 +38,7 @@ export function canViewAudit(role: OrgRole | string | null | undefined): boolean
 }
 
 export function canExportReport(role: OrgRole | string | null | undefined): boolean {
-  return role === 'admin' || role === 'reviewer' || role === 'preparer' || role === 'viewer'
+  return role === 'admin' || role === 'reviewer' || role === 'preparer'
 }
 
 export function canCreateProject(role: OrgRole | string | null | undefined): boolean {

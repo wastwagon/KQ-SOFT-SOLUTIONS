@@ -1,9 +1,17 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, ChevronDown, FileSpreadsheet, FolderKanban, Landmark, Upload } from 'lucide-react'
-import { bankAccounts, uploadBankStatement, uploadCashBook } from '../../lib/api'
+import {
+  bankAccounts,
+  uploadBankStatement,
+  uploadCashBook,
+  isSubscriptionInactiveError,
+  unlessSubscriptionInactive,
+} from '../../lib/api'
+import { PROJECT_UPLOAD_LIMITS_SUMMARY, validateProjectUploadFiles } from '../../lib/uploadConstraints'
 import { canUploadDocuments } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
+import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
 
 /**
  * Upload step of the project workflow.  Lifted out of ProjectDetail so the
@@ -54,11 +62,15 @@ export default function ProjectUploadStep({
   const groupedCashBookFiles = groupByFilename(cashBookDocs)
   const groupedBankFiles = groupByFilename(bankDocs)
 
-  const { data: bankAccountsList = [] } = useQuery({
+  const bankAccountsQuery = useQuery({
     queryKey: ['bankAccounts', projectSlug],
     queryFn: () => bankAccounts.list(projectSlug),
     enabled: !!projectSlug,
   })
+  const { data: bankAccountsList = [], isLoading: bankAccountsLoading, isError: bankAccountsQueryFailed } =
+    bankAccountsQuery
+  const paywallBlocked = isSubscriptionInactiveError(bankAccountsQuery.error)
+  const bankAccountsLoadFailed = !paywallBlocked && bankAccountsQueryFailed
 
   const uploadCb = useMutation({
     mutationFn: async ({ files, useAs }: { files: File[]; useAs: CashBookUseAs }) => {
@@ -83,7 +95,9 @@ export default function ProjectUploadStep({
     },
     onError: (err) => {
       setProgress(null)
-      toast.error('Cash book upload failed', err instanceof Error ? err.message : undefined)
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Cash book upload failed', e instanceof Error ? e.message : undefined)
+      )
     },
   })
 
@@ -130,12 +144,49 @@ export default function ProjectUploadStep({
     },
     onError: (err) => {
       setProgress(null)
-      toast.error('Bank statement upload failed', err instanceof Error ? err.message : undefined)
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Bank statement upload failed', e instanceof Error ? e.message : undefined)
+      )
     },
   })
 
   const isUploading = uploadCb.isPending || uploadBs.isPending
   const accounts = bankAccountsList as { id: string; name: string }[]
+
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-6">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  if (bankAccountsLoadFailed) {
+    const err = bankAccountsQuery.error
+    return (
+      <div className="space-y-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load bank accounts</p>
+          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['bankAccounts', projectSlug] })}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (bankAccountsLoading) {
+    return (
+      <div className="space-y-6">
+        <p className="text-sm text-gray-500">Loading upload options…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -161,6 +212,7 @@ export default function ProjectUploadStep({
               <Hint dotColor="bg-primary-500" text="Cash book date required" />
               <Hint dotColor="bg-blue-500" text="Excel, CSV, PDF, and images supported" />
             </div>
+            <p className="mt-3 text-xs text-gray-500 max-w-3xl">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
           </div>
         </div>
         {!canUpload && (
@@ -196,7 +248,14 @@ export default function ProjectUploadStep({
                 onFiles={setCbFiles}
                 buttonLabel={progressLabel('Upload', uploadCb.isPending, progress)}
                 disabled={cbFiles.length === 0 || isUploading}
-                onSubmit={() => uploadCb.mutate({ files: cbFiles, useAs: cbUseAs })}
+                onSubmit={() => {
+                  const v = validateProjectUploadFiles(cbFiles)
+                  if (!v.ok) {
+                    toast.error('Cannot upload', v.message)
+                    return
+                  }
+                  uploadCb.mutate({ files: cbFiles, useAs: cbUseAs })
+                }}
               />
             </>
           )}
@@ -258,7 +317,12 @@ export default function ProjectUploadStep({
                 onFiles={setBsFiles}
                 buttonLabel={progressLabel('Upload', uploadBs.isPending, progress)}
                 disabled={bsFiles.length === 0 || isUploading}
-                onSubmit={() =>
+                onSubmit={() => {
+                  const v = validateProjectUploadFiles(bsFiles)
+                  if (!v.ok) {
+                    toast.error('Cannot upload', v.message)
+                    return
+                  }
                   uploadBs.mutate({
                     files: bsFiles,
                     useAs: bsUseAs,
@@ -266,7 +330,7 @@ export default function ProjectUploadStep({
                     accountName: bankAccountId ? undefined : bankAccountName || undefined,
                     accountNo: bankAccountId ? undefined : bankAccountNo || undefined,
                   })
-                }
+                }}
               />
             </>
           )}
@@ -472,7 +536,7 @@ function FilePickerRow({
       <input
         type="file"
         multiple
-        accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.tiff"
+        accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
         onChange={(e) => onFiles(Array.from(e.target.files || []))}
         className="text-xs text-gray-500 file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:text-primary-700"
       />

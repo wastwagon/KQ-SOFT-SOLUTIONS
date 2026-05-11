@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileCheck, Download } from 'lucide-react'
-import { audit, projects } from '../lib/api'
+import { audit, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
+import { useToast } from '../components/ui/Toast'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 const PAGE_SIZE = 20
 
@@ -22,18 +24,25 @@ interface AuditLog {
 }
 
 export default function Audit() {
+  const queryClient = useQueryClient()
+  const toast = useToast()
   const [projectFilter, setProjectFilter] = useState('')
   const [page, setPage] = useState(0)
   const [exporting, setExporting] = useState(false)
 
-  const { data, isLoading } = useQuery({
+  const auditQuery = useQuery({
     queryKey: ['audit', { limit: 200 }],
     queryFn: () => audit.list({ limit: 200 }),
   })
-  const { data: projectsData } = useQuery({
+  const { data, isLoading, isError: auditQueryFailed } = auditQuery
+  const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
   })
+  const { data: projectsData, isError: projectsQueryFailed } = projectsQuery
+  const paywallBlocked =
+    isSubscriptionInactiveError(auditQuery.error) || isSubscriptionInactiveError(projectsQuery.error)
+  const auditLoadFailed = !paywallBlocked && (auditQueryFailed || projectsQueryFailed)
 
   const projectsList = useMemo(
     () => (projectsData as { id: string; name: string; slug: string }[]) || [],
@@ -62,6 +71,38 @@ export default function Audit() {
     [filtered, currentPage]
   )
 
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Audit log</h1>
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  if (auditLoadFailed) {
+    const err = auditQuery.error ?? projectsQuery.error
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Audit log</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load audit log</p>
+          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['audit'] })
+              void queryClient.invalidateQueries({ queryKey: ['projects'] })
+            }}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight text-gray-900">Audit log</h1>
@@ -89,6 +130,10 @@ export default function Audit() {
             setExporting(true)
             try {
               await audit.exportCsv({ projectId: projectFilter || undefined, limit: 500 })
+            } catch (err) {
+              unlessSubscriptionInactive(err, (e) =>
+                toast.error('Export failed', e instanceof Error ? e.message : undefined)
+              )
             } finally {
               setExporting(false)
             }

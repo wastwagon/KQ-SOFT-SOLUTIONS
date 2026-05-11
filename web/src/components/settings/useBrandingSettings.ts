@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { settings } from '../../lib/api'
+import { settings, unlessSubscriptionInactive } from '../../lib/api'
 import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../../lib/brandColors'
 import { useToast } from '../ui/Toast'
 
@@ -33,14 +33,15 @@ export function useBrandingSettings(features: Record<string, boolean>) {
   const [approvalThresholdAmount, setApprovalThresholdAmount] = useState('')
   const [logoLoadError, setLogoLoadError] = useState(false)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError: brandingQueryFailed, error: brandingQueryError } = useQuery({
     queryKey: ['settings', 'branding'],
     queryFn: settings.getBranding,
   })
 
-  const { data: platformDefaults } = useQuery({
+  const { data: platformDefaults, isError: platformDefaultsLoadFailed } = useQuery({
     queryKey: ['settings', 'platform-defaults'],
     queryFn: settings.getPlatformDefaults,
+    refetchOnWindowFocus: true,
   })
 
   const d = data as BrandingRecord | undefined
@@ -70,9 +71,10 @@ export function useBrandingSettings(features: Record<string, boolean>) {
       queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })
       toast.success('Branding saved', 'Your changes are live across the app and reports.')
     },
-    onError: (err) => {
-      toast.error('Could not save branding', err instanceof Error ? err.message : undefined)
-    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not save branding', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const uploadLogoMutation = useMutation({
@@ -83,9 +85,10 @@ export function useBrandingSettings(features: Record<string, boolean>) {
       queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })
       toast.success('Logo uploaded', 'Save branding to apply it to reports.')
     },
-    onError: (err) => {
-      toast.error('Logo upload failed', err instanceof Error ? err.message : undefined)
-    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Logo upload failed', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +126,9 @@ export function useBrandingSettings(features: Record<string, boolean>) {
 
   return {
     isLoading,
+    brandingLoadFailed: brandingQueryFailed,
+    brandingLoadError: brandingQueryError,
+    platformDefaultsLoadFailed,
     data: d,
     platformDefaults,
     logoUrl,

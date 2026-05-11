@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { settings } from '../../lib/api'
+import { settings, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
 
@@ -9,9 +9,9 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
   const toast = useToast()
   const confirm = useConfirm()
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<string>('member')
+  const [role, setRole] = useState<string>('preparer')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: membersQueryError } = useQuery({
     queryKey: ['settings', 'members'],
     queryFn: settings.getMembers,
   })
@@ -21,11 +21,13 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })
       setEmail('')
-      setRole('member')
+      setRole('preparer')
       toast.success('Member added')
     },
     onError: (err) =>
-      toast.error('Could not add member', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not add member', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const removeMutation = useMutation({
@@ -35,7 +37,9 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
       toast.success('Member removed')
     },
     onError: (err) =>
-      toast.error('Could not remove member', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not remove member', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const updateRoleMutation = useMutation({
@@ -46,7 +50,9 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
       toast.success('Role updated')
     },
     onError: (err) =>
-      toast.error('Could not update role', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not update role', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const members = data?.members ?? []
@@ -55,6 +61,24 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
   const atLimit = limit != null && currentCount >= limit
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading members...</p>
+
+  if (membersQueryError) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p className="font-medium text-red-900">Could not load members</p>
+        <p className="mt-1">
+          {membersQueryError instanceof Error ? membersQueryError.message : 'Something went wrong.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })}
+          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -78,7 +102,6 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
             onChange={(e) => setRole(e.target.value)}
             className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
-            <option value="member">Member</option>
             <option value="viewer">Viewer</option>
             <option value="preparer">Preparer</option>
             <option value="reviewer">Reviewer</option>
@@ -134,21 +157,22 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
                     <td className="px-4 py-3">
                       {canManage ? (
                         <select
-                          value={m.role}
+                          value={m.role === 'member' ? 'preparer' : m.role}
                           onChange={(e) =>
                             updateRoleMutation.mutate({ userId: m.userId, role: e.target.value })
                           }
                           disabled={updateRoleMutation.isPending}
                           className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 transition-shadow"
                         >
-                          <option value="member">Member</option>
                           <option value="viewer">Viewer</option>
                           <option value="preparer">Preparer</option>
                           <option value="reviewer">Reviewer</option>
                           <option value="admin">Admin</option>
                         </select>
                       ) : (
-                        <span className="capitalize">{m.role}</span>
+                        <span className="capitalize">
+                          {m.role === 'member' ? 'preparer' : m.role}
+                        </span>
                       )}
                     </td>
                     {canManage && (

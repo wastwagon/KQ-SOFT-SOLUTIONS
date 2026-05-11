@@ -9,8 +9,10 @@ import AuthHydrator from './components/AuthHydrator'
 import ErrorFallback from './components/ErrorFallback'
 import PageLoader from './components/PageLoader'
 import { ToastProvider } from './components/ui/Toast'
+import SubscriptionPaywallToastBridge from './components/SubscriptionPaywallToastBridge'
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog'
 import { useAuth } from './store/auth'
+import { subscriptionPaywallRetry } from './lib/api'
 
 const Landing = lazy(() => import('./pages/Landing'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -37,7 +39,14 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      /** Avoid hammering the API when `SUBSCRIPTION_INACTIVE` is returned. */
+      retry: subscriptionPaywallRetry,
+    },
+  },
+})
 
 /**
  * Root path resolver:
@@ -58,6 +67,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
+        <SubscriptionPaywallToastBridge />
         <ConfirmDialogProvider>
           <AuthHydrator />
           <BrowserRouter>

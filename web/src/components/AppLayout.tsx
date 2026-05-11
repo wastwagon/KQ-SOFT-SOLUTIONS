@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -18,7 +18,7 @@ import {
   UserCircle2,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
-import { settings, getLogoDisplayUrl } from '../lib/api'
+import { settings, getLogoDisplayUrl, subscription } from '../lib/api'
 import BrandLogo from './BrandLogo'
 
 const preloadProjectsPage = () => import('../pages/Projects')
@@ -43,6 +43,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`
 
 export default function AppLayout() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, org, role, logout, isPlatformAdmin } = useAuth()
@@ -54,13 +55,45 @@ export default function AppLayout() {
   const [platformMenuOpen, setPlatformMenuOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null)
-  const { data: branding } = useQuery({
+  const [subscriptionBannerDismissed, setSubscriptionBannerDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('brs_subscription_banner_dismissed') === '1'
+    } catch {
+      return false
+    }
+  })
+  const { data: branding, isError: layoutBrandingQueryFailed } = useQuery({
     queryKey: ['settings', 'branding'],
     queryFn: settings.getBranding,
+    refetchOnWindowFocus: true,
+  })
+  const { data: usageForBanner, isError: layoutUsageQueryFailed } = useQuery({
+    queryKey: ['subscription', 'usage'],
+    queryFn: subscription.getUsage,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
   })
   const logoUrl = (branding as { logoUrl?: string } | undefined)?.logoUrl
   const showOrgLogo = !!logoUrl?.trim() && failedLogoUrl !== logoUrl
   const path = location.pathname
+  const sub = usageForBanner?.subscription?.status
+  const showSubscriptionStrip =
+    !subscriptionBannerDismissed &&
+    !path.startsWith('/settings') &&
+    !!usageForBanner?.paywallEnabled &&
+    (sub === 'free' || sub === 'expired')
+  /** Settings shows its own combined usage/plans banner. */
+  const hideLayoutUsageFailureBanner = path.startsWith('/settings')
+  /** Settings branding tab loads branding and shows a full-page error when it fails. */
+  const hideLayoutBrandingFailureBanner = path.startsWith('/settings')
+  const dismissSubscriptionStrip = () => {
+    try {
+      sessionStorage.setItem('brs_subscription_banner_dismissed', '1')
+    } catch {
+      /* ignore */
+    }
+    setSubscriptionBannerDismissed(true)
+  }
   const workActive = path === '/projects' || path.startsWith('/projects/') || path === '/clients' || path.startsWith('/clients/') || path === '/reports' || path.startsWith('/reports/')
   const administrationActive = path === '/audit' || path.startsWith('/audit/') || path === '/manual' || path.startsWith('/manual/') || path === '/settings' || path.startsWith('/settings/')
   const platformActive = path === '/platform-admin' || path.startsWith('/platform-admin/')
@@ -445,6 +478,55 @@ export default function AppLayout() {
           </div>
         </div>
       </header>
+
+      {showSubscriptionStrip && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2.5 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <p className="min-w-0">
+            <span className="font-semibold">Subscription inactive.</span>{' '}
+            Core features are paused until an admin renews —{' '}
+            <Link to="/settings/billing" className="font-medium underline hover:no-underline">
+              open billing
+            </Link>
+            .
+          </p>
+          <button
+            type="button"
+            onClick={dismissSubscriptionStrip}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 border border-amber-300/80"
+            aria-label="Dismiss subscription notice"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {layoutUsageQueryFailed && !showSubscriptionStrip && !hideLayoutUsageFailureBanner && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <p className="min-w-0">
+            Plan limits could not be loaded. Project filters and usage metrics may be incomplete until this succeeds.
+          </p>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 border border-amber-300/80"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {layoutBrandingQueryFailed && !hideLayoutBrandingFailureBanner && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <p className="min-w-0">Organisation branding could not be loaded.</p>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 border border-amber-300/80"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
         <Outlet />

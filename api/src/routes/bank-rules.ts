@@ -4,9 +4,11 @@ import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBankRules } from '../lib/permissions.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 async function requireBankRulesPlan(req: AuthRequest, res: import('express').Response): Promise<boolean> {
   const org = await prisma.organization.findUnique({

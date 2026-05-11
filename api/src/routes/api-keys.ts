@@ -6,9 +6,11 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canManageBilling } from '../lib/permissions.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
 import { generateApiKey, hashApiKey, getKeyPrefix } from '../lib/apiKey.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 /**
  * Rate-limit API key creation per org.  A stolen admin JWT could otherwise

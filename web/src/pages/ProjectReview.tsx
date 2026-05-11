@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
-import { reconcile, projects } from '../lib/api'
+import { reconcile, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { formatAmountNumber, formatDateCompact } from '../lib/format'
 import { getCurrencySymbol } from '../lib/currency'
 import { canSubmitForReview, canApprove } from '../lib/permissions'
 import BrsHelp from '../components/BrsHelp'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import { useToast } from '../components/ui/Toast'
 
 interface Tx {
   id: string
@@ -25,6 +27,7 @@ interface ProjectReviewProps {
 
 export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport }: ProjectReviewProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const role = useAuth((s) => s.role)
   const [exceptionReviewedIds, setExceptionReviewedIds] = useState<Set<string>>(new Set())
   const { data, isLoading, isError, error } = useQuery({
@@ -40,6 +43,10 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Submit for review failed', e instanceof Error ? e.message : undefined)
+      ),
   })
   const approveMutation = useMutation({
     mutationFn: () => projects.approve(projectId),
@@ -58,21 +65,37 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
     )
   }
   if (isError || !data) {
+    if (isSubscriptionInactiveError(error)) {
+      return (
+        <div className="py-4">
+          <SubscriptionRenewalPanel />
+        </div>
+      )
+    }
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-6">
         <h2 className="text-lg font-semibold text-red-900 mb-2">Could not load review data</h2>
         <p className="text-sm text-red-800">
           {error instanceof Error ? error.message : 'Something went wrong. Try again or go back to Reconcile.'}
         </p>
-        {onGoToReconcile && (
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={onGoToReconcile}
-            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
+            className="px-4 py-2 bg-white border border-red-300 text-red-900 rounded-xl font-medium hover:bg-red-100"
           >
-            Go to Reconcile
+            Retry
           </button>
-        )}
+          {onGoToReconcile && (
+            <button
+              type="button"
+              onClick={onGoToReconcile}
+              className="px-4 py-2 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700"
+            >
+              Go to Reconcile
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -232,7 +255,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                   >
                     {approveMutation.isPending ? 'Approving...' : 'Approve'}
                   </button>
-                  {approveMutation.error && (
+                  {approveMutation.error && !isSubscriptionInactiveError(approveMutation.error) && (
                     <p className="text-sm text-red-600">{approveMutation.error.message}</p>
                   )}
                 </>

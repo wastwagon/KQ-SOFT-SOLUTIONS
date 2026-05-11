@@ -84,6 +84,7 @@ export default function SettingsBillingTab({
             const introEligible = plansData?.introOffer?.eligible
             const firstMonthGhs = introEligible ? Math.round(p.monthlyGhs * 0.5 * 100) / 100 : null
             const firstYearGhs = introEligible ? Math.round(p.yearlyGhs * 0.5 * 100) / 100 : null
+            const isCurrentPlan = usageData?.organization?.plan === p.id
             return (
               <div
                 key={p.id}
@@ -103,20 +104,32 @@ export default function SettingsBillingTab({
                   or GH₵{p.yearlyGhs}/yr (17% off)
                   {firstYearGhs != null && ` · First payment: GH₵${firstYearGhs}`}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => onUpgrade(p.id, 'monthly')}
-                  disabled={
-                    usageData?.organization?.plan === p.id || initializing === `${p.id}-monthly`
-                  }
-                  className="mt-4 w-full px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow transition-all"
-                >
-                  {initializing === `${p.id}-monthly`
-                    ? 'Redirecting...'
-                    : usageData?.organization?.plan === p.id
-                      ? 'Current plan'
-                      : 'Upgrade'}
-                </button>
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onUpgrade(p.id, 'monthly')}
+                    disabled={initializing === `${p.id}-monthly`}
+                    className="w-full px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow transition-all"
+                  >
+                    {initializing === `${p.id}-monthly`
+                      ? 'Redirecting...'
+                      : isCurrentPlan
+                        ? 'Renew monthly'
+                        : 'Pay monthly'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpgrade(p.id, 'yearly')}
+                    disabled={initializing === `${p.id}-yearly`}
+                    className="w-full px-4 py-2.5 font-medium border border-gray-300 text-gray-800 bg-white rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm shadow-sm transition-all"
+                  >
+                    {initializing === `${p.id}-yearly`
+                      ? 'Redirecting...'
+                      : isCurrentPlan
+                        ? `Renew yearly (GH₵${p.yearlyGhs})`
+                        : `Pay yearly (GH₵${p.yearlyGhs})`}
+                  </button>
+                </div>
               </div>
             )
           })}

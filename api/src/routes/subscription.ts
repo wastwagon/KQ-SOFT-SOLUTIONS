@@ -11,13 +11,18 @@ import { getPlanBySlug } from '../services/plan.js'
 import { PLAN_PRICES } from '../config/subscription.js'
 import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
+import { fetchSubscriptionOverrides } from '../services/subscriptionOverrides.js'
+import { isSubscriptionPaywallEnabled } from '../services/orgSubscriptionAccess.js'
 import { logger } from '../middleware/logging.js'
+import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
 
 const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
-const PLAN_RANK: Record<(typeof PAYABLE_PLANS)[number], number> = {
+/** Rank for upgrade/downgrade checks; `firm` is highest (custom billing, not self-service). */
+const PLAN_SLUG_RANK: Record<string, number> = {
   basic: 1,
   standard: 2,
   premium: 3,
+  firm: 4,
 }
 const initializeSchema = z.object({
   plan: z.enum(PAYABLE_PLANS),
@@ -59,20 +64,6 @@ const initializeLimiter = rateLimit({
   },
 })
 
-async function getSubscriptionOverrides(orgId: string) {
-  const [trialOverride, statusOverride] = await Promise.all([
-    prisma.platformSettings.findUnique({ where: { key: `org_trial_override:${orgId}` }, select: { value: true } }),
-    prisma.platformSettings.findUnique({ where: { key: `org_subscription_status_override:${orgId}` }, select: { value: true } }),
-  ])
-  const trialEndsAtRaw = (trialOverride?.value as { trialEndsAt?: string } | null)?.trialEndsAt
-  const trialEndsAt = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null
-  const status = (statusOverride?.value as { status?: 'trial' | 'active' | 'expired' | 'free' } | null)?.status ?? null
-  return {
-    trialEndsAt: trialEndsAt && !Number.isNaN(trialEndsAt.getTime()) ? trialEndsAt : null,
-    status,
-  }
-}
-
 export function computeWebhookSignature(rawBody: Buffer, secret: string): string {
   return crypto.createHmac('sha512', secret).update(rawBody).digest('hex')
 }
@@ -105,7 +96,7 @@ router.get('/usage', async (req: AuthRequest, res) => {
     orderBy: { createdAt: 'desc' },
     select: { createdAt: true, period: true, amount: true },
   })
-  const overrides = await getSubscriptionOverrides(orgId)
+  const overrides = await fetchSubscriptionOverrides(orgId)
   const subscription = getSubscriptionSnapshot(org, latestPayment, overrides)
   const planData = await getPlanBySlug(org.plan)
   const limits = planData
@@ -116,6 +107,7 @@ router.get('/usage', async (req: AuthRequest, res) => {
   ) as Record<string, boolean>
   res.json({
     organization: { id: org.id, name: org.name, plan: org.plan },
+    paywallEnabled: isSubscriptionPaywallEnabled(),
     features,
     usage: {
       ...usage,
@@ -199,17 +191,23 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
   })
   if (!org) return res.status(404).json({ error: 'Organization not found' })
 
+  if (org.plan === 'firm') {
+    return res.status(400).json({
+      error: 'Firm and enterprise plans use custom billing. Contact support to change your subscription.',
+    })
+  }
+
   // Block downgrades through self-service billing — admins who need to switch
   // plans should contact support so we can prorate / reconcile entitlements.
-  const currentRank = (PLAN_RANK as Record<string, number | undefined>)[org.plan]
-  const targetRank = PLAN_RANK[plan]
-  if (currentRank && targetRank < currentRank) {
+  const currentRank = PLAN_SLUG_RANK[org.plan]
+  const targetRank = PLAN_SLUG_RANK[plan]
+  if (currentRank !== undefined && targetRank < currentRank) {
     return res.status(400).json({
       error: 'Plan downgrades are not supported via self-service. Contact support to switch to a lower tier.',
     })
   }
 
-  const email = org.members[0]?.user?.email
+  const email = pickOrgBillingEmail(org.members)
   if (!email) {
     return res.status(400).json({ error: 'No billing email found for organization. Add a member email before upgrading.' })
   }

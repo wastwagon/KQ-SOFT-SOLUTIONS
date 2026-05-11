@@ -8,7 +8,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 
-const ROLES = ['admin', 'reviewer', 'preparer', 'viewer', 'member'] as const
+const ROLES = ['admin', 'reviewer', 'preparer', 'viewer'] as const
 
 export default function AdminOrgDetail() {
   const { slug } = useParams<{ slug: string }>()
@@ -335,7 +335,7 @@ export default function AdminOrgDetail() {
                 </Link>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <select
-                    value={m.role}
+                    value={m.role === 'member' ? 'preparer' : m.role}
                     onChange={(e) => updateRoleMutation.mutate({ userId: m.user.id, role: e.target.value })}
                     disabled={updateRoleMutation.isPending}
                     className="px-2 py-1 border border-border rounded bg-white text-gray-900 text-xs capitalize focus:ring-2 focus:ring-primary-500"

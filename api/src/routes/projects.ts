@@ -8,10 +8,12 @@ import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProj
 import { logAudit } from '../services/audit.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
 import { getProjectVariance } from '../lib/reconcile-variance.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 function slugFromName(name: string): string {
   return name
@@ -147,7 +149,15 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     const updated = await prisma.project.update({
       where: { id: projectId },
       data,
-      include: { documents: true, client: true, rollForwardFrom: { select: { id: true, name: true } } },
+      include: {
+        documents: {
+          include: {
+            _count: { select: { transactions: true } },
+          },
+        },
+        client: true,
+        rollForwardFrom: { select: { id: true, name: true } },
+      },
     })
     res.json(updated)
   } catch (e) {
@@ -165,7 +175,11 @@ router.get('/:id', async (req: AuthRequest, res) => {
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
     include: {
-      documents: true,
+      documents: {
+        include: {
+          _count: { select: { transactions: true } },
+        },
+      },
       client: true,
       rollForwardFrom: { select: { id: true, name: true } },
       preparedBy: { select: { id: true, name: true, email: true } },

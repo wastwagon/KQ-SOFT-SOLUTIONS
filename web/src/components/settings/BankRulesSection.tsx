@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bankRules as bankRulesApi } from '../../lib/api'
+import { bankRules as bankRulesApi, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
 
 type ConditionRow = { field: string; operator: string; value: string }
 const defaultCondition = (): ConditionRow => ({ field: 'description', operator: 'contains', value: '' })
@@ -18,10 +19,11 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
   const [conditions, setConditions] = useState<ConditionRow[]>([defaultCondition()])
   const [action, setAction] = useState<'suggest_match' | 'flag_for_review'>('suggest_match')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: rulesQueryError } = useQuery({
     queryKey: ['bank-rules'],
     queryFn: bankRulesApi.list,
   })
+  const paywallBlocked = isSubscriptionInactiveError(rulesQueryError)
 
   const createMutation = useMutation({
     mutationFn: bankRulesApi.create,
@@ -32,7 +34,9 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
       toast.success('Rule created')
     },
     onError: (err) =>
-      toast.error('Could not create rule', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not create rule', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const deleteMutation = useMutation({
@@ -42,7 +46,9 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
       toast.success('Rule deleted')
     },
     onError: (err) =>
-      toast.error('Could not delete rule', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not delete rule', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const updateMutation = useMutation({
@@ -55,7 +61,9 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
       toast.success('Rule updated')
     },
     onError: (err) =>
-      toast.error('Could not update rule', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not update rule', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const resetForm = () => {
@@ -90,7 +98,32 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
     }
   }
 
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-4">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
   if (isLoading) return <p className="text-sm text-gray-500">Loading rules...</p>
+
+  if (rulesQueryError && !paywallBlocked) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p className="font-medium text-red-900">Could not load bank rules</p>
+        <p className="mt-1">
+          {rulesQueryError instanceof Error ? rulesQueryError.message : 'Something went wrong.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['bank-rules'] })}
+          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">

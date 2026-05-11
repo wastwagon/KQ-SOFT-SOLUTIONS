@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { FileCheck, FolderKanban, LayoutDashboard, Users, X } from 'lucide-react'
-import { projects, subscription, settings as settingsApi } from '../lib/api'
+import { projects, subscription, settings as settingsApi, isSubscriptionInactiveError } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
@@ -10,10 +10,12 @@ import MetricCard from '../components/ui/MetricCard'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
 
 export default function Dashboard() {
+  const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
   const isAdmin = useAuth((s) => s.isAdmin())
   const [getStartedDismissed, setGetStartedDismissed] = useState(() => {
@@ -58,22 +60,27 @@ export default function Dashboard() {
       mounted = false
     }
   }, [])
-  const { data: projectsData, isLoading } = useQuery({
+  const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
   })
+  const { data: projectsData, isLoading, isError: projectsQueryFailed, error: projectsError } = projectsQuery
   const projectsList = projectsData?.projects || []
+  const projectsPaywallBlocked = isSubscriptionInactiveError(projectsError)
+  const projectsLoadFailed = !projectsPaywallBlocked && projectsQueryFailed
 
-  const { data: usage, isLoading: usageLoading } = useQuery({
+  const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
   })
+  const { data: usage, isLoading: usageLoading } = usageQuery
   const features = (usage?.features || {}) as Record<string, boolean>
-  const { data: membersData } = useQuery({
+  const membersQuery = useQuery({
     queryKey: ['settings', 'members'],
     queryFn: settingsApi.getMembers,
     enabled: isAdmin,
   })
+  const { data: membersData, isError: membersQueryFailed } = membersQuery
   const memberCount = membersData?.currentCount ?? 1
   const projectsUsed = usage?.usage?.projectsUsed ?? projectsList.length
   const projectsLimit = usage?.usage?.projectsLimit ?? 20
@@ -83,6 +90,33 @@ export default function Dashboard() {
   const transactionsUnlimited = usage?.usage?.transactionsUnlimited ?? false
   const inProgressCount = projectsList.filter((p: { status: string }) => p.status !== 'completed').length
   const completedCount = projectsList.filter((p: { status: string }) => p.status === 'completed').length
+
+  const subStatus = usage?.subscription?.status
+  const showSubscriptionPaywallBanner =
+    !!usage?.paywallEnabled && (subStatus === 'free' || subStatus === 'expired')
+
+  if (projectsLoadFailed) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load projects</p>
+          <p className="mt-1">
+            {projectsError instanceof Error ? projectsError.message : 'Something went wrong.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -106,7 +140,34 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!isLoading && projectsList.length === 0 && !getStartedDismissed && (
+      {showSubscriptionPaywallBanner && (
+        <div
+          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="status"
+        >
+          <strong className="font-semibold">Subscription inactive.</strong> Core reconciliation features are
+          unavailable until an admin renews. Ask an organisation admin to open{' '}
+          <Link to="/settings/billing" className="font-semibold underline hover:no-underline">
+            Settings → Billing
+          </Link>{' '}
+          and complete payment, or contact support if you are on a custom plan.
+        </div>
+      )}
+
+      {isAdmin && membersQueryFailed && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 max-w-2xl">
+          <span>Team member count could not be loaded. </span>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })}
+            className="font-semibold text-amber-900 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!isLoading && projectsList.length === 0 && !getStartedDismissed && !projectsPaywallBlocked && (
         <Card className="border-l-4 border-l-primary-500 bg-primary-50/30 overflow-hidden">
           <div className="flex items-start justify-between gap-6 p-5 sm:p-7">
             <div className="min-w-0 flex-1">
@@ -397,6 +458,10 @@ export default function Dashboard() {
                   <Skeleton className="h-4 w-12 rounded" />
                 </div>
               ))}
+            </div>
+          ) : projectsPaywallBlocked ? (
+            <div className="px-6 py-8">
+              <SubscriptionRenewalPanel />
             </div>
           ) : projectsList.length === 0 ? (
             <EmptyState

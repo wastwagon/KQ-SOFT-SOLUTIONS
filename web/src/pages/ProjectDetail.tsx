@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { clients, projects } from '../lib/api'
+import { clients, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import {
   canDeleteProject,
   canEditProject,
@@ -21,6 +21,7 @@ import ProjectMap from './ProjectMap'
 import ProjectReconcile from './ProjectReconcile'
 import ProjectReview from './ProjectReview'
 import ProjectReport from './ProjectReport'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 const STEPS: readonly ProjectStep[] = [
   { id: 'upload', label: 'Upload' },
@@ -35,7 +36,7 @@ const HASH_TO_STEP: Record<string, number> = Object.fromEntries(
 )
 
 interface ProjectResponse extends ProjectHeaderProject {
-  documents?: { filename: string; type: string }[]
+  documents?: { filename: string; type: string; id?: string; _count?: { transactions?: number } }[]
 }
 
 /**
@@ -85,16 +86,21 @@ export default function ProjectDetail() {
     [location.pathname, location.search]
   )
 
-  const { data: project, isLoading } = useQuery<ProjectResponse>({
+  const projectQuery = useQuery<ProjectResponse>({
     queryKey: ['project', slug],
     queryFn: () => projects.get(slug!) as Promise<ProjectResponse>,
     enabled: !!slug,
   })
+  const { data: project, isLoading, isPending: projectPending, isError: projectQueryFailed } = projectQuery
 
-  const { data: clientsList = [] } = useQuery({
+  const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
   })
+  const { data: clientsList = [], isError: clientsQueryFailed } = clientsQuery
+  const paywallBlocked =
+    isSubscriptionInactiveError(projectQuery.error) || isSubscriptionInactiveError(clientsQuery.error)
+  const loadFailed = !paywallBlocked && (projectQueryFailed || clientsQueryFailed)
 
   const updateMutation = useMutation({
     mutationFn: (body: {
@@ -107,9 +113,10 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       toast.success('Project updated')
     },
-    onError: (err) => {
-      toast.error('Could not update project', err instanceof Error ? err.message : undefined)
-    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not update project', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const deleteMutation = useMutation({
@@ -119,12 +126,44 @@ export default function ProjectDetail() {
       toast.success('Project deleted')
       navigate('/projects')
     },
-    onError: (err) => {
-      toast.error('Could not delete project', err instanceof Error ? err.message : undefined)
-    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not delete project', e instanceof Error ? e.message : undefined)
+      ),
   })
 
-  if (!slug || (isLoading && !project)) {
+  if (!slug) {
+    return <ProjectDetailSkeleton />
+  }
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-6">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+  if (loadFailed) {
+    const err = projectQuery.error ?? clientsQuery.error
+    return (
+      <div className="space-y-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load project</p>
+          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['project', slug] })
+              void queryClient.invalidateQueries({ queryKey: ['clients'] })
+            }}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+  if ((isLoading || projectPending) && !project) {
     return <ProjectDetailSkeleton />
   }
   if (!project) {

@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { getUsageWithLimits } from '../../services/usage.js'
 import { getSubscriptionSnapshot } from '../../services/subscriptionState.js'
+import { fetchSubscriptionOverrides } from '../../services/subscriptionOverrides.js'
+import { normalizeOrgMemberRole } from '../../lib/orgMemberRole.js'
 import type { AuthRequest } from '../../middleware/auth.js'
 
 const router = Router()
@@ -40,20 +42,6 @@ async function resolveOrgId(slugOrId: string): Promise<string | null> {
     select: { id: true },
   })
   return org?.id ?? null
-}
-
-async function getSubscriptionOverrides(orgId: string) {
-  const [trialOverride, statusOverride] = await Promise.all([
-    prisma.platformSettings.findUnique({ where: { key: `org_trial_override:${orgId}` }, select: { value: true } }),
-    prisma.platformSettings.findUnique({ where: { key: `org_subscription_status_override:${orgId}` }, select: { value: true } }),
-  ])
-  const trialEndsAtRaw = (trialOverride?.value as { trialEndsAt?: string } | null)?.trialEndsAt
-  const trialEndsAt = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null
-  const status = (statusOverride?.value as { status?: 'trial' | 'active' | 'expired' | 'free' } | null)?.status ?? null
-  return {
-    trialEndsAt: trialEndsAt && !Number.isNaN(trialEndsAt.getTime()) ? trialEndsAt : null,
-    status,
-  }
 }
 
 router.get('/', async (req, res) => {
@@ -204,7 +192,7 @@ router.get('/:id', async (req, res) => {
   if (!org) return res.status(404).json({ error: 'Organization not found' })
   const usage = await getUsageWithLimits(org.id, org.plan)
   const latestPayment = org.payments[0]
-  const overrides = await getSubscriptionOverrides(org.id)
+  const overrides = await fetchSubscriptionOverrides(org.id)
   const subscription = getSubscriptionSnapshot(
     { createdAt: org.createdAt },
     latestPayment
@@ -243,7 +231,7 @@ router.get('/:id/subscription', async (req, res) => {
     },
   })
   if (!org) return res.status(404).json({ error: 'Organization not found' })
-  const overrides = await getSubscriptionOverrides(org.id)
+  const overrides = await fetchSubscriptionOverrides(org.id)
   const latestPayment = org.payments[0] ?? null
   const snapshot = getSubscriptionSnapshot(org, latestPayment, overrides)
   res.json({ organization: { id: org.id, name: org.name, plan: org.plan }, subscription: snapshot, latestPayment, overrides })
@@ -378,9 +366,10 @@ router.patch('/:orgId/members/:userId', async (req, res) => {
     where: { organizationId: resolvedOrgId, userId },
   })
   if (!mem) return res.status(404).json({ error: 'Membership not found' })
+  const roleToPersist = normalizeOrgMemberRole(body.role)
   const updated = await prisma.organizationMember.update({
     where: { id: mem.id },
-    data: { role: body.role },
+    data: { role: roleToPersist },
     include: { user: { select: { id: true, email: true, name: true } } },
   })
   res.json(updated)

@@ -13,9 +13,11 @@ import { hasPlanFeature } from '../config/planFeatures.js'
 import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
 import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 interface TxLike {
   id: string

@@ -10,9 +10,11 @@ import { suggestMatches, suggestSplitMatches, type Tx, type SuggestedSplitMatch 
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { logAudit } from '../services/audit.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 const RECONCILE_DEFAULT_LIMIT = 1500
 const RECONCILE_MAX_LIMIT = 5000

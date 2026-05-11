@@ -2,8 +2,16 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
-import { projects, clients, subscription, settings } from '../lib/api'
+import {
+  projects,
+  clients,
+  subscription,
+  settings,
+  isSubscriptionInactiveError,
+  unlessSubscriptionInactive,
+} from '../lib/api'
 import { useToast } from '../components/ui/Toast'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 function SelectWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -17,10 +25,11 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 export default function ProjectNew() {
   const [name, setName] = useState('')
   const [currencyOverride, setCurrencyOverride] = useState<'GHS' | 'USD' | 'EUR' | null>(null)
-  const { data: platformDefaults } = useQuery({
+  const platformDefaultsQuery = useQuery({
     queryKey: ['settings', 'platform-defaults'],
     queryFn: settings.getPlatformDefaults,
   })
+  const { data: platformDefaults, isError: platformDefaultsFailed } = platformDefaultsQuery
   const currency = currencyOverride ?? platformDefaults?.defaultCurrency ?? 'GHS'
   const [clientId, setClientId] = useState('')
   const [reconciliationDate, setReconciliationDate] = useState('')
@@ -29,19 +38,25 @@ export default function ProjectNew() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const toast = useToast()
-  const { data: usageData } = useQuery({
+  const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
   })
+  const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
-  const { data: clientsList = [] } = useQuery({
+  const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
   })
-  const { data: projectsList = [] } = useQuery({
+  const { data: clientsList = [], isError: clientsQueryFailed } = clientsQuery
+  const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
   })
+  const { data: projectsList = [], isError: projectsQueryFailed } = projectsQuery
+  const paywallBlocked =
+    isSubscriptionInactiveError(clientsQuery.error) || isSubscriptionInactiveError(projectsQuery.error)
+  const listLoadFailed = !paywallBlocked && (clientsQueryFailed || projectsQueryFailed)
   const completedProjects = useMemo(
     () => (projectsList as { id: string; name: string; slug: string; status: string; clientId?: string; currency?: string }[]).filter((p) => p.status === 'completed'),
     [projectsList]
@@ -58,11 +73,12 @@ export default function ProjectNew() {
       toast.success('Project created', `"${name.trim() || data.slug}" is ready — upload your statements to start matching.`)
       navigate(`/projects/${data.slug}`)
     },
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : 'Failed'
-      setError(msg)
-      toast.error('Could not create project', msg)
-    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) => {
+        const msg = e instanceof Error ? e.message : 'Failed'
+        setError(msg)
+        toast.error('Could not create project', msg)
+      }),
   })
 
   function handleSubmit(e: React.FormEvent) {
@@ -84,6 +100,48 @@ export default function ProjectNew() {
   const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5'
   const hintClass = 'text-sm text-gray-600 mt-1.5'
 
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
+          <p className="mt-1 text-sm text-gray-600 max-w-xl">
+            Create a bank reconciliation project once your subscription is active.
+          </p>
+        </div>
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  if (listLoadFailed) {
+    const err = projectsQuery.error ?? clientsQuery.error
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
+          <p className="mt-1 text-sm text-gray-600 max-w-xl">
+            Create a bank reconciliation project. You can copy settings from an existing project or start from scratch.
+          </p>
+        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load data for new project</p>
+          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['projects'] })
+              void queryClient.invalidateQueries({ queryKey: ['clients'] })
+            }}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -92,6 +150,18 @@ export default function ProjectNew() {
           Create a bank reconciliation project. You can copy settings from an existing project or start from scratch.
         </p>
       </div>
+      {platformDefaultsFailed && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 max-w-2xl">
+          <span>Workspace defaults could not be loaded; new projects use GHS until this succeeds. </span>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'platform-defaults'] })}
+            className="font-semibold text-amber-900 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <form
         onSubmit={handleSubmit}
         className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8 max-w-lg space-y-5"

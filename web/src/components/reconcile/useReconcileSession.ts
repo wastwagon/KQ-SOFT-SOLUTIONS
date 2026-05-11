@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { attachments, reconcile, subscription } from '../../lib/api'
+import {
+  attachments,
+  reconcile,
+  subscription,
+  isSubscriptionInactiveError,
+  unlessSubscriptionInactive,
+} from '../../lib/api'
 import { useToast } from '../ui/Toast'
 import type {
   MatchParams,
@@ -91,6 +97,10 @@ export interface ReconcileSession {
   // Query state
   data: ReconcileApiResponse | undefined
   isLoading: boolean
+  /** True when reconcile API returned subscription paywall (org inactive). */
+  subscriptionPaywallBlocked: boolean
+  /** True when reconcile fetch failed for a reason other than subscription paywall. */
+  reconcileLoadFailed: boolean
   // View / scope
   view: ReconcileView
   setView: (view: ReconcileView) => void
@@ -160,10 +170,12 @@ export function useReconcileSession(projectId: string): ReconcileSession {
   const { data: usageData } = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
   })
   const features = (usageData?.features || {}) as Record<string, boolean>
 
-  const { data, isLoading } = useQuery<ReconcileApiResponse>({
+  const reconcileQuery = useQuery<ReconcileApiResponse>({
     queryKey: [
       'reconcile',
       projectId,
@@ -183,6 +195,9 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       }) as Promise<ReconcileApiResponse>,
     enabled: !!projectId,
   })
+  const { data, isLoading, isError: reconcileQueryFailed } = reconcileQuery
+  const subscriptionPaywallBlocked = isSubscriptionInactiveError(reconcileQuery.error)
+  const reconcileLoadFailed = !subscriptionPaywallBlocked && reconcileQueryFailed
 
   const bankAccounts = useMemo(() => data?.bankAccounts ?? [], [data?.bankAccounts])
 
@@ -232,7 +247,10 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       setSelectedBankIds(new Set())
       toast.success('Match saved')
     },
-    onError: (err) => toast.error('Could not save match', err.message),
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not save match', e instanceof Error ? e.message : 'Request failed')
+      ),
   })
 
   const multiMatchMutation = useMutation<
@@ -255,7 +273,10 @@ export function useReconcileSession(projectId: string): ReconcileSession {
             : variables.cashBookTransactionIds.length
       toast.success(`Matched ${count} transaction${count === 1 ? '' : 's'}`)
     },
-    onError: (err) => toast.error('Could not save match', err.message),
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not save match', e instanceof Error ? e.message : 'Request failed')
+      ),
   })
 
   const bulkMatchMutation = useMutation<
@@ -273,7 +294,10 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       const created = resp?.created ?? 0
       toast.success(`Matched ${created} pair${created === 1 ? '' : 's'}`)
     },
-    onError: (err) => toast.error('Bulk match failed', err.message),
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Bulk match failed', e instanceof Error ? e.message : 'Request failed')
+      ),
   })
 
   const unmatchMutation = useMutation<unknown, Error, string>({
@@ -282,7 +306,10 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       invalidateAll()
       toast.success('Match removed')
     },
-    onError: (err) => toast.error('Could not remove match', err.message),
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not remove match', e instanceof Error ? e.message : 'Request failed')
+      ),
   })
 
   const evidenceUploadMutation = useMutation<unknown, Error, { file: File; matchId: string }>({
@@ -292,7 +319,10 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
       toast.success('Evidence uploaded')
     },
-    onError: (err) => toast.error('Evidence upload failed', err.message),
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Evidence upload failed', e instanceof Error ? e.message : 'Request failed')
+      ),
   })
 
   const toggleCb = (id: string) => {
@@ -321,6 +351,8 @@ export function useReconcileSession(projectId: string): ReconcileSession {
   return {
     data,
     isLoading,
+    subscriptionPaywallBlocked,
+    reconcileLoadFailed,
     view,
     setView,
     bankAccountId: effectiveBankAccountId,

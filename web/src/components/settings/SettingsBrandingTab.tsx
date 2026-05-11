@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import Card from '../ui/Card'
 import { getLogoDisplayUrl } from '../../lib/api'
 import { canEditBranding } from '../../lib/permissions'
@@ -11,12 +12,25 @@ interface SettingsBrandingTabProps {
 }
 
 export default function SettingsBrandingTab({ role, features, branding: b }: SettingsBrandingTabProps) {
+  const queryClient = useQueryClient()
 
   const d = b.data
 
   return (
     <Card className="rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">
       <h2 className="text-lg font-semibold tracking-tight text-gray-900 mb-2">Report Branding</h2>
+      {b.platformDefaultsLoadFailed && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 mb-4 max-w-2xl">
+          <span>Platform default text could not be loaded. </span>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'platform-defaults'] })}
+            className="font-semibold text-amber-900 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <p className="text-sm text-gray-600 mb-6">
         Customise your Bank Reconciliation Statement reports with your logo, colours, and letterhead.
       </p>

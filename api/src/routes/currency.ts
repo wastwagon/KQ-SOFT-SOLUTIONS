@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { getRates } from '../services/currencyConversion.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 /** GET /currency/rates — fetch FX rates for display/conversion. Attribution: ExchangeRate-API */
 router.get('/rates', async (_req, res) => {

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { clients, subscription } from '../lib/api'
+import { clients, subscription, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 export default function Clients() {
   const queryClient = useQueryClient()
@@ -10,15 +11,18 @@ export default function Clients() {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
 
-  const { data: usageData } = useQuery({
+  const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
   })
+  const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
-  const { data: clientsList = [], isLoading } = useQuery({
+  const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
   })
+  const { data: clientsList = [], isLoading, isError, error: clientsListError } = clientsQuery
+  const paywallBlocked = isSubscriptionInactiveError(clientsQuery.error)
 
   const createMutation = useMutation({
     mutationFn: clients.create,
@@ -28,11 +32,12 @@ export default function Clients() {
       setError('')
       toast.success('Client added', `"${variables.name}" is ready to be assigned to a project.`)
     },
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : 'Failed'
-      setError(msg)
-      toast.error('Could not add client', msg)
-    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) => {
+        const msg = e instanceof Error ? e.message : 'Failed'
+        setError(msg)
+        toast.error('Could not add client', msg)
+      }),
   })
 
   function handleSubmit(e: React.FormEvent) {
@@ -43,6 +48,36 @@ export default function Clients() {
   }
 
   const list = clientsList as { id: string; name: string; _count?: { projects: number } }[]
+
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Clients</h1>
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  if (isError && clientsListError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Clients</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load clients</p>
+          <p className="mt-1">
+            {clientsListError instanceof Error ? clientsListError.message : 'Something went wrong.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

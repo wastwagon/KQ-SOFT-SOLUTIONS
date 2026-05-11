@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
-import { subscription } from '../lib/api'
+import { subscription, unlessSubscriptionInactive } from '../lib/api'
 import {
   canEditBankRules,
   canManageBilling,
@@ -16,23 +16,32 @@ import SettingsBrandingTab from '../components/settings/SettingsBrandingTab'
 import SettingsTabNav from '../components/settings/SettingsTabNav'
 import { useBrandingSettings } from '../components/settings/useBrandingSettings'
 import Card from '../components/ui/Card'
+import { useToast } from '../components/ui/Toast'
 
 /**
  * Organisation settings hub (branding, billing, members, API keys, bank rules).
  * Tab routing lives here; each tab is implemented under `components/settings/`.
  */
 export default function Settings() {
+  const queryClient = useQueryClient()
+  const toast = useToast()
   const role = useAuth((s) => s.role)
 
-  const { data: usageData } = useQuery({
+  const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
+    refetchOnWindowFocus: true,
   })
+  const { data: usageData, isError: usageQueryFailed } = usageQuery
 
-  const { data: plansData } = useQuery({
+  const plansQuery = useQuery({
     queryKey: ['subscription', 'plans'],
     queryFn: subscription.getPlans,
+    refetchOnWindowFocus: true,
   })
+  const { data: plansData, isError: plansQueryFailed } = plansQuery
+
+  const subscriptionSidebarFailed = usageQueryFailed || plansQueryFailed
 
   const [initializing, setInitializing] = useState<string | null>(null)
   const initPaymentMutation = useMutation({
@@ -40,7 +49,12 @@ export default function Settings() {
     onSuccess: (data) => {
       if (data?.authorizationUrl) window.location.href = data.authorizationUrl
     },
-    onError: () => setInitializing(null),
+    onError: (err) => {
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Payment could not be started', e instanceof Error ? e.message : undefined)
+      )
+      setInitializing(null)
+    },
   })
 
   const features = (usageData?.features || {}) as Record<string, boolean>
@@ -65,6 +79,29 @@ export default function Settings() {
     return <div className="text-gray-500 py-8">Loading settings...</div>
   }
 
+  if (branding.brandingLoadFailed) {
+    return (
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">Settings</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load branding</p>
+          <p className="mt-1">
+            {branding.brandingLoadError != null && branding.brandingLoadError instanceof Error
+              ? branding.brandingLoadError.message
+              : 'Something went wrong.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const handleUpgrade = (plan: string, period: 'monthly' | 'yearly') => {
     setInitializing(`${plan}-${period}`)
     initPaymentMutation.mutate({ plan, period })
@@ -76,6 +113,22 @@ export default function Settings() {
       <p className="text-sm text-gray-600 mb-6">
         Manage branding, billing, and bank rules for your organisation.
       </p>
+      {subscriptionSidebarFailed && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 max-w-2xl">
+          <p className="font-medium">Plan or usage information could not be loaded.</p>
+          <p className="mt-1 text-amber-900/90">Billing amounts and feature flags may be incomplete until this succeeds.</p>
+          <button
+            type="button"
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
+              void queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
+            }}
+            className="mt-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-amber-400 text-amber-950 hover:bg-amber-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <SettingsTabNav showApiKeys={!!features.api_access} showBankRules={!!features.bank_rules} />
       <div className="max-w-2xl">
         {activeTab === 'branding' && (

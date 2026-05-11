@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBranding, canManageMembers } from '../lib/permissions.js'
 import { hasPlanFeature, getUserLimit } from '../config/planFeatures.js'
+import { normalizeOrgMemberRole } from '../lib/orgMemberRole.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -24,7 +25,7 @@ router.get('/platform-defaults', async (_req, res) => {
 
 const addMemberSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['member', 'viewer', 'preparer', 'reviewer']).default('member'),
+  role: z.enum(['member', 'viewer', 'preparer', 'reviewer']).default('preparer'),
 })
 
 export interface BrandingPayload {
@@ -145,6 +146,7 @@ router.post('/members', async (req: AuthRequest, res) => {
     return res.status(400).json({ error: parse.error.errors[0]?.message ?? 'Invalid input' })
   }
   const { email, role: newRole } = parse.data
+  const roleToAssign = normalizeOrgMemberRole(newRole)
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
@@ -187,7 +189,7 @@ router.post('/members', async (req: AuthRequest, res) => {
     data: {
       userId: user.id,
       organizationId: orgId,
-      role: newRole,
+      role: roleToAssign,
     },
     include: { user: { select: { id: true, email: true, name: true } } },
   })
@@ -235,9 +237,10 @@ router.patch('/members/:userId', async (req: AuthRequest, res) => {
     where: { organizationId: orgId, userId },
   })
   if (!mem) return res.status(404).json({ error: 'Member not found' })
+  const nextRole = normalizeOrgMemberRole(body.data.role)
   const updated = await prisma.organizationMember.update({
     where: { id: mem.id },
-    data: { role: body.data.role },
+    data: { role: nextRole },
     include: { user: { select: { id: true, email: true, name: true } } },
   })
   res.json({

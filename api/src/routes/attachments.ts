@@ -7,9 +7,11 @@ import { canDeleteAttachment } from '../lib/permissions.js'
 import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 router.get('/', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId

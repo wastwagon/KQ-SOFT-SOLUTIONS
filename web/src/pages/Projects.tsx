@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { X, FolderKanban } from 'lucide-react'
 import { useAuth } from '../store/auth'
-import { projects, clients, subscription } from '../lib/api'
+import { projects, clients, subscription, isSubscriptionInactiveError } from '../lib/api'
 import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
@@ -11,6 +11,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 const preloadProjectDetailPage = () => import('./ProjectDetail')
 
@@ -27,6 +28,7 @@ const STATUS_OPTIONS = [
 type ProjectsProps = { initialStatus?: string }
 
 export default function Projects({ initialStatus }: ProjectsProps) {
+  const queryClient = useQueryClient()
   const role = useAuth((s) => s.role)
   const [searchParams, setSearchParams] = useSearchParams()
   const clientFromUrl = searchParams.get('clientId') || ''
@@ -35,28 +37,35 @@ export default function Projects({ initialStatus }: ProjectsProps) {
   const [clientFilter, setClientFilter] = useState(() => clientFromUrl)
   const [search, setSearch] = useState('')
 
-  const { data: usageData } = useQuery({
+  const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
   })
+  const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
   const effectiveClientFilter = features.multi_client ? clientFilter : ''
   const [limit] = useState(50)
   const [offset, setOffset] = useState(0)
 
-  const { data: projectsData, isLoading } = useQuery({
+  const projectsQuery = useQuery({
     queryKey: ['projects', effectiveClientFilter || null, offset],
     queryFn: () => projects.list(effectiveClientFilter ? { clientId: effectiveClientFilter, limit, offset } : { limit, offset }),
   })
+  const { data: projectsData, isLoading, isError: projectsQueryFailed } = projectsQuery
   const projectsList = useMemo(
     () => projectsData?.projects || [],
     [projectsData?.projects]
   )
   const totalProjects = projectsData?.total || 0
-  const { data: clientsList = [] } = useQuery({
+  const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
   })
+  const { data: clientsList = [], isError: clientsQueryFailed } = clientsQuery
+  const paywallBlocked =
+    isSubscriptionInactiveError(projectsQuery.error) || isSubscriptionInactiveError(clientsQuery.error)
+  const listLoadFailed =
+    !paywallBlocked && (projectsQueryFailed || clientsQueryFailed)
 
   const clientName = (clientFilter && (clientsList as { id: string; name: string }[]).find((c) => c.id === clientFilter)?.name) || null
   const clearClientFilter = () => {
@@ -92,6 +101,42 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       completed: list.filter((p) => p.status === 'completed').length,
     }
   }, [projectsList])
+
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projects</h1>
+        </div>
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  if (listLoadFailed) {
+    const err = projectsQuery.error ?? clientsQuery.error
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projects</h1>
+        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load projects</p>
+          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['projects'] })
+              void queryClient.invalidateQueries({ queryKey: ['clients'] })
+            }}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

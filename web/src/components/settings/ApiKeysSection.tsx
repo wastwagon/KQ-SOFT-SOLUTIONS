@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiKeys as apiKeysApi } from '../../lib/api'
+import { apiKeys as apiKeysApi, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
 
 export default function ApiKeysSection() {
   const queryClient = useQueryClient()
@@ -11,10 +12,11 @@ export default function ApiKeysSection() {
   const [newName, setNewName] = useState('')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
 
-  const { data: keys = [], isLoading } = useQuery({
+  const { data: keys = [], isLoading, error: keysQueryError } = useQuery({
     queryKey: ['api-keys'],
     queryFn: apiKeysApi.list,
   })
+  const paywallBlocked = isSubscriptionInactiveError(keysQueryError)
 
   const createMutation = useMutation({
     mutationFn: (name: string) => apiKeysApi.create({ name }),
@@ -26,7 +28,9 @@ export default function ApiKeysSection() {
       setTimeout(() => setCreatedKey(null), 15000)
     },
     onError: (err) =>
-      toast.error('Could not create key', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not create key', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const deleteMutation = useMutation({
@@ -36,10 +40,37 @@ export default function ApiKeysSection() {
       toast.success('API key revoked')
     },
     onError: (err) =>
-      toast.error('Could not revoke key', err instanceof Error ? err.message : undefined),
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not revoke key', e instanceof Error ? e.message : undefined)
+      ),
   })
 
+  if (paywallBlocked) {
+    return (
+      <div className="space-y-4">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
   if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>
+
+  if (keysQueryError && !paywallBlocked) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p className="font-medium text-red-900">Could not load API keys</p>
+        <p className="mt-1">
+          {keysQueryError instanceof Error ? keysQueryError.message : 'Something went wrong.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['api-keys'] })}
+          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">

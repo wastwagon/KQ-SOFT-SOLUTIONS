@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
+import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
 
 const router = Router()
 router.use(authMiddleware)
+router.use(requireOrgSubscriptionForApp)
 
 const ACTION_LABELS: Record<string, string> = {
   document_uploaded: 'Document uploaded',

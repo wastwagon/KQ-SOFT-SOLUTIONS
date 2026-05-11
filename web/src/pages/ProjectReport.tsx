@@ -1,12 +1,24 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
-import { report, projects, attachments, subscription, currency as currencyApi, getLogoDisplayUrl, type BrsStatement, type ReportResponse } from '../lib/api'
+import {
+  report,
+  projects,
+  attachments,
+  subscription,
+  currency as currencyApi,
+  getLogoDisplayUrl,
+  isSubscriptionInactiveError,
+  unlessSubscriptionInactive,
+  type BrsStatement,
+  type ReportResponse,
+} from '../lib/api'
 import { canSubmitForReview, canApprove, canUploadDocuments, canDeleteAttachment, canReopenProject, canExportReport } from '../lib/permissions'
 import { formatDate, formatDateBRSTitle } from '../lib/format'
 import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 
 interface ProjectReportProps {
   projectId: string
@@ -69,25 +81,28 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const [signedAmountMode, setSignedAmountMode] = useState(false)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
 
-  const { data: usageData } = useQuery({
+  const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
   })
+  const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
-  const { data, isLoading } = useQuery<ReportResponse>({
+  const reportQuery = useQuery<ReportResponse>({
     queryKey: ['report', projectId, bankAccountId || null],
     queryFn: () => report.get(projectId, bankAccountId ? { bankAccountId } : undefined),
     enabled: !!projectId,
   })
-  const { data: attachmentsList = [] } = useQuery({
+  const { data, isLoading, isError: reportQueryFailed } = reportQuery
+  const attachmentsQuery = useQuery({
     queryKey: ['attachments', projectId],
     queryFn: () => attachments.list(projectId),
     enabled: !!projectId,
   })
+  const { data: attachmentsList = [], isError: attachmentsQueryFailed } = attachmentsQuery
   const projectCurrency = (data?.currency as string) || 'GHS'
   const effectiveDisplayCurrency = displayCurrency || projectCurrency
   const needsConversion = effectiveDisplayCurrency !== projectCurrency
-  const { data: ratesData } = useQuery({
+  const { data: ratesData, error: ratesQueryError, isError: ratesQueryFailed } = useQuery({
     queryKey: ['currency', 'rates'],
     queryFn: () => currencyApi.getRates(),
     enabled: needsConversion,
@@ -143,9 +158,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       await (format === 'pdf' ? report.exportPdf : report.exportExcel)(projectId, bankAccountId || undefined, signedAmountMode)
       toast.success(`${format.toUpperCase()} export ready`, 'Your download should start automatically.')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Export failed'
-      setExportError(msg)
-      toast.error('Export failed', msg)
+      unlessSubscriptionInactive(err, (e) => {
+        const msg = e instanceof Error ? e.message : 'Export failed'
+        setExportError(msg)
+        toast.error('Export failed', msg)
+      })
     } finally {
       setExporting(false)
     }
@@ -163,6 +180,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       onReopen?.()
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not reopen project', e instanceof Error ? e.message : undefined)
+      ),
   })
   const undoReconciliationMutation = useMutation({
     mutationFn: (reason?: string) => projects.undoReconciliation(projectId, reason),
@@ -174,6 +195,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       onReopen?.()
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not undo reconciliation', e instanceof Error ? e.message : undefined)
+      ),
   })
 
   const submitMutation = useMutation({
@@ -183,6 +208,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Submit for review failed', e instanceof Error ? e.message : undefined)
+      ),
   })
   const approveMutation = useMutation({
     mutationFn: () => projects.approve(projectId),
@@ -191,6 +220,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Approve failed', e instanceof Error ? e.message : undefined)
+      ),
   })
   const attachmentUploadMutation = useMutation({
     mutationFn: (payload: { file: File; type: 'bank_statement' | 'approval' | 'other' }) =>
@@ -198,12 +231,20 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Attachment upload failed', e instanceof Error ? e.message : undefined)
+      ),
   })
   const attachmentDeleteMutation = useMutation({
     mutationFn: (id: string) => attachments.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not remove attachment', e instanceof Error ? e.message : undefined)
+      ),
   })
   const rollForwardMutation = useMutation({
     mutationFn: () => projects.create({
@@ -214,6 +255,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       onRollForward?.(newProject.slug ?? newProject.id)
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Roll forward failed', e instanceof Error ? e.message : undefined)
+      ),
   })
   const updateCommentsMutation = useMutation({
     mutationFn: (body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null }) =>
@@ -222,6 +267,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       setEditingComments(false)
     },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not save report comments', e instanceof Error ? e.message : undefined)
+      ),
   })
   const startEditingComments = () => {
     const proj = data?.project
@@ -247,6 +296,46 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   useEffect(() => {
     if (preHasSignAnomaly) setShowDiagnostics(true)
   }, [preHasSignAnomaly])
+
+  const reportPaywallBlocked =
+    isSubscriptionInactiveError(reportQuery.error) ||
+    isSubscriptionInactiveError(attachmentsQuery.error) ||
+    isSubscriptionInactiveError(ratesQueryError)
+
+  if (reportPaywallBlocked) {
+    return (
+      <div className="py-8">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  const reportLoadFailed =
+    reportQueryFailed ||
+    attachmentsQueryFailed ||
+    (needsConversion && ratesQueryFailed)
+  if (reportLoadFailed) {
+    const err = reportQuery.error ?? attachmentsQuery.error ?? ratesQueryError
+    return (
+      <div className="py-8 space-y-4">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+          <p className="font-medium text-red-900">Could not load report</p>
+          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['report', projectId] })
+              void queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
+              void queryClient.invalidateQueries({ queryKey: ['currency', 'rates'] })
+            }}
+            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading || !data) return <div className="text-gray-600">Loading report...</div>
 
@@ -1300,7 +1389,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       <td className="px-3 py-2 text-right print:hidden">
                         <button
                           type="button"
-                          onClick={() => attachments.download(a.id, a.filename).catch((err) => setExportError(err instanceof Error ? err.message : 'Download failed'))}
+                          onClick={() =>
+                            attachments.download(a.id, a.filename).catch((err) =>
+                              unlessSubscriptionInactive(err, (e) =>
+                                setExportError(e instanceof Error ? e.message : 'Download failed')
+                              )
+                            )
+                          }
                           className="text-primary-600 hover:text-primary-700 font-medium"
                         >
                           Download

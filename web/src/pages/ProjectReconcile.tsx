@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import BrsHelp from '../components/BrsHelp'
 import ConfirmedMatchesPanel from '../components/reconcile/ConfirmedMatchesPanel'
@@ -8,6 +9,7 @@ import ReconcileTransactionsTables from '../components/reconcile/ReconcileTransa
 import SplitSuggestionsPanel from '../components/reconcile/SplitSuggestionsPanel'
 import SuggestedMatchesPanel from '../components/reconcile/SuggestedMatchesPanel'
 import { useReconcileSession } from '../components/reconcile/useReconcileSession'
+import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 
 /**
@@ -31,10 +33,13 @@ export default function ProjectReconcile({
   canReconcile = true,
   onProceedToReview,
 }: ProjectReconcileProps) {
+  const queryClient = useQueryClient()
   const session = useReconcileSession(projectId)
   const {
     data,
     isLoading,
+    subscriptionPaywallBlocked,
+    reconcileLoadFailed,
     view,
     setView,
     bankAccounts,
@@ -78,6 +83,30 @@ export default function ProjectReconcile({
     }
     return matches.filter((m) => paymentIds.has(m.cbTx.id) && debitIds.has(m.bankTx.id))
   }, [view, matches, receipts, credits, payments, debits])
+
+  if (subscriptionPaywallBlocked) {
+    return (
+      <div className="py-8">
+        <SubscriptionRenewalPanel />
+      </div>
+    )
+  }
+
+  if (reconcileLoadFailed) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <p className="font-medium text-red-900">Could not load reconciliation data</p>
+        <p className="mt-1">Check your connection and try again.</p>
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
+          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   if (isLoading || !data) {
     return (
