@@ -1105,62 +1105,70 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             )}
           </div>
         )}
-        {showExtendedSections && <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50/40 p-4 print:bg-white print:border-slate-300">
-          <h3 className="font-semibold text-primary-900 mb-2">{labels.additionalInformationTitle}</h3>
-          <p className="text-sm text-primary-800 mb-3">
+        <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50/40 p-4 print:bg-white print:border-slate-300">
+          <h3 className="font-semibold text-primary-900 mb-2 text-left">{labels.additionalInformationTitle}</h3>
+          <p className="text-sm text-primary-800 mb-4 max-w-none">
             This section separates the reconciliation position as at the reconciliation date from post-period movement carried into this report.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl border border-primary-100 bg-white p-3 overflow-auto">
-              <p className="font-medium text-primary-900 mb-2">{labels.asAtReconciliationPosition}</p>
-              <p className="text-xs text-primary-700 mb-2">
+          <div className="space-y-6 text-sm">
+            <div className="rounded-xl border border-primary-100 bg-white p-4">
+              <p className="font-medium text-primary-900 mb-2 text-left">{labels.asAtReconciliationPosition}</p>
+              <p className="text-xs text-primary-700 mb-3">
                 As-at totals show differences existing on the reconciliation date.
               </p>
-              <table className="min-w-full text-sm text-primary-900">
+              <table className="w-full table-fixed border-collapse text-sm text-primary-900">
+                <colgroup>
+                  <col className="w-[62%]" />
+                  <col className="w-[38%]" />
+                </colgroup>
                 <thead className="bg-primary-50 print:bg-slate-100">
                   <tr>
-                    <th className="px-2 py-1.5 text-left">Description</th>
-                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-left font-semibold align-bottom">Description</th>
+                    <th className="px-3 py-2 text-right font-semibold align-bottom">Amount ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t border-primary-100">
-                    <td className="px-2 py-1.5">{labels.uncreditedLodgmentsOrUnclearedDeposits}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(asAtUncreditedTotal)}</td>
+                  <tr className="border-t border-primary-200">
+                    <td className="px-3 py-2 align-top break-words">{labels.uncreditedLodgmentsOrUnclearedDeposits}</td>
+                    <td className="px-3 py-2 text-right font-semibold whitespace-nowrap align-top">{fmtSignedReportAmt(asAtUncreditedTotal)}</td>
                   </tr>
-                  <tr className="border-t border-primary-100 bg-primary-50/40 print:bg-white">
-                    <td className="px-2 py-1.5">{labels.unpresentedChequesOrUnclearedPayments}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(asAtUnpresentedTotal), { forceNegative: true })}</td>
+                  <tr className="border-t border-primary-200 bg-primary-50/40 print:bg-white">
+                    <td className="px-3 py-2 align-top break-words">{labels.unpresentedChequesOrUnclearedPayments}</td>
+                    <td className="px-3 py-2 text-right font-semibold whitespace-nowrap align-top">{fmtSignedReportAmt(-Math.abs(asAtUnpresentedTotal), { forceNegative: true })}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div className="rounded-xl border border-primary-100 bg-white p-3 overflow-auto">
-              <p className="font-medium text-primary-900 mb-2">{labels.postPeriodMovement}</p>
-              <p className="text-xs text-primary-700 mb-2">
+            <div className="rounded-xl border border-primary-100 bg-white p-4">
+              <p className="font-medium text-primary-900 mb-2 text-left">{labels.postPeriodMovement}</p>
+              <p className="text-xs text-primary-700 mb-3">
                 Post-period movement shows prior-period items carried into this period.
               </p>
-              <table className="min-w-full text-sm text-primary-900">
+              <table className="w-full table-fixed border-collapse text-sm text-primary-900">
+                <colgroup>
+                  <col className="w-[62%]" />
+                  <col className="w-[38%]" />
+                </colgroup>
                 <thead className="bg-primary-50 print:bg-slate-100">
                   <tr>
-                    <th className="px-2 py-1.5 text-left">Description</th>
-                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-left font-semibold align-bottom">Description</th>
+                    <th className="px-3 py-2 text-right font-semibold align-bottom">Amount ({effectiveDisplayCurrency})</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t border-primary-100">
-                    <td className="px-2 py-1.5">{labels.broughtForwardUncreditedLodgments}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(postPeriodLodgmentsTotal)}</td>
+                  <tr className="border-t border-primary-200">
+                    <td className="px-3 py-2 align-top break-words">{labels.broughtForwardUncreditedLodgments}</td>
+                    <td className="px-3 py-2 text-right font-semibold whitespace-nowrap align-top">{fmtSignedReportAmt(postPeriodLodgmentsTotal)}</td>
                   </tr>
-                  <tr className="border-t border-primary-100 bg-primary-50/40 print:bg-white">
-                    <td className="px-2 py-1.5">{labels.broughtForwardUnpresentedCheques}</td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{fmtSignedReportAmt(-Math.abs(postPeriodChequesTotal), { forceNegative: true })}</td>
+                  <tr className="border-t border-primary-200 bg-primary-50/40 print:bg-white">
+                    <td className="px-3 py-2 align-top break-words">{labels.broughtForwardUnpresentedCheques}</td>
+                    <td className="px-3 py-2 text-right font-semibold whitespace-nowrap align-top">{fmtSignedReportAmt(-Math.abs(postPeriodChequesTotal), { forceNegative: true })}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </div>}
+        </div>
 
 
         {/* Phase 6: Missing Cheques Report — single section id for anchor linking */}

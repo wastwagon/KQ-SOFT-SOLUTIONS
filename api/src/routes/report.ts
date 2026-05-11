@@ -1475,64 +1475,70 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       const ensureRoom = (needed: number, redrawHeader = false) => {
         if (doc.y + needed < doc.page.height - 60) return
         doc.addPage()
+        doc.x = margin
         doc.y = 50
         if (redrawHeader) {
-          doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+          doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title, { width: contentWidth, align: 'left' })
           doc.moveDown(0.35)
           drawHeader()
         }
       }
       const drawHeader = () => {
+        const headerTop = doc.y
         doc.save()
-        doc.rect(x, doc.y, tableWidth, rowH).fill('#F8FAFC')
+        doc.rect(x, headerTop, tableWidth, rowH).fill('#F8FAFC')
         doc.restore()
-        const y = doc.y + 5
+        const textY = headerTop + 5
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
-        doc.text('DATE', x + 6, y, { width: cDate - 8 })
-        doc.text(opts?.refLabel || 'DOC REF', x + cDate + 6, y, { width: cRef - 8 })
-        doc.text(opts?.hideAmount ? 'EVENT DETAILS' : 'NAME - DETAILS', x + cDate + cRef + 6, y, { width: cDesc - 8 })
+        doc.text('DATE', x + 6, textY, { width: cDate - 8 })
+        doc.text(opts?.refLabel || 'DOC REF', x + cDate + 6, textY, { width: cRef - 8 })
+        doc.text(opts?.hideAmount ? 'EVENT DETAILS' : 'NAME - DETAILS', x + cDate + cRef + 6, textY, { width: cDesc - 8 })
         if (!opts?.hideAmount) {
-          doc.text(`AMT (${curr})`, x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+          doc.text(`AMT (${curr})`, x + cDate + cRef + cDesc + 6, textY, { width: cAmount - 12, align: 'right' })
         }
-        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
-        doc.y += rowH
+        doc.moveTo(x, headerTop + rowH).lineTo(x + tableWidth, headerTop + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
+        doc.y = headerTop + rowH
       }
+      doc.x = margin
       ensureRoom(36)
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title, { width: contentWidth, align: 'left' })
       doc.moveDown(0.35)
       drawHeader()
       if (!rows.length) {
-        doc.fontSize(9).font('Helvetica').fillColor('#6B7280').text(opts?.allowEmptyText || 'None', x + 6, doc.y + 4)
-        doc.y += rowH + 6
+        const emptyTop = doc.y
+        doc.fontSize(9).font('Helvetica').fillColor('#6B7280').text(opts?.allowEmptyText || 'None', x + 6, emptyTop + 4)
+        doc.y = emptyTop + rowH + 6
         return
       }
       let total = 0
       rows.forEach((r, idx) => {
         ensureRoom(rowH + 8, true)
+        const rowTop = doc.y
         if (idx % 2 === 1) {
           doc.save()
-          doc.rect(x, doc.y, tableWidth, rowH).fill('#F1F5F9')
+          doc.rect(x, rowTop, tableWidth, rowH).fill('#F1F5F9')
           doc.restore()
         }
-        const y = doc.y + 4
+        const textY = rowTop + 4
         total += r.amount
         doc.fontSize(9).font('Helvetica').fillColor('#111827')
-        doc.text(fmtPdfDate(r.date), x + 6, y, { width: cDate - 8 })
-        doc.text(r.ref || '—', x + cDate + 6, y, { width: cRef - 8 })
-        doc.text((r.details || '—').slice(0, opts?.hideAmount ? 120 : 62), x + cDate + cRef + 6, y, { width: cDesc - 8 })
+        doc.text(fmtPdfDate(r.date), x + 6, textY, { width: cDate - 8 })
+        doc.text(r.ref || '—', x + cDate + 6, textY, { width: cRef - 8 })
+        doc.text((r.details || '—').slice(0, opts?.hideAmount ? 120 : 62), x + cDate + cRef + 6, textY, { width: cDesc - 8 })
         if (!opts?.hideAmount) {
-          doc.text(amtNum(r.amount), x + cDate + cRef + cDesc + 6, y, { width: cAmount - 12, align: 'right' })
+          doc.text(amtNum(r.amount), x + cDate + cRef + cDesc + 6, textY, { width: cAmount - 12, align: 'right' })
         }
-        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
-        doc.y += rowH
+        doc.moveTo(x, rowTop + rowH).lineTo(x + tableWidth, rowTop + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
+        doc.y = rowTop + rowH
       })
       if (!opts?.hideAmount) {
         ensureRoom(24)
+        const totalTop = doc.y
         doc.font('Helvetica-Bold').fillColor('#111827')
-        doc.text('Total', x + 6, doc.y + 6, { width: tableWidth - cAmount - 12 })
-        doc.text(amtNum(total), x + tableWidth - cAmount + 6, doc.y + 6, { width: cAmount - 12, align: 'right' })
-        doc.moveTo(x, doc.y + 24).lineTo(x + tableWidth, doc.y + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
-        doc.y += 30
+        doc.text('Total', x + 6, totalTop + 6, { width: tableWidth - cAmount - 12 })
+        doc.text(amtNum(total), x + tableWidth - cAmount + 6, totalTop + 6, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, totalTop + 24).lineTo(x + tableWidth, totalTop + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
+        doc.y = totalTop + 30
       } else {
         doc.y += 12
       }
@@ -1566,29 +1572,32 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       const ensureRoom = (needed: number, redrawHeader = false) => {
         if (doc.y + needed < doc.page.height - 60) return
         doc.addPage()
+        doc.x = margin
         doc.y = 50
         if (redrawHeader) {
           if (!hideTitle) {
-            doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title, { width: contentWidth, align: 'left' })
             doc.moveDown(0.35)
           }
           if (!hideColumnHeaders) drawHeader()
         }
       }
       const drawHeader = () => {
+        const headerTop = doc.y
         doc.save()
-        doc.rect(x, doc.y, tableWidth, rowH).fill('#F8FAFC')
+        doc.rect(x, headerTop, tableWidth, rowH).fill('#F8FAFC')
         doc.restore()
-        const y = doc.y + 5
+        const textY = headerTop + 5
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
-        doc.text(opts?.leftHeaderLabel ?? 'Description', x + 6, y, { width: cLabel - 8 })
-        doc.text(`Amount (${curr})`, x + cLabel + 6, y, { width: cAmount - 12, align: 'right' })
-        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
-        doc.y += rowH
+        doc.text(opts?.leftHeaderLabel ?? 'Description', x + 6, textY, { width: cLabel - 8 })
+        doc.text(`Amount (${curr})`, x + cLabel + 6, textY, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, headerTop + rowH).lineTo(x + tableWidth, headerTop + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
+        doc.y = headerTop + rowH
       }
+      doc.x = margin
       ensureRoom(36)
       if (!hideTitle) {
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title)
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(title, { width: contentWidth, align: 'left' })
         doc.moveDown(0.35)
       }
       if (!hideColumnHeaders) {
@@ -1600,8 +1609,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       let total = 0
       for (const r of rows) {
         ensureRoom(rowH + 8, true)
+        const rowTop = doc.y
         if (!r.subRow) total += r.amount
-        const y = doc.y + 4
+        const textY = rowTop + 4
         const amountText =
           r.workbookStyle ?
             amtNum(Math.abs(r.amount)) :
@@ -1610,22 +1620,24 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         const fs = r.subRow ? 8 : 9
         const fill = r.subRow ? '#374151' : '#111827'
         doc.fontSize(fs).font(fontBody).fillColor(fill)
-        doc.text(r.label, x + 6, y, { width: cLabel - 8 })
-        doc.text(amountText, x + cLabel + 6, y, { width: cAmount - 12, align: 'right' })
+        doc.text(r.label, x + 6, textY, { width: cLabel - 8 })
+        doc.text(amountText, x + cLabel + 6, textY, { width: cAmount - 12, align: 'right' })
         doc.font('Helvetica')
-        doc.moveTo(x, doc.y + rowH).lineTo(x + tableWidth, doc.y + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
-        doc.y += rowH
+        doc.moveTo(x, rowTop + rowH).lineTo(x + tableWidth, rowTop + rowH).strokeColor('#E5E7EB').lineWidth(0.7).stroke()
+        doc.y = rowTop + rowH
       }
       if (opts?.drawTotal) {
         ensureRoom(24)
+        const totalTop = doc.y
         doc.font('Helvetica-Bold').fillColor('#111827')
-        doc.text('Total', x + 6, doc.y + 6, { width: cLabel - 8 })
-        doc.text(amtNum(total), x + cLabel + 6, doc.y + 6, { width: cAmount - 12, align: 'right' })
-        doc.moveTo(x, doc.y + 24).lineTo(x + tableWidth, doc.y + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
-        doc.y += 30
+        doc.text('Total', x + 6, totalTop + 6, { width: cLabel - 8 })
+        doc.text(amtNum(total), x + cLabel + 6, totalTop + 6, { width: cAmount - 12, align: 'right' })
+        doc.moveTo(x, totalTop + 24).lineTo(x + tableWidth, totalTop + 24).strokeColor('#94A3B8').lineWidth(1).stroke()
+        doc.y = totalTop + 30
       } else {
         doc.y += 8
       }
+      doc.x = margin
     }
     const signedAmt = (n: number, opts?: { forceNegative?: boolean }) => {
       const forceNegative = !!opts?.forceNegative
@@ -1719,7 +1731,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       doc.x = margin
       doc.y = 50
 
-      doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle)
+      doc.fontSize(11).fillColor('#000000').text(exportLabels.additionalInformationTitle, { width: contentWidth, align: 'left' })
       doc.moveDown(0.2)
       drawAmountSummaryTable(exportLabels.asAtReconciliationPosition, [
         { label: exportLabels.uncreditedLodgmentsOrUnclearedDeposits, amount: asAtUncreditedTotalExport },
@@ -1733,14 +1745,14 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       const exportNarrative =
         (project as { reportNarrative?: string | null }).reportNarrative ||
         `Matched: ${matchPairs.length} transaction(s). Unpresented Cheques: ${amtNum(Math.abs(unpresentedChequesTotal))}. Uncredited Lodgments: ${amtNum(uncreditedLodgmentsTimingTotalExport)}.`
-      doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: 495 }).fillColor('#000000').moveDown(0.5)
+      doc.fontSize(9).fillColor('#444444').text(exportNarrative, { align: 'left', width: contentWidth }).fillColor('#000000').moveDown(0.5)
       const prepComment = (project as { preparerComment?: string | null }).preparerComment
       const revComment = (project as { reviewerComment?: string | null }).reviewerComment
       if (prepComment?.trim()) {
-        doc.fontSize(8).fillColor('#333333').text('Preparer note: ' + prepComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+        doc.fontSize(8).fillColor('#333333').text('Preparer note: ' + prepComment.trim().slice(0, 200), { width: contentWidth }).moveDown(0.3)
       }
       if (revComment?.trim()) {
-        doc.fontSize(8).fillColor('#333333').text('Reviewer note: ' + revComment.trim().slice(0, 200), { width: 495 }).moveDown(0.3)
+        doc.fontSize(8).fillColor('#333333').text('Reviewer note: ' + revComment.trim().slice(0, 200), { width: contentWidth }).moveDown(0.3)
       }
       if (prepComment?.trim() || revComment?.trim()) doc.moveDown(0.5)
     }
