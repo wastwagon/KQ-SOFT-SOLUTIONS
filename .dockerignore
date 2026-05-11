@@ -1,0 +1,11 @@
+# Used when web service builds with context: . (repo root) — see web/Dockerfile
+.git
+.gitignore
+web/node_modules
+api/node_modules
+web/dist
+api/dist
+**/.env
+**/.env.*
+*.log
+freight-static-site

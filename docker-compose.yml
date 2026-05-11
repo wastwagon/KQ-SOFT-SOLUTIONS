@@ -69,8 +69,8 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL}
     # No host ports — avoids clashes with Coolify (80, 8080, 9001 often taken on the host).

@@ -85,6 +85,10 @@ If Coolify builds **`Dockerfile.development`** (log shows `load build definition
 
 Coolify may still inject build `ARG`s into Dockerfiles; that is fine as long as **`build.dockerfile`** in compose is **`Dockerfile`** (production) for `api` and `web`.
 
+### Web Docker build: `Cannot find module '@brs/suggested-mapping'`
+
+The web app imports shared logic from `api/src/services/suggestedMapping.ts` via the `@brs/suggested-mapping` alias. **Production `docker-compose.yml` builds `web` with the repository root as context** so that file is copied into the image. If you maintain a custom Compose snippet, use **`context: .`** and **`dockerfile: web/Dockerfile`** (not `context: ./web` only).
+
 ### Build fails with exit code `255` / no TypeScript or Vite error in logs
 
 Coolify runs `docker compose build`, which builds **`api`** and **`web`** **in parallel**. Each stage runs `npm ci` and a full compile (`tsc`, `vite build`). On a **small VPS** (≈1–2 GiB RAM), the kernel **OOM killer** can stop the build container; Coolify then reports **`Command execution failed (exit code 255)`** and may **truncate** logs before any useful stderr appears.

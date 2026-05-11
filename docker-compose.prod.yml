@@ -62,8 +62,8 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL}
     # No host ports — Coolify proxies over the Docker network. See docker-compose.override.example.yml for local.
