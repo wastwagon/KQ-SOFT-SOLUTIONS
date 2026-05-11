@@ -85,6 +85,35 @@ If Coolify builds **`Dockerfile.development`** (log shows `load build definition
 
 Coolify may still inject build `ARG`s into Dockerfiles; that is fine as long as **`build.dockerfile`** in compose is **`Dockerfile`** (production) for `api` and `web`.
 
+### Build fails with exit code `255` / no TypeScript or Vite error in logs
+
+Coolify runs `docker compose build`, which builds **`api`** and **`web`** **in parallel**. Each stage runs `npm ci` and a full compile (`tsc`, `vite build`). On a **small VPS** (≈1–2 GiB RAM), the kernel **OOM killer** can stop the build container; Coolify then reports **`Command execution failed (exit code 255)`** and may **truncate** logs before any useful stderr appears.
+
+**Confirm locally on the server** (SSH into the Coolify host or use **Coolify → Terminal** from the deployment directory):
+
+```bash
+docker compose build --progress=plain api 2>&1 | tail -80
+docker compose build --progress=plain web 2>&1 | tail -80
+```
+
+If each service builds alone but the combined deploy fails, use **sequential** builds (same compose file, lower peak memory):
+
+```bash
+chmod +x scripts/docker-compose-build-sequential.sh
+./scripts/docker-compose-build-sequential.sh --progress=plain
+docker compose up -d
+```
+
+Or run two builds yourself:
+
+```bash
+docker compose build --progress=plain api
+docker compose build --progress=plain web
+docker compose up -d
+```
+
+**Other mitigations:** add **swap** or **RAM** on the host; temporarily stop other heavy containers during deploy. Some Compose versions honor **`COMPOSE_PARALLEL_LIMIT=1`** in the environment (limits concurrent builds); set it in Coolify only if your Compose version documents it.
+
 ## 3. Required environment variables
 
 Set these in Coolify for the **stack** (or per-service, depending on Coolify):
