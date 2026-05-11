@@ -750,18 +750,22 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             {accountReferenceLine ? (
               <p className="mt-3 text-[15px] font-bold leading-snug text-slate-900">{accountReferenceLine}</p>
             ) : null}
-            <div className="mt-8 overflow-auto">
-              <table className="w-full max-w-xl border-collapse text-sm text-slate-900">
+            <div className="mt-8 w-full overflow-x-auto">
+              <table className="w-full table-fixed border-collapse text-sm text-slate-900">
+                <colgroup>
+                  <col className="min-w-0 w-[72%] sm:w-[75%]" />
+                  <col className="w-[28%] sm:w-[25%]" />
+                </colgroup>
                 <tbody className="align-top">
                   <tr className="border-t border-b border-slate-200">
-                    <td className="py-2 pr-6 text-slate-900">{labels.closingBankStatementBalance}</td>
-                    <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
+                    <td className="py-2 pr-6 text-slate-900 align-top">{labels.closingBankStatementBalance}</td>
+                    <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900 align-top">
                       {fmtBaseReportAmt(brsStatement.bankClosingBalance)}
                     </td>
                   </tr>
                   <tr className="border-b border-slate-200">
-                    <td className="py-2 pr-6 text-slate-900">{labels.addUncreditedLodgments}</td>
-                    <td className="py-2 pl-2 text-right tabular-nums text-slate-900">
+                    <td className="py-2 pr-6 text-slate-900 align-top">{labels.addUncreditedLodgments}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums text-slate-900 align-top">
                       {fmtBrWorkbookMagnitudeAmt(brsStatement.uncreditedLodgmentsTimingTotal ?? brsStatement.uncreditedLodgmentsTotal)}
                     </td>
                   </tr>
@@ -844,7 +848,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </table>
             </div>
             {Math.abs(brsStatement.workbookScheduleTieOutVariance ?? 0) > 0.02 ? (
-              <div className="mt-4 max-w-xl rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
+              <div className="mt-4 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
                 Workbook tie-out: declared cash book minus schedule =
                 {' '}
                 <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
@@ -852,7 +856,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 overstated closing balance inputs — review mappings and extracted balances.
               </div>
             ) : null}
-            <p className="mt-6 max-w-xl text-xs leading-relaxed text-slate-700">
+            <p className="mt-6 w-full text-xs leading-relaxed text-slate-700">
               Note: timing items are transactions already in the cash book but not yet reflected by the bank at the
               reconciliation date. Bank-only items are transactions on the bank statement not yet recorded in the cash book.
               {((brsStatement.timingUncreditedBroughtForwardPrior ?? 0) > 0.005 ||
@@ -868,7 +872,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 ) :
                 null}
             </p>
-            <div className="mt-8 max-w-xl space-y-4 text-sm text-slate-900 print:mt-10">
+            <div className="mt-8 w-full space-y-4 text-sm text-slate-900 print:mt-10">
               <p>Checked By: _________________________________________</p>
               <p>Signed off By: _________________________________________</p>
               <p>Date: _________________________________________</p>
