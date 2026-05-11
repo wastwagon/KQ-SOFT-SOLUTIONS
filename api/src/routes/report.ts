@@ -1292,14 +1292,27 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     ? formatBankAccountHeaderLine(headerBankAccountExport)
     : null
   const reconciliationDateExport = project.reconciliationDate
-  const fmtBRSTitle = (d: Date | string | null) => {
+  const ordinalSuffixEn = (day: number) => {
+    if (day >= 11 && day <= 13) return 'TH'
+    const m = day % 10
+    if (m === 1) return 'ST'
+    if (m === 2) return 'ND'
+    if (m === 3) return 'RD'
+    return 'TH'
+  }
+  const fmtBrsFormalDate = (d: Date | string | null) => {
     if (!d) return '—'
     const date = typeof d === 'string' ? new Date(d) : d
     if (Number.isNaN(date.getTime())) return '—'
     const day = date.getDate()
     const month = date.toLocaleString('en-GB', { month: 'long' }).toUpperCase()
     const year = date.getFullYear()
-    return `${day}-${month}-${year}`
+    return `${day}${ordinalSuffixEn(day)} ${month}, ${year}`
+  }
+  const fmtBrsAsAtLine = (d: Date | string | null) => {
+    const inner = fmtBrsFormalDate(d)
+    if (inner === '—') return '—'
+    return `AS AT ${inner}`
   }
 
   if (format === 'excel' || format === 'xlsx') {
@@ -1318,7 +1331,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     const brsStatementRows: (string | number)[][] = [
       [`${project.organization.name}`],
       [],
-      [`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`],
+      ['Bank Reconciliation Statement'],
+      [fmtBrsAsAtLine(reconciliationDateExport)],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [],
       ['Description', `Amount (${curr})`],
@@ -1429,15 +1443,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
     doc.fillColor(primaryColor).fontSize(20).text(letterheadCaps(`${project.organization.name}`), { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.35)
-    const letterhead = branding.letterheadAddress as string | undefined
-    if (letterhead) {
-      doc.fontSize(9).fillColor('#444444').text(letterheadCaps(letterhead), { align: 'center' }).fillColor('#000000').moveDown(0.3)
-    }
-    doc
-      .fontSize(10)
-      .font('Helvetica-Bold')
-      .text(letterheadCaps(`Bank Reconciliation Statement as at ${fmtBRSTitle(reconciliationDateExport)}`), { align: 'center' })
-      .font('Helvetica')
+    doc.fontSize(10).font('Helvetica-Bold').text(letterheadCaps('Bank Reconciliation Statement'), { align: 'center' }).font('Helvetica')
+    doc.moveDown(0.18)
+    doc.fontSize(10).font('Helvetica-Bold').text(letterheadCaps(fmtBrsAsAtLine(reconciliationDateExport)), { align: 'center' }).font('Helvetica')
     if (bankAccountHeaderLineExport) {
       doc.moveDown(0.2)
       doc.fontSize(9).text(letterheadCaps(bankAccountHeaderLineExport), { align: 'center' })

@@ -14,7 +14,7 @@ import {
   type ReportResponse,
 } from '../lib/api'
 import { canSubmitForReview, canApprove, canUploadDocuments, canDeleteAttachment, canReopenProject, canExportReport } from '../lib/permissions'
-import { formatDate, formatDateBRSTitle } from '../lib/format'
+import { formatDate, formatBrsAsAtLine, formatBrsFormalDate, formatPrintDateAccra } from '../lib/format'
 import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
@@ -83,6 +83,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const [signedAmountMode, setSignedAmountMode] = useState(false)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   const [exportMenu, setExportMenu] = useState('')
+  /** Stable “print moment” for footer line while this view is open. */
+  const [reportPrintAt] = useState(() => new Date())
 
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -409,20 +411,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   }
   const fmtBrWorkbookMagnitudeAmt = (n: number) => fmtBaseReportAmt(Math.abs(n))
-  const fmtDateTime = (d: string | null | undefined) => {
-    if (!d) return '—'
-    const x = new Date(d)
-    if (Number.isNaN(x.getTime())) return '—'
-    return x.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
-  }
   const fmtSignedReportAmt = (n: number, opts?: { forceNegative?: boolean }) => {
     const forceNegative = !!opts?.forceNegative
     const base = fmtBaseReportAmt(Math.abs(n))
@@ -467,8 +455,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   ].some((s) => (s?.cross_reference ?? 0) > 0 || (s?.zero ?? 0) > 0 || (s?.empty ?? 0) > 0)
   const canViewDiagnosticsByRole = ['admin', 'reviewer', 'preparer'].includes(role || '')
   const canViewDiagnostics = canViewDiagnosticsByRole || hasSignAnomaly
-  const completionTimestamp = data.reportCompletedAt || data.project?.approvedAt || data.project?.reviewedAt || data.project?.preparedAt || data.generatedAt
-  const printTimestamp = new Date().toISOString()
   const accountReferenceLine =
     bankAccountHeaderLine ||
     (selectedBankAccountName && selectedBankAccountNo
@@ -734,13 +720,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       </nav>
 
       <div id="brs-report" className="bg-white rounded-xl border border-slate-200 print:bg-white print:border-slate-300 overflow-x-auto min-w-0 font-sans print:text-black text-slate-800 shadow-sm">
-        {/* Header — letterhead-style for premium/enterprise */}
-        <div className="border-b border-slate-200 pb-4 mb-4">
+        {/* Header — letterhead aligned with PDF export (no project name / meta in band) */}
+        <div className="border-b border-slate-200 pb-4 mb-4 uppercase tracking-tight">
           {data.organization?.branding?.logoUrl && !reportLogoLoadFailed && (
             <img
               src={getLogoDisplayUrl(data.organization.branding.logoUrl)}
               alt=""
-              className="h-12 object-contain mb-2 max-w-[200px]"
+              className="h-12 object-contain mb-2 max-w-[200px] normal-case"
               onError={() => setReportLogoLoadFailed(true)}
             />
           )}
@@ -748,77 +734,35 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             className={`text-xl font-bold ${hasBranding ? '' : 'text-slate-800'}`}
             style={primaryColor ? { color: primaryColor } : undefined}
           >
-            {organizationDisplayName}
+            {organizationDisplayName.toLocaleUpperCase('en-US')}
           </h1>
-          {data.organization?.branding?.letterheadAddress && (
-            <p className="text-sm text-slate-600 mt-1">{data.organization.branding.letterheadAddress}</p>
-          )}
-          <p className="text-lg font-medium text-slate-700 mt-1">{data.project?.name}</p>
           {accountReferenceLine ? (
-            <p className="mt-3 text-sm font-semibold text-slate-800 tracking-tight border-l-4 border-primary-400 pl-3 py-2 bg-slate-50/90 rounded-r-md print:border-slate-300 print:bg-white">
-              {accountReferenceLine}
+            <p className="mt-3 text-sm font-semibold text-slate-800">
+              {accountReferenceLine.toLocaleUpperCase('en-US')}
             </p>
           ) : null}
           {(data?.project?.status === 'completed') && (() => {
             const p = data.project
             return p?.approvedBy && p?.approvedAt ? (
-              <div className="mt-2 px-3 py-1.5 rounded-xl bg-green-100 border border-green-300 inline-block print:bg-green-50 print:border-green-400">
+              <div className="mt-2 px-3 py-1.5 rounded-xl bg-green-100 border border-green-300 inline-block print:bg-green-50 print:border-green-400 normal-case">
                 <span className="font-semibold text-green-800 print:text-green-900">Final report</span>
                 <span className="text-green-700 print:text-green-800 text-sm ml-2">Approved {fmt(p.approvedAt)}</span>
               </div>
             ) : null
-          })()}
-          <p className="text-sm text-slate-500 mt-1">
-            Generated {formatDate(data.generatedAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {data.currency}
-          </p>
-          {data.reportLanguageProfile && (
-            <div
-              className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-800"
-              title={
-                data.reportLanguageProfile.code
-                  ? `Technical profile code: ${data.reportLanguageProfile.code}`
-                  : undefined
-              }
-            >
-              <span className="font-medium">{data.reportLanguageProfile.label}</span>
-            </div>
-          )}
-          <div className="mt-2 text-xs text-slate-700 bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-md px-3 py-2 shadow-sm">
-            <p>
-              Reconciled as at: <strong>{formatDateBRSTitle(reconciliationDate)}</strong>. Transactions posted after this reconciliation date are treated as post-period movements and are not part of the as-at matching position.
-            </p>
-            <p className="mt-1 text-sm font-medium text-slate-800">
-              Report completed: <strong>{fmtDateTime(completionTimestamp)}</strong> · Print timestamp: <strong>{fmtDateTime(printTimestamp)}</strong>
-            </p>
-          </div>
-          {(() => {
-            const p = data.project
-            if (!p?.preparedBy && !p?.reviewedBy && !p?.approvedBy) return null
-            return (
-              <div className="mt-4 pt-4 border-t border-slate-200 space-y-1 text-sm text-slate-600">
-                {p.preparedBy && p.preparedAt && (
-                  <p>Prepared by: <strong>{p.preparedBy.name || '—'}</strong> • {fmt(p.preparedAt)}</p>
-                )}
-                {p.reviewedBy && p.reviewedAt && (
-                  <p>Reviewed by: <strong>{p.reviewedBy.name || '—'}</strong> • {fmt(p.reviewedAt)}</p>
-                )}
-                {p.approvedBy && p.approvedAt && (
-                  <p>Approved by: <strong>{p.approvedBy.name || '—'}</strong> • {fmt(p.approvedAt)}</p>
-                )}
-              </div>
-            )
           })()}
         </div>
 
         {/* BRS statement — two-column workbook layout (spreadsheet/manual style) */}
         {brsStatement && (
           <div id="brs-statement" className="mb-8 rounded-xl border border-slate-200 bg-white p-6 print:border-slate-300 print:bg-white">
-            <p className="text-[15px] leading-snug text-slate-900">{organizationDisplayName}</p>
-            <p className="mt-6 text-[15px] font-bold leading-snug text-slate-900">
-              Bank Reconciliation Statement as at {formatDateBRSTitle(reconciliationDate)}
-            </p>
+            <div className="mt-2 text-[15px] font-bold leading-snug text-slate-900 uppercase">
+              <p>Bank Reconciliation Statement</p>
+              <p className="mt-1">{formatBrsAsAtLine(reconciliationDate)}</p>
+            </div>
             {accountReferenceLine ? (
-              <p className="mt-3 text-[15px] font-bold leading-snug text-slate-900">{accountReferenceLine}</p>
+              <p className="mt-3 text-[15px] font-bold leading-snug text-slate-900 uppercase">
+                {accountReferenceLine}
+              </p>
             ) : null}
             <div className="mt-8 w-full overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm text-slate-900">
@@ -1667,17 +1611,41 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           </div>
         </div>
 
-        {data.organization?.branding?.footer && (
-          <div className="mt-8 pt-4 border-t border-slate-200 text-center text-sm text-slate-600">
-            {data.organization.branding.footer as string}
-          </div>
-        )}
-        <div className="mt-6 pt-4 border-t border-slate-200 text-center text-xs text-slate-500 print:text-slate-600">
-          Generated {formatDate(data.generatedAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} · Currency: {currency}
-          {typeof data.currency === 'string' && (
-            <span> · For audit purposes retain supporting documents.</span>
+        {/* Footer band — matches PDF: prepared trail + print date + branding footer */}
+        <div className="mt-10 pt-6 border-t border-slate-200 text-sm text-slate-600 space-y-2 print:mt-8 print:pt-4 print:text-xs uppercase tracking-tight">
+          {data.organization?.branding?.footer && (
+            <p className="text-center">{data.organization.branding.footer as string}</p>
           )}
+          <p className="text-center text-slate-500 print:text-slate-600">
+            Print date: {formatPrintDateAccra(reportPrintAt)} (Africa/Accra)
+          </p>
+          {(() => {
+            const p = data.project
+            if (!p?.preparedBy && !p?.reviewedBy && !p?.approvedBy) return null
+            return (
+              <div className="space-y-1 text-center">
+                {p.preparedBy && p.preparedAt && (
+                  <p>
+                    Prepared by: <strong>{p.preparedBy.name || '—'}</strong> • {fmt(p.preparedAt)}
+                  </p>
+                )}
+                {p.reviewedBy && p.reviewedAt && (
+                  <p>
+                    Reviewed by: <strong>{p.reviewedBy.name || '—'}</strong> • {fmt(p.reviewedAt)}
+                  </p>
+                )}
+                {p.approvedBy && p.approvedAt && (
+                  <p>
+                    Approved by: <strong>{p.approvedBy.name || '—'}</strong> • {fmt(p.approvedAt)}
+                  </p>
+                )}
+              </div>
+            )
+          })()}
         </div>
+        <p className="mt-4 text-center text-xs text-slate-400 print:hidden">
+          Reconciled as at {formatBrsFormalDate(reconciliationDate)}. Post-period items are excluded from the as-at matching position.
+        </p>
       </div>
     </div>
   )
