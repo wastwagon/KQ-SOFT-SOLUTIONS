@@ -11,7 +11,6 @@ import PageLoader from './components/PageLoader'
 import { ToastProvider } from './components/ui/Toast'
 import SubscriptionPaywallToastBridge from './components/SubscriptionPaywallToastBridge'
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog'
-import { useAuth } from './store/auth'
 import { subscriptionPaywallRetry } from './lib/api'
 
 const Landing = lazy(() => import('./pages/Landing'))
@@ -49,20 +48,9 @@ const queryClient = new QueryClient({
 })
 
 /**
- * Root path resolver:
- *   - Logged-in visitors are sent to their dashboard.
- *   - Everyone else sees the public landing page.
- *
- * Kept inside <BrowserRouter> so <Navigate> works.
+ * Public marketing site at `/`. Authenticated users can open it anytime;
+ * app shell routes (e.g. `/dashboard`) stay under `ProtectedRoute`.
  */
-function HomeRoute() {
-  const isAuthenticated = useAuth((s) => !!s.token)
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
-  }
-  return <Landing />
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -81,7 +69,7 @@ function App() {
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Public marketing & auth pages */}
-                  <Route path="/" element={<HomeRoute />} />
+                  <Route path="/" element={<Landing />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -102,8 +90,7 @@ function App() {
                     <Route path="database" element={<AdminDatabase />} />
                   </Route>
 
-                  {/* Authenticated app — same root-level paths as before, plus
-                      /dashboard for the index. Public landing now owns "/". */}
+                  {/* Authenticated app — /dashboard is the default after login. */}
                   <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/projects" element={<Projects />} />
