@@ -31,6 +31,7 @@ import {
 import BrandLogo from '../components/BrandLogo'
 import SubscriptionFxReference from '../components/marketing/SubscriptionFxReference'
 import { publicApi } from '../lib/api'
+import { useAuth } from '../store/auth'
 import {
   FEATURE_GROUPS,
   formatGhs,
@@ -323,6 +324,7 @@ function AnnouncementBar({
   visible: boolean
   onDismiss: () => void
 }) {
+  const isAuthed = useAuth((s) => !!s.token)
   if (!visible) return null
   return (
     <div className="relative z-40 nav-shimmer text-white">
@@ -332,10 +334,10 @@ function AnnouncementBar({
           Welcome offer · <span className="font-bold">50% off your first 2 months</span> on any paid plan
         </span>
         <Link
-          to="/register"
+          to={isAuthed ? '/settings/billing' : '/register'}
           className="hidden sm:inline-flex items-center gap-1 ml-2 px-2.5 py-0.5 rounded-full bg-white/15 hover:bg-white/25 font-semibold transition-colors"
         >
-          Claim it
+          {isAuthed ? 'Billing' : 'Claim it'}
           <ArrowRight className="w-3 h-3" />
         </Link>
         <button
@@ -356,6 +358,7 @@ function AnnouncementBar({
  * ------------------------------------------------------------------------- */
 
 function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolean) => void }) {
+  const isAuthed = useAuth((s) => !!s.token)
   const links: { label: string; href: string }[] = [
     { label: 'Features', href: '#features' },
     { label: 'How it works', href: '#how-it-works' },
@@ -387,19 +390,31 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
-          <Link
-            to="/login"
-            className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-primary-700 rounded-lg hover:bg-primary-50/60 transition-colors"
-          >
-            Sign in
-          </Link>
-          <Link
-            to="/register"
-            className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
-          >
-            Start free
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          {isAuthed ? (
+            <Link
+              to="/dashboard"
+              className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
+            >
+              Dashboard
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-primary-700 rounded-lg hover:bg-primary-50/60 transition-colors"
+              >
+                Sign in
+              </Link>
+              <Link
+                to="/register"
+                className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
+              >
+                Start free
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -424,21 +439,33 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
                 {l.label}
               </a>
             ))}
-            <div className="pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
-              <Link
-                to="/login"
-                className="text-center px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
-                onClick={() => setNavOpen(false)}
-              >
-                Sign in
-              </Link>
-              <Link
-                to="/register"
-                className="text-center px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
-                onClick={() => setNavOpen(false)}
-              >
-                Start free
-              </Link>
+            <div className={`pt-3 border-t border-gray-100 grid gap-2 ${isAuthed ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {isAuthed ? (
+                <Link
+                  to="/dashboard"
+                  className="text-center px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
+                  onClick={() => setNavOpen(false)}
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-center px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    onClick={() => setNavOpen(false)}
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="text-center px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
+                    onClick={() => setNavOpen(false)}
+                  >
+                    Start free
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -452,6 +479,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
  * ------------------------------------------------------------------------- */
 
 function Hero() {
+  const isAuthed = useAuth((s) => !!s.token)
   return (
     <section className="relative isolate overflow-hidden">
       <div aria-hidden className="absolute inset-0 -z-10">
@@ -488,10 +516,10 @@ function Hero() {
 
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              to="/register"
+              to={isAuthed ? '/dashboard' : '/register'}
               className="group inline-flex items-center gap-2 px-6 py-3 text-base font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-600/20 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             >
-              Start free trial
+              {isAuthed ? 'Go to dashboard' : 'Start free trial'}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <a
@@ -503,7 +531,9 @@ function Hero() {
           </div>
 
           <p className="mt-5 text-sm text-gray-500">
-            No credit card required · Set up in under 5 minutes
+            {isAuthed
+              ? 'Signed in — open your workspace to continue reconciliations.'
+              : 'No credit card required · Set up in under 5 minutes'}
           </p>
         </div>
 
@@ -847,6 +877,7 @@ function HowItWorks() {
  * ------------------------------------------------------------------------- */
 
 function DashboardShowcase() {
+  const isAuthed = useAuth((s) => !!s.token)
   return (
     <section className="py-24 sm:py-32 bg-gradient-to-b from-white via-gray-50/60 to-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -880,10 +911,10 @@ function DashboardShowcase() {
             </ul>
             <div className="mt-8 flex gap-3">
               <Link
-                to="/register"
+                to={isAuthed ? '/dashboard' : '/register'}
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm"
               >
-                Try it free
+                {isAuthed ? 'Open dashboard' : 'Try it free'}
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <a
@@ -1087,11 +1118,16 @@ function PlanCard({
   plan: MarketingPlan
   period: 'monthly' | 'yearly'
 }) {
+  const isAuthed = useAuth((s) => !!s.token)
   const isHighlight = !!plan.highlight
   const isCustom = plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
   const amount = period === 'yearly' ? plan.yearlyGhs : plan.monthlyGhs
   const monthlyEq = period === 'yearly' ? plan.yearlyGhs / 12 : null
-  const isInternalCta = plan.ctaHref.startsWith('/')
+  const ctaHref =
+    isAuthed && plan.ctaHref === '/register' ? '/settings/billing' : plan.ctaHref
+  const ctaLabel =
+    isAuthed && plan.ctaHref === '/register' ? 'Billing & plans' : plan.ctaLabel
+  const isInternalCta = ctaHref.startsWith('/')
 
   return (
     <div
@@ -1163,26 +1199,26 @@ function PlanCard({
 
       {isInternalCta ? (
         <Link
-          to={plan.ctaHref}
+          to={ctaHref}
           className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
             isHighlight
               ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20 hover:shadow-lg'
               : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
           }`}
         >
-          {plan.ctaLabel}
+          {ctaLabel}
           <ArrowRight className="w-4 h-4" />
         </Link>
       ) : (
         <a
-          href={plan.ctaHref}
+          href={ctaHref}
           className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
             isHighlight
               ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20'
               : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
           }`}
         >
-          {plan.ctaLabel}
+          {ctaLabel}
           <ArrowRight className="w-4 h-4" />
         </a>
       )}
@@ -1414,6 +1450,7 @@ function Faq({
  * ------------------------------------------------------------------------- */
 
 function FinalCta() {
+  const isAuthed = useAuth((s) => !!s.token)
   return (
     <section className="py-24 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -1434,19 +1471,31 @@ function FinalCta() {
               </p>
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">
-              <Link
-                to="/register"
-                className="inline-flex justify-center items-center gap-2 px-6 py-3 text-base font-bold text-primary-700 bg-white hover:bg-gray-100 rounded-xl shadow-lg transition-colors"
-              >
-                Start free trial
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex justify-center items-center px-6 py-3 text-base font-semibold text-white bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl border border-white/20 transition-colors"
-              >
-                Sign in
-              </Link>
+              {isAuthed ? (
+                <Link
+                  to="/dashboard"
+                  className="inline-flex justify-center items-center gap-2 px-6 py-3 text-base font-bold text-primary-700 bg-white hover:bg-gray-100 rounded-xl shadow-lg transition-colors"
+                >
+                  Go to dashboard
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/register"
+                    className="inline-flex justify-center items-center gap-2 px-6 py-3 text-base font-bold text-primary-700 bg-white hover:bg-gray-100 rounded-xl shadow-lg transition-colors"
+                  >
+                    Start free trial
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    to="/login"
+                    className="inline-flex justify-center items-center px-6 py-3 text-base font-semibold text-white bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl border border-white/20 transition-colors"
+                  >
+                    Sign in
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1460,6 +1509,18 @@ function FinalCta() {
  * ------------------------------------------------------------------------- */
 
 function Footer() {
+  const isAuthed = useAuth((s) => !!s.token)
+  const accountLinks = isAuthed
+    ? [
+        { label: 'Dashboard', href: '/dashboard', internal: true },
+        { label: 'Settings', href: '/settings/branding', internal: true },
+        { label: 'Forgot password', href: '/forgot-password', internal: true },
+      ]
+    : [
+        { label: 'Sign in', href: '/login', internal: true },
+        { label: 'Create account', href: '/register', internal: true },
+        { label: 'Forgot password', href: '/forgot-password', internal: true },
+      ]
   return (
     <footer
       id="contact"
@@ -1615,14 +1676,7 @@ function Footer() {
               { label: 'FAQ', href: '#faq' },
             ]}
           />
-          <FooterColumn
-            title="Account"
-            links={[
-              { label: 'Sign in', href: '/login', internal: true },
-              { label: 'Create account', href: '/register', internal: true },
-              { label: 'Forgot password', href: '/forgot-password', internal: true },
-            ]}
-          />
+          <FooterColumn title="Account" links={accountLinks} />
           <div className="sm:col-span-2 lg:col-span-1">
             <FooterColumn
               title="Resources"
