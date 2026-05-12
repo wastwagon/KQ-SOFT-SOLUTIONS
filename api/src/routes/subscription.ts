@@ -179,11 +179,17 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
   }
   const { plan, period } = parsed.data
   const planData = await getPlanBySlug(plan)
-  if (!planData || (planData.monthlyGhs <= 0 && planData.yearlyGhs <= 0)) {
-    return res.status(400).json({ error: 'Invalid plan. Use basic, standard, or premium.' })
+  if (!planData) {
+    return res.status(400).json({ error: 'Unknown plan.' })
+  }
+  if (planData.monthlyGhs <= 0 && planData.yearlyGhs <= 0) {
+    return res.status(400).json({
+      error:
+        'This plan has no online checkout amount (e.g. free Basic or custom Firm). Choose a paid tier to upgrade, or contact support for firm billing.',
+    })
   }
   let amountGhs = period === 'yearly' ? planData.yearlyGhs : planData.monthlyGhs
-  if (amountGhs <= 0) return res.status(400).json({ error: 'Invalid plan' })
+  if (amountGhs <= 0) return res.status(400).json({ error: 'Invalid billing period for this plan.' })
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },

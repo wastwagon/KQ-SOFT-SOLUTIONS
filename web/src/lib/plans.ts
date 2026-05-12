@@ -146,8 +146,8 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     name: 'Basic',
     tagline: 'For solo accountants getting started.',
     audience: 'Solo practitioner',
-    monthlyGhs: 150,
-    yearlyGhs: 1500,
+    monthlyGhs: 0,
+    yearlyGhs: 0,
     projectsPerMonth: 5,
     transactionsPerMonth: 500,
     users: 1,
@@ -197,8 +197,8 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     audience: 'Small finance team',
     badge: 'Most popular',
     highlight: true,
-    monthlyGhs: 400,
-    yearlyGhs: 4000,
+    monthlyGhs: 50,
+    yearlyGhs: 550,
     projectsPerMonth: 20,
     transactionsPerMonth: 2000,
     users: 3,
@@ -248,8 +248,8 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     name: 'Premium',
     tagline: 'For firms reconciling at scale.',
     audience: 'Established firm',
-    monthlyGhs: 900,
-    yearlyGhs: 9000,
+    monthlyGhs: 100,
+    yearlyGhs: 1100,
     projectsPerMonth: 100,
     transactionsPerMonth: 10000,
     users: 5,
@@ -361,16 +361,21 @@ export function mergeWithApiPlans(
   }> | undefined
 ): MarketingPlan[] {
   if (!apiPlans || apiPlans.length === 0) return MARKETING_PLANS
+  const pickNum = (v: unknown, fallback: number) => {
+    if (v === null || v === undefined) return fallback
+    const n = Number(v)
+    return Number.isFinite(n) ? n : fallback
+  }
   const byId = new Map(apiPlans.map((p) => [p.id, p]))
   return MARKETING_PLANS.map((p) => {
     const live = byId.get(p.slug)
     if (!live) return p
     const merged: MarketingPlan = {
       ...p,
-      monthlyGhs: live.monthlyGhs ?? p.monthlyGhs,
-      yearlyGhs: live.yearlyGhs ?? p.yearlyGhs,
-      projectsPerMonth: live.projectsPerMonth ?? p.projectsPerMonth,
-      transactionsPerMonth: live.transactionsPerMonth ?? p.transactionsPerMonth,
+      monthlyGhs: pickNum(live.monthlyGhs, p.monthlyGhs),
+      yearlyGhs: pickNum(live.yearlyGhs, p.yearlyGhs),
+      projectsPerMonth: pickNum(live.projectsPerMonth, p.projectsPerMonth),
+      transactionsPerMonth: pickNum(live.transactionsPerMonth, p.transactionsPerMonth),
     }
     // Sync feature-matrix limits so the comparison table reflects live values.
     merged.features = {
@@ -389,7 +394,9 @@ export function mergeWithApiPlans(
 }
 
 export function formatGhs(amount: number): string {
-  if (!Number.isFinite(amount) || amount <= 0) return 'Custom'
+  if (!Number.isFinite(amount)) return '—'
+  if (amount === 0) return 'Free'
+  if (amount < 0) return '—'
   try {
     return new Intl.NumberFormat('en-GH', {
       style: 'currency',

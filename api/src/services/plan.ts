@@ -21,7 +21,9 @@ let cacheTs = 0
 const CACHE_TTL_MS = 60_000 // 1 min
 
 async function loadPlansFromDb(): Promise<Map<string, PlanData>> {
-  const plans = await prisma.plan.findMany({ where: { active: true } })
+  // Include inactive rows so public pricing + admin stay aligned (inactive tiers
+  // were previously invisible here and fell back to PLAN_PRICES / stale amounts).
+  const plans = await prisma.plan.findMany({ orderBy: { slug: 'asc' } })
   const m = new Map<string, PlanData>()
   for (const p of plans) {
     m.set(p.slug, {

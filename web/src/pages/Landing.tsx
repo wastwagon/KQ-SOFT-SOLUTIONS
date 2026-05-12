@@ -1120,7 +1120,7 @@ function PlanCard({
 }) {
   const isAuthed = useAuth((s) => !!s.token)
   const isHighlight = !!plan.highlight
-  const isCustom = plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
+  const isCustom = plan.slug === 'firm' && plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
   const amount = period === 'yearly' ? plan.yearlyGhs : plan.monthlyGhs
   const monthlyEq = period === 'yearly' ? plan.yearlyGhs / 12 : null
   const ctaHref =

@@ -9,11 +9,11 @@ export const TIER_LIMITS: Record<string, { projectsPerMonth: number; transaction
   firm: { projectsPerMonth: -1, transactionsPerMonth: -1 },
 }
 
-/** Plan prices in GHS (matches PLANNING_DATA.json) — amount in pesewas = GHS * 100 */
+/** Plan prices in GHS — fallback when no DB row; keep aligned with seed + admin defaults */
 export const PLAN_PRICES: Record<string, { monthlyGhs: number; yearlyGhs: number }> = {
-  basic: { monthlyGhs: 150, yearlyGhs: 1500 },
-  standard: { monthlyGhs: 400, yearlyGhs: 4000 },
-  premium: { monthlyGhs: 900, yearlyGhs: 9000 },
+  basic: { monthlyGhs: 0, yearlyGhs: 0 },
+  standard: { monthlyGhs: 50, yearlyGhs: 550 },
+  premium: { monthlyGhs: 100, yearlyGhs: 1100 },
   firm: { monthlyGhs: 0, yearlyGhs: 0 }, // custom
 }
 

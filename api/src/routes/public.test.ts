@@ -27,8 +27,8 @@ describe('buildPublicPlans', () => {
 
     const basic = plans.find((p) => p.id === 'basic')
     expect(basic).toMatchObject({
-      monthlyGhs: 150,
-      yearlyGhs: 1500,
+      monthlyGhs: 0,
+      yearlyGhs: 0,
       projectsPerMonth: 5,
       transactionsPerMonth: 500,
     })
@@ -59,6 +59,19 @@ describe('buildPublicPlans', () => {
     expect(standard?.transactionsPerMonth).toBe(2500)
   })
 
+  it('uses inactive DB rows for pricing (admin can mark a tier inactive without losing its prices)', async () => {
+    mocks.planFindMany.mockResolvedValue([
+      { slug: 'basic', name: 'Basic', projectsPerMonth: 5, transactionsPerMonth: 500, monthlyGhs: 0, yearlyGhs: 0, active: false },
+      { slug: 'standard', name: 'Standard', projectsPerMonth: 20, transactionsPerMonth: 2000, monthlyGhs: 50, yearlyGhs: 550, active: true },
+      { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 10000, monthlyGhs: 100, yearlyGhs: 1100, active: true },
+      { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
+    ])
+    const plans = await buildPublicPlans()
+    const basic = plans.find((p) => p.id === 'basic')
+    expect(basic?.monthlyGhs).toBe(0)
+    expect(basic?.yearlyGhs).toBe(0)
+  })
+
   it('always orders plans basic → standard → premium → firm regardless of DB ordering', async () => {
     mocks.planFindMany.mockResolvedValue([
       { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
@@ -81,7 +94,7 @@ describe('buildPublicPlans', () => {
     const plans = await buildPublicPlans()
     expect(plans).toHaveLength(4)
     const premium = plans.find((p) => p.id === 'premium')
-    expect(premium).toMatchObject({ monthlyGhs: 900, yearlyGhs: 9000, projectsPerMonth: 100 })
+    expect(premium).toMatchObject({ monthlyGhs: 100, yearlyGhs: 1100, projectsPerMonth: 100 })
     const firm = plans.find((p) => p.id === 'firm')
     expect(firm).toMatchObject({ monthlyGhs: 0, yearlyGhs: 0, projectsPerMonth: -1 })
   })
