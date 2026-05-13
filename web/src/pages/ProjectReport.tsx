@@ -736,11 +736,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           >
             {organizationDisplayName.toLocaleUpperCase('en-US')}
           </h1>
-          {accountReferenceLine ? (
-            <p className="mt-3 text-sm font-semibold text-slate-800">
-              {accountReferenceLine.toLocaleUpperCase('en-US')}
-            </p>
-          ) : null}
           {(data?.project?.status === 'completed') && (() => {
             const p = data.project
             return p?.approvedBy && p?.approvedAt ? (
@@ -770,8 +765,22 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <col className="min-w-0 w-[72%] sm:w-[75%]" />
                   <col className="w-[28%] sm:w-[25%]" />
                 </colgroup>
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-100 print:bg-slate-100">
+                    <th
+                      scope="col"
+                      className="py-2 pr-6 text-left font-normal text-slate-600 normal-case"
+                    />
+                    <th
+                      scope="col"
+                      className="py-2 pl-2 text-right text-sm font-bold text-slate-900 tabular-nums normal-case"
+                    >
+                      Amount ({effectiveDisplayCurrency})
+                    </th>
+                  </tr>
+                </thead>
                 <tbody className="align-top">
-                  <tr className="border-t border-b border-slate-200">
+                  <tr className="border-b border-slate-200">
                     <td className="py-2 pr-6 text-slate-900 align-top">{labels.closingBankStatementBalance}</td>
                     <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900 align-top">
                       {fmtBaseReportAmt(brsStatement.bankClosingBalance)}

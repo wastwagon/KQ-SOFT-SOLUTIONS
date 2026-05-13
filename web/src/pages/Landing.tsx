@@ -936,19 +936,24 @@ function DashboardShowcase() {
                 <p className="text-[11px] text-gray-500">
                   Period ending 31 Mar — Acme Logistics Ltd
                 </p>
-                <div className="mt-4 space-y-2 text-sm">
+                <div className="mt-4 flex justify-end rounded-md bg-gray-100 px-3 py-2 border border-gray-200/80">
+                  <span className="text-xs font-bold text-gray-900 tabular-nums min-w-[7.5rem] text-right">
+                    Amount (GHS)
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
                   {[
-                    { label: 'Balance per bank statement', val: 'GHS 482,150.00' },
-                    { label: 'Add: Uncredited lodgments', val: 'GHS 18,400.00' },
-                    { label: 'Less: Unpresented cheques', val: '(GHS 12,250.00)' },
-                    { label: 'Bank-only reconciling items', val: 'GHS 1,100.00' },
+                    { label: 'Balance per bank statement', val: '482,150.00' },
+                    { label: 'Add: Uncredited lodgments', val: '18,400.00' },
+                    { label: 'Less: Unpresented cheques', val: '(12,250.00)' },
+                    { label: 'Bank-only reconciling items', val: '1,100.00' },
                   ].map((r) => (
                     <div
                       key={r.label}
                       className="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0"
                     >
                       <span className="text-gray-700">{r.label}</span>
-                      <span className="tabular-nums font-medium text-gray-900">
+                      <span className="tabular-nums font-medium text-gray-900 text-right min-w-[7.5rem]">
                         {r.val}
                       </span>
                     </div>
@@ -958,8 +963,8 @@ function DashboardShowcase() {
                   <span className="text-xs font-bold uppercase tracking-wider text-primary-700">
                     Balance per cash book
                   </span>
-                  <span className="tabular-nums font-bold text-primary-900">
-                    GHS 489,400.00
+                  <span className="tabular-nums font-bold text-primary-900 text-right min-w-[7.5rem]">
+                    489,400.00
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
