@@ -14,6 +14,7 @@ import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
 import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { brsSignOffRowsForExcel, drawBrsWorkbookSignOffPdf } from '../lib/brsSignOff.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -962,9 +963,21 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       rollForwardFrom: { select: { id: true, name: true } },
       documents: { include: { transactions: true } },
       matches: { include: { matchItems: true } },
+      preparedBy: { select: { id: true, name: true, email: true } },
+      reviewedBy: { select: { id: true, name: true, email: true } },
+      approvedBy: { select: { id: true, name: true, email: true } },
     },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  const signOffProjectInput = {
+    preparedBy: project.preparedBy,
+    preparedAt: project.preparedAt,
+    reviewedBy: project.reviewedBy,
+    reviewedAt: project.reviewedAt,
+    approvedBy: project.approvedBy,
+    approvedAt: project.approvedAt,
+  }
 
   const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
   const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
@@ -1347,10 +1360,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES sheet and supporting schedules.',
         '',
       ],
-      [],
-      ['Checked By:', ''],
-      ['Signed off By:', ''],
-      ['Date:', ''],
+      ...brsSignOffRowsForExcel(signOffProjectInput),
       ...(footerExport ? [[], [footerExport]] : []),
     ]
     const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
@@ -1707,27 +1717,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       .fillColor('#000000')
     doc.moveDown(1)
 
-    const labelColW = 122
-    const gapAfterLabel = 12
-    const lineLeft = margin + labelColW + gapAfterLabel
-    const lineRight = pageWidth - margin
-    const rowStep = 28
-    const ruleDrop = 13
-    const signLabelsPdf = ['Checked By', 'Signed off By', 'Date'] as const
-    let rowY = doc.y
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
-    for (const lab of signLabelsPdf) {
-      doc.text(`${lab}:`, margin, rowY, { width: labelColW, align: 'right', lineBreak: false })
-      const ruleY = rowY + ruleDrop
-      doc
-        .moveTo(lineLeft, ruleY)
-        .lineTo(lineRight, ruleY)
-        .strokeColor('#475569')
-        .lineWidth(0.9)
-        .stroke()
-      rowY += rowStep
-    }
-    doc.y = rowY + 4
+    const signOffBottomY = drawBrsWorkbookSignOffPdf(doc, {
+      pageRight: pageWidth - margin,
+      startY: doc.y + 6,
+      blockWidth: Math.min(360, contentWidth * 0.68),
+      project: signOffProjectInput,
+    })
+    doc.y = signOffBottomY
     doc.font('Helvetica').fillColor('#000000')
     doc.moveDown(0.6)
 

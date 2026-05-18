@@ -12,7 +12,7 @@ Standard layout and terminology for Bank Reconciliation Statements (BRS) as used
 4. **Currency:** e.g. "GHS" or "GH₵".
 5. **Primary workbook block** (two-column): Closing balance per bank statement → Add timing uncredited → Less unpresented (magnitudes) → Add bank-only debits → Deduct bank-only credits → Cash book balance. Optional indented lines split **current period vs brought-forward** when roll-forward applies. See `docs/REPORT_LAYOUT_SCHEMA.md` §0 and `deriveCashBookFromWorkbookSchedule` in `api/src/routes/report.ts`.
 6. **Supporting tables:** Uncredited lodgments (unmatched receipts + lists), Unpresented cheques (unmatched payments + brought forward). Compact columns per schema.
-7. Sign-off (Prepared by, Reviewed by, Approved by) plus workbook-style **Checked By / Signed off By / Date** on the primary block.
+7. **Workbook sign-off** on the primary block (bottom-right dashed grid): columns **Prepared By**, **Checked By**, **Approved By**; rows **NAME**, **SIGNATURE**, **DATE** — NAME/DATE pre-filled from workflow when submitted; SIGNATURE blank for wet sign. Footer retains digital audit trail (Prepared / Reviewed / Approved with timestamps).
 8. Footer (from organisation branding).
 
 ---

@@ -124,6 +124,22 @@ Required:
 
 ---
 
+## 5b) Workbook sign-off (primary BRS block)
+
+Applies to: **BRS statement** section on web, Excel **`BANK RECONCILIATION`** sheet (rows after note), PDF **brs_only** and full export (after note, before NOTES page).
+
+**Layout**
+- Bottom-right aligned dashed-border table (max width ~36rem on web).
+- Column headers (centered): `Prepared By`, `Checked By`, `Approved By`.
+- Row labels (left column): `NAME`, `SIGNATURE`, `DATE`.
+- **NAME** and **DATE** cells pre-filled from workflow when available (`preparedBy`/`preparedAt`, `reviewedBy`/`reviewedAt`, `approvedBy`/`approvedAt`).
+- **SIGNATURE** row always blank (wet sign).
+- Footer of full report retains separate digital audit lines (Prepared / Reviewed / Approved with timestamps).
+
+**Shared helpers:** `web/src/lib/brsSignOff.ts`, `api/src/lib/brsSignOff.ts`
+
+---
+
 ## 6) Change Control Rules
 
 When modifying report layout:
