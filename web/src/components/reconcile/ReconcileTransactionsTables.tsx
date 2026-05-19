@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { formatAmountNumber, formatDateCompact } from '../../lib/format'
-import { getCurrencySymbol } from '../../lib/currency'
+import { amountColumnHeader } from '../../lib/currency'
 import type { ReconcileView, SuggestedMatch, Tx } from './types'
 
 /**
@@ -222,13 +222,13 @@ export default function ReconcileTransactionsTables({
                   scope="col"
                   className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  Amount Received ({getCurrencySymbol(currency)})
+                  {amountColumnHeader(currency)}
                 </th>
                 <th
                   scope="col"
                   className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  Amount Paid ({getCurrencySymbol(currency)})
+                  {amountColumnHeader(currency)}
                 </th>
                 <th
                   scope="col"
@@ -388,13 +388,13 @@ export default function ReconcileTransactionsTables({
                   scope="col"
                   className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  Debit ({getCurrencySymbol(currency)})
+                  {amountColumnHeader(currency)}
                 </th>
                 <th
                   scope="col"
                   className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  Credit ({getCurrencySymbol(currency)})
+                  {amountColumnHeader(currency)}
                 </th>
                 <th
                   scope="col"

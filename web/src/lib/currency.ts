@@ -37,6 +37,20 @@ export function formatAmountNumber(amount: number): string {
   return new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2 }).format(amount)
 }
 
+/** Table/export column header — ISO currency code only (e.g. GHS). */
+export function amountColumnHeader(currency: string): string {
+  return (currency || 'GHS').toUpperCase()
+}
+
+/** Distinct headers when multiple amount columns share one row (matched / discrepancy). */
+export function amountColumnCashBook(currency: string): string {
+  return `${amountColumnHeader(currency)} cash book`
+}
+
+export function amountColumnBank(currency: string): string {
+  return `${amountColumnHeader(currency)} bank`
+}
+
 export function formatAmountForReport(amount: number, currency: string): string {
   const code = ISO_CODES[currency?.toUpperCase()] ?? currency?.toUpperCase() ?? 'GHS'
   const formatted = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)

@@ -100,7 +100,7 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 | doc_ref | string | No | Document reference |
 | chq_no | string | No | Cheque/CHQ number |
 | accode | integer | No | Account code |
-| amt_received | decimal(18,2) | Yes | Amount (GHS) |
+| amt_received | decimal(18,2) | Yes | GHS (column header) |
 
 ### 5.2 Cash Book — Payments
 
@@ -113,7 +113,7 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 | doc_ref | string | No | Document reference |
 | chq_no | string | No | Cheque number |
 | accode | integer | No | Account code |
-| amt_paid | decimal(18,2) | Yes | Amount (GHS) |
+| amt_paid | decimal(18,2) | Yes | GHS (column header) |
 
 ### 5.3 Bank Statement — Credits
 
@@ -121,7 +121,7 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 |-------|------|----------|-------|
 | transaction_date | date | Yes | Bank transaction date |
 | description | string | Yes | Bank description (full text) |
-| credit | decimal(18,2) | Yes | Amount (GHS) |
+| credit | decimal(18,2) | Yes | GHS (column header) |
 
 ### 5.4 Bank Statement — Debits
 
@@ -129,7 +129,7 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 |-------|------|----------|-------|
 | transaction_date | date | Yes | Bank transaction date |
 | description | string | Yes | Bank description (full text) |
-| debit | decimal(18,2) | Yes | Amount (GHS) |
+| debit | decimal(18,2) | Yes | GHS (column header) |
 
 ---
 

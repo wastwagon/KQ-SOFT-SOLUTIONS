@@ -799,7 +799,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       scope="col"
                       className="py-2 pl-2 text-right text-sm font-bold text-slate-900 tabular-nums normal-case"
                     >
-                      Amount ({effectiveDisplayCurrency})
+                      {effectiveDisplayCurrency}
                     </th>
                   </tr>
                 </thead>
@@ -1091,7 +1091,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <thead className="bg-primary-50 print:bg-slate-100">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold align-bottom">Description</th>
-                    <th className="px-3 py-2 text-right font-semibold align-bottom">Amount ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-right font-semibold align-bottom">{effectiveDisplayCurrency}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1119,7 +1119,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <thead className="bg-primary-50 print:bg-slate-100">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold align-bottom">Description</th>
-                    <th className="px-3 py-2 text-right font-semibold align-bottom">Amount ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-right font-semibold align-bottom">{effectiveDisplayCurrency}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1167,7 +1167,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                           <th className="px-2 py-1.5 text-left">Date</th>
                           <th className="px-2 py-1.5 text-left">Cheque No</th>
                           <th className="px-2 py-1.5 text-left">Name</th>
-                          <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                          <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
                           <th className="px-2 py-1.5 text-right">Days Outstanding</th>
                           <th className="px-2 py-1.5 text-center">Ageing Band</th>
                         </tr>
@@ -1224,7 +1224,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr>
                     <th className="px-2 py-1.5 text-left">Date</th>
                     <th className="px-2 py-1.5 text-left">Details</th>
-                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1281,7 +1281,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr>
                     <th className="px-2 py-1.5 text-left">Date</th>
                     <th className="px-2 py-1.5 text-left">Details</th>
-                    <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                    <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1354,7 +1354,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       <tr>
                         <th className="px-2 py-1.5 text-left">Date</th>
                         <th className="px-2 py-1.5 text-left">Description</th>
-                        <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                        <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1381,7 +1381,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       <tr>
                         <th className="px-2 py-1.5 text-left">Date</th>
                         <th className="px-2 py-1.5 text-left">Description</th>
-                        <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                        <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1521,10 +1521,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-3 py-2 text-left text-slate-700">Cash book</th>
-                    <th className="px-3 py-2 text-right text-slate-700">CB Amt ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-right text-slate-700">{effectiveDisplayCurrency} cash book</th>
                     <th className="px-3 py-2 text-left text-slate-700">Bank</th>
-                    <th className="px-3 py-2 text-right text-slate-700">Bank Amt ({effectiveDisplayCurrency})</th>
-                    <th className="px-3 py-2 text-right text-slate-700">Var. ({effectiveDisplayCurrency})</th>
+                    <th className="px-3 py-2 text-right text-slate-700">{effectiveDisplayCurrency} bank</th>
+                    <th className="px-3 py-2 text-right text-slate-700">Variance</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1568,10 +1568,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       <thead className="bg-amber-50">
                         <tr>
                           <th className="px-2 py-1.5 text-left">Cash book</th>
-                          <th className="px-2 py-1.5 text-right">CB Amt ({effectiveDisplayCurrency})</th>
+                          <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency} cash book</th>
                           <th className="px-2 py-1.5 text-left">Bank</th>
-                          <th className="px-2 py-1.5 text-right">Bank Amt ({effectiveDisplayCurrency})</th>
-                          <th className="px-2 py-1.5 text-right text-amber-800 font-bold">Variance ({effectiveDisplayCurrency})</th>
+                          <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency} bank</th>
+                          <th className="px-2 py-1.5 text-right text-amber-800 font-bold">Variance</th>
                           <th className="px-2 py-1.5 text-right text-gray-600">Date diff</th>
                         </tr>
                       </thead>
@@ -1608,7 +1608,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     <tr>
                       <th className="px-2 py-1.5 text-left">Reference key</th>
                       <th className="px-2 py-1.5 text-left">Stream</th>
-                      <th className="px-2 py-1.5 text-right">Amount ({effectiveDisplayCurrency})</th>
+                      <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
                       <th className="px-2 py-1.5 text-left">Incoming entry</th>
                       <th className="px-2 py-1.5 text-left">Outgoing entry</th>
                       <th className="px-2 py-1.5 text-right">Day diff</th>

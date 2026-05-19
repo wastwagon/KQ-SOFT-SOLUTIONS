@@ -938,7 +938,7 @@ function DashboardShowcase() {
                 </p>
                 <div className="mt-4 flex justify-end rounded-md bg-gray-100 px-3 py-2 border border-gray-200/80">
                   <span className="text-xs font-bold text-gray-900 tabular-nums min-w-[7.5rem] text-right">
-                    Amount (GHS)
+                    GHS
                   </span>
                 </div>
                 <div className="space-y-2 text-sm">

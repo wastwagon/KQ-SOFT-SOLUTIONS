@@ -25,7 +25,7 @@ Applies to: **first block** on `ProjectReport`, Excel sheet **`BANK RECONCILIATI
 **Column rules**
 
 1. Left: Description (main lines + optional indented **composition** sub-lines when roll-forward splits apply).
-2. Right: `Amount ({currency})` — **positive magnitudes** for Add / Less / Deduct lines (worksheet style).
+2. Right: `{currency}` only (e.g. `GHS`) — **positive magnitudes** for Add / Less / Deduct lines (worksheet style).
 
 **Main lines (fixed order)**
 
@@ -58,9 +58,9 @@ Applies to: **first block** on `ProjectReport`, Excel sheet **`BANK RECONCILIATI
 
 Allowed columns:
 1. `Cash Book` (date + description)
-2. `Cash Book Amount`
+2. `{currency} cash book` (e.g. `GHS cash book`)
 3. `Bank` (date + description)
-4. `Bank Amount`
+4. `{currency} bank` (e.g. `GHS bank`)
 5. `Variance`
 
 Not allowed in compact layout:
@@ -74,9 +74,9 @@ Not allowed in compact layout:
 
 Allowed columns:
 1. `Cash Book` (date + short description)
-2. `Cash Book Amount`
+2. `{currency} Rcvd` / `{currency} Paid` (cash book side)
 3. `Bank` (date + short description)
-4. `Bank Amount`
+4. `{currency} bank`
 5. `Variance`
 6. `Date Diff`
 
@@ -92,7 +92,7 @@ Not allowed in compact layout:
 Allowed columns:
 1. `Date`
 2. `Details`
-3. `Amount`
+3. `{currency}` (e.g. `GHS`)
 
 Totals:
 - `Subtotal (unmatched receipts)`
@@ -105,7 +105,7 @@ Totals:
 Allowed columns:
 1. `Date`
 2. `Details`
-3. `Amount`
+3. `{currency}` (e.g. `GHS`)
 
 Totals:
 - `Subtotal (unmatched payments)`

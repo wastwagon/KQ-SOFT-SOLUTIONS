@@ -1,5 +1,14 @@
 import { Router } from 'express'
 import { formatAmountForReport } from '../lib/currency.js'
+import {
+  amountColumnHeader,
+  amountColumnBank,
+  amountColumnCashBook,
+  amountColumnPaid,
+  amountColumnReceived,
+  findAmountColumnValue,
+  VARIANCE_COLUMN_HEADER,
+} from '../lib/reportColumnHeaders.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import * as XLSX from 'xlsx'
 import PDFDocument from 'pdfkit'
@@ -1144,10 +1153,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     const variance = Math.abs(cbAmount - p.bank.amount)
     return {
       'Cash Book': `${fmt(p.cb.date)} - ${p.cb.name || p.cb.details || '—'}`,
-      [`Cash Book Amount (${curr})`]: cbAmount,
+      [amountColumnCashBook(curr)]: cbAmount,
       'Bank': `${fmt(p.bank.date)} - ${p.bank.name || p.bank.details || '—'}`,
-      [`Bank Amount (${curr})`]: p.bank.amount,
-      [`Variance (${curr})`]: variance,
+      [amountColumnBank(curr)]: p.bank.amount,
+      [VARIANCE_COLUMN_HEADER]: variance,
     }
   })
 
@@ -1156,7 +1165,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     return {
       Date: fmt(t.date),
       Details: t.name || t.details || '',
-      [`Amount (${curr})`]: t.amount,
+      [amountColumnHeader(curr)]: t.amount,
     }
   })
 
@@ -1165,7 +1174,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     return {
       Date: fmt(t.date),
       Description: t.name || t.details || '',
-      [`Amount (${curr})`]: t.amount,
+      [amountColumnHeader(curr)]: t.amount,
     }
   })
 
@@ -1174,7 +1183,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     return {
       Date: fmt(t.date),
       Details: t.name || t.details || '',
-      [`Amount (${curr})`]: t.amount,
+      [amountColumnHeader(curr)]: t.amount,
     }
   })
   const refDateExport = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
@@ -1197,7 +1206,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     'CHQ NO': t.chqNo || '',
     'DOC REF': '',
     Name: t.name || '',
-    [`Amount (${curr})`]: t.amount,
+    [amountColumnHeader(curr)]: t.amount,
     'Days Outstanding': t.daysOutstanding,
     'Ageing Band': t.ageingBand,
   }))
@@ -1215,14 +1224,14 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       'Cash Book Desc': (p.cb.name || p.cb.details || '').slice(0, 40),
       'Cash Book Chq No': p.cb.chqNo || '',
       'DOC REF': p.cb.docRef || '',
-      [`AMT RECEIVED (${curr})`]: isReceipt ? p.cb.amount : '',
-      [`AMT PAID (${curr})`]: !isReceipt ? p.cb.amount : '',
+      [amountColumnReceived(curr)]: isReceipt ? p.cb.amount : '',
+      [amountColumnPaid(curr)]: !isReceipt ? p.cb.amount : '',
       'Bank Date': fmt(p.bank.date),
       'Bank Desc': (p.bank.name || p.bank.details || '').slice(0, 40),
       'Bank Chq No': p.bank.chqNo || '',
       'DOC REF (BANK)': p.bank.docRef || '',
-      [`Bank Amount (${curr})`]: p.bank.amount,
-      [`Amount Variance (${curr})`]: Math.abs(p.cb.amount - p.bank.amount),
+      [amountColumnBank(curr)]: p.bank.amount,
+      [VARIANCE_COLUMN_HEADER]: Math.abs(p.cb.amount - p.bank.amount),
       'Date Diff Days': p.cb.date && p.bank.date ? Math.abs((new Date(p.cb.date).getTime() - new Date(p.bank.date).getTime()) / (1000 * 60 * 60 * 24)) : 0,
     }
   })
@@ -1231,7 +1240,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     return {
       Date: fmt(t.date),
       Description: t.name || t.details || '',
-      [`Amount (${curr})`]: t.amount,
+      [amountColumnHeader(curr)]: t.amount,
     }
   })
 
@@ -1347,7 +1356,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         Date: fmt(t.date),
         Details: (t.name || t.details || '').trim() || '—',
         'Chq / Ref': (t.chqNo || t.docRef || '').trim() || '',
-        [`Amount (${curr})`]: Number(t.amount),
+        [amountColumnHeader(curr)]: Number(t.amount),
       }))
       .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
     const mappedBankDebitRows = debits
@@ -1355,7 +1364,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         Date: fmt(t.date),
         Details: (t.name || t.details || '').trim() || '—',
         'Chq / Ref': (t.chqNo || t.docRef || '').trim() || '',
-        [`Amount (${curr})`]: Number(Math.abs(t.amount)),
+        [amountColumnHeader(curr)]: Number(Math.abs(t.amount)),
       }))
       .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
 
@@ -1402,7 +1411,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [fmtBrsAsAtLine(reconciliationDateExport)],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [],
-      ['Description', `Amount (${curr})`],
+      ['Description', curr],
       [exportLabels.closingBankStatementBalance, wbAmt(bankClosingBalance)],
       [exportLabels.addUncreditedLodgments, wbAmt(uncreditedLodgmentsTimingTotalExport)],
       [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
@@ -1435,11 +1444,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [`${exportLabels.additionalInformationTitle} - As-at vs Post-period movement`],
       [`Language profile: ${reportLanguageProfile.label}`],
       [],
-      [exportLabels.asAtReconciliationPosition, `Amount (${curr})`],
+      [exportLabels.asAtReconciliationPosition, amountColumnHeader(curr)],
       [exportLabels.uncreditedLodgmentsOrUnclearedDeposits, maybeSigned(asAtUncreditedTotalExport)],
       [exportLabels.unpresentedChequesOrUnclearedPayments, maybeSigned(-Math.abs(asAtUnpresentedTotalExport), { forceNegative: true })],
       [],
-      [exportLabels.postPeriodMovement, `Amount (${curr})`],
+      [exportLabels.postPeriodMovement, amountColumnHeader(curr)],
       [exportLabels.broughtForwardUncreditedLodgments, maybeSigned(broughtForwardLodgmentsTotalExport)],
       [exportLabels.broughtForwardBankOnlyCredits, maybeSigned(broughtForwardBankCreditsTotalExport)],
       [exportLabels.broughtForwardUnpresentedCheques, maybeSigned(-Math.abs(broughtForwardChequesTotalExport), { forceNegative: true })],
@@ -1668,7 +1677,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         const textY = headerTop + 5
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#111827')
         doc.text(opts?.leftHeaderLabel ?? 'Description', x + 6, textY, { width: cLabel - 8 })
-        doc.text(`Amount (${curr})`, x + cLabel + 6, textY, { width: cAmount - 12, align: 'right' })
+        doc.text(curr, x + cLabel + 6, textY, { width: cAmount - 12, align: 'right' })
         doc.moveTo(x, headerTop + rowH).lineTo(x + tableWidth, headerTop + rowH).strokeColor('#CBD5E1').lineWidth(1).stroke()
         doc.y = headerTop + rowH
       }
@@ -1842,7 +1851,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         date: d['Cash Book Date'],
         ref: d['Cash Book Chq No'] || d['DOC REF'] || '',
         details: (d['Cash Book Desc'] + ' -> ' + d['Bank Desc']).slice(0, 60),
-        amount: Number(d[`Amount Variance (${curr})`] || 0),
+        amount: Number(d[VARIANCE_COLUMN_HEADER] ?? d[`Amount Variance (${curr})`] ?? 0),
       }))
       drawTable('DISCREPANCY AUDIT LOG', discRows, { allowEmptyText: 'None', refLabel: 'REF' })
     }
@@ -1855,7 +1864,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       date: (t as { Date: string }).Date,
       ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
       details: (t as { Details?: string }).Details || '—',
-      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
+      amount: findAmountColumnValue(t as Record<string, unknown>, curr),
     }))
     drawTable('UNMATCHED RECEIPTS IN CASH BOOK', unmatchedReceiptRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
@@ -1863,7 +1872,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       date: (t as { Date: string }).Date,
       ref: String(pickField(t as Record<string, unknown>, 'CHQ NO') || pickField(t as Record<string, unknown>, 'DOC REF') || ''),
       details: (t as { Details?: string }).Details || '—',
-      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
+      amount: findAmountColumnValue(t as Record<string, unknown>, curr),
     }))
     drawTable('UNMATCHED PAYMENTS IN CASH BOOK', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
 
@@ -1871,7 +1880,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       date: (t as { Date: string }).Date,
       ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
       details: (t as { Description?: string }).Description || '—',
-      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
+      amount: findAmountColumnValue(t as Record<string, unknown>, curr),
     }))
     drawTable('BANK-ONLY DEBITS (ADD)', unmatchedDebitRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
@@ -1879,7 +1888,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       date: (t as { Date: string }).Date,
       ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
       details: (t as { Description?: string }).Description || '—',
-      amount: Number(pickField(t as Record<string, unknown>, 'Amount') || 0),
+      amount: findAmountColumnValue(t as Record<string, unknown>, curr),
     }))
     drawTable('BANK-ONLY CREDITS (DEDUCT)', unmatchedCreditRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 

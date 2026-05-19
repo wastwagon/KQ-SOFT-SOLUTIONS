@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
 import { reconcile, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { formatAmountNumber, formatDateCompact } from '../lib/format'
-import { getCurrencySymbol } from '../lib/currency'
+import { amountColumnHeader } from '../lib/currency'
 import { canSubmitForReview, canApprove } from '../lib/permissions'
 import BrsHelp from '../components/BrsHelp'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
@@ -153,7 +153,6 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
 
   const currency = (data?.project as { currency?: string })?.currency || 'GHS'
   const fmtAmt = (n: number) => formatAmountNumber(Number.isFinite(n) ? n : 0)
-  const sym = getCurrencySymbol(currency)
 
   return (
     <div className="space-y-6">
@@ -295,8 +294,8 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                     <th className="px-2 py-1.5 text-left">Description</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Chq no.</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Amount Received ({sym})</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Amount Paid ({sym})</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -356,9 +355,9 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                     <th className="px-2 py-1.5 text-left">Description</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Chq no.</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Debit ({sym})</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Credit ({sym})</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Balance ({sym})</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -423,8 +422,8 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                     <th className="px-2 py-1.5 text-left">Description</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Chq no.</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Amount Received ({sym})</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Amount Paid ({sym})</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -484,9 +483,9 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                     <th className="px-2 py-1.5 text-left">Description</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Chq no.</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Ref. Doc. No.</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Debit ({sym})</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Credit ({sym})</th>
-                    <th className="px-2 py-1.5 text-right whitespace-nowrap">Balance ({sym})</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
+                    <th className="px-2 py-1.5 text-right whitespace-nowrap">{amountColumnHeader(currency)}</th>
                   </tr>
                 </thead>
                 <tbody>
