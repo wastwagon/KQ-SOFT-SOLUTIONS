@@ -428,13 +428,16 @@ Create rules to auto-suggest matches:
 
 ## 12. Subscription Plans & Limits
 
-| Plan | Projects/mo | Transactions/mo | Users |
-|------|-------------|-----------------|-------|
-| Basic | 5 | 500 | 1 |
-| Standard | 20 | 2,000 | 3 |
-| Premium | 100 | 10,000 | 5+ |
-| Firm | Unlimited | Unlimited | Unlimited |
+| Plan | Projects/mo | Transactions/mo | Bank accounts / project | Users |
+|------|-------------|-----------------|-------------------------|-------|
+| Basic | 5 | 200 | 2 | 1 |
+| Standard | 20 | 2,000 | Unlimited | 3 |
+| Premium | 100 | 10,000 | Unlimited | 5+ |
+| Firm | Unlimited | Unlimited | Unlimited | Unlimited |
 
+- **Trial:** 14 days on signup; subscribe via Paystack to continue when paywall is enabled.
+- **Basic** is a paid tier (not free after trial).
+- **Excel export** includes mapped bank lines on sheets `BANK CREDITS (MAPPED)` and `BANK DEBITS (MAPPED)`.
 - **Intro offer:** 50% off first payment when enabled.
 - **Yearly billing:** ~17% discount vs monthly.
 

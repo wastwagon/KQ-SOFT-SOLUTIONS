@@ -949,6 +949,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const bankAccountId = (req.query.bankAccountId as string) || undefined
   const scopeRaw = ((req.query.scope as string) || 'full').toLowerCase()
   const brsOnlyExport = scopeRaw === 'brs_only'
+  const mappedBankOnlyExport = scopeRaw === 'mapped_bank'
   const signedAmounts = String(req.query.signedAmounts || '').toLowerCase()
   const useSignedAmounts = signedAmounts === '1' || signedAmounts === 'true' || signedAmounts === 'yes'
   const orgId = req.auth!.orgId
@@ -1340,6 +1341,59 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       return n.toFixed(2)
     }
     const wbAmt = (n: number) => Number(Math.abs(n).toFixed(2))
+
+    const mappedBankCreditRows = credits
+      .map((t) => ({
+        Date: fmt(t.date),
+        Details: (t.name || t.details || '').trim() || '—',
+        'Chq / Ref': (t.chqNo || t.docRef || '').trim() || '',
+        [`Amount (${curr})`]: Number(t.amount),
+      }))
+      .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
+    const mappedBankDebitRows = debits
+      .map((t) => ({
+        Date: fmt(t.date),
+        Details: (t.name || t.details || '').trim() || '—',
+        'Chq / Ref': (t.chqNo || t.docRef || '').trim() || '',
+        [`Amount (${curr})`]: Number(Math.abs(t.amount)),
+      }))
+      .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
+
+    if (mappedBankOnlyExport) {
+      if (!mappedBankCreditRows.length && !mappedBankDebitRows.length) {
+        return res.status(400).json({
+          error: 'No mapped bank transactions to export. Map bank credits and/or debits first.',
+        })
+      }
+      const coverRows: (string | number)[][] = [
+        [`${project.organization.name}`],
+        [project.name],
+        ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
+        [fmtBrsAsAtLine(reconciliationDateExport)],
+        [],
+        ['Mapped bank statement lines exported from your reconciliation project.'],
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(coverRows), 'INFO')
+      if (mappedBankCreditRows.length) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mappedBankCreditRows), 'BANK CREDITS (MAPPED)')
+      }
+      if (mappedBankDebitRows.length) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mappedBankDebitRows), 'BANK DEBITS (MAPPED)')
+      }
+      const bufMapped = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+      const mappedFilename = `Mapped_bank_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      res.setHeader('Content-Disposition', `attachment; filename="${mappedFilename}"`)
+      await logAudit({
+        organizationId: orgId,
+        userId: req.auth!.userId,
+        projectId,
+        action: 'report_exported',
+        details: { format: 'excel', scope: 'mapped_bank' },
+      })
+      return res.send(bufMapped)
+    }
+
     // Client-facing workbook: match standard 4-line BRS handout (see LICL template). Full detail stays on web report, NOTES sheet, and other tabs.
     const brsStatementRows: (string | number)[][] = [
       [`${project.organization.name}`],
@@ -1365,6 +1419,14 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     ]
     const brsStatementSheet = XLSX.utils.aoa_to_sheet(brsStatementRows)
     XLSX.utils.book_append_sheet(wb, brsStatementSheet, 'BANK RECONCILIATION')
+
+    if (mappedBankCreditRows.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mappedBankCreditRows), 'BANK CREDITS (MAPPED)')
+    }
+    if (mappedBankDebitRows.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mappedBankDebitRows), 'BANK DEBITS (MAPPED)')
+    }
+
     if (!brsOnlyExport) {
     const additionalInformationRows: (string | number)[][] = [
       [`${project.organization.name} - ${reportTitle}`],

@@ -15,7 +15,7 @@ async function main() {
 
   // Plans (subscription tiers)
   const plans = [
-    { slug: 'basic', name: 'Basic', projectsPerMonth: 5, transactionsPerMonth: 500, monthlyGhs: 0, yearlyGhs: 0 },
+    { slug: 'basic', name: 'Basic', projectsPerMonth: 5, transactionsPerMonth: 200, monthlyGhs: 150, yearlyGhs: 1500 },
     { slug: 'standard', name: 'Standard', projectsPerMonth: 20, transactionsPerMonth: 2000, monthlyGhs: 50, yearlyGhs: 550 },
     { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 10000, monthlyGhs: 100, yearlyGhs: 1100 },
     { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0 },

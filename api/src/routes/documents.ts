@@ -12,7 +12,7 @@ import {
   extractChqNoFromDescription,
   type GhanaBankFormat,
 } from '../services/ghanaBankParsers.js'
-import { canAddTransactions, incrementTransactions } from '../services/usage.js'
+import { canAddTransactions, adjustTransactions } from '../services/usage.js'
 import { logAudit } from '../services/audit.js'
 import { classifyBySourceSign, summarizeSignBuckets, type SourceDocumentType } from '../services/signClassifier.js'
 import { parseImportedAmount } from '../services/amountParser.js'
@@ -166,6 +166,8 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     const transactions: { rowIndex: number; date: Date | null; name: string | null; details: string | null; docRef: string | null; chqNo: string | null; accode: number | null; amount: number }[] = []
     const duplicateRowFingerprints = new Set<string>()
     let skippedDuplicateRows = 0
+    let skippedZeroAmountRows = 0
+    const sourceRowCount = result.rows.length
     for (let i = 0; i < result.rows.length; i++) {
       const row = result.rows[i] as unknown[]
       const getVal = (field: string): unknown => {
@@ -241,8 +243,12 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
         })
       }
     }
-    const txLimitCheck = await canAddTransactions(doc.project.organizationId, org.plan, transactions.length)
-    if (!txLimitCheck.ok) return res.status(403).json({ error: txLimitCheck.message })
+    const previousTxCount = await prisma.transaction.count({ where: { documentId: id } })
+    const usageDelta = transactions.length - previousTxCount
+    if (usageDelta > 0) {
+      const txLimitCheck = await canAddTransactions(doc.project.organizationId, org.plan, usageDelta)
+      if (!txLimitCheck.ok) return res.status(403).json({ error: txLimitCheck.message })
+    }
     await prisma.transaction.deleteMany({ where: { documentId: id } })
     await prisma.transaction.createMany({
       data: transactions.map((t) => ({
@@ -270,7 +276,7 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
       })
       .filter((w) => w.bucket !== 'primary')
     const signWarningsPreview = signWarnings.slice(0, 25)
-    await incrementTransactions(doc.project.organizationId, transactions.length)
+    await adjustTransactions(doc.project.organizationId, usageDelta)
     await logAudit({
       organizationId: doc.project.organizationId,
       userId: req.auth!.userId,
@@ -286,6 +292,13 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     })
     res.json({
       count: transactions.length,
+      importStats: {
+        sourceRowCount,
+        importedCount: transactions.length,
+        skippedDuplicateRows,
+        skippedZeroAmountRows,
+        previousMappedCount: previousTxCount,
+      },
       signFilterSummary: signSummary,
       signWarningsCount: signWarnings.length,
       signWarningsPreview,

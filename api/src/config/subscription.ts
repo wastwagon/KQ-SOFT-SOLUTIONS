@@ -2,16 +2,19 @@
  * Subscription tier limits - matches PLANNING_DATA.json
  * -1 = unlimited
  */
-export const TIER_LIMITS: Record<string, { projectsPerMonth: number; transactionsPerMonth: number }> = {
-  basic: { projectsPerMonth: 5, transactionsPerMonth: 500 },
-  standard: { projectsPerMonth: 20, transactionsPerMonth: 2000 },
-  premium: { projectsPerMonth: 100, transactionsPerMonth: 10000 },
-  firm: { projectsPerMonth: -1, transactionsPerMonth: -1 },
+export const TIER_LIMITS: Record<
+  string,
+  { projectsPerMonth: number; transactionsPerMonth: number; bankAccountsPerProject: number }
+> = {
+  basic: { projectsPerMonth: 5, transactionsPerMonth: 200, bankAccountsPerProject: 2 },
+  standard: { projectsPerMonth: 20, transactionsPerMonth: 2000, bankAccountsPerProject: -1 },
+  premium: { projectsPerMonth: 100, transactionsPerMonth: 10000, bankAccountsPerProject: -1 },
+  firm: { projectsPerMonth: -1, transactionsPerMonth: -1, bankAccountsPerProject: -1 },
 }
 
 /** Plan prices in GHS — fallback when no DB row; keep aligned with seed + admin defaults */
 export const PLAN_PRICES: Record<string, { monthlyGhs: number; yearlyGhs: number }> = {
-  basic: { monthlyGhs: 0, yearlyGhs: 0 },
+  basic: { monthlyGhs: 150, yearlyGhs: 1500 },
   standard: { monthlyGhs: 50, yearlyGhs: 550 },
   premium: { monthlyGhs: 100, yearlyGhs: 1100 },
   firm: { monthlyGhs: 0, yearlyGhs: 0 }, // custom

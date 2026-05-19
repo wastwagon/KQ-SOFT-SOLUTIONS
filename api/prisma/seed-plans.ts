@@ -35,9 +35,9 @@ const PLANS: PlanSeed[] = [
     slug: 'basic',
     name: 'Basic',
     projectsPerMonth: 5,
-    transactionsPerMonth: 500,
-    monthlyGhs: 0,
-    yearlyGhs: 0,
+    transactionsPerMonth: 200,
+    monthlyGhs: 150,
+    yearlyGhs: 1500,
   },
   {
     slug: 'standard',

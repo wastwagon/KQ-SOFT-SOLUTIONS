@@ -1,36 +1,47 @@
-/** Phase 9: Multi-currency support — display only, no FX conversion */
+/** Multi-currency display — no FX conversion */
 
-const SYMBOLS: Record<string, string> = {
+const KNOWN_SYMBOLS: Record<string, string> = {
   GHS: 'GH₵',
   USD: '$',
   EUR: '€',
+  GBP: '£',
+  NGN: '₦',
+  XOF: 'CFA',
+  ZAR: 'R',
 }
 
-/** ISO 4217 codes for report/print — avoids font substitution (e.g. ₵ → µ) in PDF/print */
 const ISO_CODES: Record<string, string> = {
   GHS: 'GHS',
   USD: 'USD',
   EUR: 'EUR',
+  GBP: 'GBP',
+  NGN: 'NGN',
+  XOF: 'XOF',
+  ZAR: 'ZAR',
 }
 
-export function getCurrencySymbol(currency: string): string {
-  return SYMBOLS[currency?.toUpperCase()] ?? 'GH₵'
+export function getCurrencySymbol(currency: string, currencySymbolOverride?: string | null): string {
+  const override = (currencySymbolOverride || '').trim()
+  if (override) return override
+  const code = (currency || 'GHS').toUpperCase()
+  return KNOWN_SYMBOLS[code] ?? code
 }
 
-export function formatAmount(amount: number, currency: string): string {
-  const sym = getCurrencySymbol(currency)
+export function formatAmount(amount: number, currency: string, currencySymbolOverride?: string | null): string {
+  const sym = getCurrencySymbol(currency, currencySymbolOverride)
   const formatted = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2 }).format(amount)
   return sym + formatted
 }
 
-/** Format amount without symbol — use when currency is in column header */
 export function formatAmountNumber(amount: number): string {
   return new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2 }).format(amount)
 }
 
-/** Use for BRS reports and print/PDF — ISO code + amount so currency displays correctly globally */
 export function formatAmountForReport(amount: number, currency: string): string {
   const code = ISO_CODES[currency?.toUpperCase()] ?? currency?.toUpperCase() ?? 'GHS'
   const formatted = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
   return `${code} ${formatted}`
 }
+
+/** Common ISO codes for project currency picker */
+export const COMMON_PROJECT_CURRENCIES = ['GHS', 'USD', 'EUR', 'GBP', 'NGN', 'XOF', 'ZAR'] as const

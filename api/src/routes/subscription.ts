@@ -13,6 +13,7 @@ import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
 import { fetchSubscriptionOverrides } from '../services/subscriptionOverrides.js'
 import { isSubscriptionPaywallEnabled } from '../services/orgSubscriptionAccess.js'
+import { getPlanQuotaLimits } from '../services/planLimits.js'
 import { logger } from '../middleware/logging.js'
 import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
 
@@ -99,9 +100,14 @@ router.get('/usage', async (req: AuthRequest, res) => {
   const overrides = await fetchSubscriptionOverrides(orgId)
   const subscription = getSubscriptionSnapshot(org, latestPayment, overrides)
   const planData = await getPlanBySlug(org.plan)
+  const quotaLimits = await getPlanQuotaLimits(org.plan)
   const limits = planData
-    ? { projectsPerMonth: planData.projectsPerMonth, transactionsPerMonth: planData.transactionsPerMonth }
-    : { projectsPerMonth: 5, transactionsPerMonth: 500 }
+    ? {
+        projectsPerMonth: planData.projectsPerMonth,
+        transactionsPerMonth: planData.transactionsPerMonth,
+        bankAccountsPerProject: quotaLimits.bankAccountsPerProject,
+      }
+    : quotaLimits
   const features = Object.fromEntries(
     PLAN_FEATURES.map((f) => [f, hasPlanFeature(org.plan, f)])
   ) as Record<string, boolean>
@@ -117,6 +123,7 @@ router.get('/usage', async (req: AuthRequest, res) => {
     limits: {
       projectsPerMonth: limits.projectsPerMonth,
       transactionsPerMonth: limits.transactionsPerMonth,
+      bankAccountsPerProject: limits.bankAccountsPerProject,
     },
     subscription,
   })

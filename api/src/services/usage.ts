@@ -74,10 +74,17 @@ export async function incrementProjects(organizationId: string): Promise<void> {
 }
 
 export async function incrementTransactions(organizationId: string, count: number): Promise<void> {
+  if (count === 0) return
+  await adjustTransactions(organizationId, count)
+}
+
+/** Apply delta to monthly transaction meter (re-map safe; never below zero). */
+export async function adjustTransactions(organizationId: string, delta: number): Promise<void> {
+  if (delta === 0) return
   const period = currentPeriod()
   const log = await getOrCreateUsage(organizationId, period)
   await prisma.usageLog.update({
     where: { id: log.id },
-    data: { transactionsCount: log.transactionsCount + count },
+    data: { transactionsCount: Math.max(0, log.transactionsCount + delta) },
   })
 }

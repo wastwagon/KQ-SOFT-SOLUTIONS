@@ -9,6 +9,7 @@ import { logAudit } from '../services/audit.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
 import { getProjectVariance } from '../lib/reconcile-variance.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { canAddBankAccount } from '../services/planLimits.js'
 
 const router = Router()
 
@@ -30,7 +31,13 @@ const createSchema = z.object({
   clientId: z.string().optional(),
   reconciliationDate: z.string().datetime().optional(),
   rollForwardFromProjectId: z.string().optional(),
-  currency: z.enum(['GHS', 'USD', 'EUR']).optional(),
+  currency: z
+    .string()
+    .min(3)
+    .max(8)
+    .regex(/^[A-Za-z]{3,8}$/, 'Currency must be a 3–8 letter code (e.g. GHS, USD, NGN)')
+    .optional(),
+  currencySymbol: z.string().min(1).max(8).optional(),
   /** Optional primary bank — creates first BankAccount for BRS letterhead / workbook header */
   primaryBankName: z.string().max(100).optional(),
   primaryAccountNo: z.string().max(50).optional(),
@@ -111,12 +118,17 @@ router.post('/', async (req: AuthRequest, res) => {
         clientId: body.clientId || null,
         rollForwardFromProjectId: rollForwardId,
         reconciliationDate: body.reconciliationDate ? new Date(body.reconciliationDate) : null,
-        currency: body.currency || 'GHS',
+        currency: (body.currency || 'GHS').toUpperCase(),
+        currencySymbol: body.currencySymbol?.trim() || null,
       },
     })
     const pb = (body.primaryBankName ?? '').trim()
     const pa = (body.primaryAccountNo ?? '').trim()
     if (pb || pa) {
+      const bankLimitCheck = await canAddBankAccount(project.id, org.plan)
+      if (!bankLimitCheck.ok) {
+        return res.status(403).json({ error: bankLimitCheck.message })
+      }
       const displayName = pb || (pa ? `Account ${pa}` : 'Primary bank account')
       await prisma.bankAccount.create({
         data: {
@@ -140,7 +152,13 @@ router.post('/', async (req: AuthRequest, res) => {
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   clientId: z.string().nullable().optional(),
-  currency: z.enum(['GHS', 'USD', 'EUR']).optional(),
+  currency: z
+    .string()
+    .min(3)
+    .max(8)
+    .regex(/^[A-Za-z]{3,8}$/, 'Currency must be a 3–8 letter code (e.g. GHS, USD, NGN)')
+    .optional(),
+  currencySymbol: z.string().min(1).max(8).optional(),
 })
 
 router.patch('/:id', async (req: AuthRequest, res) => {
@@ -158,10 +176,16 @@ router.patch('/:id', async (req: AuthRequest, res) => {
   }
   try {
     const body = updateSchema.parse(req.body)
-    const data: { name?: string; clientId?: string | null; currency?: string } = {}
+    const data: {
+      name?: string
+      clientId?: string | null
+      currency?: string
+      currencySymbol?: string | null
+    } = {}
     if (body.name !== undefined) data.name = body.name
     if (body.clientId !== undefined) data.clientId = body.clientId
-    if (body.currency !== undefined) data.currency = body.currency
+    if (body.currency !== undefined) data.currency = body.currency.toUpperCase()
+    if (body.currencySymbol !== undefined) data.currencySymbol = body.currencySymbol.trim() || null
     const updated = await prisma.project.update({
       where: { id: projectId },
       data,

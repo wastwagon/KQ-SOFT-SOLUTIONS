@@ -11,6 +11,7 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { canAddBankAccount } from '../services/planLimits.js'
 
 const router = Router()
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
@@ -163,6 +164,7 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
+    include: { organization: { select: { plan: true } } },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
@@ -187,6 +189,15 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
         })
       }
     } else {
+      const bankLimitCheck = await canAddBankAccount(projectId, project.organization.plan)
+      if (!bankLimitCheck.ok) {
+        try {
+          fs.unlinkSync(req.file.path)
+        } catch {
+          /* ignore */
+        }
+        return res.status(403).json({ error: bankLimitCheck.message })
+      }
       const acct = await prisma.bankAccount.create({
         data: {
           projectId,

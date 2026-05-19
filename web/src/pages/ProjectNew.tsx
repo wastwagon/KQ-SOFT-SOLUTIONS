@@ -14,6 +14,7 @@ import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import { useAuth } from '../store/auth'
+import { COMMON_PROJECT_CURRENCIES, getCurrencySymbol } from '../lib/currency'
 
 function SelectWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -27,7 +28,9 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 export default function ProjectNew() {
   const org = useAuth((s) => s.org)
   const [name, setName] = useState('')
-  const [currencyOverride, setCurrencyOverride] = useState<'GHS' | 'USD' | 'EUR' | null>(null)
+  const [currencyOverride, setCurrencyOverride] = useState<string | null>(null)
+  const [currencySymbolOverride, setCurrencySymbolOverride] = useState('')
+  const [customCurrencyCode, setCustomCurrencyCode] = useState('')
   const platformDefaultsQuery = useQuery({
     queryKey: ['settings', 'platform-defaults'],
     queryFn: settings.getPlatformDefaults,
@@ -96,7 +99,8 @@ export default function ProjectNew() {
       clientId: clientId || undefined,
       reconciliationDate: reconciliationDate ? `${reconciliationDate}T00:00:00.000Z` : undefined,
       rollForwardFromProjectId: rollForwardFromProjectId || undefined,
-      currency,
+      currency: currency.toUpperCase(),
+      ...(currencySymbolOverride.trim() ? { currencySymbol: currencySymbolOverride.trim() } : {}),
       ...(primaryBankName.trim() || primaryAccountNo.trim()
         ? {
             primaryBankName: primaryBankName.trim() || undefined,
@@ -304,18 +308,52 @@ export default function ProjectNew() {
           <label className={labelClass}>Currency</label>
           <SelectWrapper>
             <select
-              value={currency}
-              onChange={(e) => setCurrencyOverride(e.target.value as 'GHS' | 'USD' | 'EUR')}
+              value={COMMON_PROJECT_CURRENCIES.includes(currency as (typeof COMMON_PROJECT_CURRENCIES)[number]) ? currency : 'OTHER'}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === 'OTHER') {
+                  setCurrencyOverride((customCurrencyCode || 'GHS').toUpperCase())
+                } else {
+                  setCurrencyOverride(v)
+                  setCustomCurrencyCode('')
+                }
+              }}
               className={selectClass}
             >
-              <option value="GHS">GHS (GH₵)</option>
-              <option value="USD">USD ($)</option>
-              <option value="EUR">EUR (€)</option>
+              {COMMON_PROJECT_CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c} ({getCurrencySymbol(c)})
+                </option>
+              ))}
+              <option value="OTHER">Other (enter code below)</option>
             </select>
           </SelectWrapper>
+          {!COMMON_PROJECT_CURRENCIES.includes(currency as (typeof COMMON_PROJECT_CURRENCIES)[number]) && (
+            <input
+              type="text"
+              value={customCurrencyCode || currency}
+              onChange={(e) => {
+                const v = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 8)
+                setCustomCurrencyCode(v)
+                setCurrencyOverride(v || 'GHS')
+              }}
+              placeholder="e.g. NGN"
+              className={`${inputClass} mt-2 max-w-xs`}
+              maxLength={8}
+            />
+          )}
+          <label className={`${labelClass} mt-3`}>Currency symbol (optional)</label>
+          <input
+            type="text"
+            value={currencySymbolOverride}
+            onChange={(e) => setCurrencySymbolOverride(e.target.value.slice(0, 8))}
+            placeholder={`Default: ${getCurrencySymbol(currency)}`}
+            className={`${inputClass} max-w-xs`}
+            maxLength={8}
+          />
           <p className={hintClass}>
-            This is the <strong>reporting currency</strong> for this project&apos;s BRS and exports. Your workspace
-            plan is billed in <strong>GHS</strong> via Paystack — see{' '}
+            Reporting currency for this BRS (no FX conversion). Subscription is billed in <strong>GHS</strong> via
+            Paystack — see{' '}
             <Link to="/settings/billing" className="font-medium text-primary-600 hover:underline">
               Settings → Billing
             </Link>

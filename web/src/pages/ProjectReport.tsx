@@ -148,7 +148,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const totalTransactions = data?.summary?.totalTransactions ?? 0
   const isLargeReport = totalTransactions > 200
 
-  const handleExport = async (format: 'excel' | 'pdf', scope: 'full' | 'brs_only' = 'full') => {
+  const handleExport = async (
+    format: 'excel' | 'pdf',
+    scope: 'full' | 'brs_only' | 'mapped_bank' = 'full'
+  ) => {
     if (isLargeReport && scope === 'full') {
       const ok = await confirm({
         title: `Export ${format.toUpperCase()} for ${totalTransactions.toLocaleString()} transactions?`,
@@ -166,12 +169,19 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         signedAmounts: signedAmountMode,
         scope,
       }
-      if (format === 'pdf') await report.exportPdf(projectId, opts)
-      else await report.exportExcel(projectId, opts)
+      if (format === 'pdf') {
+        if (scope === 'mapped_bank') {
+          toast.error('Mapped bank export', 'Use Excel for mapped bank statement lines.')
+          return
+        }
+        await report.exportPdf(projectId, opts)
+      } else await report.exportExcel(projectId, opts)
       const short =
         scope === 'brs_only'
           ? `${format.toUpperCase()} (BRS only)`
-          : `${format.toUpperCase()} (full workbook)`
+          : scope === 'mapped_bank'
+            ? 'Excel (mapped bank)'
+            : `${format.toUpperCase()} (full workbook)`
       toast.success(`${short} ready`, 'Your download should start automatically.')
     } catch (err) {
       unlessSubscriptionInactive(err, (e) => {
@@ -223,9 +233,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const parts = value.split(':')
     if (parts.length !== 2) return
     const fmt = parts[0] as 'excel' | 'pdf'
-    const sc = parts[1] as 'full' | 'brs_only'
+    const sc = parts[1] as 'full' | 'brs_only' | 'mapped_bank'
     if (fmt !== 'excel' && fmt !== 'pdf') return
-    await handleExport(fmt, sc === 'brs_only' ? 'brs_only' : 'full')
+    if (sc === 'mapped_bank' && fmt !== 'excel') return
+    await handleExport(
+      fmt,
+      sc === 'brs_only' ? 'brs_only' : sc === 'mapped_bank' ? 'mapped_bank' : 'full'
+    )
   }
 
   const handlePrint = () => {
@@ -573,6 +587,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <optgroup label="Microsoft Excel">
                     <option value="excel:full">Full workbook (all tabs)</option>
                     <option value="excel:brs_only">BRS statement only</option>
+                    <option value="excel:mapped_bank">Mapped bank statement (credits & debits)</option>
                   </optgroup>
                   <optgroup label="PDF">
                     <option value="pdf:full">Full report (BRS, notes, audit)</option>
@@ -760,6 +775,14 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 {accountReferenceLine}
               </p>
             ) : null}
+            {data?.project?.bankStatementClosingBalance == null && (
+              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 print:border-amber-400 print:bg-amber-50">
+                <strong>Bank statement closing balance not entered.</strong> The &quot;Closing balance per bank
+                statement&quot; line is calculated from your reconciling items until you enter the figure from your bank
+                statement (Notes → As per bank statement). Mapped bank lines are in{' '}
+                <strong>Export & download → Full workbook</strong> (BANK CREDITS/DEBITS MAPPED sheets).
+              </div>
+            )}
             <div className="mt-8 w-full overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm text-slate-900">
                 <colgroup>

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   projects,
   documents,
+  report,
   type MapDocumentResponse,
   type DocumentPreviewResponse,
   type SignBucket,
@@ -14,6 +15,9 @@ import {
   getMappingConfidence,
   type MappingConfidence,
 } from '@brs/suggested-mapping'
+import { useAuth } from '../store/auth'
+import { canExportReport } from '../lib/permissions'
+import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
@@ -76,6 +80,8 @@ type ProjectMapProps = { projectId: string; canMap?: boolean; onProceedToReconci
 
 export default function ProjectMap({ projectId, canMap = true, onProceedToReconcile }: ProjectMapProps) {
   const id = projectId
+  const role = useAuth((s) => s.role)
+  const toast = useToast()
   const queryClient = useQueryClient()
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const [previewSheetIndex, setPreviewSheetIndex] = useState(0)
@@ -134,6 +140,11 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   const bulkSelectionDocKeyRef = useRef('')
 
   const docs = project?.documents || []
+  const hasBankDocuments = useMemo(
+    () =>
+      (docs as { type: string }[]).some((d) => d.type === 'bank_credits' || d.type === 'bank_debits'),
+    [docs]
+  )
   const selectedDoc = docs.find((d: { id: string }) => d.id === selectedDocId)
 
   useEffect(() => {
@@ -382,7 +393,26 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               </span>
             )}
           </p>
-          {(mapResult.skippedDuplicateRows || 0) > 0 && (
+          {mapResult.importStats && (
+            <p className="text-sm text-slate-700">
+              Source rows: <strong>{mapResult.importStats.sourceRowCount}</strong> → imported{' '}
+              <strong>{mapResult.importStats.importedCount}</strong>
+              {(mapResult.importStats.skippedZeroAmountRows > 0 ||
+                mapResult.importStats.skippedDuplicateRows > 0) && (
+                <>
+                  {' '}
+                  (skipped {mapResult.importStats.skippedZeroAmountRows} zero-amount,{' '}
+                  {mapResult.importStats.skippedDuplicateRows} duplicate
+                  {mapResult.importStats.previousMappedCount > 0
+                    ? `; replaced ${mapResult.importStats.previousMappedCount} previously mapped`
+                    : ''}
+                  )
+                </>
+              )}
+              . If imported count is far below your statement, check PDF page limits or column mapping.
+            </p>
+          )}
+          {!mapResult.importStats && (mapResult.skippedDuplicateRows || 0) > 0 && (
             <p className="text-sm text-slate-600">
               Skipped <strong>{mapResult.skippedDuplicateRows}</strong> duplicate row(s) in the source (same date,
               amount, and narrative as an earlier row).
@@ -404,6 +434,31 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   <li key={i}>Row {w.rowIndex}: {w.amount} ({w.bucket.replace('_', ' ')}) - {w.note}</li>
                 ))}
               </ul>
+            </div>
+          )}
+          {hasBankDocuments && canExportReport(role) && (
+            <div className="pt-2">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium rounded-xl border border-primary-200 bg-primary-50 text-primary-800 hover:bg-primary-100"
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      await report.exportExcel(projectId, { scope: 'mapped_bank' })
+                      toast.success('Excel ready', 'Mapped bank statement download should start automatically.')
+                    } catch (err) {
+                      unlessSubscriptionInactive(err, (e) =>
+                        toast.error('Export failed', e instanceof Error ? e.message : undefined)
+                      )
+                    }
+                  })()
+                }}
+              >
+                Download mapped bank Excel
+              </button>
+              <p className="mt-1 text-xs text-slate-600">
+                Credits and debits you have mapped, as Excel — also available under Report → Export.
+              </p>
             </div>
           )}
         </div>

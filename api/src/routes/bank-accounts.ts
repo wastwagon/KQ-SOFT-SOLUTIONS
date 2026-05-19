@@ -5,6 +5,7 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canUploadDocuments } from '../lib/permissions.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { canAddBankAccount } from '../services/planLimits.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -55,8 +56,12 @@ router.post('/project/:projectId', async (req: AuthRequest, res) => {
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
+    include: { organization: { select: { plan: true } } },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  const bankLimitCheck = await canAddBankAccount(projectId, project.organization.plan)
+  if (!bankLimitCheck.ok) return res.status(403).json({ error: bankLimitCheck.message })
 
   const parsed = createSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.message })

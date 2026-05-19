@@ -157,7 +157,8 @@ model Project {
   slug                    String    // URL-friendly identifier, unique per org
   status                  String    @default("draft") // draft | mapping | reconciling | submitted_for_review | approved | completed
   reconciliationDate      DateTime? @map("reconciliation_date")
-  currency                String    @default("GHS")  // GHS | USD | EUR
+  currency                String    @default("GHS")  // ISO-style code, e.g. GHS, USD, NGN
+  currencySymbol          String?   @map("currency_symbol") // optional display override, e.g. ₦
   preparedById            String?   @map("prepared_by_id")
   preparedAt              DateTime? @map("prepared_at")
   reviewedById            String?   @map("reviewed_by_id")

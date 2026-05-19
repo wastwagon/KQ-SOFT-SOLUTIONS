@@ -27,10 +27,10 @@ describe('buildPublicPlans', () => {
 
     const basic = plans.find((p) => p.id === 'basic')
     expect(basic).toMatchObject({
-      monthlyGhs: 0,
-      yearlyGhs: 0,
+      monthlyGhs: 150,
+      yearlyGhs: 1500,
       projectsPerMonth: 5,
-      transactionsPerMonth: 500,
+      transactionsPerMonth: 200,
     })
 
     const firm = plans.find((p) => p.id === 'firm')

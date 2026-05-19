@@ -50,8 +50,17 @@ export function subscriptionPaywallRetry(failureCount: number, err: unknown): bo
 
 export type SignBucket = 'primary' | 'cross_reference' | 'zero' | 'empty'
 
+export interface MapImportStats {
+  sourceRowCount: number
+  importedCount: number
+  skippedDuplicateRows: number
+  skippedZeroAmountRows: number
+  previousMappedCount: number
+}
+
 export interface MapDocumentResponse {
   count: number
+  importStats?: MapImportStats
   signFilterSummary?: Record<SignBucket, number>
   signWarningsCount?: number
   signWarningsPreview?: { rowIndex: number; amount: number; bucket: SignBucket; note: string }[]
@@ -314,7 +323,11 @@ export interface SubscriptionUsageResponse {
     transactionsUnlimited: boolean
     transactionsDisplay: string
   }
-  limits: { projectsPerMonth: number; transactionsPerMonth: number }
+  limits: {
+    projectsPerMonth: number
+    transactionsPerMonth: number
+    bankAccountsPerProject: number
+  }
   subscription?: {
     status: 'trial' | 'active' | 'expired' | 'free'
     trialEndsAt: string | null
@@ -650,7 +663,7 @@ export const settings = {
   },
 }
 
-export type ReportExportScope = 'full' | 'brs_only'
+export type ReportExportScope = 'full' | 'brs_only' | 'mapped_bank'
 
 export interface ReportExportOptions {
   bankAccountId?: string
@@ -663,7 +676,7 @@ async function reportExport(projectId: string, format: string, opts?: ReportExpo
   const q = new URLSearchParams({ format })
   if (opts?.bankAccountId) q.set('bankAccountId', opts.bankAccountId)
   if (opts?.signedAmounts) q.set('signedAmounts', '1')
-  if (opts?.scope === 'brs_only') q.set('scope', 'brs_only')
+  if (opts?.scope && opts.scope !== 'full') q.set('scope', opts.scope)
   const res = await fetch(`${API_URL}/api/v1/report/${projectId}/export?${q}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
