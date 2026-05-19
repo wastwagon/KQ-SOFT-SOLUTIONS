@@ -71,6 +71,11 @@ export function detectGhanaBankFormat(
     if (s >= 2) return 'absa'
   }
 
+  const hasEcobankColumns = headers.some((h) => /payments?/i.test(h)) && headers.some((h) => /deposits?/i.test(h))
+  if (hasEcobankColumns && headers.some((h) => /transaction[\s_-]?date/i.test(h))) {
+    return 'ecobank'
+  }
+
   // Check for Ecobank by header + description content
   const ecobankHeaderScore = ECOBANK_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
   let ecobankContentScore = 0
@@ -113,8 +118,12 @@ export function getSuggestedBankMapping(
 
   const dateIdx = findCol([/transaction[\s_-]?date/i, /value\s*date/i, /date/i])
   const descIdx = findCol([/description/i, /particulars/i, /narrative/i])
-  const creditIdx = type === 'credits' ? findCol([/credit/i, /deposit/i, /amount/i]) : -1
-  const debitIdx = type === 'debits' ? findCol([/debit/i, /withdrawal/i, /amount/i]) : -1
+  const creditIdx = type === 'credits'
+    ? findCol([/^credit$/i, /deposits?/i, /deposit/i, /credit/i, /amount/i])
+    : -1
+  const debitIdx = type === 'debits'
+    ? findCol([/^debit$/i, /payments?/i, /payment/i, /debit/i, /withdrawal/i, /amount/i])
+    : -1
 
   if (dateIdx >= 0) mapping.transaction_date = dateIdx
   if (descIdx >= 0) mapping.description = descIdx

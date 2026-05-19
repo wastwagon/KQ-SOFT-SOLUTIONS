@@ -72,11 +72,11 @@ export function buildSmartSuggestedMapping(
       if (i >= 0) out.description = i
     }
     if (out.credit == null) {
-      const i = find([/^credit$/, /\bcr\b/, /deposits?/, /in(?:ward)?/])
+      const i = find([/^credit$/, /\bcr\b/, /^deposits?$/, /deposits?/, /in(?:ward)?/])
       if (i >= 0) out.credit = i
     }
     if (out.debit == null) {
-      const i = find([/^debit$/, /\bdr\b/, /withdrawals?/, /out(?:ward)?/])
+      const i = find([/^debit$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/, /out(?:ward)?/])
       if (i >= 0) out.debit = i
     }
     if (out.credit == null && out.debit == null) {
@@ -107,8 +107,8 @@ export function getMappingConfidence(
     accode: [/^accode$/, /account\s*code/, /ac\s*code/],
     amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credit$/, /\bcr\b/],
     amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debit$/, /\bdr\b/],
-    credit: [/^credit$/, /\bcr\b/, /deposits?/],
-    debit: [/^debit$/, /\bdr\b/, /withdrawals?/],
+    credit: [/^credit$/, /\bcr\b/, /^deposits?$/, /deposits?/],
+    debit: [/^debit$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/],
   }
   const SOFT: Record<string, RegExp[]> = {
     doc_ref: [/ref/, /receipt/, /number/],

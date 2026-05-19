@@ -150,7 +150,9 @@ router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequ
     action: 'document_uploaded',
     details: { documentId: doc.id, documentType: type, filename: safeFilename },
   })
-  res.status(201).json(doc)
+  const { tryAutoMapDocument } = await import('../services/autoMapDocument.js')
+  const autoMap = await tryAutoMapDocument(doc.id)
+  res.status(201).json({ ...doc, autoMap })
 })
 
 router.post('/bank-statement/:projectId', upload.single('file'), async (req: AuthRequest, res) => {
@@ -250,7 +252,9 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
     action: 'document_uploaded',
     details: { documentId: doc.id, documentType: type, filename: safeFilename },
   })
-  res.status(201).json(doc)
+  const { tryAutoMapDocument } = await import('../services/autoMapDocument.js')
+  const autoMap = await tryAutoMapDocument(doc.id)
+  res.status(201).json({ ...doc, autoMap })
 })
 
 // Phase 7: Supporting documents (BrsAttachment) - Extended for Phase 3 Match Evidence

@@ -83,6 +83,14 @@ export interface DocumentPreviewResponse {
   detectedBankFormat?: string
   suggestedMapping?: Record<string, number>
   mappingConfidence?: Record<string, 'high' | 'medium' | 'low'>
+  /** How the file was parsed (ecobank_pdf, excel, ocr, …) */
+  parseMethod?: string
+  mappingDiagnostics?: {
+    severity: 'error' | 'warning' | 'info'
+    field?: string
+    message: string
+    fix?: string
+  }[]
   pdfTruncated?: boolean
   pdfPagesProcessed?: number
   pdfTotalPages?: number

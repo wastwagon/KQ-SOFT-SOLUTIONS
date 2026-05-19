@@ -21,6 +21,7 @@ import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
+import { getMappingIssues, fieldLabel } from '../lib/mappingHints'
 
 const CASH_BOOK_FIELDS = ['date', 'name', 'details', 'doc_ref', 'chq_no', 'accode', 'amt_received', 'amt_paid']
 const BANK_FIELDS = ['transaction_date', 'description', 'credit', 'debit']
@@ -299,6 +300,19 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     if (!preview?.headers) return {} as Record<string, MappingConfidence>
     return getMappingConfidence(preview.headers as string[], mapping)
   }, [preview, mapping])
+
+  const mappingIssues = useMemo(() => {
+    if (!preview?.headers || !selectedDoc?.type) return []
+    const fromPreview = (preview as { mappingDiagnostics?: { severity: string; message: string; fix?: string; field?: string }[] }).mappingDiagnostics ?? []
+    const live = getMappingIssues(selectedDoc.type, preview.headers as string[], mapping)
+    const seen = new Set<string>()
+    return [...fromPreview, ...live].filter((item) => {
+      const key = `${item.severity}:${item.field}:${item.message}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [preview, mapping, selectedDoc?.type])
 
   const documentsWithoutTransactions = useMemo(() => {
     return (
@@ -639,12 +653,35 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   </tbody>
                 </table>
               </div>
+              {mappingIssues.length > 0 && (
+                <ul className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                  {mappingIssues.map((issue, i) => (
+                    <li
+                      key={i}
+                      className={
+                        issue.severity === 'error'
+                          ? 'text-red-900'
+                          : issue.severity === 'warning'
+                            ? 'text-amber-900'
+                            : 'text-slate-700'
+                      }
+                    >
+                      <span className="font-medium">
+                        {issue.severity === 'error' ? 'Fix required' : issue.severity === 'warning' ? 'Check' : 'Tip'}
+                        {issue.field ? ` (${fieldLabel(issue.field)})` : ''}:{' '}
+                      </span>
+                      {issue.message}
+                      {issue.fix && <span className="block mt-0.5 text-xs opacity-90">→ {issue.fix}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="grid gap-4">
                 <h4 className="font-medium">Map to canonical fields</h4>
                 {canonicalFields.map((field: string) => (
                   <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <label className="sm:w-40 text-sm font-medium text-gray-700">
-                      {field}
+                      {fieldLabel(field)}
                       {liveConfidence[field] && (
                         <span
                           className={`ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase ${

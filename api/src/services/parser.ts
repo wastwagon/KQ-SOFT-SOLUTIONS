@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import fs from 'fs'
 import path from 'path'
 import { parse as parseCsvSync } from 'csv-parse/sync'
+import { findEcobankTransactionHeaderRow, normalizeEcobankExcelTable } from './ecobankStatement.js'
 
 export interface ParseResult {
   headers: string[]
@@ -26,13 +27,18 @@ export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
     defval: null,
   }) as unknown[][]
   const nonEmpty = data.filter((row) => row.some((c) => c != null && String(c).trim() !== ''))
-  const headerRow = findHeaderRow(nonEmpty)
+  const ecobankHeaderRow = findEcobankTransactionHeaderRow(nonEmpty)
+  const headerRow = ecobankHeaderRow >= 0 ? ecobankHeaderRow : findHeaderRow(nonEmpty)
   const headerRowData = nonEmpty[headerRow] || []
   const headers = headerRowData.map((c, i) =>
     String(c ?? '').trim() || `Col_${i}`
   )
   const rows = nonEmpty.slice(headerRow + 1).filter((r) => r.some((c) => c != null && String(c).trim() !== ''))
-  return { headers, rows, sheetNames, activeSheet: sheetName }
+  let result: ParseResult = { headers, rows, sheetNames, activeSheet: sheetName }
+  if (ecobankHeaderRow >= 0) {
+    result = normalizeEcobankExcelTable(result)
+  }
+  return result
 }
 
 export function parseCsv(filepath: string): ParseResult {

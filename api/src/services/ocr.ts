@@ -9,6 +9,10 @@ import fs from 'fs'
 import path from 'path'
 import { resolveOcrLanguages } from './ocrLang.js'
 import { textToTableFromOcrText } from './ocrLineSplit.js'
+import { looksLikeEcobankStatementText, parseEcobankPdfText } from './ecobankStatement.js'
+import { extractPdfTextNative } from './documentParse.js'
+
+export { parseBankPdf, extractPdfTextNative } from './documentParse.js'
 
 export interface OcrResult {
   headers: string[]
@@ -51,22 +55,11 @@ const PDF_OCR_SCALE = Math.min(3, Math.max(1, parseFloat(process.env.PDF_OCR_SCA
 const PDF_USE_NATIVE_FIRST = process.env.PDF_USE_NATIVE_FIRST !== 'false'
 const NATIVE_MIN_CHARS = 50 // Minimum chars to consider native extraction useful
 
-/**
- * Extract text from PDF using native (embedded) text. Fast for text-based PDFs.
- * Returns null if extraction fails or yields too little text (likely a scanned/image PDF).
- */
-async function extractPdfTextNative(buffer: Buffer): Promise<{ text: string; numpages: number } | null> {
-  try {
-    const pdfParse = require('pdf-parse-new') as (b: Buffer) => Promise<{ text: string; numpages?: number }>
-    const data = await pdfParse(buffer)
-    const text = (data?.text || '').trim()
-    if (text.length >= NATIVE_MIN_CHARS) {
-      return { text, numpages: data?.numpages ?? 1 }
-    }
-    return null
-  } catch {
-    return null
-  }
+function shouldPreferEcobankParser(text: string, result: OcrResult): boolean {
+  if (!looksLikeEcobankStatementText(text)) return false
+  const h = result.headers.map((x) => (x || '').toLowerCase()).join(' ')
+  if (/\bdebit\b/.test(h) && /\bcredit\b/.test(h)) return false
+  return result.headers.length < 5 || /payments?/.test(h) || result.rows.length > 150
 }
 
 export async function parsePdf(filepath: string, maxPages = PDF_MAX_PAGES): Promise<OcrResult> {
@@ -79,7 +72,19 @@ export async function parsePdf(filepath: string, maxPages = PDF_MAX_PAGES): Prom
   if (PDF_USE_NATIVE_FIRST) {
     const nativeResult = await extractPdfTextNative(buffer)
     if (nativeResult) {
+      if (looksLikeEcobankStatementText(nativeResult.text)) {
+        const ecobank = parseEcobankPdfText(nativeResult.text)
+        if (ecobank.rows.length > 0) {
+          return { ...ecobank, pdfTotalPages: nativeResult.numpages }
+        }
+      }
       const base = textToTable(nativeResult.text)
+      if (shouldPreferEcobankParser(nativeResult.text, base)) {
+        const ecobank = parseEcobankPdfText(nativeResult.text)
+        if (ecobank.rows.length > 0) {
+          return { ...ecobank, pdfTotalPages: nativeResult.numpages }
+        }
+      }
       return { ...base, pdfTotalPages: nativeResult.numpages }
     }
   }
@@ -98,6 +103,23 @@ export async function parsePdf(filepath: string, maxPages = PDF_MAX_PAGES): Prom
     pages.push(text)
   }
 
-  const base = textToTable(pages.join('\n\n'))
+  const ocrText = pages.join('\n\n')
+  if (looksLikeEcobankStatementText(ocrText)) {
+    const ecobank = parseEcobankPdfText(ocrText)
+    if (ecobank.rows.length > 0) {
+      return truncated
+        ? { ...ecobank, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
+        : { ...ecobank, pdfTotalPages: totalPages }
+    }
+  }
+  const base = textToTable(ocrText)
+  if (shouldPreferEcobankParser(ocrText, base)) {
+    const ecobank = parseEcobankPdfText(ocrText)
+    if (ecobank.rows.length > 0) {
+      return truncated
+        ? { ...ecobank, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
+        : { ...ecobank, pdfTotalPages: totalPages }
+    }
+  }
   return truncated ? { ...base, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages } : base
 }

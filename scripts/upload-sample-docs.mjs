@@ -34,7 +34,8 @@ async function getProjects(token) {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(`Projects list failed: ${res.status}`)
-  return res.json()
+  const data = await res.json()
+  return Array.isArray(data) ? data : data.projects ?? []
 }
 
 async function createProject(token, name) {

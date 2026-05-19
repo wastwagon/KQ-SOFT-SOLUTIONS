@@ -52,8 +52,9 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    # Host 15441 avoids conflict with other local Postgres on 15432 (e.g. oceancyber-db-dev).
     ports:
-      - "15432:5432"
+      - "${BRS_POSTGRES_PORT:-15441}:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
