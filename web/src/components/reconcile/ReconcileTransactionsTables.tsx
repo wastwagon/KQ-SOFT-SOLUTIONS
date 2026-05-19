@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { formatAmountNumber, formatDateCompact } from '../../lib/format'
-import { amountColumnHeader } from '../../lib/currency'
+import { amountColumnHeader, getCurrencySymbol } from '../../lib/currency'
 import type { ReconcileView, SuggestedMatch, Tx } from './types'
 
 /**

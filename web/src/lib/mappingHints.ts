@@ -17,9 +17,7 @@ export function getMappingIssues(
   const issues: MappingIssue[] = []
   const isCashBook = docType.startsWith('cash_book_')
   const isReceipts = docType === 'cash_book_receipts'
-  const isPayments = docType === 'cash_book_payments'
   const isCredits = docType === 'bank_credits'
-  const isDebits = docType === 'bank_debits'
 
   const dateField = isCashBook ? 'date' : 'transaction_date'
   if (mapping[dateField] == null) {

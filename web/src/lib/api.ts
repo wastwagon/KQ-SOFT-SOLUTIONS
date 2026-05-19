@@ -486,7 +486,9 @@ export const projects = {
     clientId?: string
     reconciliationDate?: string
     rollForwardFromProjectId?: string
-    currency?: 'GHS' | 'USD' | 'EUR'
+    /** 3–8 letter ISO-style code (e.g. GHS, NGN) */
+    currency?: string
+    currencySymbol?: string
     /** Shown on BRS letterhead when set; creates primary bank account record */
     primaryBankName?: string
     primaryAccountNo?: string
