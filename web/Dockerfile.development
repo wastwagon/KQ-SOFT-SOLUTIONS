@@ -1,11 +1,13 @@
+# Dev web — repo root context so @brs/suggested-mapping resolves (see vite.config.ts).
 FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY web/package*.json ./
 RUN npm install
 
-COPY . .
+COPY web/ .
+COPY api/src/services/suggestedMapping.ts /api/src/services/suggestedMapping.ts
 
 EXPOSE 9100
 

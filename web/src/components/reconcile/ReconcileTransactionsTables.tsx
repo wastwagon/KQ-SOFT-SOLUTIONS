@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { formatAmountNumber, formatDateCompact } from '../../lib/format'
 import { amountColumnHeader, getCurrencySymbol } from '../../lib/currency'
+import ReconcileTableExportButtons from './ReconcileTableExportButtons'
 import type { ReconcileView, SuggestedMatch, Tx } from './types'
 
 /**
@@ -13,6 +14,8 @@ import type { ReconcileView, SuggestedMatch, Tx } from './types'
  * the page, and clicks delegate back through `onToggleCb`/`onToggleBank`.
  */
 interface ReconcileTransactionsTablesProps {
+  projectSlug: string
+  projectName?: string
   view: ReconcileView
   canReconcile: boolean
   currency: string
@@ -46,6 +49,8 @@ function formatMatchTooltip(label: string, t: Tx, conf: number, reason: string) 
 }
 
 export default function ReconcileTransactionsTables({
+  projectSlug,
+  projectName,
   view,
   canReconcile,
   currency,
@@ -163,13 +168,27 @@ export default function ReconcileTransactionsTables({
     return base ? `${base}\n\n${lines.join('\n')}` : lines.join('\n')
   }
 
+  const exportBase = {
+    view,
+    currency,
+    projectSlug,
+    projectName,
+    receipts,
+    payments,
+    credits,
+    debits,
+    matchedCbIds,
+    matchedBankIds,
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Cash Book table */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-        <h3 className="px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-bold text-gray-900 tracking-tight">
-          Cash Book
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-sm font-bold text-gray-900 tracking-tight">Cash Book</h3>
+          <ReconcileTableExportButtons side="cash_book" label="cash book" {...exportBase} />
+        </div>
         <div className="overflow-x-auto overflow-y-auto max-h-[45rem]">
           <table className="min-w-full text-xs sm:text-sm text-gray-900">
             <thead className="bg-gray-100/80 sticky top-0">
@@ -339,9 +358,10 @@ export default function ReconcileTransactionsTables({
 
       {/* Bank Statement table */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-        <h3 className="px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-bold text-gray-900 tracking-tight">
-          Bank Statement
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-sm font-bold text-gray-900 tracking-tight">Bank Statement</h3>
+          <ReconcileTableExportButtons side="bank_statement" label="bank statement" {...exportBase} />
+        </div>
         <div className="overflow-x-auto overflow-y-auto max-h-[45rem]">
           <table className="min-w-full text-xs sm:text-sm text-gray-900">
             <thead className="bg-gray-100/80 sticky top-0">

@@ -34,8 +34,8 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile.development
+      context: .
+      dockerfile: web/Dockerfile.development
     ports:
       - "${WEB_PORT:-9100}:9100"
     tty: true
@@ -45,6 +45,8 @@ services:
       - VITE_API_PROXY_TARGET=http://api:9001
     volumes:
       - ./web:/app
+      # Vite alias @brs/suggested-mapping → ../api/src/services/suggestedMapping.ts
+      - ./api/src/services/suggestedMapping.ts:/api/src/services/suggestedMapping.ts:ro
       - /app/node_modules
     depends_on:
       - api

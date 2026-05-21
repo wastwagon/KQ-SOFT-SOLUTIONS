@@ -316,6 +316,7 @@ export default function ProjectReconcile({
       </p>
 
       <ReconcileTransactionsTables
+        projectSlug={projectId}
         view={view}
         canReconcile={canReconcile}
         currency={currency}
