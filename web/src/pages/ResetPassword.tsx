@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import AuthLayout, {
   authAlertErrorClass,
-  authFieldClass,
   authLabelClass,
   authPrimaryButtonClass,
 } from '../components/AuthLayout'
@@ -87,39 +86,27 @@ export default function ResetPassword() {
               <label htmlFor="reset-password" className={authLabelClass}>
                 New password
               </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-                <input
-                  id="reset-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className={`${authFieldClass} pl-11`}
-                  placeholder="At least 6 characters"
-                />
-              </div>
+              <PasswordInput
+                id="reset-password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="new-password"
+                placeholder="At least 6 characters"
+                minLength={6}
+              />
             </div>
             <div>
               <label htmlFor="reset-confirm" className={authLabelClass}>
                 Confirm password
               </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-                <input
-                  id="reset-confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  required
-                  minLength={6}
-                  className={`${authFieldClass} pl-11`}
-                  placeholder="Repeat new password"
-                />
-              </div>
+              <PasswordInput
+                id="reset-confirm"
+                value={confirm}
+                onChange={setConfirm}
+                autoComplete="new-password"
+                placeholder="Repeat new password"
+                minLength={6}
+              />
             </div>
             <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
               {loading ? 'Updating…' : 'Update password'}

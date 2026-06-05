@@ -57,10 +57,15 @@ const resetSchema = z.object({
   password: z.string().min(6),
 })
 
+function normalizeAuthEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
 router.post('/register', async (req, res) => {
   try {
     const body = registerSchema.parse(req.body)
-    const existing = await prisma.user.findUnique({ where: { email: body.email } })
+    const email = normalizeAuthEmail(body.email)
+    const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
       return res.status(400).json({ error: 'Email already registered' })
     }
@@ -71,7 +76,7 @@ router.post('/register', async (req, res) => {
     const { user, org } = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          email: body.email,
+          email,
           passwordHash,
           name: body.name,
         },
@@ -151,7 +156,8 @@ router.get('/me', authMiddleware, async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const body = loginSchema.parse(req.body)
-    const user = await prisma.user.findUnique({ where: { email: body.email } })
+    const email = normalizeAuthEmail(body.email)
+    const user = await prisma.user.findUnique({ where: { email } })
     if (!user || user.suspendedAt) {
       return res.status(401).json({ error: user?.suspendedAt ? 'Account suspended' : 'Invalid email or password' })
     }
@@ -194,8 +200,9 @@ const RESET_TOKEN_EXPIRY_HOURS = 1
 router.post('/forgot-password', passwordRecoveryLimiter, async (req, res) => {
   try {
     const body = forgotSchema.parse(req.body)
+    const email = normalizeAuthEmail(body.email)
     const user = await prisma.user.findUnique({
-      where: { email: body.email },
+      where: { email },
       include: {
         memberships: {
           take: 1,

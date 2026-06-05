@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { Building2, Lock, Mail, User } from 'lucide-react'
+import { Building2, Mail, User } from 'lucide-react'
+import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
 import AuthLayout, {
@@ -123,20 +124,14 @@ export default function Register() {
           <label htmlFor="register-password" className={authLabelClass}>
             Password
           </label>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              id="register-password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className={`${authFieldClass} pl-11`}
-              placeholder="At least 6 characters"
-            />
-          </div>
+          <PasswordInput
+            id="register-password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            placeholder="At least 6 characters"
+            minLength={6}
+          />
           <p className="mt-1.5 text-xs text-gray-500">
             Use at least 6 characters. You can change this anytime from your profile.
           </p>

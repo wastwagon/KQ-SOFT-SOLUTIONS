@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Lock, Mail } from 'lucide-react'
+import { Mail } from 'lucide-react'
+import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
 import AuthLayout, {
@@ -94,19 +95,13 @@ export default function Login() {
               Forgot password?
             </Link>
           </div>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className={`${authFieldClass} pl-11`}
-              placeholder="Enter your password"
-            />
-          </div>
+          <PasswordInput
+            id="login-password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            placeholder="Enter your password"
+          />
         </div>
 
         <button type="submit" disabled={loading} className={authPrimaryButtonClass}>

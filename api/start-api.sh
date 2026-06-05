@@ -96,6 +96,22 @@ seed_plans() {
   fi
 }
 
+seed_demo_users() {
+  # Optional demo accounts (premium@test.com / Test123!, etc.). Off by default in production.
+  # Enable in Coolify → api service → SEED_DEMO_USERS=1, then redeploy once.
+  if [ "${SEED_DEMO_USERS:-0}" != "1" ]; then
+    return 0
+  fi
+  if [ ! -f prisma/seed.ts ]; then
+    echo "start-api: seed.ts not found — skipping demo user seed" >&2
+    return 0
+  fi
+  echo "start-api: seeding demo users (SEED_DEMO_USERS=1; password Test123!)" >&2
+  if ! npx tsx prisma/seed.ts >&2; then
+    echo "start-api: WARN — demo user seed failed; continuing" >&2
+  fi
+}
+
 round=0
 while [ "$round" -lt "$MAX_ROUNDS" ]; do
   if run_migrate >"$LOG" 2>&1; then
@@ -103,6 +119,7 @@ while [ "$round" -lt "$MAX_ROUNDS" ]; do
     trap - EXIT
     echo "start-api: prisma migrate deploy OK" >&2
     seed_plans
+    seed_demo_users
     echo "start-api: starting Node on port ${PORT:-9001}" >&2
     exec node dist/index.js
   fi

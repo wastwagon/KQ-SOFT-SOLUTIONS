@@ -58,6 +58,7 @@ services:
       PAYSTACK_WEBHOOK_SECRET: ${PAYSTACK_WEBHOOK_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-0}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
