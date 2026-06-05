@@ -18,6 +18,8 @@ interface ConfirmedMatchesPanelProps {
   canReconcile: boolean
   onUnmatch: (matchId: string) => void
   isUnmatching: boolean
+  onClearAll?: () => void
+  isClearingAll?: boolean
   onUploadEvidence: (matchId: string, file: File) => void
   isUploading: boolean
   uploadingMatchId?: string | null
@@ -29,6 +31,8 @@ export default function ConfirmedMatchesPanel({
   canReconcile,
   onUnmatch,
   isUnmatching,
+  onClearAll,
+  isClearingAll,
   onUploadEvidence,
   isUploading,
   uploadingMatchId,
@@ -44,10 +48,33 @@ export default function ConfirmedMatchesPanel({
 
   return (
     <section className="rounded-xl border border-green-200/80 bg-green-50/80 p-5 shadow-sm">
-      <h3 className="text-base font-bold text-green-900 tracking-tight mb-1">Confirmed matches</h3>
-      <p className="text-sm text-green-800/90 mb-4">
-        {canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-base font-bold text-green-900 tracking-tight mb-1">Confirmed matches</h3>
+          <p className="text-sm text-green-800/90">
+            {canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}
+          </p>
+        </div>
+        {canReconcile && matches.length > 0 && onClearAll && (
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Clear all matches?',
+                description:
+                  'Every confirmed match on this project will be removed. Cash book and bank transactions return to the unmatched lists. This cannot be undone.',
+                confirmLabel: 'Clear all',
+                tone: 'danger',
+              })
+              if (ok) onClearAll()
+            }}
+            disabled={isClearingAll || isUnmatching}
+            className="shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium text-red-700 border border-red-200 bg-white transition-colors hover:bg-red-50 disabled:opacity-50"
+          >
+            {isClearingAll ? 'Clearing…' : 'Clear all'}
+          </button>
+        )}
+      </div>
       <ul className="space-y-2 max-h-40 overflow-y-auto pr-1">
         {matches.map((m) => (
           <li

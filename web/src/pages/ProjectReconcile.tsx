@@ -63,6 +63,7 @@ export default function ProjectReconcile({
     multiMatchMutation,
     bulkMatchMutation,
     unmatchMutation,
+    clearAllMatchesMutation,
     evidenceUploadMutation,
     reconcileLimit,
     loadMore,
@@ -247,8 +248,26 @@ export default function ProjectReconcile({
       {canReconcile && (
         <p className="text-xs text-slate-600 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
           <strong>Best practice:</strong> For cheques, match only when the amount (and reference if
-          present) matches the bank.
+          present) matches the bank. Ecobank inward clearing / HSE deposits appear as bank{' '}
+          <strong>credits</strong> — use suggestions tagged <strong>Clearing</strong>.
         </p>
+      )}
+
+      {data.reconcileProfile?.ghanaBrs && canReconcile && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 max-w-2xl">
+          <strong>Ecobank Ghana BRS profile</strong> — clearing matches use a{' '}
+          {data.reconcileProfile.clearingDateWindowDays}-day date window. Use{' '}
+          <strong>Clearing</strong>, <strong>Transfer</strong>, and <strong>Withdrawal</strong>{' '}
+          suggestions before generic payment↔debit pairs.
+        </div>
+      )}
+
+      {(data.duplicateChequeWarnings?.length ?? 0) > 0 && canReconcile && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 max-w-2xl">
+          <strong>Duplicate cheque numbers in cash book:</strong>{' '}
+          {data.duplicateChequeWarnings!.map((w) => `${w.chqNo} (×${w.count})`).join(', ')}. Match
+          each row carefully — bulk match skips ambiguous pairs.
+        </div>
       )}
 
       {suggestions.length > 0 && canReconcile && (
@@ -291,6 +310,8 @@ export default function ProjectReconcile({
           canReconcile={canReconcile}
           onUnmatch={(matchId) => unmatchMutation.mutate(matchId)}
           isUnmatching={unmatchMutation.isPending}
+          onClearAll={() => clearAllMatchesMutation.mutate()}
+          isClearingAll={clearAllMatchesMutation.isPending}
           onUploadEvidence={(matchId, file) => evidenceUploadMutation.mutate({ file, matchId })}
           isUploading={evidenceUploadMutation.isPending}
           uploadingMatchId={evidenceUploadMutation.variables?.matchId ?? null}

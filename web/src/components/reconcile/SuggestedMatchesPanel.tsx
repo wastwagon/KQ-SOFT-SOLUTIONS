@@ -46,7 +46,13 @@ export default function SuggestedMatchesPanel({
   const highConfidence = suggestions.filter((s) => s.confidence >= 0.95)
   const visible = suggestions.slice(0, 50)
   const canBulk = !!features.bulk_match
-
+  const safeSuggestions = visible.filter((s) => !s.duplicateWarning && s.confidence >= 0.9)
+  const phaseBSuggestions = visible.filter(
+    (s) =>
+      !s.duplicateWarning &&
+      s.confidence >= 0.85 &&
+      (s.matchKind === 'receipt' || s.ecobankPattern)
+  )
   return (
     <section className="rounded-xl border border-amber-200/80 bg-amber-50/80 p-5 shadow-sm">
       <header className="flex items-center justify-between mb-4">
@@ -103,17 +109,40 @@ export default function SuggestedMatchesPanel({
             type="button"
             onClick={() =>
               onBulkMatch(
-                visible.map((s) => ({
+                safeSuggestions.map((s) => ({
                   cashBookTransactionId: s.cashBookTx.id,
                   bankTransactionId: s.bankTx.id,
                 }))
               )
             }
-            disabled={isMatching || visible.length === 0}
+            disabled={isMatching || safeSuggestions.length === 0}
             className="px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 transition-all"
+            title="Skips ambiguous duplicates; requires 90%+ confidence"
           >
-            {isMatching ? 'Matching…' : 'Match all suggested (up to 50)'}
+            {isMatching
+              ? 'Matching…'
+              : `Match safe suggestions (90%+, no duplicates) — ${safeSuggestions.length}`}
           </button>
+          {phaseBSuggestions.length > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                onBulkMatch(
+                  phaseBSuggestions.map((s) => ({
+                    cashBookTransactionId: s.cashBookTx.id,
+                    bankTransactionId: s.bankTx.id,
+                  }))
+                )
+              }
+              disabled={isMatching || phaseBSuggestions.length === 0}
+              className="px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-violet-700 hover:shadow disabled:opacity-50 transition-all"
+              title="Phase B: receipts at 85%+ and Ecobank clearing/transfer/withdrawal patterns only — skips generic payment↔debit guesses"
+            >
+              {isMatching
+                ? 'Matching…'
+                : `Match receipts + Ecobank patterns (85%+) — ${phaseBSuggestions.length}`}
+            </button>
+          )}
           {bulkSelected.size > 0 && (
             <button
               type="button"
@@ -177,6 +206,30 @@ export default function SuggestedMatchesPanel({
                     {formatAmount(s.cashBookTx.amount, currency)} ·{' '}
                     {Math.round(s.confidence * 100)}%
                   </span>
+                  {s.reason.toLowerCase().includes('ecobank clearing') && (
+                    <span
+                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-800"
+                      title="Ecobank inward clearing / HSE deposit — payment matched to bank credit"
+                    >
+                      Clearing
+                    </span>
+                  )}
+                  {s.reason.toLowerCase().includes('ecobank transfer') && (
+                    <span
+                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-800"
+                      title="Ecobank outward transfer — payment matched to bank debit"
+                    >
+                      Transfer
+                    </span>
+                  )}
+                  {s.reason.toLowerCase().includes('ecobank withdrawal') && (
+                    <span
+                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
+                      title="Ecobank named withdrawal — payment matched to bank debit by payee"
+                    >
+                      Withdrawal
+                    </span>
+                  )}
                   {s.duplicateWarning && (
                     <span
                       className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"

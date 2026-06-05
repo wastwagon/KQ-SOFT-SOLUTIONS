@@ -24,6 +24,12 @@ import { summarizeSignBuckets } from '../services/signClassifier.js'
 import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { brsSignOffRowsForExcel, drawBrsWorkbookSignOffPdf } from '../lib/brsSignOff.js'
+import {
+  brsTotalsExcludingLinkedClearingPairs,
+  buildBankOnlyScheduleRows,
+  computeBankOnlyCreditsTotal,
+  computeBankOnlyDebitsTotal,
+} from '../services/ecobankClearingMatcher.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -659,24 +665,48 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     .reduce((s, t) => s + t.amount, 0)
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal + broughtForwardLodgmentsTotal
   const uncreditedLodgmentsTimingTotal = unmatchedReceiptsTotal + broughtForwardReceiptLodgmentsTotal
-  const unmatchedPaymentsTotal = unmatchedPayments.reduce((s, t) => s + t.amount, 0)
+  const broughtForwardTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
+  const clearingBrsTotals = brsTotalsExcludingLinkedClearingPairs(
+    unmatchedPayments as TxLike[],
+    unmatchedCredits as TxLike[],
+    debits as TxLike[],
+    credits as TxLike[],
+    broughtForwardTotal,
+    broughtForwardBankCreditsTotal
+  )
+  const unmatchedPaymentsTotal = clearingBrsTotals.unmatchedPaymentsTotal
   const unmatchedPaymentsWithoutDetailsTotal = unmatchedPayments
     .filter((t) => !(t.details || '').trim())
     .reduce((s, t) => s + t.amount, 0)
-  const broughtForwardTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
-  // Manual-template alignment:
-  // "Unpresented cheques" excludes rows parked as unmatched payments with blank details.
-  const unpresentedChequesTotal = unmatchedPaymentsTotal + broughtForwardTotal
-  const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebits
-    .filter((d) => payments.some((p) => hasChequeOrRefLink(p, d)))
-    .reduce((s, t) => s + t.amount, 0)
+  const unpresentedChequesTotal = clearingBrsTotals.unpresentedChequesTotal
   const unmatchedDebitsTotal = unmatchedDebits.reduce((s, t) => s + t.amount, 0)
-  // Final-facing report excludes bank-only items from displayed as-at sections.
+  const matchedPaymentIds = new Set(
+    payments.filter((t) => matchedCbIds.has(t.id)).map((t) => t.id)
+  )
+  const bankOnlyDebitsNotInCashBookTotal = computeBankOnlyDebitsTotal(
+    unmatchedDebits as TxLike[],
+    unmatchedCredits as TxLike[],
+    payments as TxLike[],
+    0.01,
+    matchedPaymentIds
+  )
+  const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebitsTotal - bankOnlyDebitsNotInCashBookTotal
   const asAtUncreditedTotal = unmatchedReceiptsTotal
   const asAtUnpresentedTotal = unmatchedPaymentsTotal
-  const bankOnlyCreditsNotInCashBookTotal = unmatchedCreditsTotal + broughtForwardBankCreditsTotal
-  // Debits with cheque/ref linkage to cash-book payments are not treated as "bank-only" in manual workbook style.
-  const bankOnlyDebitsNotInCashBookTotal = unmatchedDebitsTotal
+  const bankOnlyCreditsNotInCashBookTotal = computeBankOnlyCreditsTotal(
+    unmatchedCredits as TxLike[],
+    payments as TxLike[],
+    receipts as TxLike[],
+    broughtForwardBankCreditsTotal
+  )
+  const bankOnlySchedule = buildBankOnlyScheduleRows(
+    unmatchedDebits as TxLike[],
+    unmatchedCredits as TxLike[],
+    payments as TxLike[],
+    receipts as TxLike[],
+    0.01,
+    matchedPaymentIds
+  )
   const bankStatementClosingBalanceValue =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
@@ -939,6 +969,24 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       amount: t.amount,
       debit: t.amount,
       credit: '',
+    })),
+    bankOnlyDebits: bankOnlySchedule.debits.map((t) => ({
+      date: fmt(t.date),
+      description: t.name || t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      debit: t.amount,
+      credit: '',
+    })),
+    bankOnlyCredits: bankOnlySchedule.credits.map((t) => ({
+      date: fmt(t.date),
+      description: t.name || t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      debit: '',
+      credit: t.amount,
     })),
     broughtForwardItems,
     broughtForwardLodgments,
@@ -1250,15 +1298,24 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const unmatchedReceiptsTotalExport = receipts.filter((t) => !matchedCbIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
   const unmatchedCreditsTotalExport = credits.filter((t) => !matchedBankIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
   const unmatchedPaymentsOnlyExport = payments.filter((t) => !matchedCbIds.has(t.id))
+  const unmatchedCreditsOnlyExport = credits.filter((t) => !matchedBankIds.has(t.id))
   const unmatchedDebitsOnlyExport = debits.filter((t) => !matchedBankIds.has(t.id))
-  const unmatchedPaymentsTotalExport = unmatchedPaymentsOnlyExport.reduce((s, t) => s + t.amount, 0)
   const unmatchedPaymentsWithoutDetailsTotalExport = unmatchedPaymentsOnlyExport
     .filter((t) => !(t.details || '').trim())
     .reduce((s, t) => s + t.amount, 0)
   const unmatchedDebitsTotalExport = unmatchedDebitsOnlyExport.reduce((s, t) => s + t.amount, 0)
-  const unmatchedDebitsLinkedToCashBookTotalExport = unmatchedDebitsOnlyExport
-    .filter((d) => payments.some((p) => hasChequeOrRefLink(p, d)))
-    .reduce((s, t) => s + t.amount, 0)
+  const matchedPaymentIdsExport = new Set(
+    payments.filter((t) => matchedCbIds.has(t.id)).map((t) => t.id)
+  )
+  const bankOnlyDebitsNotInCashBookTotalExport = computeBankOnlyDebitsTotal(
+    unmatchedDebitsOnlyExport as TxLike[],
+    unmatchedCreditsOnlyExport as TxLike[],
+    payments as TxLike[],
+    0.01,
+    matchedPaymentIdsExport
+  )
+  const unmatchedDebitsLinkedToCashBookTotalExport =
+    unmatchedDebitsTotalExport - bankOnlyDebitsNotInCashBookTotalExport
   const broughtForwardLodgmentsTotalExport = broughtForwardLodgmentsExport.reduce((s, t) => s + t.amount, 0)
   const broughtForwardReceiptLodgmentsTotalExport = broughtForwardLodgmentsExport
     .filter((t) => t.source === 'cash_book_receipts')
@@ -1266,16 +1323,45 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const broughtForwardBankCreditsTotalExport = broughtForwardLodgmentsExport
     .filter((t) => t.source === 'bank_credits')
     .reduce((s, t) => s + t.amount, 0)
+  const broughtForwardChequesTotalExport = broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
+  const clearingBrsTotalsExport = brsTotalsExcludingLinkedClearingPairs(
+    unmatchedPaymentsOnlyExport as TxLike[],
+    unmatchedCreditsOnlyExport as TxLike[],
+    debits as TxLike[],
+    credits as TxLike[],
+    broughtForwardChequesTotalExport,
+    broughtForwardBankCreditsTotalExport
+  )
+  const unmatchedPaymentsTotalExport = clearingBrsTotalsExport.unmatchedPaymentsTotal
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
-  const unpresentedChequesTotal =
-    unmatchedPaymentsTotalExport +
-    broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
-  const broughtForwardChequesTotalExport = broughtForwardItemsExport.reduce((s, t) => s + t.amount, 0)
+  const unpresentedChequesTotal = clearingBrsTotalsExport.unpresentedChequesTotal
   const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport
   const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport
-  const bankOnlyCreditsNotInCashBookTotalExport = unmatchedCreditsTotalExport + broughtForwardBankCreditsTotalExport
-  const bankOnlyDebitsNotInCashBookTotalExport = unmatchedDebitsTotalExport
+  const bankOnlyCreditsNotInCashBookTotalExport = computeBankOnlyCreditsTotal(
+    unmatchedCreditsOnlyExport as TxLike[],
+    payments as TxLike[],
+    receipts as TxLike[],
+    broughtForwardBankCreditsTotalExport
+  )
+  const bankOnlyScheduleExport = buildBankOnlyScheduleRows(
+    unmatchedDebitsOnlyExport as TxLike[],
+    unmatchedCreditsOnlyExport as TxLike[],
+    payments as TxLike[],
+    receipts as TxLike[],
+    0.01,
+    matchedPaymentIdsExport
+  )
+  const bankOnlyDebitsSheet = bankOnlyScheduleExport.debits.map((t) => ({
+    Date: fmt(t.date),
+    Description: t.name || t.details || '',
+    [amountColumnHeader(curr)]: t.amount,
+  }))
+  const bankOnlyCreditsSheet = bankOnlyScheduleExport.credits.map((t) => ({
+    Date: fmt(t.date),
+    Description: t.name || t.details || '',
+    [amountColumnHeader(curr)]: t.amount,
+  }))
   const bankStatementClosingBalanceExport =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
@@ -1468,11 +1554,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (unmatchedPayments.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedPayments), 'UNMATCHED PAYMENTS')
     }
-    if (unmatchedDebits.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedDebits), 'BANK-ONLY DEBITS (ADD)')
+    if (bankOnlyDebitsSheet.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bankOnlyDebitsSheet), 'BANK-ONLY DEBITS (ADD)')
     }
-    if (unmatchedCredits.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedCredits), 'BANK-ONLY CREDITS (DEDUCT)')
+    if (bankOnlyCreditsSheet.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bankOnlyCreditsSheet), 'BANK-ONLY CREDITS (DEDUCT)')
     }
     if (matchedRows.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matchedRows), 'MATCHED AUDIT LOG')
@@ -1876,21 +1962,21 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }))
     drawTable('UNMATCHED PAYMENTS IN CASH BOOK', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
 
-    const unmatchedDebitRows = unmatchedDebits.map((t) => ({
-      date: (t as { Date: string }).Date,
-      ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
-      details: (t as { Description?: string }).Description || '—',
-      amount: findAmountColumnValue(t as Record<string, unknown>, curr),
+    const bankOnlyDebitRows = bankOnlyScheduleExport.debits.map((t) => ({
+      date: fmt(t.date),
+      ref: t.chqNo || t.docRef || '',
+      details: (t.name || t.details || '—').slice(0, 60),
+      amount: t.amount,
     }))
-    drawTable('BANK-ONLY DEBITS (ADD)', unmatchedDebitRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
+    drawTable('BANK-ONLY DEBITS (ADD)', bankOnlyDebitRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
-    const unmatchedCreditRows = unmatchedCredits.map((t) => ({
-      date: (t as { Date: string }).Date,
-      ref: String(pickField(t as Record<string, unknown>, 'DOC REF') || ''),
-      details: (t as { Description?: string }).Description || '—',
-      amount: findAmountColumnValue(t as Record<string, unknown>, curr),
+    const bankOnlyCreditRows = bankOnlyScheduleExport.credits.map((t) => ({
+      date: fmt(t.date),
+      ref: t.chqNo || t.docRef || '',
+      details: (t.name || t.details || '—').slice(0, 60),
+      amount: t.amount,
     }))
-    drawTable('BANK-ONLY CREDITS (DEDUCT)', unmatchedCreditRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
+    drawTable('BANK-ONLY CREDITS (DEDUCT)', bankOnlyCreditRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
     // --- REVISION HISTORY ---
     const logs = await prisma.auditLog.findMany({

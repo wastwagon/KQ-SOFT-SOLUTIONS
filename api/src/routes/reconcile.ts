@@ -7,6 +7,14 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canReconcile, isProjectEditable } from '../lib/permissions.js'
 import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
 import { suggestMatches, suggestSplitMatches, type Tx, type SuggestedSplitMatch } from '../services/matching.js'
+import {
+  detectDuplicateChequePayments,
+  isEcobankPatternMatchReason,
+  mergePaymentSuggestions,
+  resolveEcobankGhanaProfile,
+  suggestEcobankClearingMatches,
+  suggestEcobankPaymentDebitMatches,
+} from '../services/ecobankClearingMatcher.js'
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { logAudit } from '../services/audit.js'
@@ -167,10 +175,30 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const hasSplitMatchingPlan = hasPlanFeature(plan, 'one_to_many')
 
   const platformDefaults = await getPlatformDefaults()
+  const ecobankProfile = resolveEcobankGhanaProfile({
+    bankAccounts: project.bankAccounts || [],
+    sampleBankText: [...creditsFull, ...debitsFull]
+      .slice(0, 12)
+      .map((t) => [t.details, t.name].filter(Boolean).join(' '))
+      .join('\n'),
+  })
   const matchOptions = {
     amountTolerance: platformDefaults.amountTolerance ?? 0.01,
     dateWindowDays: platformDefaults.dateWindowDays ?? 3,
   }
+  const clearingDateWindowDays = ecobankProfile.active
+    ? Math.max(matchOptions.dateWindowDays, ecobankProfile.clearingDateWindowDays)
+    : matchOptions.dateWindowDays
+
+  const annotateSuggestions = (
+    list: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string }[],
+    matchKind: 'receipt' | 'payment'
+  ) =>
+    list.map((s) => ({
+      ...s,
+      matchKind,
+      ecobankPattern: matchKind === 'payment' && isEcobankPatternMatchReason(s.reason),
+    }))
 
   // Matching suggestions for all plans (intelligent matching clues)
   const receiptSuggestions = suggestMatches(receipts, credits, matchedCbIds, matchedBankIds, {
@@ -180,7 +208,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     useDocRef,
     useChequeNo,
   })
-  const paymentSuggestions = suggestMatches(payments, debits, matchedCbIds, matchedBankIds, {
+  const standardPaymentSuggestions = suggestMatches(payments, debits, matchedCbIds, matchedBankIds, {
     ...matchOptions,
     requireDateMatch: useDate,
     requireRefForCheques: useDocRef || useChequeNo,
@@ -188,6 +216,28 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     useDocRef,
     useChequeNo,
   })
+  const clearingPaymentSuggestions = suggestEcobankClearingMatches(
+    paymentsFull,
+    creditsFull,
+    matchedCbIds,
+    matchedBankIds,
+    {
+      amountTolerance: matchOptions.amountTolerance,
+      dateWindowDays: clearingDateWindowDays,
+    }
+  )
+  const ecobankPaymentDebitSuggestions = suggestEcobankPaymentDebitMatches(
+    paymentsFull,
+    debitsFull,
+    matchedCbIds,
+    matchedBankIds,
+    matchOptions.amountTolerance
+  )
+  const paymentSuggestions = mergePaymentSuggestions(
+    mergePaymentSuggestions(clearingPaymentSuggestions, ecobankPaymentDebitSuggestions),
+    standardPaymentSuggestions
+  )
+  const duplicateChequeWarnings = detectDuplicateChequePayments(paymentsFull)
 
   // Apply bank rules for rule-based suggestions and flagged txs (Standard+ only)
   const bankRules = hasBankRulesPlan ? await prisma.bankRule.findMany({
@@ -228,7 +278,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     }
   }
   addRuleSuggestions(receipts, credits, receiptSuggestions)
-  addRuleSuggestions(payments, debits, paymentSuggestions)
+  addRuleSuggestions(payments, debits, standardPaymentSuggestions)
 
   // AI-style boost: learn from confirmed matches — if suggestion resembles a past match, boost confidence
   const learnedPatterns = matchList.map(({ cbTx, bankTx }) => ({
@@ -258,6 +308,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
 
   receiptSuggestions.sort((a, b) => b.confidence - a.confidence)
   paymentSuggestions.sort((a, b) => b.confidence - a.confidence)
+  const receiptSuggestionsOut = annotateSuggestions(receiptSuggestions, 'receipt')
+  const paymentSuggestionsOut = annotateSuggestions(paymentSuggestions, 'payment')
 
   let splitSuggestions: { receipts: SuggestedSplitMatch[]; payments: SuggestedSplitMatch[] } = { receipts: [], payments: [] }
   if (hasSplitMatchingPlan) {
@@ -282,10 +334,15 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     /** @deprecated Use matchedBankIds (includes credits and debits) */
     matchedCreditIds: Array.from(matchedBankIds),
     suggestions: {
-      receipts: receiptSuggestions.slice(0, 50),
-      payments: paymentSuggestions.slice(0, 50),
+      receipts: receiptSuggestionsOut.slice(0, 50),
+      payments: paymentSuggestionsOut.slice(0, 50),
+      clearingPayments: clearingPaymentSuggestions.slice(0, 50),
       split: splitSuggestions,
     },
+    reconcileProfile: ecobankProfile.active
+      ? { bankFormat: 'ecobank' as const, ghanaBrs: true, clearingDateWindowDays }
+      : null,
+    duplicateChequeWarnings,
     flaggedBankIds,
     existingMatches: project.matches.length,
     matchedCashBookIds: Array.from(matchedCbIds),
@@ -586,6 +643,33 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     }
     res.status(500).json({ error: (e as Error).message })
   }
+})
+
+/** Clear all confirmed matches while project is still editable (reconciling / mapping). */
+router.delete('/:projectId/matches', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canReconcile(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to reconcile' })
+  }
+  const orgId = req.auth!.orgId
+  const projectId = await resolveProjectId(req.params.projectId, orgId)
+  if (!projectId) return res.status(404).json({ error: 'Project not found' })
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId },
+  })
+  if (!project) return res.status(404).json({ error: 'Project not found' })
+  if (!isProjectEditable(project.status)) {
+    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+  }
+  const deleted = await prisma.match.deleteMany({ where: { projectId } })
+  await logAudit({
+    organizationId: orgId,
+    userId: req.auth!.userId,
+    projectId,
+    action: 'matches_cleared',
+    details: { count: deleted.count },
+  })
+  res.json({ deleted: deleted.count })
 })
 
 router.delete('/:projectId/match/:matchId', async (req: AuthRequest, res) => {

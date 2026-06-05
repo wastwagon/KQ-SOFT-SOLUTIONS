@@ -776,6 +776,8 @@ export const reconcile = {
     api(`/reconcile/${projectId}/match/bulk`, { method: 'POST', body: JSON.stringify(body) }),
   deleteMatch: (projectId: string, matchId: string) =>
     api(`/reconcile/${projectId}/match/${matchId}`, { method: 'DELETE' }),
+  clearAllMatches: (projectId: string) =>
+    api(`/reconcile/${projectId}/matches`, { method: 'DELETE' }) as Promise<{ deleted: number }>,
 }
 
 export function uploadCashBook(projectId: string, file: File, type: 'receipts' | 'payments') {

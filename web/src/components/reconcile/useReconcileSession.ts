@@ -85,11 +85,23 @@ interface ReconcileApiResponse {
   suggestions?: {
     receipts?: SuggestedMatch[]
     payments?: SuggestedMatch[]
+    clearingPayments?: SuggestedMatch[]
     split?: {
       receipts?: SuggestedSplitMatch[]
       payments?: SuggestedSplitMatch[]
     }
   }
+  duplicateChequeWarnings?: {
+    chqNo: string
+    count: number
+    transactionIds: string[]
+    totalAmount: number
+  }[]
+  reconcileProfile?: {
+    bankFormat: 'ecobank'
+    ghanaBrs: boolean
+    clearingDateWindowDays: number
+  } | null
   project?: { currency?: string }
 }
 
@@ -146,6 +158,7 @@ export interface ReconcileSession {
     >
   >
   unmatchMutation: ReturnType<typeof useMutation<unknown, Error, string>>
+  clearAllMatchesMutation: ReturnType<typeof useMutation<{ deleted: number }, Error, void>>
   evidenceUploadMutation: ReturnType<
     typeof useMutation<unknown, Error, { file: File; matchId: string }>
   >
@@ -312,6 +325,21 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       ),
   })
 
+  const clearAllMatchesMutation = useMutation<{ deleted: number }, Error, void>({
+    mutationFn: () => reconcile.clearAllMatches(projectId),
+    onSuccess: (resp) => {
+      invalidateAll()
+      setBulkSelected(new Set())
+      clearSelection()
+      const n = resp?.deleted ?? 0
+      toast.success(n ? `Cleared ${n} match${n === 1 ? '' : 'es'}` : 'All matches cleared')
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not clear matches', e instanceof Error ? e.message : 'Request failed')
+      ),
+  })
+
   const evidenceUploadMutation = useMutation<unknown, Error, { file: File; matchId: string }>({
     mutationFn: ({ file, matchId }) =>
       attachments.upload(projectId, file, 'match_evidence', matchId),
@@ -377,6 +405,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     multiMatchMutation,
     bulkMatchMutation,
     unmatchMutation,
+    clearAllMatchesMutation,
     evidenceUploadMutation,
   }
 }

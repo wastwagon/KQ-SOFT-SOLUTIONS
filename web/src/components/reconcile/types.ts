@@ -20,6 +20,8 @@ export interface SuggestedMatch {
   confidence: number
   reason: string
   duplicateWarning?: boolean
+  matchKind?: 'receipt' | 'payment'
+  ecobankPattern?: boolean
 }
 
 export interface SuggestedSplitMatch {
