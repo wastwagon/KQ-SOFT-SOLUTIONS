@@ -971,7 +971,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       credit: '',
     })),
     bankOnlyDebits: bankOnlySchedule.debits.map((t) => ({
-      date: fmt(t.date),
+      date: fmt(t.date ?? null),
       description: t.name || t.details || '—',
       chqNo: t.chqNo || null,
       docRef: t.docRef || null,
@@ -980,7 +980,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       credit: '',
     })),
     bankOnlyCredits: bankOnlySchedule.credits.map((t) => ({
-      date: fmt(t.date),
+      date: fmt(t.date ?? null),
       description: t.name || t.details || '—',
       chqNo: t.chqNo || null,
       docRef: t.docRef || null,
@@ -1353,12 +1353,12 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     matchedPaymentIdsExport
   )
   const bankOnlyDebitsSheet = bankOnlyScheduleExport.debits.map((t) => ({
-    Date: fmt(t.date),
+    Date: fmt(t.date ?? null),
     Description: t.name || t.details || '',
     [amountColumnHeader(curr)]: t.amount,
   }))
   const bankOnlyCreditsSheet = bankOnlyScheduleExport.credits.map((t) => ({
-    Date: fmt(t.date),
+    Date: fmt(t.date ?? null),
     Description: t.name || t.details || '',
     [amountColumnHeader(curr)]: t.amount,
   }))
@@ -1963,7 +1963,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     drawTable('UNMATCHED PAYMENTS IN CASH BOOK', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
 
     const bankOnlyDebitRows = bankOnlyScheduleExport.debits.map((t) => ({
-      date: fmt(t.date),
+      date: fmt(t.date ?? null),
       ref: t.chqNo || t.docRef || '',
       details: (t.name || t.details || '—').slice(0, 60),
       amount: t.amount,
@@ -1971,7 +1971,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     drawTable('BANK-ONLY DEBITS (ADD)', bankOnlyDebitRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
     const bankOnlyCreditRows = bankOnlyScheduleExport.credits.map((t) => ({
-      date: fmt(t.date),
+      date: fmt(t.date ?? null),
       ref: t.chqNo || t.docRef || '',
       details: (t.name || t.details || '—').slice(0, 60),
       amount: t.amount,

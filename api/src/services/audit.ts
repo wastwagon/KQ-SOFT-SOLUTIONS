@@ -5,6 +5,7 @@ export type AuditAction =
   | 'document_mapped'
   | 'match_created'
   | 'match_deleted'
+  | 'matches_cleared'
   | 'match_bulk'
   | 'report_generated'
   | 'report_exported'

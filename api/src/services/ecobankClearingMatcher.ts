@@ -4,7 +4,16 @@
  */
 import type { SuggestedMatch, SuggestMatchesOptions, Tx } from './matching.js'
 
-export type ClearingTxLike = Pick<Tx, 'id' | 'amount' | 'chqNo' | 'details' | 'name' | 'date'>
+/** Minimal tx shape for BRS clearing logic (report routes may use string dates). */
+export type ClearingTxLike = {
+  id: string
+  amount: number
+  chqNo?: string | null
+  details?: string | null
+  name?: string | null
+  date?: Date | string | null
+  docRef?: string | null
+}
 
 /** Bank credit lines that pair with cash-book cheque payments. */
 export const ECOBANK_CLEARING_CREDIT_RE =
@@ -82,16 +91,16 @@ function extractRefsFromText(text: string | null | undefined): string[] {
   return Array.from(refs)
 }
 
-function bankText(tx: Tx): string {
+function bankText(tx: ClearingTxLike): string {
   return [tx.details, tx.name].filter(Boolean).join(' ')
 }
 
 export function isEcobankClearingCredit(tx: { details?: string | null; name?: string | null }): boolean {
-  const text = bankText(tx as Tx)
+  const text = [tx.details, tx.name].filter(Boolean).join(' ')
   return ECOBANK_CLEARING_CREDIT_RE.test(text)
 }
 
-export function chequeOrRefLink(left: Tx, right: Tx): boolean {
+export function chequeOrRefLink(left: ClearingTxLike, right: ClearingTxLike): boolean {
   const leftChq = left.chqNo?.trim()
   const rightChq = right.chqNo?.trim()
   if (refTokensEquivalent(leftChq, rightChq)) return true
@@ -139,7 +148,7 @@ export function paymentHasNamedWithdrawalCounterpart(
   if (!tokens.length) return false
   for (const d of bankDebits) {
     if (!amountsMatch(payment.amount, d.amount, amountTolerance)) continue
-    const text = bankText(d as Tx).toUpperCase()
+    const text = bankText(d).toUpperCase()
     if (!/CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i.test(text)) continue
     if (tokens.some((t) => text.includes(t))) return true
   }
@@ -155,7 +164,7 @@ export function paymentHasTransferCounterpart(
   const tokens = payeeTokens(payment)
   for (const d of bankDebits) {
     if (!amountsMatch(payment.amount, d.amount, amountTolerance)) continue
-    const text = bankText(d as Tx).toUpperCase()
+    const text = bankText(d).toUpperCase()
     if (!TRANSFER_DEBIT_RE.test(text)) continue
     if (!tokens.length || tokens.some((t) => text.includes(t))) return true
   }
@@ -346,7 +355,7 @@ export function debitHasPaymentCounterpart(
   amountTolerance = 0.01,
   matchedPaymentIds?: Set<string>
 ): boolean {
-  const text = bankText(debit as Tx).toUpperCase()
+  const text = bankText(debit).toUpperCase()
   const isTransfer = TRANSFER_DEBIT_RE.test(text)
   const isWithdrawal = WITHDRAWAL_DEBIT_RE.test(text)
   for (const p of payments) {
