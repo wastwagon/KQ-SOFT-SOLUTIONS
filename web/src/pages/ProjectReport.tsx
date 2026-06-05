@@ -448,11 +448,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const matchedReceiptsVsCredits = data.matchedReceiptsVsCredits || []
   const matchedPaymentsVsDebits = data.matchedPaymentsVsDebits || []
   const unmatchedReceipts = data.unmatchedReceipts || []
+  const ecobankBrsProfile = data.reconcileProfile?.bankFormat === 'ecobank'
+  const unpresentedChequesForBrs = data.unpresentedChequesForBrs || []
   const unmatchedPayments = data.unmatchedPayments || []
+  const unpresentedPaymentsForSection2 = ecobankBrsProfile && unpresentedChequesForBrs.length > 0
+    ? unpresentedChequesForBrs
+    : unmatchedPayments
+  const bankOnlyDebitsForSection3 = (data.bankOnlyDebits?.length ? data.bankOnlyDebits : data.unmatchedDebits) || []
+  const bankOnlyCreditsForSection3 = (data.bankOnlyCredits?.length ? data.bankOnlyCredits : data.unmatchedCredits) || []
   const broughtForwardItems = data.broughtForwardItems || []
   const broughtForwardLodgments = data.broughtForwardLodgments || []
   const localAsAtUncreditedTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0)
-  const localAsAtUnpresentedTotal = unmatchedPayments.reduce((s, t) => s + t.amount, 0)
+  const localAsAtUnpresentedTotal = unpresentedPaymentsForSection2.reduce((s, t) => s + t.amount, 0)
   const localPostPeriodLodgmentsTotal = broughtForwardLodgments.reduce((s, t) => s + t.amount, 0)
   const localPostPeriodChequesTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
   const additionalInformation = data.additionalInformation
@@ -888,20 +895,29 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr className="border-b border-slate-400">
                     <td className="py-2 pr-6 text-base font-bold text-slate-900">{labels.cashBookBalanceEnd}</td>
                     <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
-                      {fmtBaseReportAmt(brsStatement.workbookScheduleDerivedCashBook ?? 0)}
+                      {fmtBaseReportAmt(brsStatement.balancePerCashBook ?? brsStatement.workbookScheduleDerivedCashBook ?? 0)}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             {Math.abs(brsStatement.workbookScheduleTieOutVariance ?? 0) > 0.02 ? (
-              <div className="mt-4 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
-                Workbook tie-out: declared cash book minus schedule =
-                {' '}
-                <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
-                Large variances usually mean duplicate cash-book exposure, mismatched reconciliation date, or a missing /
-                overstated closing balance inputs — review mappings and extracted balances.
-              </div>
+              ecobankBrsProfile ? (
+                <div className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700 print:bg-slate-50 print:border-slate-400">
+                  Declared cash book (from file) differs from schedule arithmetic by{' '}
+                  <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
+                  The BRS uses the declared closing balance to match the manual workbook; schedule-derived cash book is{' '}
+                  <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleDerivedCashBook ?? 0)}</strong>.
+                </div>
+              ) : (
+                <div className="mt-4 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
+                  Workbook tie-out: declared cash book minus schedule =
+                  {' '}
+                  <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
+                  Large variances usually mean duplicate cash-book exposure, mismatched reconciliation date, or a missing /
+                  overstated closing balance inputs — review mappings and extracted balances.
+                </div>
+              )
             ) : null}
             <p className="mt-6 w-full text-xs leading-relaxed text-slate-700">
               Note: timing items are transactions already in the cash book but not yet reflected by the bank at the
@@ -1271,10 +1287,16 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           <div className="rounded-xl border border-blue-200 bg-blue-50/30 p-5 print:bg-white print:border-slate-300">
             <h3 className="font-semibold mb-3 text-blue-900">2. UNPRESENTED CHEQUES</h3>
             <p className="text-sm text-blue-800 mb-4">
-              Items to deduct from bank balance: unmatched payments in cash book (cheques issued not yet presented) and brought-forward unpresented cheques from previous period.
+              {ecobankBrsProfile
+                ? 'Items to deduct from bank balance: unpresented cheques per Ecobank clearing rules (BRS schedule), plus brought-forward unpresented cheques from the previous period.'
+                : 'Items to deduct from bank balance: unmatched payments in cash book (cheques issued not yet presented) and brought-forward unpresented cheques from previous period.'}
             </p>
           <div>
-            <h4 className="text-sm font-medium mb-2 text-gray-800">2a. Unmatched payments in cash book (payments not yet in bank)</h4>
+            <h4 className="text-sm font-medium mb-2 text-gray-800">
+              {ecobankBrsProfile
+                ? '2a. Unpresented cheques (BRS schedule — Ecobank clearing filter)'
+                : '2a. Unmatched payments in cash book (payments not yet in bank)'}
+            </h4>
             <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
               <table className="min-w-full text-sm text-slate-900">
                 <thead className="bg-slate-100">
@@ -1285,10 +1307,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   </tr>
                 </thead>
                 <tbody>
-                  {(data.unmatchedPayments || []).length === 0 ? (
+                  {unpresentedPaymentsForSection2.length === 0 ? (
                     <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                   ) : (
-                    (data.unmatchedPayments || []).map((t, i: number) => (
+                    unpresentedPaymentsForSection2.map((t, i: number) => (
                       <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                         <td className="px-2 py-1.5">{fmt(t.date)}</td>
                         <td className="px-2 py-1.5 truncate max-w-[220px]" title={`${t.name || ''} ${t.details || ''}`}>{t.name || t.details || '—'}</td>
@@ -1297,11 +1319,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     ))
                   )}
                 </tbody>
-                {(data.unmatchedPayments || []).length > 0 && (
+                {unpresentedPaymentsForSection2.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
-                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched payments)</td>
-                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.unmatchedPayments || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
+                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">
+                        {ecobankBrsProfile ? 'Subtotal (BRS unpresented cheques)' : 'Subtotal (unmatched payments)'}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt(unpresentedPaymentsForSection2.reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
                     </tr>
                   </tfoot>
                 )}
@@ -1358,10 +1382,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       </tr>
                     </thead>
                     <tbody>
-                      {(data.unmatchedDebits || []).length === 0 ? (
+                      {bankOnlyDebitsForSection3.length === 0 ? (
                         <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                       ) : (
-                        (data.unmatchedDebits || []).map((t: ReportTransaction, i: number) => (
+                        bankOnlyDebitsForSection3.map((t: ReportTransaction, i: number) => (
                           <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                             <td className="px-2 py-1.5">{fmt(t.date ?? '')}</td>
                             <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description ?? undefined}>{t.description}</td>
@@ -1385,10 +1409,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       </tr>
                     </thead>
                     <tbody>
-                      {(data.unmatchedCredits || []).length === 0 ? (
+                      {bankOnlyCreditsForSection3.length === 0 ? (
                         <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                       ) : (
-                        (data.unmatchedCredits || []).map((t: ReportTransaction, i: number) => (
+                        bankOnlyCreditsForSection3.map((t: ReportTransaction, i: number) => (
                           <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                             <td className="px-2 py-1.5">{fmt(t.date ?? '')}</td>
                             <td className="px-2 py-1.5 truncate max-w-[180px]" title={t.description ?? undefined}>{t.description}</td>

@@ -29,6 +29,7 @@ import {
   buildBankOnlyScheduleRows,
   computeBankOnlyCreditsTotal,
   computeBankOnlyDebitsTotal,
+  resolveEcobankGhanaProfile,
 } from '../services/ecobankClearingMatcher.js'
 
 const router = Router()
@@ -554,19 +555,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const fmt = (d: Date | string | null) =>
     d ? new Date(d).toISOString().slice(0, 10) : ''
 
-  // Phase 6: Missing Cheques Report with ageing (0–30, 31–60, 61–90, 90+ days)
   const refDate = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
-  const allUnpresented = [
-    ...unmatchedPayments.map((t) => ({ ...t, fromProject: project.name })),
-    ...broughtForwardItems.map((t) => ({ date: t.date, name: t.name, chqNo: t.chqNo, amount: t.amount, fromProject: t.fromProject })),
-  ]
-  const missingChequesWithAgeing = buildMissingChequesAgeing(allUnpresented, refDate)
-  const missingChequesAgeingSummary = {
-    band0_30: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').reduce((s, x) => s + x.amount, 0) },
-    band31_60: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').reduce((s, x) => s + x.amount, 0) },
-    band61_90: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').reduce((s, x) => s + x.amount, 0) },
-    band90_plus: { count: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').length, total: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').reduce((s, x) => s + x.amount, 0) },
-  }
 
   const receiptIdsForDisc = new Set(receipts.map((t) => t.id))
   // Phase 6: Reconciliation Discrepancy Report — summary by variance band
@@ -645,8 +634,6 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   } : null
 
   const effectiveDiscList = hasDiscrepancyReport ? discList : []
-  const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
-  const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
 
   // Legacy BRS statement block (GHANA_BRS_V1 shape) used by current UI consumers.
   // Note: "uncredited lodgments" here includes unmatched bank credits for backward compatibility.
@@ -679,6 +666,53 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     .filter((t) => !(t.details || '').trim())
     .reduce((s, t) => s + t.amount, 0)
   const unpresentedChequesTotal = clearingBrsTotals.unpresentedChequesTotal
+  const unpresentedChequeRowsForBrs = clearingBrsTotals.unpresentedChequeRows
+  const ecobankProfile = resolveEcobankGhanaProfile({
+    bankAccounts: project.bankAccounts || [],
+    sampleBankText: [...credits, ...debits]
+      .slice(0, 12)
+      .map((t) => [t.details, t.name].filter(Boolean).join(' '))
+      .join('\n'),
+  })
+  const unpresentedForAgeing = ecobankProfile.active
+    ? unpresentedChequeRowsForBrs.map((t) => ({
+        date: t.date ?? null,
+        name: t.name ?? null,
+        chqNo: t.chqNo,
+        amount: t.amount,
+        fromProject: project.name,
+      }))
+    : [
+        ...unmatchedPayments.map((t) => ({ ...t, fromProject: project.name })),
+        ...broughtForwardItems.map((t) => ({
+          date: t.date,
+          name: t.name,
+          chqNo: t.chqNo,
+          amount: t.amount,
+          fromProject: t.fromProject,
+        })),
+      ]
+  const missingChequesWithAgeing = buildMissingChequesAgeing(unpresentedForAgeing, refDate)
+  const missingChequesAgeingSummary = {
+    band0_30: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').reduce((s, x) => s + x.amount, 0),
+    },
+    band31_60: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').reduce((s, x) => s + x.amount, 0),
+    },
+    band61_90: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').reduce((s, x) => s + x.amount, 0),
+    },
+    band90_plus: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').reduce((s, x) => s + x.amount, 0),
+    },
+  }
+  const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
+  const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
   const unmatchedDebitsTotal = unmatchedDebits.reduce((s, t) => s + t.amount, 0)
   const matchedPaymentIds = new Set(
     payments.filter((t) => matchedCbIds.has(t.id)).map((t) => t.id)
@@ -692,7 +726,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   )
   const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebitsTotal - bankOnlyDebitsNotInCashBookTotal
   const asAtUncreditedTotal = unmatchedReceiptsTotal
-  const asAtUnpresentedTotal = unmatchedPaymentsTotal
+  const asAtUnpresentedTotal = ecobankProfile.active
+    ? unpresentedChequesTotal
+    : unmatchedPaymentsTotal
   const bankOnlyCreditsNotInCashBookTotal = computeBankOnlyCreditsTotal(
     unmatchedCredits as TxLike[],
     payments as TxLike[],
@@ -724,7 +760,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal,
     bankStatementClosingBalance: bankStatementClosingBalanceValue,
   })
-  const unpresentedCurrentCashBookPeriod = unmatchedPaymentsTotal
+  const unpresentedCurrentCashBookPeriod = ecobankProfile.active
+    ? unpresentedChequeRowsForBrs.reduce((s, t) => s + t.amount, 0)
+    : unmatchedPaymentsTotal
   const timingUncreditedCurrentPeriod = unmatchedReceiptsTotal
   const timingUncreditedBroughtForwardPrior = broughtForwardReceiptLodgmentsTotal
   const unpresentedBroughtForwardPrior = broughtForwardTotal
@@ -804,6 +842,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
     reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
     reportLanguageProfile,
+    reconcileProfile: ecobankProfile.active
+      ? { bankFormat: 'ecobank' as const, ghanaBrs: true, clearingDateWindowDays: ecobankProfile.clearingDateWindowDays }
+      : null,
     brsStatement: {
       bankClosingBalance,
       bankClosingBalanceLegacy,
@@ -829,8 +870,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     additionalInformation: {
       asAtReconciliationPosition: {
         uncreditedLodgmentsOrUnclearedDeposits: asAtUncreditedTotal,
-        bankOnlyCreditsNotInCashBook: unmatchedCreditsTotal,
-        bankOnlyDebitsNotInCashBook: unmatchedDebitsTotal,
+        bankOnlyCreditsNotInCashBook: bankOnlyCreditsNotInCashBookTotal,
+        bankOnlyDebitsNotInCashBook: bankOnlyDebitsNotInCashBookTotal,
         unpresentedChequesOrUnclearedPayments: asAtUnpresentedTotal,
       },
       postPeriodMovement: {
@@ -961,6 +1002,18 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       amountReceived: null as number | null,
       amountPaid: t.amount,
     })),
+    unpresentedChequesForBrs: ecobankProfile.active
+      ? unpresentedChequeRowsForBrs.map((t) => ({
+          date: fmt(t.date ?? null),
+          name: t.name || '—',
+          details: t.details || '—',
+          chqNo: t.chqNo || null,
+          docRef: t.docRef || null,
+          amount: t.amount,
+          amountReceived: null as number | null,
+          amountPaid: t.amount,
+        }))
+      : [],
     unmatchedDebits: unmatchedDebits.map((t) => ({
       date: fmt(t.date),
       description: t.name || t.details || '—',
@@ -1235,29 +1288,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
   })
   const refDateExport = project.reconciliationDate ? new Date(project.reconciliationDate) : new Date()
-  const allUnpresentedExport = [
-    ...payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => ({
-      date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
-      name: t.name || t.details || '—',
-      chqNo: t.chqNo || null,
-      amount: t.amount,
-    })),
-    ...broughtForwardItemsExport.map((t) => ({
-      date: t.date,
-      name: t.name,
-      chqNo: t.chqNo,
-      amount: t.amount,
-    })),
-  ]
-  const missingChequesAgeingExport = buildMissingChequesAgeing(allUnpresentedExport, refDateExport).map((t) => ({
-    Date: t.date,
-    'CHQ NO': t.chqNo || '',
-    'DOC REF': '',
-    Name: t.name || '',
-    [amountColumnHeader(curr)]: t.amount,
-    'Days Outstanding': t.daysOutstanding,
-    'Ageing Band': t.ageingBand,
-  }))
   const receiptIdsExport = new Set(receipts.map((t) => t.id))
   const discrepancies = matchPairs.filter((p) => {
     const amountDiff = Math.abs(p.cb.amount - p.bank.amount)
@@ -1336,8 +1366,54 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
   const unpresentedChequesTotal = clearingBrsTotalsExport.unpresentedChequesTotal
+  const unpresentedChequeRowsForBrsExport = clearingBrsTotalsExport.unpresentedChequeRows
+  const ecobankProfileExport = resolveEcobankGhanaProfile({
+    bankAccounts: project.bankAccounts || [],
+    sampleBankText: [...credits, ...debits]
+      .slice(0, 12)
+      .map((t) => [t.details, t.name].filter(Boolean).join(' '))
+      .join('\n'),
+  })
+  const unpresentedForAgeingExport = ecobankProfileExport.active
+    ? unpresentedChequeRowsForBrsExport.map((t) => ({
+        date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
+        name: t.name || t.details || '—',
+        chqNo: t.chqNo || null,
+        amount: t.amount,
+      }))
+    : [
+        ...payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => ({
+          date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
+          name: t.name || t.details || '—',
+          chqNo: t.chqNo || null,
+          amount: t.amount,
+        })),
+        ...broughtForwardItemsExport.map((t) => ({
+          date: t.date,
+          name: t.name,
+          chqNo: t.chqNo,
+          amount: t.amount,
+        })),
+      ]
+  const missingChequesAgeingExport = buildMissingChequesAgeing(unpresentedForAgeingExport, refDateExport).map((t) => ({
+    Date: t.date,
+    'CHQ NO': t.chqNo || '',
+    'DOC REF': '',
+    Name: t.name || '',
+    [amountColumnHeader(curr)]: t.amount,
+    'Days Outstanding': t.daysOutstanding,
+    'Ageing Band': t.ageingBand,
+  }))
+  const unpresentedChequesForBrsExport = unpresentedChequeRowsForBrsExport.map((t) => ({
+    Date: fmt(t.date ?? null),
+    Details: t.name || t.details || '',
+    'CHQ NO': t.chqNo || '',
+    [amountColumnHeader(curr)]: t.amount,
+  }))
   const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport
-  const asAtUnpresentedTotalExport = unmatchedPaymentsTotalExport
+  const asAtUnpresentedTotalExport = ecobankProfileExport.active
+    ? unpresentedChequesTotal
+    : unmatchedPaymentsTotalExport
   const bankOnlyCreditsNotInCashBookTotalExport = computeBankOnlyCreditsTotal(
     unmatchedCreditsOnlyExport as TxLike[],
     payments as TxLike[],
@@ -1379,7 +1455,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     bankStatementClosingBalance: bankStatementClosingBalanceExport,
   })
   const epsComposition = 0.005
-  const unpresentedCurrentCashBookPeriodExport = unmatchedPaymentsTotalExport
+  const unpresentedCurrentCashBookPeriodExport = ecobankProfileExport.active
+    ? unpresentedChequeRowsForBrsExport.reduce((s, t) => s + t.amount, 0)
+    : unmatchedPaymentsTotalExport
   const timingUncreditedCurrentPeriodExport = unmatchedReceiptsTotalExport
   const timingUncreditedBroughtForwardPriorExport = broughtForwardReceiptLodgmentsTotalExport
   const unpresentedBroughtForwardPriorExport = broughtForwardChequesTotalExport
@@ -1503,7 +1581,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
       [exportLabels.addBankOnlyDebitsNotInCashBookLine, wbAmt(bankOnlyDebitsNotInCashBookTotalExport)],
       [exportLabels.deductBankOnlyCreditsNotInCashBookLine, wbAmt(bankOnlyCreditsNotInCashBookTotalExport)],
-      [exportLabels.cashBookBalanceEnd, wbAmt(workbookScheduleDerivedCashBookExport)],
+      [exportLabels.cashBookBalanceEnd, wbAmt(declaredCashBookBalance ?? workbookScheduleDerivedCashBookExport)],
       [],
       [
         'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES sheet and supporting schedules.',
@@ -1551,7 +1629,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (unmatchedReceipts.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedReceipts), 'UNMATCHED RECEIPTS')
     }
-    if (unmatchedPayments.length) {
+    if (ecobankProfileExport.active && unpresentedChequesForBrsExport.length) {
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(unpresentedChequesForBrsExport),
+        'UNPRESENTED CHEQUES (BRS)'
+      )
+    } else if (unmatchedPayments.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedPayments), 'UNMATCHED PAYMENTS')
     }
     if (bankOnlyDebitsSheet.length) {
@@ -1852,7 +1936,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       },
       {
         label: exportLabels.cashBookBalanceEnd,
-        amount: workbookScheduleDerivedCashBookExport,
+        amount: declaredCashBookBalance ?? workbookScheduleDerivedCashBookExport,
         workbookStyle: true,
         bold: true,
       },

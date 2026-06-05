@@ -297,6 +297,8 @@ export interface BrsClearingAdjustments {
   bankOnlyCreditsNotInCashBookTotal: number
   clearingLinkedPairCount: number
   unpresentedPaymentCount: number
+  /** Cash-book payments that count toward the BRS unpresented line (Ecobank Ghana rules). */
+  unpresentedChequeRows: ClearingTxLike[]
 }
 
 /** True when any bank debit or Ecobank clearing credit corresponds to this cash-book payment. */
@@ -485,6 +487,7 @@ export function brsTotalsExcludingLinkedClearingPairs(
     bankOnlyCreditsNotInCashBookTotal: 0,
     clearingLinkedPairCount: paymentIds.size,
     unpresentedPaymentCount: unpresented.rows.length,
+    unpresentedChequeRows: unpresented.rows,
   }
 }
 

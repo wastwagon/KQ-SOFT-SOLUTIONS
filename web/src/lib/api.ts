@@ -268,10 +268,18 @@ export interface ReportResponse {
       broughtForwardUnpresentedCheques?: number
     }
   }
+  reconcileProfile?: {
+    bankFormat?: 'ecobank' | string
+    ghanaBrs?: boolean
+    clearingDateWindowDays?: number
+  } | null
   unmatchedReceipts?: ReportSimpleTx[]
   unmatchedCredits?: ReportSimpleTx[]
   unmatchedPayments?: ReportSimpleTx[]
+  unpresentedChequesForBrs?: ReportSimpleTx[]
   unmatchedDebits?: ReportSimpleTx[]
+  bankOnlyDebits?: ReportSimpleTx[]
+  bankOnlyCredits?: ReportSimpleTx[]
   discrepancies?: ReportDiscrepancy[]
   broughtForwardItems?: ReportBroughtForwardItem[]
   broughtForwardLodgments?: ReportBroughtForwardLodgment[]
