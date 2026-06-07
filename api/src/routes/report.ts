@@ -31,6 +31,7 @@ import {
   computeBankOnlyDebitsTotal,
   resolveEcobankGhanaProfile,
 } from '../services/ecobankClearingMatcher.js'
+import { unpresentedWithOptionalWorkbookNetting } from '../services/ghanaBrsWorkbookNetting.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -393,6 +394,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const bankAccountId = (req.query.bankAccountId as string) || undefined
+  const workbookNettingQuery = String(req.query.workbookNetting || '').toLowerCase()
+  const workbookNettingRequested =
+    workbookNettingQuery === '1' || workbookNettingQuery === 'true' || workbookNettingQuery === 'yes'
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
     include: {
@@ -551,6 +555,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const receiptIds = new Set(receipts.map((t) => t.id))
   const matchedReceiptsVsCredits = matchPairs.filter((p) => receiptIds.has(p.cb.id))
   const matchedPaymentsVsDebits = matchPairs.filter((p) => !receiptIds.has(p.cb.id))
+  const debitIds = new Set(debits.map((t) => t.id))
+  const creditIds = new Set(credits.map((t) => t.id))
+  const matchedPaymentDebitsForNetting = matchedPaymentsVsDebits
+    .filter((p) => debitIds.has(p.bank.id) || creditIds.has(p.bank.id))
+    .map((p) => ({ payment: p.cb, bankDebit: p.bank }))
 
   const fmt = (d: Date | string | null) =>
     d ? new Date(d).toISOString().slice(0, 10) : ''
@@ -665,15 +674,33 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const unmatchedPaymentsWithoutDetailsTotal = unmatchedPayments
     .filter((t) => !(t.details || '').trim())
     .reduce((s, t) => s + t.amount, 0)
-  const unpresentedChequesTotal = clearingBrsTotals.unpresentedChequesTotal
-  const unpresentedChequeRowsForBrs = clearingBrsTotals.unpresentedChequeRows
   const ecobankProfile = resolveEcobankGhanaProfile({
     bankAccounts: project.bankAccounts || [],
     sampleBankText: [...credits, ...debits]
       .slice(0, 12)
       .map((t) => [t.details, t.name].filter(Boolean).join(' '))
       .join('\n'),
+    workbookNetting: workbookNettingRequested ? true : undefined,
   })
+  const unpresentedResolved = unpresentedWithOptionalWorkbookNetting(
+    ecobankProfile.workbookNetting,
+    {
+      total: clearingBrsTotals.unpresentedChequesTotal,
+      rows: clearingBrsTotals.unpresentedChequeRows,
+    },
+    {
+      unmatchedPayments: unmatchedPayments as TxLike[],
+      unmatchedDebits: unmatchedDebits as TxLike[],
+      unmatchedCredits: unmatchedCredits as TxLike[],
+      allBankDebits: debits as TxLike[],
+      allBankCredits: credits as TxLike[],
+      broughtForwardUnpresentedTotal: broughtForwardTotal,
+      allPayments: payments as TxLike[],
+      matchedPaymentDebits: matchedPaymentDebitsForNetting,
+    }
+  )
+  const unpresentedChequesTotal = unpresentedResolved.total
+  const unpresentedChequeRowsForBrs = unpresentedResolved.rows
   const unpresentedForAgeing = ecobankProfile.active
     ? unpresentedChequeRowsForBrs.map((t) => ({
         date: t.date ?? null,
@@ -843,7 +870,36 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
     reportLanguageProfile,
     reconcileProfile: ecobankProfile.active
-      ? { bankFormat: 'ecobank' as const, ghanaBrs: true, clearingDateWindowDays: ecobankProfile.clearingDateWindowDays }
+      ? {
+          bankFormat: 'ecobank' as const,
+          ghanaBrs: true,
+          clearingDateWindowDays: ecobankProfile.clearingDateWindowDays,
+          workbookNetting: ecobankProfile.workbookNetting,
+          ...(unpresentedResolved.workbook
+            ? {
+                workbookNettingDetail: {
+                  sectionATotal: unpresentedResolved.workbook.sectionATotal,
+                  sectionBTotal: unpresentedResolved.workbook.sectionBTotal,
+                  sectionCOffsetTotal: unpresentedResolved.workbook.sectionCOffsetTotal,
+                  matchedB1Add: unpresentedResolved.workbook.matchedB1Add,
+                  matchedCAdd: unpresentedResolved.workbook.matchedCAdd,
+                  group2Net: unpresentedResolved.workbook.group2Net,
+                  group3OffsetTotal: unpresentedResolved.workbook.group3OffsetTotal,
+                  group3Net: unpresentedResolved.workbook.group3Net,
+                  round1PairCount: unpresentedResolved.workbook.round1Pairs.length,
+                  round1MatchedPairCount: unpresentedResolved.workbook.round1MatchedPairs.length,
+                  round2PairCount: unpresentedResolved.workbook.round2Pairs.length,
+                  round2PaymentOffset: unpresentedResolved.workbook.round2Pairs.reduce(
+                    (s, p) => s + p.amount,
+                    0
+                  ),
+                  workbookUnpresented: unpresentedResolved.workbook.unpresentedChequesTotal,
+                  legacyUnpresented: clearingBrsTotals.unpresentedChequesTotal,
+                  applied: unpresentedResolved.total,
+                },
+              }
+            : {}),
+        }
       : null,
     brsStatement: {
       bankClosingBalance,
@@ -1365,8 +1421,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const unmatchedPaymentsTotalExport = clearingBrsTotalsExport.unmatchedPaymentsTotal
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
-  const unpresentedChequesTotal = clearingBrsTotalsExport.unpresentedChequesTotal
-  const unpresentedChequeRowsForBrsExport = clearingBrsTotalsExport.unpresentedChequeRows
   const ecobankProfileExport = resolveEcobankGhanaProfile({
     bankAccounts: project.bankAccounts || [],
     sampleBankText: [...credits, ...debits]
@@ -1374,6 +1428,31 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       .map((t) => [t.details, t.name].filter(Boolean).join(' '))
       .join('\n'),
   })
+  const matchedPaymentsVsDebitsExport = matchPairs.filter((p) => !receiptIds.has(p.cb.id))
+  const debitIdsExport = new Set(debits.map((t) => t.id))
+  const creditIdsExport = new Set(credits.map((t) => t.id))
+  const matchedPaymentDebitsForNettingExport = matchedPaymentsVsDebitsExport
+    .filter((p) => debitIdsExport.has(p.bank.id) || creditIdsExport.has(p.bank.id))
+    .map((p) => ({ payment: p.cb, bankDebit: p.bank }))
+  const unpresentedResolvedExport = unpresentedWithOptionalWorkbookNetting(
+    ecobankProfileExport.workbookNetting,
+    {
+      total: clearingBrsTotalsExport.unpresentedChequesTotal,
+      rows: clearingBrsTotalsExport.unpresentedChequeRows,
+    },
+    {
+      unmatchedPayments: unmatchedPaymentsOnlyExport as TxLike[],
+      unmatchedDebits: unmatchedDebitsOnlyExport as TxLike[],
+      unmatchedCredits: unmatchedCreditsOnlyExport as TxLike[],
+      allBankDebits: debits as TxLike[],
+      allBankCredits: credits as TxLike[],
+      broughtForwardUnpresentedTotal: broughtForwardChequesTotalExport,
+      allPayments: payments as TxLike[],
+      matchedPaymentDebits: matchedPaymentDebitsForNettingExport,
+    }
+  )
+  const unpresentedChequesTotal = unpresentedResolvedExport.total
+  const unpresentedChequeRowsForBrsExport = unpresentedResolvedExport.rows
   const unpresentedForAgeingExport = ecobankProfileExport.active
     ? unpresentedChequeRowsForBrsExport.map((t) => ({
         date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',

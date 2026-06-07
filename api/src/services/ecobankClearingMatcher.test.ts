@@ -14,6 +14,7 @@ import {
   creditHasCashBookCounterpart,
   isCreditReclassifiedAsDebit,
   suggestEcobankPaymentDebitMatches,
+  suggestEcobankStatutoryDepositMatches,
   resolveEcobankGhanaProfile,
   buildBankOnlyScheduleRows,
   isEcobankPatternMatchReason,
@@ -42,6 +43,67 @@ describe('isEcobankClearingCredit', () => {
       })
     ).toBe(true)
     expect(isEcobankClearingCredit({ details: 'CHEQUE WITHDRAWAL CHQ 002067' })).toBe(false)
+    expect(
+      isEcobankClearingCredit({
+        details: 'HSE CHEQUE-EGH CHQ NO 926118 DEPOSIT BO LORDSHIP INSURANCE BROKERS LIMITED',
+      })
+    ).toBe(true)
+    expect(
+      isEcobankClearingCredit({
+        details: 'HSE CHEQUE-EGH CHQ 926116 PAID TO ALEX SETSOAFIA AVORKPO.',
+      })
+    ).toBe(false)
+    expect(
+      isEcobankClearingCredit({ details: 'CHQ NO 926117 received from Clearing' })
+    ).toBe(true)
+  })
+})
+
+describe('suggestEcobankStatutoryDepositMatches', () => {
+  it('suggests GRA payment ↔ HSE GRA deposit on debit column when chq numbers differ', () => {
+    const payments = [
+      tx({
+        id: 'p1',
+        amount: 2981.81,
+        chqNo: '926044',
+        name: 'GRA',
+        details: 'Payment of staff PAYE for Dec 25',
+      }),
+    ]
+    const debits = [
+      tx({
+        id: 'd1',
+        amount: 2981.81,
+        details: 'HSE CHEQUE-EGH CHQ 925966 DEP. BO LORDSHIP INSURANCE BROKERS LIMITED IRO GRA PMT.',
+      }),
+    ]
+    const result = suggestEcobankStatutoryDepositMatches(payments, [], new Set(), new Set(), 0.01, debits)
+    expect(result).toHaveLength(1)
+    expect(result[0]!.cashBookTx.id).toBe('p1')
+    expect(result[0]!.bankTx.id).toBe('d1')
+  })
+
+  it('suggests GRA payment ↔ HSE GRA deposit when chq numbers differ', () => {
+    const payments = [
+      tx({
+        id: 'p1',
+        amount: 2981.81,
+        chqNo: '926044',
+        name: 'GRA',
+        details: 'Payment of staff PAYE for Dec 25',
+      }),
+    ]
+    const credits = [
+      tx({
+        id: 'c1',
+        amount: 2981.81,
+        details: 'HSE CHEQUE-EGH CHQ 925966 DEP. BO LORDSHIP INSURANCE BROKERS LIMITED IRO GRA PMT',
+      }),
+    ]
+    const result = suggestEcobankStatutoryDepositMatches(payments, credits, new Set(), new Set())
+    expect(result).toHaveLength(1)
+    expect(result[0]!.cashBookTx.id).toBe('p1')
+    expect(result[0]!.bankTx.id).toBe('c1')
   })
 })
 
@@ -251,6 +313,41 @@ describe('creditHasCashBookCounterpart', () => {
 })
 
 describe('suggestEcobankPaymentDebitMatches', () => {
+  it('prefers chq/ref + amount over payee when bank line cites a different chq', () => {
+    const payments = [
+      tx({ id: 'p1', amount: 5000, chqNo: '925976', name: 'Philip akuffo', details: 'Part payment of ED fuel' }),
+      tx({ id: 'p2', amount: 5000, chqNo: '926075', name: 'Royal Adjei', details: 'Payment of Short Loan' }),
+    ]
+    const debits = [
+      tx({
+        id: 'd1',
+        amount: 5000,
+        chqNo: '925976',
+        details: 'WITHDRAWAL- EGH CHQ NO 925976 PD TO ROYAL ADJEI - 0246136244',
+      }),
+    ]
+    const result = suggestEcobankPaymentDebitMatches(payments, debits, new Set(), new Set())
+    expect(result).toHaveLength(1)
+    expect(result[0]!.cashBookTx.id).toBe('p1')
+    expect(result[0]!.reason).toContain('chq/ref + amount')
+  })
+  it('suggests cross-chq withdrawal when payee matches but bank cites a different chq', () => {
+    const payments = [
+      tx({ id: 'p2', amount: 5000, chqNo: '926075', name: 'Royal Adjei', details: 'Payment of Short Loan' }),
+    ]
+    const debits = [
+      tx({
+        id: 'd1',
+        amount: 5000,
+        chqNo: '925976',
+        details: 'WITHDRAWAL- EGH CHQ NO 925976 PD TO ROYAL ADJEI - 0246136244',
+      }),
+    ]
+    const result = suggestEcobankPaymentDebitMatches(payments, debits, new Set(), new Set())
+    expect(result).toHaveLength(1)
+    expect(result[0]!.cashBookTx.id).toBe('p2')
+    expect(result[0]!.reason).toContain('cross-chq')
+  })
   it('suggests transfer payment ↔ outward transfer debit', () => {
     const payments = [
       tx({
@@ -287,6 +384,21 @@ describe('resolveEcobankGhanaProfile', () => {
       }).active
     ).toBe(true)
     expect(resolveEcobankGhanaProfile({ bankAccounts: [{ name: 'GCB Main' }] }).active).toBe(false)
+  })
+
+  it('enables workbook netting only when opted in (env or explicit flag)', () => {
+    expect(
+      resolveEcobankGhanaProfile({
+        bankAccounts: [{ name: 'Ecobank Tesano', bankName: 'Ecobank' }],
+      }).workbookNetting
+    ).toBe(false)
+    expect(
+      resolveEcobankGhanaProfile({
+        bankAccounts: [{ name: 'Ecobank Tesano', bankName: 'Ecobank' }],
+        workbookNetting: true,
+      }).workbookNetting
+    ).toBe(true)
+    expect(resolveEcobankGhanaProfile({ bankAccounts: [{ name: 'GCB Main' }] }).workbookNetting).toBe(false)
   })
 })
 

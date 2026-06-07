@@ -14,6 +14,7 @@ import {
   resolveEcobankGhanaProfile,
   suggestEcobankClearingMatches,
   suggestEcobankPaymentDebitMatches,
+  suggestEcobankStatutoryDepositMatches,
 } from '../services/ecobankClearingMatcher.js'
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
@@ -233,8 +234,19 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     matchedBankIds,
     matchOptions.amountTolerance
   )
+  const statutoryDepositSuggestions = suggestEcobankStatutoryDepositMatches(
+    paymentsFull,
+    creditsFull,
+    matchedCbIds,
+    matchedBankIds,
+    matchOptions.amountTolerance,
+    debitsFull
+  )
   const paymentSuggestions = mergePaymentSuggestions(
-    mergePaymentSuggestions(clearingPaymentSuggestions, ecobankPaymentDebitSuggestions),
+    mergePaymentSuggestions(
+      mergePaymentSuggestions(clearingPaymentSuggestions, statutoryDepositSuggestions),
+      ecobankPaymentDebitSuggestions
+    ),
     standardPaymentSuggestions
   )
   const duplicateChequeWarnings = detectDuplicateChequePayments(paymentsFull)
@@ -340,7 +352,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       split: splitSuggestions,
     },
     reconcileProfile: ecobankProfile.active
-      ? { bankFormat: 'ecobank' as const, ghanaBrs: true, clearingDateWindowDays }
+      ? {
+          bankFormat: 'ecobank' as const,
+          ghanaBrs: true,
+          clearingDateWindowDays,
+          workbookNetting: ecobankProfile.workbookNetting,
+        }
       : null,
     duplicateChequeWarnings,
     flaggedBankIds,

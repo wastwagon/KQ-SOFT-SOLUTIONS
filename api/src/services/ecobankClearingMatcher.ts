@@ -15,9 +15,12 @@ export type ClearingTxLike = {
   docRef?: string | null
 }
 
-/** Bank credit lines that pair with cash-book cheque payments. */
+/**
+ * Bank credit lines that pair with cash-book cheque payments.
+ * Lordship Ecobank exports often use "HSE CHEQUE-EGH … DEPOSIT" without the "CHEQUE DEPOSIT - HSE" prefix.
+ */
 export const ECOBANK_CLEARING_CREDIT_RE =
-  /CHEQUE\s+CLEARING\s*-\s*INWARD|CHEQUE\s+DEPOSIT\s*-\s*HSE|CHEQUE\s+DEPOSIT(?!\s+-\s*HSE)/i
+  /CHEQUE\s+CLEARING\s*-\s*INWARD|CHQ\s+NO\s+[\d.]+\s+received\s+from\s+Clearing|received\s+from\s+Clearing|CHEQUE\s+DEPOSIT\s*-\s*HSE|CHEQUE\s+DEPOSIT(?!\s+-\s*HSE)|HSE\s+CHEQUE(?:-EGH|-EBG)?[\s\S]*(?:DEPOSIT|DEP\.?\b|DEP\s+BO|DEPOSIT\s+BO)/i
 
 const CHEQUE_REF_RE =
   /\b(?:CHQ|Cheque|REF|Ref)(?:\s*(?:No|NO|no)\.?)?\s*[#:.]?\s*(\d{2,10})(?=[A-Z]|\b|$)/gi
@@ -27,7 +30,7 @@ const WITHDRAWAL_DEBIT_RE = /CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i
 
 /** Bulk-match tier B: only auto-apply payment suggestions with these reasons (not generic chq↔debit). */
 export const ECOBANK_BULK_SAFE_REASON_RE =
-  /Ecobank clearing|Ecobank transfer|Ecobank withdrawal/i
+  /Ecobank clearing|Ecobank transfer|Ecobank withdrawal|Ecobank statutory deposit/i
 
 export function isEcobankPatternMatchReason(reason: string): boolean {
   return ECOBANK_BULK_SAFE_REASON_RE.test(reason)
@@ -37,21 +40,28 @@ export interface EcobankGhanaProfile {
   active: boolean
   label: string
   clearingDateWindowDays: number
+  /** When true, BRS unpresented uses manual workbook Groups 2–3 netting (opt-in; default off). */
+  workbookNetting: boolean
 }
 
 export function resolveEcobankGhanaProfile(opts: {
   bankAccounts?: { name?: string | null; bankName?: string | null }[]
   sampleBankText?: string
+  workbookNetting?: boolean
 }): EcobankGhanaProfile {
   const names = (opts.bankAccounts || []).flatMap((a) => [a.name, a.bankName].filter(Boolean))
   const text = [...names, opts.sampleBankText || ''].join(' ')
   const active =
     /ecobank/i.test(text) ||
     /CHEQUE\s+CLEARING\s*-\s*INWARD|CHEQUE\s+DEPOSIT\s*-\s*HSE/i.test(opts.sampleBankText || '')
+  const envOn =
+    process.env.GHANA_BRS_WORKBOOK_NETTING === '1' || process.env.GHANA_BRS_WORKBOOK_NETTING === 'true'
+  const workbookNetting = opts.workbookNetting ?? envOn
   return {
     active,
     label: 'Ecobank Ghana BRS',
     clearingDateWindowDays: 14,
+    workbookNetting: active && workbookNetting,
   }
 }
 
@@ -138,18 +148,119 @@ function payeeTokens(payment: ClearingTxLike): string[] {
     .filter((t) => t.length >= 4)
 }
 
+/** GRA / PAYE / statutory lines often clear via HSE deposits with a different cheque number. */
+const STATUTORY_DEPOSIT_PAIRS: { payment: RegExp; bank: RegExp }[] = [
+  { payment: /\bGRA\b/i, bank: /\bGRA\b/i },
+  { payment: /\bSSNIT\b/i, bank: /\bSSNIT\b/i },
+  { payment: /\bNBC\b/i, bank: /\bNBC\b/i },
+  { payment: /\bECG\b/i, bank: /\bECG\b/i },
+  { payment: /ENTERPRISE\s+TRUSTEES/i, bank: /ENTERPRISE\s+TRUSTEES/i },
+]
+
+function paymentMatchesStatutoryBankLine(payment: ClearingTxLike, bankLine: ClearingTxLike): boolean {
+  const payText = [payment.name, payment.details].filter(Boolean).join(' ')
+  const bankT = bankText(bankLine)
+  return STATUTORY_DEPOSIT_PAIRS.some(
+    ({ payment: payRe, bank: bankRe }) => payRe.test(payText) && bankRe.test(bankT)
+  )
+}
+
+/** HSE statutory deposits sometimes post to the debit column on Ecobank exports. */
+export function isEcobankHseStatutoryDepositLine(tx: ClearingTxLike): boolean {
+  const text = bankText(tx)
+  return /HSE\s+CHEQUE/i.test(text) && /\bDEP/i.test(text) && /\b(GRA|SSNIT|NBC|ECG|ENTERPRISE\s+TRUSTEES)\b/i.test(text)
+}
+
+function statutoryDepositBankLines(
+  bankCredits: ClearingTxLike[],
+  bankDebits: ClearingTxLike[] = []
+): ClearingTxLike[] {
+  return [
+    ...bankCredits.filter((c) => isEcobankClearingCredit(c)),
+    ...bankDebits.filter((d) => isEcobankHseStatutoryDepositLine(d)),
+  ]
+}
+
+/** True when the payment chq appears anywhere on a bank line (timing signal / workbook section B). */
+export function paymentChqMentionedOnBankStatement(
+  payment: ClearingTxLike,
+  bankDebits: ClearingTxLike[],
+  bankCredits: ClearingTxLike[]
+): boolean {
+  const lines = [...bankDebits, ...bankCredits]
+  for (const line of lines) {
+    if (chequeOrRefLink(payment, line)) return true
+  }
+  const chq = payment.chqNo?.trim()
+  if (!chq) return false
+  const padded = padChqRef(chq)
+  for (const line of lines) {
+    const text = bankText(line)
+    if (text.includes(chq) || (padded && text.includes(padded))) return true
+  }
+  return false
+}
+
+/** Payee-only withdrawal pairing is unsafe when the bank line cites a different explicit chq. */
+function withdrawalPayeeMatchAllowed(
+  payment: ClearingTxLike,
+  debit: ClearingTxLike,
+  amountTolerance: number
+): boolean {
+  const payChq = payment.chqNo?.trim()
+  if (payChq) {
+    const refs = extractRefsFromText(bankText(debit)).filter((r) => r.length >= 5)
+    if (refs.length > 0 && !refs.some((r) => refTokensEquivalent(r, payChq))) return false
+  }
+  const tokens = payeeTokens(payment)
+  if (!tokens.length) return false
+  const text = bankText(debit).toUpperCase()
+  if (!/CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i.test(text)) return false
+  return tokens.some((t) => text.includes(t))
+}
+
+/** HSE / inward clearing bank line that pairs with a statutory cash-book payment (amount + payee keyword). */
+export function paymentHasStatutoryDepositCounterpart(
+  payment: ClearingTxLike,
+  bankCredits: ClearingTxLike[],
+  amountTolerance = 0.01,
+  bankDebits: ClearingTxLike[] = []
+): boolean {
+  for (const line of statutoryDepositBankLines(bankCredits, bankDebits)) {
+    if (!amountsMatch(payment.amount, line.amount, amountTolerance)) continue
+    if (paymentMatchesStatutoryBankLine(payment, line)) return true
+  }
+  return false
+}
+
 /** Ecobank withdrawal debits with matching amount and payee name (handles truncated CHQ refs). */
 export function paymentHasNamedWithdrawalCounterpart(
   payment: ClearingTxLike,
   bankDebits: ClearingTxLike[],
   amountTolerance = 0.01
 ): boolean {
+  for (const d of bankDebits) {
+    if (!amountsMatch(payment.amount, d.amount, amountTolerance)) continue
+    if (withdrawalPayeeMatchAllowed(payment, d, amountTolerance)) return true
+  }
+  return false
+}
+
+/** Withdrawal cites a different chq but names the same payee (manual cross-chq pairs). */
+export function paymentHasCrossChqWithdrawalCounterpart(
+  payment: ClearingTxLike,
+  bankDebits: ClearingTxLike[],
+  amountTolerance = 0.01
+): boolean {
+  const payChq = payment.chqNo?.trim()
   const tokens = payeeTokens(payment)
   if (!tokens.length) return false
   for (const d of bankDebits) {
     if (!amountsMatch(payment.amount, d.amount, amountTolerance)) continue
     const text = bankText(d).toUpperCase()
     if (!/CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i.test(text)) continue
+    const bankRefs = extractRefsFromText(bankText(d)).filter((r) => r.length >= 5)
+    if (payChq && bankRefs.some((r) => refTokensEquivalent(r, payChq))) continue
     if (tokens.some((t) => text.includes(t))) return true
   }
   return false
@@ -311,10 +422,12 @@ export function paymentHasBankCounterpart(
   if (isLevyPayment(payment)) return true
   if (paymentHasTransferCounterpart(payment, bankDebits, amountTolerance)) return true
   if (paymentHasNamedWithdrawalCounterpart(payment, bankDebits, amountTolerance)) return true
+  if (paymentHasCrossChqWithdrawalCounterpart(payment, bankDebits, amountTolerance)) return true
   for (const d of bankDebits) {
     if (!amountsMatch(payment.amount, d.amount, amountTolerance)) continue
     if (chequeOrRefLink(payment, d)) return true
   }
+  if (paymentHasStatutoryDepositCounterpart(payment, bankCredits, amountTolerance, bankDebits)) return true
   for (const c of bankCredits) {
     if (!isEcobankClearingCredit(c)) continue
     if (!amountsMatch(payment.amount, c.amount, amountTolerance)) continue
@@ -360,11 +473,23 @@ export function debitHasPaymentCounterpart(
   const text = bankText(debit).toUpperCase()
   const isTransfer = TRANSFER_DEBIT_RE.test(text)
   const isWithdrawal = WITHDRAWAL_DEBIT_RE.test(text)
+  if (isEcobankHseStatutoryDepositLine(debit)) {
+    for (const p of payments) {
+      if (!amountsMatch(p.amount, debit.amount, amountTolerance)) continue
+      if (paymentMatchesStatutoryBankLine(p, debit)) return true
+    }
+  }
   for (const p of payments) {
     if (!amountsMatch(p.amount, debit.amount, amountTolerance)) continue
     if (chequeOrRefLink(p, debit)) return true
     const tokens = payeeTokens(p)
-    if (tokens.length && (isWithdrawal || isTransfer) && tokens.some((t) => text.includes(t))) {
+    if (tokens.length && isWithdrawal && withdrawalPayeeMatchAllowed(p, debit, amountTolerance)) {
+      return true
+    }
+    if (isWithdrawal && paymentHasCrossChqWithdrawalCounterpart(p, [debit], amountTolerance)) {
+      return true
+    }
+    if (tokens.length && isTransfer && tokens.some((t) => text.includes(t))) {
       return true
     }
   }
@@ -396,6 +521,7 @@ export function creditHasCashBookCounterpart(
   for (const p of payments) {
     if (!amountsMatch(p.amount, credit.amount, amountTolerance)) continue
     if (chequeOrRefLink(p, credit)) return true
+    if (isEcobankClearingCredit(credit) && paymentMatchesStatutoryBankLine(p, credit)) return true
   }
   return false
 }
@@ -508,16 +634,74 @@ export function suggestEcobankPaymentDebitMatches(
     for (const bk of debits) {
       if (matchedBankIds.has(bk.id)) continue
       if (!amountsMatch(cb.amount, bk.amount, amountTolerance)) continue
+      const text = bankText(bk).toUpperCase()
+      const isWithdrawal = /CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i.test(text)
+      if (isWithdrawal && chequeOrRefLink(cb, bk)) {
+        suggestions.push({
+          cashBookTx: cb,
+          bankTx: bk,
+          confidence: 0.94,
+          reason: 'Ecobank withdrawal: chq/ref + amount',
+        })
+        continue
+      }
       const transfer = paymentHasTransferCounterpart(cb, [bk], amountTolerance)
-      const named = paymentHasNamedWithdrawalCounterpart(cb, [bk], amountTolerance)
-      if (!transfer && !named) continue
+      const crossChq =
+        isWithdrawal &&
+        paymentHasCrossChqWithdrawalCounterpart(cb, [bk], amountTolerance) &&
+        !chequeOrRefLink(cb, bk)
+      const named = isWithdrawal && withdrawalPayeeMatchAllowed(cb, bk, amountTolerance)
+      if (!transfer && !crossChq && !named) continue
       suggestions.push({
         cashBookTx: cb,
         bankTx: bk,
-        confidence: transfer ? 0.91 : 0.89,
+        confidence: transfer ? 0.91 : crossChq ? 0.88 : 0.89,
         reason: transfer
           ? 'Ecobank transfer: amount + payee'
-          : 'Ecobank withdrawal: amount + payee (truncated chq)',
+          : crossChq
+            ? 'Ecobank withdrawal: amount + payee (cross-chq)'
+            : 'Ecobank withdrawal: amount + payee (truncated chq)',
+      })
+    }
+  }
+  const byCb = new Map<string, SuggestedMatch>()
+  for (const s of suggestions) {
+    const prev = byCb.get(s.cashBookTx.id)
+    if (!prev || s.confidence > prev.confidence) byCb.set(s.cashBookTx.id, s)
+  }
+  const byBank = new Map<string, SuggestedMatch>()
+  for (const s of byCb.values()) {
+    const prev = byBank.get(s.bankTx.id)
+    if (!prev || s.confidence > prev.confidence) byBank.set(s.bankTx.id, s)
+  }
+  return Array.from(byBank.values()).sort((a, b) => b.confidence - a.confidence)
+}
+
+/**
+ * Suggest payment ↔ HSE/statutory bank credit when amount and payee keyword match
+ * (manual workbooks often use different cheque numbers for GRA / PAYE deposits).
+ */
+export function suggestEcobankStatutoryDepositMatches(
+  payments: Tx[],
+  credits: Tx[],
+  matchedCashBookIds: Set<string>,
+  matchedBankIds: Set<string>,
+  amountTolerance = 0.01,
+  debits: Tx[] = []
+): SuggestedMatch[] {
+  const suggestions: SuggestedMatch[] = []
+  const bankLines = statutoryDepositBankLines(credits, debits)
+  for (const cb of payments) {
+    if (matchedCashBookIds.has(cb.id)) continue
+    for (const bk of bankLines) {
+      if (matchedBankIds.has(bk.id)) continue
+      if (!amountsMatch(cb.amount, bk.amount, amountTolerance)) continue
+      if (!paymentMatchesStatutoryBankLine(cb, bk)) continue
+      suggestions.push({
+        cashBookTx: cb,
+        bankTx: bk,
+        confidence: 0.9,
+        reason: 'Ecobank statutory deposit: amount + payee keyword',
       })
     }
   }
