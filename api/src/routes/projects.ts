@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canCreateProject, incrementProjects } from '../services/usage.js'
-import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProject, canReopenProject, canSubmitForReview, canApprove, isProjectEditable, canExportReport } from '../lib/permissions.js'
+import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProject, canReopenProject, canSubmitForReview, canApprove, isProjectEditable, canExportReport, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { logAudit } from '../services/audit.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
 import { getProjectVariance } from '../lib/reconcile-variance.js'
@@ -176,7 +176,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
   const project = await prisma.project.findUnique({ where: { id: projectId } })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
     const body = updateSchema.parse(req.body)

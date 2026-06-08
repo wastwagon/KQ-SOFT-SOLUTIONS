@@ -76,6 +76,9 @@ export function canDeleteAttachment(role: OrgRole | string | null | undefined): 
 /** Project statuses that lock editing (upload, map, reconcile) */
 export const LOCKED_STATUSES = ['submitted_for_review', 'approved', 'completed']
 
+export const PROJECT_LOCKED_ERROR =
+  'Project is locked (completed, submitted for review, or approved). Reopen to edit.'
+
 export function isProjectEditable(status: string | null | undefined): boolean {
   return !!status && !LOCKED_STATUSES.includes(status)
 }

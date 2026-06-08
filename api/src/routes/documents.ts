@@ -3,7 +3,7 @@ import { z } from 'zod'
 import fs from 'fs'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
-import { canMapDocuments, isProjectEditable } from '../lib/permissions.js'
+import { canMapDocuments, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { detectFileType } from '../services/parser.js'
 import { parseDocumentFile } from '../services/documentParse.js'
 import { detectGhanaBankFormat, type GhanaBankFormat } from '../services/ghanaBankParsers.js'
@@ -112,7 +112,7 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     return res.status(404).json({ error: 'Document not found' })
   }
   if (!isProjectEditable((doc.project as { status?: string }).status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   if (!fs.existsSync(doc.filepath)) {
     return res.status(404).json({ error: 'File not found' })

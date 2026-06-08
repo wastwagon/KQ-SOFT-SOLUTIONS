@@ -16,7 +16,8 @@ import {
   type MappingConfidence,
 } from '@brs/suggested-mapping'
 import { useAuth } from '../store/auth'
-import { canExportReport } from '../lib/permissions'
+import { canExportReport, isProjectEditable } from '../lib/permissions'
+import ProjectLockedBanner from '../components/project/ProjectLockedBanner'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
@@ -357,6 +358,9 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   }
   if (projectPending || !project) return <WorkflowStepSkeleton bodyRows={3} />
 
+  const projectLocked = !isProjectEditable(project.status)
+  const mappingDisabled = !canMap || projectLocked
+
   const canonicalFields = selectedDoc?.type?.startsWith('cash_book_')
     ? CASH_BOOK_FIELDS
     : BANK_FIELDS
@@ -382,6 +386,9 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       <p className="text-xs text-blue-700 max-w-2xl rounded-xl bg-blue-50 border border-blue-200 px-3 py-2">
         <strong>Signed amount mode:</strong> if one amount column contains mixed entries, positive amounts are treated as receipts/credits and negative amounts as payments/debits.
       </p>
+      {projectLocked && (
+        <ProjectLockedBanner projectId={id} status={project.status} role={role} />
+      )}
       {!canMap && (
         <p className="text-sm text-amber-600">You have view-only access. Contact an admin, reviewer, or preparer to map documents.</p>
       )}
@@ -478,7 +485,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         </div>
       )}
 
-      {canMap && docs.length > 0 && (
+      {canMap && !projectLocked && docs.length > 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3 max-w-2xl">
           <div>
             <p className="text-sm font-semibold text-gray-900">Bulk apply — which files?</p>
@@ -698,6 +705,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                     </label>
                     <select
                       value={mapping[field] ?? ''}
+                      disabled={mappingDisabled}
                       onChange={(e) => {
                         const v = e.target.value
                         setMapping((m) => {
@@ -707,7 +715,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                           return next
                         })
                       }}
-                      className="w-full sm:flex-1 sm:max-w-xs px-3 py-2.5 min-h-[44px] border border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-primary-500"
+                      className="w-full sm:flex-1 sm:max-w-xs px-3 py-2.5 min-h-[44px] border border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
                     >
                       <option value="">Do not map this field</option>
                       {(preview.headers || []).map((h: string, i: number) => (
@@ -719,7 +727,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   </div>
                 ))}
               </div>
-              {canMap && (
+              {!mappingDisabled && (
               <button
                 onClick={() => mapMutation.mutate(selectedDocId)}
                 disabled={mapMutation.isPending}

@@ -6,7 +6,7 @@ import crypto from 'node:crypto'
 import type { DocumentType } from '@prisma/client'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { sanitizeFilename } from '../lib/sanitizeFilename.js'
-import { canUploadDocuments, isProjectEditable } from '../lib/permissions.js'
+import { canUploadDocuments, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
@@ -107,7 +107,7 @@ router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequ
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   const type = req.body.type === 'payments' ? 'cash_book_payments' : 'cash_book_receipts'
   const safeFilename = sanitizeFilename(req.file.originalname)
@@ -170,7 +170,7 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   const type = req.body.type === 'debits' ? 'bank_debits' : 'bank_credits'
   let bankAccountId: string | undefined = req.body.bankAccountId

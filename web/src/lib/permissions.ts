@@ -64,3 +64,10 @@ export function canApprove(role: OrgRole | string | null): boolean {
 export function canDeleteAttachment(role: OrgRole | string | null): boolean {
   return role === 'admin' || role === 'reviewer'
 }
+
+/** Project statuses that lock upload, map, and reconcile */
+export const LOCKED_STATUSES = ['submitted_for_review', 'approved', 'completed'] as const
+
+export function isProjectEditable(status: string | null | undefined): boolean {
+  return !!status && !LOCKED_STATUSES.includes(status as (typeof LOCKED_STATUSES)[number])
+}

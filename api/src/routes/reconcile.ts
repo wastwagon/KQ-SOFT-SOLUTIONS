@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
-import { canReconcile, isProjectEditable } from '../lib/permissions.js'
+import { canReconcile, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
 import { suggestMatches, suggestSplitMatches, type Tx, type SuggestedSplitMatch } from '../services/matching.js'
 import {
@@ -449,7 +449,7 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
     const body = multiMatchSchema.parse(req.body)
@@ -532,7 +532,7 @@ router.post('/:projectId/match', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
     const body = matchSchema.parse(req.body)
@@ -607,7 +607,7 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
     const body = bulkMatchSchema.parse(req.body)
@@ -708,7 +708,7 @@ router.delete('/:projectId/matches', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   const deleted = await prisma.match.deleteMany({ where: { projectId } })
   await logAudit({
@@ -735,7 +735,7 @@ router.delete('/:projectId/match/:matchId', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
   if (!isProjectEditable(project.status)) {
-    return res.status(403).json({ error: 'Project is locked (submitted for review or approved). Reopen to edit.' })
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   const match = await prisma.match.findFirst({
     where: { id: matchId, projectId },

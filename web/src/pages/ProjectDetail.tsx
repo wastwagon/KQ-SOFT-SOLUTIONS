@@ -9,6 +9,7 @@ import {
   canMapDocuments,
   canReconcile,
   canReopenProject,
+  isProjectEditable,
 } from '../lib/permissions'
 import { useAuth } from '../store/auth'
 import { useToast } from '../components/ui/Toast'
@@ -92,6 +93,17 @@ export default function ProjectDetail() {
     enabled: !!slug,
   })
   const { data: project, isLoading, isPending: projectPending, isError: projectQueryFailed } = projectQuery
+
+  // Completed / approved / submitted jobs open on Report unless the URL names another step.
+  useEffect(() => {
+    if (!project) return
+    if (isProjectEditable(project.status)) return
+    const h = (typeof window !== 'undefined' ? window.location.hash : location.hash)
+      .slice(1)
+      .toLowerCase()
+    if (h && HASH_TO_STEP[h] !== undefined) return
+    setStepState(4)
+  }, [project, location.hash])
 
   const clientsQuery = useQuery({
     queryKey: ['clients'],
