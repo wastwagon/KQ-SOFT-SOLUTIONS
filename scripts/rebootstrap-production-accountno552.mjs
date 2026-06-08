@@ -12,7 +12,9 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
-const DATA = path.join(ROOT, 'accountno552records')
+const DATA = path.join(ROOT, process.env.BRS_DATA_DIR || 'accountno552records')
+const CASH_FILE = process.env.BRS_CASH_FILE || 'LIBcashbk1 2026 1qtr.xlsx'
+const BANK_FILE = process.env.BRS_BANK_FILE || '1778163944552 dated 4.6.26.xlsx'
 
 const API = process.env.API_URL || 'https://api.kqsoftwaresolutions.com'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
@@ -20,7 +22,8 @@ const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 const PROJECT_SLUG = process.env.BRS_PROJECT_SLUG || 'lordship-ecobank-9033-q1-2026'
 const PROJECT_NAME = process.env.BRS_PROJECT_NAME || 'Lordship – Ecobank 9033 Q1 2026'
 const RECON_DATE = '2026-03-31T00:00:00.000Z'
-const BANK_CLOSING = 18643.29
+const BANK_CLOSING = Number(process.env.BRS_BANK_CLOSING || 18643.29)
+const BANK_ACCOUNT_NO = process.env.BRS_BANK_ACCOUNT_NO || '1441001519033'
 
 /** From Account901 brs as at 31.3.2026.xlsx — Ecobank 1441001519033 */
 const MANUAL = {
@@ -149,8 +152,8 @@ async function main() {
   console.log('Account:', EMAIL)
   console.log('Target slug:', PROJECT_SLUG)
 
-  for (const f of ['LIBcashbk1 2026 1qtr.xlsx', '1778163944552 dated 4.6.26.xlsx']) {
-    if (!fs.existsSync(path.join(DATA, f))) throw new Error(`Missing ${f} in accountno552records/`)
+  for (const f of [CASH_FILE, BANK_FILE]) {
+    if (!fs.existsSync(path.join(DATA, f))) throw new Error(`Missing ${f} in ${DATA}/`)
   }
 
   const token = await login()
@@ -168,14 +171,14 @@ async function main() {
     currency: 'GHS',
     reconciliationDate: RECON_DATE,
     primaryBankName: 'Ecobank Tesano',
-    primaryAccountNo: '1441001519033',
+    primaryAccountNo: BANK_ACCOUNT_NO,
   })
   console.log('Created project:', project.name, `(${project.slug})`)
 
-  const acct = 'Ecobank Tesano 1441001519033'
-  const acctNo = '1441001519033'
-  const cb = path.join(DATA, 'LIBcashbk1 2026 1qtr.xlsx')
-  const bank = path.join(DATA, '1778163944552 dated 4.6.26.xlsx')
+  const acct = `Ecobank Tesano ${BANK_ACCOUNT_NO}`
+  const acctNo = BANK_ACCOUNT_NO
+  const cb = path.join(DATA, CASH_FILE)
+  const bank = path.join(DATA, BANK_FILE)
 
   console.log('\nUploading cash book + bank xlsx...')
   await uploadFile(token, project.id, 'cash-book', cb, { type: 'receipts' })

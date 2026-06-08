@@ -95,7 +95,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const features = (usageData?.features || {}) as Record<string, boolean>
   const reportQuery = useQuery<ReportResponse>({
     queryKey: ['report', projectId, bankAccountId || null],
-    queryFn: () => report.get(projectId, bankAccountId ? { bankAccountId } : undefined),
+    queryFn: () =>
+      report.get(projectId, {
+        bankAccountId: bankAccountId || undefined,
+      }),
     enabled: !!projectId,
   })
   const { data, isLoading, isError: reportQueryFailed } = reportQuery
@@ -334,6 +337,34 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         toast.error('Roll forward failed', e instanceof Error ? e.message : undefined)
       ),
   })
+  const workbookNettingEnabled = data?.reconcileProfile?.workbookNetting === true
+  const workbookNettingMode = data?.project?.workbookNettingMode ?? data?.reconcileProfile?.workbookNettingMode ?? 'inherit'
+  const workbookNettingSource = data?.reconcileProfile?.workbookNettingSource
+  const workbookNettingSourceLabel =
+    workbookNettingSource === 'project'
+      ? 'project setting'
+      : workbookNettingSource === 'org'
+        ? 'organisation default'
+        : workbookNettingSource === 'platform'
+          ? 'platform default'
+          : workbookNettingSource === 'env'
+            ? 'environment default'
+            : workbookNettingSource === 'off'
+              ? 'off'
+              : null
+
+  const updateBrsSettingsMutation = useMutation({
+    mutationFn: (mode: 'inherit' | 'on' | 'off') => projects.updateBrsSettings(projectId, { workbookNettingMode: mode }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not save BRS setting', e instanceof Error ? e.message : undefined)
+      ),
+  })
+
   const updateCommentsMutation = useMutation({
     mutationFn: (body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null }) =>
       projects.updateReportComments(projectId, body),
@@ -451,7 +482,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const ecobankBrsProfile = data.reconcileProfile?.bankFormat === 'ecobank'
   const unpresentedChequesForBrs = data.unpresentedChequesForBrs || []
   const unmatchedPayments = data.unmatchedPayments || []
-  const unpresentedPaymentsForSection2 = ecobankBrsProfile && unpresentedChequesForBrs.length > 0
+  const unpresentedPaymentsForSection2 = ecobankBrsProfile
     ? unpresentedChequesForBrs
     : unmatchedPayments
   const bankOnlyDebitsForSection3 = (data.bankOnlyDebits?.length ? data.bankOnlyDebits : data.unmatchedDebits) || []
@@ -562,6 +593,43 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             {currency !== 'USD' && <option value="USD">Display: USD</option>}
             {currency !== 'EUR' && <option value="EUR">Display: EUR</option>}
           </select>
+          {ecobankBrsProfile && (
+            <div className="inline-flex min-h-[40px] flex-col justify-center gap-0.5 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
+              <label
+                className="inline-flex items-center gap-2"
+                title="Apply manual workbook Groups 2–3 netting to unpresented cheques (Ecobank Ghana BRS). Saved on this project for your whole team."
+              >
+                <input
+                  type="checkbox"
+                  checked={workbookNettingEnabled}
+                  disabled={updateBrsSettingsMutation.isPending}
+                  onChange={(e) => updateBrsSettingsMutation.mutate(e.target.checked ? 'on' : 'off')}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Workbook netting
+              </label>
+              {workbookNettingSourceLabel && (
+                <span className="text-xs text-gray-500 pl-6">
+                  {workbookNettingMode === 'inherit'
+                    ? `Using ${workbookNettingSourceLabel}`
+                    : `Project override (${workbookNettingEnabled ? 'on' : 'off'})`}
+                  {workbookNettingMode !== 'inherit' && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        className="underline hover:no-underline"
+                        disabled={updateBrsSettingsMutation.isPending}
+                        onClick={() => updateBrsSettingsMutation.mutate('inherit')}
+                      >
+                        Use organisation default
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
           <label className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
             <input
               type="checkbox"

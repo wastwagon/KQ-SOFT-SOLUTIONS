@@ -44,8 +44,25 @@ export interface EcobankGhanaProfile {
   workbookNetting: boolean
 }
 
+export type ScopedBankAccount = {
+  id?: string
+  name?: string | null
+  bankName?: string | null
+}
+
+/** Limit profile detection to the selected bank account when reconciling multi-bank projects. */
+export function bankAccountsForScope(
+  bankAccounts: ScopedBankAccount[] | undefined,
+  bankAccountId?: string
+): ScopedBankAccount[] {
+  const all = bankAccounts || []
+  if (!bankAccountId) return all
+  const scoped = all.filter((a) => a.id === bankAccountId)
+  return scoped.length ? scoped : all
+}
+
 export function resolveEcobankGhanaProfile(opts: {
-  bankAccounts?: { name?: string | null; bankName?: string | null }[]
+  bankAccounts?: ScopedBankAccount[]
   sampleBankText?: string
   workbookNetting?: boolean
 }): EcobankGhanaProfile {
@@ -56,13 +73,47 @@ export function resolveEcobankGhanaProfile(opts: {
     /CHEQUE\s+CLEARING\s*-\s*INWARD|CHEQUE\s+DEPOSIT\s*-\s*HSE/i.test(opts.sampleBankText || '')
   const envOn =
     process.env.GHANA_BRS_WORKBOOK_NETTING === '1' || process.env.GHANA_BRS_WORKBOOK_NETTING === 'true'
-  const workbookNetting = opts.workbookNetting ?? envOn
+  const workbookNetting =
+    opts.workbookNetting !== undefined ? opts.workbookNetting : envOn
   return {
     active,
     label: 'Ecobank Ghana BRS',
     clearingDateWindowDays: 14,
     workbookNetting: active && workbookNetting,
   }
+}
+
+export function resolveEcobankGhanaProfileForScope(opts: {
+  bankAccounts?: ScopedBankAccount[]
+  bankAccountId?: string
+  sampleBankText?: string
+  workbookNetting?: boolean
+}): EcobankGhanaProfile {
+  return resolveEcobankGhanaProfile({
+    bankAccounts: bankAccountsForScope(opts.bankAccounts, opts.bankAccountId),
+    sampleBankText: opts.sampleBankText,
+    workbookNetting: opts.workbookNetting,
+  })
+}
+
+/** Non-Ecobank Ghana bank label for reconcile/report profile (mapping + UI hints only). */
+export function resolveGhanaBankFormatLabel(
+  bankAccounts: ScopedBankAccount[] | undefined,
+  bankAccountId?: string
+): string | null {
+  const text = bankAccountsForScope(bankAccounts, bankAccountId)
+    .flatMap((a) => [a.name, a.bankName])
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  if (/ecobank/.test(text)) return 'ecobank'
+  if (/\bgcb\b|ghana commercial/.test(text)) return 'gcb'
+  if (/stanbic|standard bank/.test(text)) return 'stanbic'
+  if (/fidelity/.test(text)) return 'fidelity'
+  if (/\buba\b|united bank/.test(text)) return 'uba'
+  if (/absa|barclays/.test(text)) return 'absa'
+  if (/access bank/.test(text)) return 'access'
+  return null
 }
 
 function normalizeRefToken(value: string | null | undefined): string {

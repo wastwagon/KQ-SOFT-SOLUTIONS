@@ -85,6 +85,24 @@ describe('brsRollForward', () => {
     expect(items).toHaveLength(0)
   })
 
+  it('carries all unmatched payments for non-Ecobank roll-forward', () => {
+    const q1 = buildRollForwardSnapshot({
+      name: 'Q1 GCB',
+      bankAccounts: [{ name: 'GCB Main Branch' }],
+      receipts: [],
+      payments: [
+        tx({ id: 'g1', amount: 1200, chqNo: '100001' }),
+        tx({ id: 'g2', amount: 800, chqNo: '100002' }),
+      ],
+      debits: [],
+      credits: [],
+      matches: [],
+    })
+    const rows = computeSnapshotUnpresentedRows(q1, 0, { workbookNetting: false })
+    expect(rows).toHaveLength(2)
+    expect(rows.map((r) => r.chqNo).sort()).toEqual(['100001', '100002'])
+  })
+
   it('chains multi-period outstanding cheques oldest to newest', () => {
     const q1 = buildRollForwardSnapshot({
       name: 'Q1',

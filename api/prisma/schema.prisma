@@ -169,6 +169,7 @@ model Project {
   bankStatementClosingBalance Decimal?  @map("bank_statement_closing_balance") @db.Decimal(18, 2)  // optional: as-per-bank closing for audit comparison
   preparerComment             String?   @map("preparer_comment")    // optional preparer notes
   reviewerComment         String?   @map("reviewer_comment")    // optional reviewer notes
+  workbookNettingMode     String    @default("inherit") @map("workbook_netting_mode") // inherit | on | off
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 

@@ -11,13 +11,15 @@ import {
   detectDuplicateChequePayments,
   isEcobankPatternMatchReason,
   mergePaymentSuggestions,
-  resolveEcobankGhanaProfile,
+  resolveEcobankGhanaProfileForScope,
+  resolveGhanaBankFormatLabel,
   suggestEcobankClearingMatches,
   suggestEcobankPaymentDebitMatches,
   suggestEcobankStatutoryDepositMatches,
 } from '../services/ecobankClearingMatcher.js'
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
+import { resolveWorkbookNetting } from '../lib/brsQueryFlags.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
@@ -72,6 +74,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
     include: {
+      organization: { select: { plan: true, branding: true } },
       bankAccounts: true,
       documents: {
         include: { transactions: true, bankAccount: true },
@@ -166,23 +169,33 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     }
   }
 
-  const org = await prisma.organization.findUnique({
-    where: { id: orgId },
-    select: { plan: true },
-  })
-  const plan = org?.plan ?? 'basic'
+  const plan = project.organization?.plan ?? 'basic'
   const hasAiSuggestions = hasPlanFeature(plan, 'ai_suggestions')
   const hasBankRulesPlan = hasPlanFeature(plan, 'bank_rules')
   const hasSplitMatchingPlan = hasPlanFeature(plan, 'one_to_many')
 
   const platformDefaults = await getPlatformDefaults()
-  const ecobankProfile = resolveEcobankGhanaProfile({
-    bankAccounts: project.bankAccounts || [],
-    sampleBankText: [...creditsFull, ...debitsFull]
-      .slice(0, 12)
-      .map((t) => [t.details, t.name].filter(Boolean).join(' '))
-      .join('\n'),
+  const orgBranding = (project.organization?.branding as { ghanaBrsWorkbookNettingDefault?: boolean }) || {}
+  const workbookNettingResolution = resolveWorkbookNetting({
+    queryValue: req.query.workbookNetting,
+    projectMode: (project as { workbookNettingMode?: string }).workbookNettingMode,
+    orgDefault: orgBranding.ghanaBrsWorkbookNettingDefault,
+    platformDefault: platformDefaults.ghanaBrsWorkbookNetting,
   })
+  const workbookNettingRequested = workbookNettingResolution.enabled
+  const sampleBankText = [...creditsFull, ...debitsFull]
+    .slice(0, 12)
+    .map((t) => [t.details, t.name].filter(Boolean).join(' '))
+    .join('\n')
+  const ecobankProfile = resolveEcobankGhanaProfileForScope({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+    workbookNetting: workbookNettingRequested,
+  })
+  const ghanaBankFormat = ecobankProfile.active
+    ? 'ecobank'
+    : resolveGhanaBankFormatLabel(project.bankAccounts || [], bankAccountId)
   const matchOptions = {
     amountTolerance: platformDefaults.amountTolerance ?? 0.01,
     dateWindowDays: platformDefaults.dateWindowDays ?? 3,
@@ -217,38 +230,46 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     useDocRef,
     useChequeNo,
   })
-  const clearingPaymentSuggestions = suggestEcobankClearingMatches(
-    paymentsFull,
-    creditsFull,
-    matchedCbIds,
-    matchedBankIds,
-    {
-      amountTolerance: matchOptions.amountTolerance,
-      dateWindowDays: clearingDateWindowDays,
-    }
-  )
-  const ecobankPaymentDebitSuggestions = suggestEcobankPaymentDebitMatches(
-    paymentsFull,
-    debitsFull,
-    matchedCbIds,
-    matchedBankIds,
-    matchOptions.amountTolerance
-  )
-  const statutoryDepositSuggestions = suggestEcobankStatutoryDepositMatches(
-    paymentsFull,
-    creditsFull,
-    matchedCbIds,
-    matchedBankIds,
-    matchOptions.amountTolerance,
-    debitsFull
-  )
-  const paymentSuggestions = mergePaymentSuggestions(
-    mergePaymentSuggestions(
-      mergePaymentSuggestions(clearingPaymentSuggestions, statutoryDepositSuggestions),
-      ecobankPaymentDebitSuggestions
-    ),
-    standardPaymentSuggestions
-  )
+  const clearingPaymentSuggestions = ecobankProfile.active
+    ? suggestEcobankClearingMatches(
+        paymentsFull,
+        creditsFull,
+        matchedCbIds,
+        matchedBankIds,
+        {
+          amountTolerance: matchOptions.amountTolerance,
+          dateWindowDays: clearingDateWindowDays,
+        }
+      )
+    : []
+  const ecobankPaymentDebitSuggestions = ecobankProfile.active
+    ? suggestEcobankPaymentDebitMatches(
+        paymentsFull,
+        debitsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance
+      )
+    : []
+  const statutoryDepositSuggestions = ecobankProfile.active
+    ? suggestEcobankStatutoryDepositMatches(
+        paymentsFull,
+        creditsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance,
+        debitsFull
+      )
+    : []
+  const paymentSuggestions = ecobankProfile.active
+    ? mergePaymentSuggestions(
+        mergePaymentSuggestions(
+          mergePaymentSuggestions(clearingPaymentSuggestions, statutoryDepositSuggestions),
+          ecobankPaymentDebitSuggestions
+        ),
+        standardPaymentSuggestions
+      )
+    : standardPaymentSuggestions
   const duplicateChequeWarnings = detectDuplicateChequePayments(paymentsFull)
 
   // Apply bank rules for rule-based suggestions and flagged txs (Standard+ only)
@@ -357,8 +378,17 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
           ghanaBrs: true,
           clearingDateWindowDays,
           workbookNetting: ecobankProfile.workbookNetting,
+          workbookNettingMode: workbookNettingResolution.mode,
+          workbookNettingSource: workbookNettingResolution.source,
         }
-      : null,
+      : ghanaBankFormat
+        ? {
+            bankFormat: ghanaBankFormat,
+            ghanaBrs: true,
+            clearingDateWindowDays: matchOptions.dateWindowDays,
+            workbookNetting: false,
+          }
+        : null,
     duplicateChequeWarnings,
     flaggedBankIds,
     existingMatches: project.matches.length,

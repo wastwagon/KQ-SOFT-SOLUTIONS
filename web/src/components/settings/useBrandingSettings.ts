@@ -12,6 +12,7 @@ export type BrandingRecord = {
   reportTitle?: string
   footer?: string
   approvalThresholdAmount?: number | null
+  ghanaBrsWorkbookNettingDefault?: boolean
   organizationName?: string
 }
 
@@ -31,6 +32,7 @@ export function useBrandingSettings(features: Record<string, boolean>) {
   const [reportTitle, setReportTitle] = useState('Bank Reconciliation Statement')
   const [footer, setFooter] = useState('')
   const [approvalThresholdAmount, setApprovalThresholdAmount] = useState('')
+  const [ghanaBrsWorkbookNettingDefault, setGhanaBrsWorkbookNettingDefault] = useState(false)
   const [logoLoadError, setLogoLoadError] = useState(false)
 
   const { data, isLoading, isError: brandingQueryFailed, error: brandingQueryError } = useQuery({
@@ -61,6 +63,7 @@ export function useBrandingSettings(features: Record<string, boolean>) {
           ? String(d.approvalThresholdAmount)
           : ''
       )
+      setGhanaBrsWorkbookNettingDefault(d.ghanaBrsWorkbookNettingDefault === true)
     }
   }, [d])
 
@@ -113,6 +116,9 @@ export function useBrandingSettings(features: Record<string, boolean>) {
       const v = approvalThresholdAmount.trim()
       payload.approvalThresholdAmount = v === '' ? null : parseFloat(v) > 0 ? parseFloat(v) : null
     }
+    if (features.roll_forward) {
+      payload.ghanaBrsWorkbookNettingDefault = ghanaBrsWorkbookNettingDefault
+    }
     updateMutation.mutate(payload)
   }
 
@@ -145,6 +151,8 @@ export function useBrandingSettings(features: Record<string, boolean>) {
     setFooter,
     approvalThresholdAmount,
     setApprovalThresholdAmount,
+    ghanaBrsWorkbookNettingDefault,
+    setGhanaBrsWorkbookNettingDefault,
     logoLoadError,
     setLogoLoadError,
     handleLogoUpload,

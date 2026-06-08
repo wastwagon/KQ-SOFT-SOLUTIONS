@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Users, Building2, CreditCard, DollarSign, ArrowRight } from 'lucide-react'
+import { Users, Building2, CreditCard, DollarSign, ArrowRight, Server } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import PageHeader from '../../components/layout/PageHeader'
 import { api } from '../../lib/api'
@@ -72,14 +72,24 @@ export default function AdminOverview() {
       <Card className="shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900 mb-2">Quick links</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Use the sidebar to manage users, organizations, subscription plans, revenue analytics, and generation settings.
+          Use the sidebar to manage users, organizations, subscription plans, revenue analytics, generation settings,
+          and database migrations when deploy auto-migrate fails.
         </p>
-        <Link
-          to="/platform-admin/generation-settings"
-          className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
-        >
-          Platform generation settings <ArrowRight className="w-4 h-4" />
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-4">
+          <Link
+            to="/platform-admin/database"
+            className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
+            <Server className="w-4 h-4" aria-hidden />
+            Database migrations &amp; seed <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            to="/platform-admin/generation-settings"
+            className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
+            Platform generation settings <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </Card>
     </div>
   )

@@ -21,6 +21,8 @@ export interface PlatformDefaults {
   dateWindowDays?: number
   /** Data retention: years to keep audit/data (documentation only; deletion not implemented). Default 7 */
   dataRetentionYears?: number
+  /** Default Ecobank Ghana BRS workbook netting when org has no override (Premium Ghana workflows). */
+  ghanaBrsWorkbookNetting?: boolean
 }
 
 const DEFAULTS: PlatformDefaults = {
@@ -56,6 +58,7 @@ export async function getPlatformDefaults(): Promise<PlatformDefaults> {
     amountTolerance,
     dateWindowDays,
     dataRetentionYears: typeof value.dataRetentionYears === 'number' && value.dataRetentionYears > 0 ? value.dataRetentionYears : DEFAULTS.dataRetentionYears!,
+    ghanaBrsWorkbookNetting: value.ghanaBrsWorkbookNetting === true,
   }
   cache = { value: result, expiresAt: now + CACHE_TTL_MS }
   return result

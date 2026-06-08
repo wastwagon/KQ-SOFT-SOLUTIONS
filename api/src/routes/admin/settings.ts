@@ -23,6 +23,7 @@ const generationSchema = z.object({
   amountTolerance: z.number().min(0).max(100).optional(),
   dateWindowDays: z.number().int().min(0).max(90).optional(),
   dataRetentionYears: z.number().int().min(1).max(30).optional(),
+  ghanaBrsWorkbookNetting: z.boolean().optional(),
 })
 
 router.get('/', async (_req, res) => {
@@ -41,6 +42,7 @@ router.get('/', async (_req, res) => {
     amountTolerance: value.amountTolerance ?? 0.01,
     dateWindowDays: value.dateWindowDays ?? 3,
     dataRetentionYears: value.dataRetentionYears ?? 7,
+    ghanaBrsWorkbookNetting: value.ghanaBrsWorkbookNetting === true,
   })
 })
 

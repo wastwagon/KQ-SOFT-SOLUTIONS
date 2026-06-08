@@ -20,6 +20,7 @@ router.get('/platform-defaults', async (_req, res) => {
     footer: (value.defaultFooter as string) || 'Prepared by your organisation',
     primaryColor: (value.defaultPrimaryColor as string) || '#0473ea',
     secondaryColor: (value.defaultSecondaryColor as string) || '#38d200',
+    ghanaBrsWorkbookNetting: value.ghanaBrsWorkbookNetting === true,
   })
 })
 
@@ -37,6 +38,8 @@ export interface BrandingPayload {
   footer?: string
   /** Premium+ only: max discrepancy (GH₵) that reviewers can approve; above this, admin required */
   approvalThresholdAmount?: number | null
+  /** Org default for Ecobank Ghana BRS workbook Groups 2–3 netting on reports/reconcile */
+  ghanaBrsWorkbookNettingDefault?: boolean
 }
 
 router.get('/branding', async (req: AuthRequest, res) => {
@@ -80,6 +83,9 @@ router.patch('/branding', async (req: AuthRequest, res) => {
   if (orgForPlan && hasPlanFeature(orgForPlan.plan, 'threshold_approval')) {
     allowed.push('approvalThresholdAmount')
   }
+  if (orgForPlan && hasPlanFeature(orgForPlan.plan, 'roll_forward')) {
+    allowed.push('ghanaBrsWorkbookNettingDefault')
+  }
   const existing = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { branding: true },
@@ -91,6 +97,8 @@ router.patch('/branding', async (req: AuthRequest, res) => {
       if (k === 'approvalThresholdAmount') {
         const v = body[k]
         branding[k] = (v == null || (typeof v === 'string' && v === '')) ? null : (typeof v === 'number' && !Number.isNaN(v) ? v : prev[k])
+      } else if (k === 'ghanaBrsWorkbookNettingDefault') {
+        branding[k] = body[k] === true ? true : body[k] === false ? false : prev[k]
       } else {
         branding[k] = typeof body[k] === 'string' ? body[k].trim() : body[k]
       }

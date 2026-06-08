@@ -19,6 +19,7 @@ type GenerationSettings = {
   amountTolerance: number
   dateWindowDays: number
   dataRetentionYears: number
+  ghanaBrsWorkbookNetting: boolean
 }
 
 export default function AdminGenerationSettings() {
@@ -35,6 +36,7 @@ export default function AdminGenerationSettings() {
     amountTolerance: 0.01,
     dateWindowDays: 3,
     dataRetentionYears: 7,
+    ghanaBrsWorkbookNetting: false,
   })
 
   const { data, isLoading } = useQuery({
@@ -224,6 +226,25 @@ export default function AdminGenerationSettings() {
               />
               <span className="text-sm text-gray-700">Use manual rates only (disable FX API)</span>
             </label>
+          </div>
+
+          <div className="border-t border-border pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Ghana BRS</h3>
+            <label className="flex items-center gap-2 cursor-pointer mb-4">
+              <input
+                type="checkbox"
+                checked={form.ghanaBrsWorkbookNetting}
+                onChange={(e) => setForm((f) => ({ ...f, ghanaBrsWorkbookNetting: e.target.checked }))}
+                className="rounded border-border"
+              />
+              <span className="text-sm text-gray-700">
+                Enable workbook netting by default (Ecobank Ghana BRS groups 2–3)
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 mb-4 -mt-2">
+              Org branding can override per organisation. Env var GHANA_BRS_WORKBOOK_NETTING still applies
+              when neither is set.
+            </p>
           </div>
 
           <div className="border-t border-border pt-6">

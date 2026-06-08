@@ -238,6 +238,34 @@ const reportCommentsSchema = z.object({
   reviewerComment: z.string().max(1000).optional(),
 })
 
+const brsSettingsSchema = z.object({
+  workbookNettingMode: z.enum(['inherit', 'on', 'off']),
+})
+
+router.patch('/:id/brs-settings', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canExportReport(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to update BRS settings' })
+  }
+  const orgId = req.auth!.orgId
+  const projectId = await resolveProjectId(req.params.id, orgId)
+  if (!projectId) return res.status(404).json({ error: 'Project not found' })
+  try {
+    const body = brsSettingsSchema.parse(req.body)
+    const updated = await prisma.project.update({
+      where: { id: projectId },
+      data: { workbookNettingMode: body.workbookNettingMode },
+      select: { id: true, workbookNettingMode: true },
+    })
+    res.json(updated)
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: e.errors[0]?.message })
+    }
+    res.status(500).json({ error: 'Update failed' })
+  }
+})
+
 router.patch('/:id/report-comments', async (req: AuthRequest, res) => {
   const role = req.auth!.role
   if (!canExportReport(role)) {

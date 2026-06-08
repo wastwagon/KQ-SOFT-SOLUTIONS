@@ -22,6 +22,14 @@ import {
   paymentHasStatutoryDepositCounterpart,
   paymentHasTransferCounterpart,
 } from './ecobankClearingMatcher.js'
+import {
+  WORKBOOK_B1_FUEL_AMOUNT,
+  WORKBOOK_B1_FUEL_PAYEE_RE,
+  WORKBOOK_B1_SMALL_AMOUNTS,
+  WORKBOOK_B1_TIMING_CHQ_NOS,
+  WORKBOOK_JUDGMENT_PAYEE_RE,
+  WORKBOOK_ROUND2_CONTRA_AMOUNTS,
+} from './ghanaBrsWorkbookNettingConfig.js'
 
 /** True unpresented (section A): aligns with legacy Ecobank unpresented row rules. */
 function isTrueUnpresentedPayment(
@@ -38,27 +46,27 @@ function isManualB1TimingPayment(payment: ClearingTxLike, amountTolerance = 0.01
   if (isB1SmallTimingPayment(payment, amountTolerance)) return true
   const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
   if (
-    Math.abs(payment.amount - 5000) <= amountTolerance &&
-    /FUEL|ED FUEL|FUEL ALLOWANCE/i.test(text)
+    Math.abs(payment.amount - WORKBOOK_B1_FUEL_AMOUNT) <= amountTolerance &&
+    WORKBOOK_B1_FUEL_PAYEE_RE.test(text)
   ) {
     return true
   }
-  if (payment.chqNo?.trim() === '926075') return true
+  if (payment.chqNo?.trim() && WORKBOOK_B1_TIMING_CHQ_NOS.has(payment.chqNo.trim())) return true
   return false
 }
 
 function isManualFuelB1Payment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
   const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
   return (
-    Math.abs(payment.amount - 5000) <= amountTolerance &&
-    /FUEL|ED FUEL|FUEL ALLOWANCE/i.test(text)
+    Math.abs(payment.amount - WORKBOOK_B1_FUEL_AMOUNT) <= amountTolerance &&
+    WORKBOOK_B1_FUEL_PAYEE_RE.test(text)
   )
 }
 
 /** Preparer judgment lines kept off the manual Groups 2–3 netting blocks. */
 function isPreparerJudgmentPayment(payment: ClearingTxLike): boolean {
   const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
-  return /VODAFONE|GRA\b|SSNIT|SODIUM|DORIS|RITA KORKOI/i.test(text)
+  return WORKBOOK_JUDGMENT_PAYEE_RE.test(text)
 }
 
 /**
@@ -82,11 +90,7 @@ function isManualSectionAPayment(
  */
 function isB1SmallTimingPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
   const a = payment.amount
-  return (
-    Math.abs(a - 950) <= amountTolerance ||
-    Math.abs(a - 975.2) <= amountTolerance ||
-    Math.abs(a - 975) <= amountTolerance
-  )
+  return WORKBOOK_B1_SMALL_AMOUNTS.some((amt) => Math.abs(a - amt) <= amountTolerance)
 }
 
 export interface WorkbookNettingPair {
@@ -156,11 +160,7 @@ function isRound1BlockCBank(line: ClearingTxLike): boolean {
 /** Manual block E contras are commonly 3,000 / PAYE-sized (~3,214.89) payments. */
 function isRound2ContraPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
   const a = payment.amount
-  return (
-    Math.abs(a - 3000) <= amountTolerance ||
-    Math.abs(a - 3214.89) <= amountTolerance ||
-    Math.abs(a - 3214.9) <= amountTolerance
-  )
+  return WORKBOOK_ROUND2_CONTRA_AMOUNTS.some((amt) => Math.abs(a - amt) <= amountTolerance)
 }
 
 /** Manual block D: 3,000 withdrawals and ~3,214 inward clearing lines only (not FT / payroll). */

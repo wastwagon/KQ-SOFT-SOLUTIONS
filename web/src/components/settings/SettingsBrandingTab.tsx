@@ -163,6 +163,27 @@ export default function SettingsBrandingTab({ role, features, branding: b }: Set
             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
+        {features.roll_forward && (
+          <div>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={b.ghanaBrsWorkbookNettingDefault}
+                onChange={(e) => b.setGhanaBrsWorkbookNettingDefault(e.target.checked)}
+                className="mt-1 rounded border-gray-300"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-gray-700">
+                  Ghana BRS workbook netting (default on)
+                </span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  For Ecobank-style BRS, net unpresented cheque groups 2–3 by default on new reports and
+                  reconcile sessions. Users can still turn it off per project in the report view.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
         {features.threshold_approval && (
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">

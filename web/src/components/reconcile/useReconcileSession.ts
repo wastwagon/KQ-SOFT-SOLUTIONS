@@ -98,9 +98,10 @@ interface ReconcileApiResponse {
     totalAmount: number
   }[]
   reconcileProfile?: {
-    bankFormat: 'ecobank'
+    bankFormat: string
     ghanaBrs: boolean
     clearingDateWindowDays: number
+    workbookNetting?: boolean
   } | null
   project?: { currency?: string }
 }

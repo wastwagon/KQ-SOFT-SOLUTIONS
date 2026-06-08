@@ -120,6 +120,7 @@ export interface ReportProjectInfo {
   reportNarrative?: string | null
   preparerComment?: string | null
   reviewerComment?: string | null
+  workbookNettingMode?: 'inherit' | 'on' | 'off'
   preparedBy?: { name?: string | null; email?: string | null } | null
   preparedAt?: string | null
   reviewedBy?: { name?: string | null; email?: string | null } | null
@@ -186,6 +187,14 @@ export interface ReportBranding {
   primaryColor?: string
   secondaryColor?: string
   footer?: string
+  /** Org default for Ghana BRS workbook netting (Premium+ roll-forward plans). */
+  ghanaBrsWorkbookNettingDefault?: boolean
+}
+
+/** Tri-state workbook netting query: explicit true/false, or omit for server defaults. */
+function setWorkbookNettingQuery(q: URLSearchParams, value?: boolean) {
+  if (value === true) q.set('workbookNetting', '1')
+  else if (value === false) q.set('workbookNetting', '0')
 }
 
 export interface ReportDiscrepancy {
@@ -272,6 +281,19 @@ export interface ReportResponse {
     bankFormat?: 'ecobank' | string
     ghanaBrs?: boolean
     clearingDateWindowDays?: number
+    workbookNetting?: boolean
+    workbookNettingMode?: 'inherit' | 'on' | 'off'
+    workbookNettingSource?: 'query' | 'project' | 'org' | 'platform' | 'env' | 'off'
+    workbookNettingDetail?: {
+      sectionATotal?: number
+      sectionBTotal?: number
+      sectionCOffsetTotal?: number
+      group2Net?: number
+      group3OffsetTotal?: number
+      workbookUnpresented?: number
+      legacyUnpresented?: number
+      applied?: number
+    }
   } | null
   unmatchedReceipts?: ReportSimpleTx[]
   unmatchedCredits?: ReportSimpleTx[]
@@ -515,6 +537,11 @@ export const projects = {
     api(`/projects/${id}/approve`, { method: 'PATCH' }),
   updateReportComments: (id: string, body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null }) =>
     api(`/projects/${id}/report-comments`, { method: 'PATCH', body: JSON.stringify(body) }),
+  updateBrsSettings: (id: string, body: { workbookNettingMode: 'inherit' | 'on' | 'off' }) =>
+    api(`/projects/${id}/brs-settings`, { method: 'PATCH', body: JSON.stringify(body) }) as Promise<{
+      id: string
+      workbookNettingMode: 'inherit' | 'on' | 'off'
+    }>,
 }
 
 export const audit = {
@@ -556,7 +583,15 @@ export type PlatformDatabaseOpResult = {
 /** Platform admin: run Prisma on server (see Platform Admin → Database) */
 export const platformAdminDatabase = {
   status: () => api('/admin/database/status') as Promise<PlatformDatabaseOpResult>,
+  migrations: () => api('/admin/database/migrations') as Promise<{ migrations: string[] }>,
   migrate: () => api('/admin/database/migrate', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
+  dbPush: () => api('/admin/database/db-push', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
+  migrateResolve: (body: { migrationName: string; action: 'rolled-back' | 'applied' }) =>
+    api('/admin/database/migrate-resolve', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }) as Promise<PlatformDatabaseOpResult>,
+  seedPlans: () => api('/admin/database/seed-plans', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
   seed: () => api('/admin/database/seed', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
 }
 
@@ -635,6 +670,7 @@ export const settings = {
     footer?: string
     primaryColor?: string
     secondaryColor?: string
+    ghanaBrsWorkbookNetting?: boolean
   }>,
   getBranding: () => api('/settings/branding'),
   getMembers: () =>
@@ -664,6 +700,7 @@ export const settings = {
     reportTitle?: string
     footer?: string
     approvalThresholdAmount?: number | null
+    ghanaBrsWorkbookNettingDefault?: boolean
   }) => api('/settings/branding', { method: 'PATCH', body: JSON.stringify(body) }),
   uploadLogo: (file: File) => {
     const form = new FormData()
@@ -683,10 +720,16 @@ export const settings = {
 
 export type ReportExportScope = 'full' | 'brs_only' | 'mapped_bank'
 
+export interface ReportQueryParams {
+  bankAccountId?: string
+  workbookNetting?: boolean
+}
+
 export interface ReportExportOptions {
   bankAccountId?: string
   signedAmounts?: boolean
   scope?: ReportExportScope
+  workbookNetting?: boolean
 }
 
 async function reportExport(projectId: string, format: string, opts?: ReportExportOptions) {
@@ -695,6 +738,7 @@ async function reportExport(projectId: string, format: string, opts?: ReportExpo
   if (opts?.bankAccountId) q.set('bankAccountId', opts.bankAccountId)
   if (opts?.signedAmounts) q.set('signedAmounts', '1')
   if (opts?.scope && opts.scope !== 'full') q.set('scope', opts.scope)
+  setWorkbookNettingQuery(q, opts?.workbookNetting)
   const res = await fetch(`${API_URL}/api/v1/report/${projectId}/export?${q}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
@@ -753,22 +797,26 @@ export const attachments = {
 }
 
 export const report = {
-  get: (projectId: string, params?: { bankAccountId?: string }) => {
-    const q = params?.bankAccountId ? `?bankAccountId=${params.bankAccountId}` : ''
-    return api(`/report/${projectId}${q}`) as Promise<ReportResponse>
+  get: (projectId: string, params?: ReportQueryParams) => {
+    const q = new URLSearchParams()
+    if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
+    setWorkbookNettingQuery(q, params?.workbookNetting)
+    const qs = q.toString()
+    return api(`/report/${projectId}${qs ? `?${qs}` : ''}`) as Promise<ReportResponse>
   },
   exportExcel: (projectId: string, opts?: ReportExportOptions) => reportExport(projectId, 'excel', opts),
   exportPdf: (projectId: string, opts?: ReportExportOptions) => reportExport(projectId, 'pdf', opts),
 }
 
 export const reconcile = {
-  get: (projectId: string, params?: { bankAccountId?: string; limit?: number; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean }) => {
+  get: (projectId: string, params?: { bankAccountId?: string; limit?: number; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean; workbookNetting?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
     if (params?.limit) q.set('limit', String(params.limit))
     if (typeof params?.useDate === 'boolean') q.set('useDate', String(params.useDate))
     if (typeof params?.useDocRef === 'boolean') q.set('useDocRef', String(params.useDocRef))
     if (typeof params?.useChequeNo === 'boolean') q.set('useChequeNo', String(params.useChequeNo))
+    setWorkbookNettingQuery(q, params?.workbookNetting)
     return api(`/reconcile/${projectId}${q.toString() ? `?${q}` : ''}`)
   },
   createMatch: (projectId: string, body: { cashBookTransactionId: string; bankTransactionId: string }) =>

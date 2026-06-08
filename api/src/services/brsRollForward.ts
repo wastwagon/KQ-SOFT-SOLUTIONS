@@ -6,6 +6,7 @@
  */
 import {
   type ClearingTxLike,
+  bankAccountsForScope,
   brsTotalsExcludingLinkedClearingPairs,
   paymentHasBankCounterpart,
   resolveEcobankGhanaProfile,
@@ -46,6 +47,8 @@ export interface RollForwardCurrentPeriod {
 export interface RollForwardOptions {
   workbookNetting?: boolean
   amountTolerance?: number
+  /** When set, Ecobank profile detection uses only this bank account. */
+  bankAccountId?: string
 }
 
 function amountsClose(a: number, b: number, tolerance: number): boolean {
@@ -158,7 +161,7 @@ export function computeSnapshotUnpresentedRows(
     amountTolerance
   )
   const ecobankProfile = resolveEcobankGhanaProfile({
-    bankAccounts: snapshot.bankAccounts,
+    bankAccounts: bankAccountsForScope(snapshot.bankAccounts, options.bankAccountId),
     sampleBankText: [...snapshot.credits, ...snapshot.debits]
       .slice(0, 12)
       .map((t) => [t.details, t.name].filter(Boolean).join(' '))

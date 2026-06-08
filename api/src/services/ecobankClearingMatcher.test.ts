@@ -17,7 +17,10 @@ import {
   isCreditReclassifiedAsDebit,
   suggestEcobankPaymentDebitMatches,
   suggestEcobankStatutoryDepositMatches,
+  bankAccountsForScope,
   resolveEcobankGhanaProfile,
+  resolveEcobankGhanaProfileForScope,
+  resolveGhanaBankFormatLabel,
   buildBankOnlyScheduleRows,
   isEcobankPatternMatchReason,
 } from './ecobankClearingMatcher.js'
@@ -470,6 +473,42 @@ describe('resolveEcobankGhanaProfile', () => {
       }).workbookNetting
     ).toBe(true)
     expect(resolveEcobankGhanaProfile({ bankAccounts: [{ name: 'GCB Main' }] }).workbookNetting).toBe(false)
+  })
+})
+
+describe('bankAccountsForScope', () => {
+  const accounts = [
+    { id: 'a1', name: 'Ecobank 9033' },
+    { id: 'a2', name: 'GCB Main' },
+  ]
+
+  it('returns all accounts when no bankAccountId', () => {
+    expect(bankAccountsForScope(accounts)).toHaveLength(2)
+  })
+
+  it('scopes to selected bank account', () => {
+    expect(bankAccountsForScope(accounts, 'a2')).toEqual([{ id: 'a2', name: 'GCB Main' }])
+  })
+})
+
+describe('resolveEcobankGhanaProfileForScope', () => {
+  it('does not activate Ecobank profile when scoped to non-Ecobank account', () => {
+    const profile = resolveEcobankGhanaProfileForScope({
+      bankAccounts: [
+        { id: 'e1', name: 'Ecobank Tesano' },
+        { id: 'g1', name: 'GCB Main' },
+      ],
+      bankAccountId: 'g1',
+    })
+    expect(profile.active).toBe(false)
+  })
+})
+
+describe('resolveGhanaBankFormatLabel', () => {
+  it('returns bank format labels for Ghana banks', () => {
+    expect(resolveGhanaBankFormatLabel([{ name: 'GCB Accra' }])).toBe('gcb')
+    expect(resolveGhanaBankFormatLabel([{ name: 'Stanbic Main' }])).toBe('stanbic')
+    expect(resolveGhanaBankFormatLabel([{ name: 'Ecobank' }])).toBe('ecobank')
   })
 })
 

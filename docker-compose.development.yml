@@ -19,6 +19,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - UPLOAD_DIR=/app/uploads
+      - GHANA_BRS_WORKBOOK_NETTING=${GHANA_BRS_WORKBOOK_NETTING:-1}
     volumes:
       - ./api:/app
       - api_node_modules:/app/node_modules

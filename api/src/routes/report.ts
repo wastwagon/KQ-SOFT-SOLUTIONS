@@ -29,8 +29,10 @@ import {
   buildBankOnlyScheduleRows,
   computeBankOnlyCreditsTotal,
   computeBankOnlyDebitsTotal,
-  resolveEcobankGhanaProfile,
+  resolveEcobankGhanaProfileForScope,
+  resolveGhanaBankFormatLabel,
 } from '../services/ecobankClearingMatcher.js'
+import { resolveWorkbookNettingForScope } from '../lib/brsQueryFlags.js'
 import {
   unpresentedWithOptionalWorkbookNetting,
   workbookBankOnlyExcludedBankIds,
@@ -253,9 +255,10 @@ async function resolveBroughtForwardUnpresented(
 ): Promise<BroughtForwardUnpresentedItem[]> {
   const chain = await loadRollForwardChain(orgId, fromProjectId, bankAccountId, toTx)
   if (chain.length === 0) return []
-  const outstanding = computeOutstandingAtEndOfChain(chain, { workbookNetting })
+  const rollOpts = { workbookNetting, bankAccountId }
+  const outstanding = computeOutstandingAtEndOfChain(chain, rollOpts)
   const fromProject = chain[chain.length - 1]!.name
-  return applyCurrentPeriodRollForwardFilter(outstanding, current, fromProject, { workbookNetting })
+  return applyCurrentPeriodRollForwardFilter(outstanding, current, fromProject, rollOpts)
 }
 
 export function normalizeRefToken(value: string | null | undefined): string {
@@ -484,9 +487,6 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const bankAccountId = (req.query.bankAccountId as string) || undefined
-  const workbookNettingQuery = String(req.query.workbookNetting || '').toLowerCase()
-  const workbookNettingRequested =
-    workbookNettingQuery === '1' || workbookNettingQuery === 'true' || workbookNettingQuery === 'yes'
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
     include: {
@@ -501,6 +501,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  const workbookNettingResolution = await resolveWorkbookNettingForScope({
+    queryValue: req.query.workbookNetting,
+    projectMode: (project as { workbookNettingMode?: string }).workbookNettingMode,
+    orgBranding: project.organization.branding,
+  })
+  const workbookNettingRequested = workbookNettingResolution.enabled
 
   const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
   const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
@@ -742,14 +749,19 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const unmatchedPaymentsWithoutDetailsTotal = unmatchedPayments
     .filter((t) => !(t.details || '').trim())
     .reduce((s, t) => s + t.amount, 0)
-  const ecobankProfile = resolveEcobankGhanaProfile({
+  const sampleBankText = [...credits, ...debits]
+    .slice(0, 12)
+    .map((t) => [t.details, t.name].filter(Boolean).join(' '))
+    .join('\n')
+  const ecobankProfile = resolveEcobankGhanaProfileForScope({
     bankAccounts: project.bankAccounts || [],
-    sampleBankText: [...credits, ...debits]
-      .slice(0, 12)
-      .map((t) => [t.details, t.name].filter(Boolean).join(' '))
-      .join('\n'),
-    workbookNetting: workbookNettingRequested ? true : undefined,
+    bankAccountId,
+    sampleBankText,
+    workbookNetting: workbookNettingRequested,
   })
+  const ghanaBankFormat = ecobankProfile.active
+    ? 'ecobank'
+    : resolveGhanaBankFormatLabel(project.bankAccounts || [], bankAccountId)
   const unpresentedResolved = unpresentedWithOptionalWorkbookNetting(
     ecobankProfile.workbookNetting,
     {
@@ -965,6 +977,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
           ghanaBrs: true,
           clearingDateWindowDays: ecobankProfile.clearingDateWindowDays,
           workbookNetting: ecobankProfile.workbookNetting,
+          workbookNettingMode: workbookNettingResolution.mode,
+          workbookNettingSource: workbookNettingResolution.source,
           ...(unpresentedResolved.workbook
             ? {
                 workbookNettingDetail: {
@@ -990,7 +1004,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
               }
             : {}),
         }
-      : null,
+      : ghanaBankFormat
+        ? {
+            bankFormat: ghanaBankFormat,
+            ghanaBrs: true,
+            clearingDateWindowDays: 3,
+            workbookNetting: false,
+          }
+        : null,
     brsStatement: {
       bankClosingBalance,
       bankClosingBalanceLegacy,
@@ -1035,6 +1056,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       reportNarrative: (project as { reportNarrative?: string | null }).reportNarrative ?? null,
       preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
       reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
+      workbookNettingMode: workbookNettingResolution.mode,
       preparedBy: project.preparedBy ? { name: project.preparedBy.name, email: project.preparedBy.email } : null,
       preparedAt: project.preparedAt?.toISOString() ?? null,
       reviewedBy: project.reviewedBy ? { name: project.reviewedBy.name, email: project.reviewedBy.email } : null,
@@ -1208,11 +1230,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const mappedBankOnlyExport = scopeRaw === 'mapped_bank'
   const signedAmounts = String(req.query.signedAmounts || '').toLowerCase()
   const useSignedAmounts = signedAmounts === '1' || signedAmounts === 'true' || signedAmounts === 'yes'
-  const workbookNettingQueryExport = String(req.query.workbookNetting || '').toLowerCase()
-  const workbookNettingRequestedExport =
-    workbookNettingQueryExport === '1' ||
-    workbookNettingQueryExport === 'true' ||
-    workbookNettingQueryExport === 'yes'
   const orgId = req.auth!.orgId
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
@@ -1231,6 +1248,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  const workbookNettingResolutionExport = await resolveWorkbookNettingForScope({
+    queryValue: req.query.workbookNetting,
+    projectMode: (project as { workbookNettingMode?: string }).workbookNettingMode,
+    orgBranding: project.organization.branding,
+  })
+  const workbookNettingRequestedExport = workbookNettingResolutionExport.enabled
 
   const signOffProjectInput = {
     preparedBy: project.preparedBy,
@@ -1490,13 +1514,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const unmatchedPaymentsTotalExport = clearingBrsTotalsExport.unmatchedPaymentsTotal
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
-  const ecobankProfileExport = resolveEcobankGhanaProfile({
+  const sampleBankTextExport = [...credits, ...debits]
+    .slice(0, 12)
+    .map((t) => [t.details, t.name].filter(Boolean).join(' '))
+    .join('\n')
+  const ecobankProfileExport = resolveEcobankGhanaProfileForScope({
     bankAccounts: project.bankAccounts || [],
-    sampleBankText: [...credits, ...debits]
-      .slice(0, 12)
-      .map((t) => [t.details, t.name].filter(Boolean).join(' '))
-      .join('\n'),
-    workbookNetting: workbookNettingRequestedExport ? true : undefined,
+    bankAccountId,
+    sampleBankText: sampleBankTextExport,
+    workbookNetting: workbookNettingRequestedExport,
   })
   const matchedPaymentsVsDebitsExport = matchPairs.filter((p) => !receiptIds.has(p.cb.id))
   const debitIdsExport = new Set(debits.map((t) => t.id))
