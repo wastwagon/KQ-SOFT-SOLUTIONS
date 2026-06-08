@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { sendPasswordReset } from '../services/email.js'
 import { acceptOrganizationInvite, getInviteByToken } from '../services/orgInvite.js'
+import { membershipAccessBlocked } from '../lib/membershipAccess.js'
 import { isPlatformAdmin } from '../lib/platformAdmin.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { authMiddleware, requireJwtSecret } from '../middleware/auth.js'
@@ -61,6 +62,10 @@ const acceptInviteSchema = z.object({
   token: z.string().min(1),
 })
 
+const switchOrgSchema = z.object({
+  orgId: z.string().min(1),
+})
+
 const forgotSchema = z.object({
   email: z.string().email(),
 })
@@ -73,6 +78,99 @@ const resetSchema = z.object({
 function normalizeAuthEmail(email: string): string {
   return email.trim().toLowerCase()
 }
+
+router.get('/orgs', authMiddleware, async (req, res) => {
+  try {
+    const { userId, orgId: currentOrgId } = (req as AuthRequest).auth!
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, suspendedAt: true },
+    })
+    if (!user?.email) return res.status(401).json({ error: 'User not found' })
+
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId },
+      include: {
+        organization: { select: { id: true, name: true, suspendedAt: true } },
+      },
+      orderBy: { organization: { name: 'asc' } },
+    })
+
+    const organizations = memberships
+      .filter((m) => {
+        const blocked = membershipAccessBlocked({
+          role: m.role,
+          userEmail: user.email,
+          userSuspendedAt: user.suspendedAt,
+          orgSuspendedAt: m.organization.suspendedAt,
+        })
+        return !blocked.blocked
+      })
+      .map((m) => ({
+        id: m.organization.id,
+        name: m.organization.name,
+        role: m.role,
+        current: m.organization.id === currentOrgId,
+      }))
+
+    res.json({ organizations })
+  } catch (e) {
+    logger.error({ err: e }, 'auth/orgs failed')
+    res.status(500).json({ error: 'Failed to list organisations' })
+  }
+})
+
+router.post('/switch-org', authMiddleware, async (req, res) => {
+  try {
+    const body = switchOrgSchema.parse(req.body)
+    const { userId } = (req as AuthRequest).auth!
+    const membership = await prisma.organizationMember.findUnique({
+      where: { userId_organizationId: { userId, organizationId: body.orgId } },
+      include: {
+        organization: { select: { id: true, name: true, suspendedAt: true } },
+        user: { select: { id: true, email: true, name: true, suspendedAt: true } },
+      },
+    })
+    if (!membership) {
+      return res.status(404).json({ error: 'You are not a member of that organisation.' })
+    }
+    const blocked = membershipAccessBlocked({
+      role: membership.role,
+      userEmail: membership.user.email,
+      userSuspendedAt: membership.user.suspendedAt,
+      orgSuspendedAt: membership.organization.suspendedAt,
+    })
+    if (blocked.blocked) {
+      return res.status(401).json({ error: blocked.message })
+    }
+
+    const token = jwt.sign(
+      { userId, orgId: membership.organizationId },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+    res.json({
+      user: {
+        id: membership.user.id,
+        email: membership.user.email,
+        name: membership.user.name,
+      },
+      org: {
+        id: membership.organization.id,
+        name: membership.organization.name,
+      },
+      role: membership.role,
+      token,
+      isPlatformAdmin: isPlatformAdmin(membership.user.email),
+    })
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: e.errors[0]?.message })
+    }
+    logger.error({ err: e }, 'auth/switch-org failed')
+    res.status(500).json({ error: 'Could not switch organisation' })
+  }
+})
 
 router.get('/invite/:token', async (req, res) => {
   const invite = await getInviteByToken(req.params.token)

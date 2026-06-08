@@ -472,6 +472,18 @@ export const auth = {
     api('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body: { email: string; password: string; inviteToken?: string }) =>
     api('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  listOrgs: () =>
+    api('/auth/orgs') as Promise<{
+      organizations: { id: string; name: string; role: string; current: boolean }[]
+    }>,
+  switchOrg: (orgId: string) =>
+    api('/auth/switch-org', { method: 'POST', body: JSON.stringify({ orgId }) }) as Promise<{
+      user: { id: string; email: string; name?: string }
+      org: { id: string; name: string }
+      role: string
+      token: string
+      isPlatformAdmin: boolean
+    }>,
   forgotPassword: (email: string) =>
     api('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token: string, password: string) =>
@@ -690,8 +702,10 @@ export const settings = {
   getMembers: () =>
     api('/settings/members') as Promise<{
       members: { id: string; userId: string; email: string; name: string | null; role: string; createdAt: string }[]
+      pendingInvites: { id: string; email: string; role: string; expiresAt: string; createdAt: string }[]
       limit: number | null
       currentCount: number
+      pendingInviteCount: number
     }>,
   addMember: (body: { email: string; role?: string }) =>
     api('/settings/members', { method: 'POST', body: JSON.stringify(body) }) as Promise<{
@@ -711,6 +725,8 @@ export const settings = {
       ok: boolean
       inviteId: string
     }>,
+  revokeInvite: (inviteId: string) =>
+    api(`/settings/members/invites/${inviteId}`, { method: 'DELETE' }) as Promise<{ ok: boolean }>,
   updateBranding: (body: {
     logoUrl?: string
     primaryColor?: string
@@ -742,6 +758,8 @@ export type ReportExportScope = 'full' | 'brs_only' | 'mapped_bank'
 export interface ReportQueryParams {
   bankAccountId?: string
   workbookNetting?: boolean
+  /** Lighter payload (totals/BRS only — skips match rows and schedules). */
+  summaryOnly?: boolean
 }
 
 export interface ReportExportOptions {
@@ -820,6 +838,7 @@ export const report = {
     const q = new URLSearchParams()
     if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
     setWorkbookNettingQuery(q, params?.workbookNetting)
+    if (params?.summaryOnly) q.set('summaryOnly', '1')
     const qs = q.toString()
     return api(`/report/${projectId}${qs ? `?${qs}` : ''}`) as Promise<ReportResponse>
   },

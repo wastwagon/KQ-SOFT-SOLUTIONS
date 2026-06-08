@@ -70,10 +70,25 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
       ),
   })
 
+  const revokeMutation = useMutation({
+    mutationFn: settings.revokeInvite,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })
+      toast.success('Invitation revoked')
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not revoke invite', e instanceof Error ? e.message : undefined)
+      ),
+  })
+
   const members = data?.members ?? []
+  const pendingInvites = data?.pendingInvites ?? []
   const limit = data?.limit
   const currentCount = data?.currentCount ?? 0
-  const atLimit = limit != null && currentCount >= limit
+  const pendingInviteCount = data?.pendingInviteCount ?? pendingInvites.length
+  const seatCount = currentCount + pendingInviteCount
+  const atLimit = limit != null && seatCount >= limit
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading members...</p>
 
@@ -186,9 +201,37 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
         </p>
       )}
       <p className="text-xs text-gray-500">
-        {currentCount}
-        {limit != null ? ` / ${limit}` : ''} members
+        {seatCount}
+        {limit != null ? ` / ${limit}` : ''} seats
+        {pendingInviteCount > 0 ? ` (${pendingInviteCount} pending invite${pendingInviteCount === 1 ? '' : 's'})` : ''}
       </p>
+      {canManage && pendingInvites.length > 0 && (
+        <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pending invitations</p>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {pendingInvites.map((invite) => (
+              <li key={invite.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{invite.email}</p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {invite.role} · expires {new Date(invite.expiresAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => revokeMutation.mutate(invite.id)}
+                  disabled={revokeMutation.isPending}
+                  className="text-xs font-medium text-red-600 hover:text-red-700"
+                >
+                  Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">

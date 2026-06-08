@@ -4,7 +4,7 @@ vi.mock('../lib/prisma.js', () => ({
   prisma: {
     organization: { findUnique: vi.fn() },
     organizationMember: { count: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
-    organizationInvite: { count: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    organizationInvite: { count: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn() },
     user: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -21,6 +21,7 @@ import {
   createOrganizationInvite,
   getInviteByToken,
   inviteAppUrl,
+  revokeOrganizationInvite,
 } from './orgInvite.js'
 
 describe('orgInvite', () => {
@@ -93,6 +94,18 @@ describe('orgInvite', () => {
 
     expect(result).toEqual({ ok: true, orgId: 'org-1', role: 'reviewer' })
     expect(prisma.$transaction).toHaveBeenCalled()
+  })
+
+  it('revokes pending invite', async () => {
+    vi.mocked(prisma.organizationInvite.findFirst).mockResolvedValue({
+      id: 'inv-1',
+      expiresAt: new Date(Date.now() + 86400000),
+    } as never)
+    vi.mocked(prisma.organizationInvite.delete).mockResolvedValue({} as never)
+
+    const result = await revokeOrganizationInvite({ orgId: 'org-1', inviteId: 'inv-1' })
+    expect(result).toEqual({ ok: true })
+    expect(prisma.organizationInvite.delete).toHaveBeenCalledWith({ where: { id: 'inv-1' } })
   })
 
   it('rejects accept when email does not match invite', async () => {

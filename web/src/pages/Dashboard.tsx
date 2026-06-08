@@ -26,6 +26,14 @@ import EmptyState from '../components/ui/EmptyState'
 import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
+
+const BRS_SUMMARY_STATUSES = new Set([
+  'reconciling',
+  'submitted_for_review',
+  'approved',
+  'completed',
+])
 
 const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
 
@@ -631,6 +639,9 @@ export default function Dashboard() {
                     >
                       {p.status === 'completed' ? 'Completed' : 'In progress'}
                     </span>
+                    {BRS_SUMMARY_STATUSES.has(p.status) && (
+                      <BrsVarianceBadge projectId={p.id} compact />
+                    )}
                     <span className="text-sm text-gray-500">{formatDate(p.createdAt)}</span>
                   </div>
                 </div>

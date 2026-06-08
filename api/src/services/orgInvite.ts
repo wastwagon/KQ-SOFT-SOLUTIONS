@@ -150,3 +150,21 @@ export async function acceptOrganizationInvite(opts: {
 
   return { ok: true, orgId: invite.organizationId, role: invite.role }
 }
+
+export async function revokeOrganizationInvite(opts: {
+  orgId: string
+  inviteId: string
+}): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const invite = await prisma.organizationInvite.findFirst({
+    where: { id: opts.inviteId, organizationId: opts.orgId, acceptedAt: null },
+  })
+  if (!invite) {
+    return { ok: false, error: 'Invite not found or already accepted.', status: 404 }
+  }
+  if (invite.expiresAt < new Date()) {
+    await prisma.organizationInvite.delete({ where: { id: invite.id } })
+    return { ok: false, error: 'Invite has expired.', status: 404 }
+  }
+  await prisma.organizationInvite.delete({ where: { id: invite.id } })
+  return { ok: true }
+}

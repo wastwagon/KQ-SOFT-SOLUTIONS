@@ -5,7 +5,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBranding, canManageMembers } from '../lib/permissions.js'
 import { hasPlanFeature, getUserLimit } from '../config/planFeatures.js'
 import { normalizeOrgMemberRole } from '../lib/orgMemberRole.js'
-import { createOrganizationInvite } from '../services/orgInvite.js'
+import { createOrganizationInvite, revokeOrganizationInvite } from '../services/orgInvite.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -116,18 +116,26 @@ router.patch('/branding', async (req: AuthRequest, res) => {
   res.json((updated?.branding as BrandingPayload) || {})
 })
 
-/** GET /settings/members - list org members */
+/** GET /settings/members - list org members and pending invites */
 router.get('/members', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
-  const members = await prisma.organizationMember.findMany({
-    where: { organizationId: orgId },
-    include: { user: { select: { id: true, email: true, name: true } } },
-    orderBy: { createdAt: 'asc' },
-  })
-  const org = await prisma.organization.findUnique({
-    where: { id: orgId },
-    select: { plan: true },
-  })
+  const now = new Date()
+  const [members, pendingInvites, org] = await Promise.all([
+    prisma.organizationMember.findMany({
+      where: { organizationId: orgId },
+      include: { user: { select: { id: true, email: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.organizationInvite.findMany({
+      where: { organizationId: orgId, acceptedAt: null, expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
+    }),
+    prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { plan: true },
+    }),
+  ])
   const limit = org ? getUserLimit(org.plan) : 1
   res.json({
     members: members.map((m) => ({
@@ -138,8 +146,16 @@ router.get('/members', async (req: AuthRequest, res) => {
       role: m.role,
       createdAt: m.createdAt,
     })),
+    pendingInvites: pendingInvites.map((i) => ({
+      id: i.id,
+      email: i.email,
+      role: i.role,
+      expiresAt: i.expiresAt.toISOString(),
+      createdAt: i.createdAt.toISOString(),
+    })),
     limit: limit < 0 ? null : limit,
     currentCount: members.length,
+    pendingInviteCount: pendingInvites.length,
   })
 })
 
@@ -170,6 +186,22 @@ router.post('/members/invite', async (req: AuthRequest, res) => {
   res.status(201).json({ ok: true, inviteId: result.inviteId })
 })
 
+/** DELETE /settings/members/invites/:inviteId - revoke pending invite */
+router.delete('/members/invites/:inviteId', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canManageMembers(role)) {
+    return res.status(403).json({ error: 'Only admins can revoke invites.' })
+  }
+  const result = await revokeOrganizationInvite({
+    orgId: req.auth!.orgId,
+    inviteId: req.params.inviteId,
+  })
+  if (!result.ok) {
+    return res.status(result.status).json({ error: result.error })
+  }
+  res.json({ ok: true })
+})
+
 /** POST /settings/members - add member by email (user must already exist) */
 router.post('/members', async (req: AuthRequest, res) => {
   const role = req.auth!.role
@@ -192,10 +224,13 @@ router.post('/members', async (req: AuthRequest, res) => {
 
   const limit = getUserLimit(org.plan)
   if (limit >= 0) {
-    const currentCount = await prisma.organizationMember.count({
-      where: { organizationId: orgId },
-    })
-    if (currentCount >= limit) {
+    const [memberCount, pendingCount] = await Promise.all([
+      prisma.organizationMember.count({ where: { organizationId: orgId } }),
+      prisma.organizationInvite.count({
+        where: { organizationId: orgId, acceptedAt: null, expiresAt: { gt: new Date() } },
+      }),
+    ])
+    if (memberCount + pendingCount >= limit) {
       return res.status(403).json({
         error: `Your plan allows up to ${limit} member${limit === 1 ? '' : 's'}. Upgrade to add more.`,
       })

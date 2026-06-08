@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../store/auth'
 import { settings, getLogoDisplayUrl, subscription } from '../lib/api'
 import BrandLogo from './BrandLogo'
+import OrgSwitcher from './OrgSwitcher'
 
 const preloadProjectsPage = () => import('../pages/Projects')
 const preloadSettingsPage = () => import('../pages/Settings')
@@ -278,14 +279,7 @@ export default function AppLayout() {
 
         {/* Top bar items: org, role, notifications, user, logout */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {org?.name && (
-            <div className="hidden lg:flex flex-col items-end mr-1">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Organisation</span>
-              <span className="text-sm font-semibold text-gray-900 truncate max-w-[150px]" title={org.name}>
-                {org.name}
-              </span>
-            </div>
-          )}
+          <OrgSwitcher />
           <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg">
             <span
               className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider ${

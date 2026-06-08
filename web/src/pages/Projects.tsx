@@ -13,6 +13,7 @@ import { TableRowSkeleton } from '../components/ui/Skeleton'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
 
 const preloadProjectDetailPage = () => import('./ProjectDetail')
 
@@ -251,13 +252,16 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                {isReportsView && (
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">BRS tie-out</th>
+                )}
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
                 <th className="px-6 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-muted bg-white">
               {[1, 2, 3, 4, 5].map((i) => (
-                <TableRowSkeleton key={i} cols={5} />
+                <TableRowSkeleton key={i} cols={isReportsView ? 6 : 5} />
               ))}
             </tbody>
           </table>
@@ -312,6 +316,9 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                {isReportsView && (
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">BRS tie-out</th>
+                )}
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
                 <th className="px-6 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
               </tr>
@@ -326,6 +333,11 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                   <td className="px-6 py-4">
                     <ProjectStatusPill status={p.status} size="sm" />
                   </td>
+                  {isReportsView && (
+                    <td className="px-6 py-4">
+                      <BrsVarianceBadge projectId={p.id} />
+                    </td>
+                  )}
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {formatDate(p.createdAt)}
                   </td>
