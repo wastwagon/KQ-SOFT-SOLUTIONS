@@ -35,6 +35,14 @@ import {
   unpresentedWithOptionalWorkbookNetting,
   workbookBankOnlyExcludedBankIds,
 } from '../services/ghanaBrsWorkbookNetting.js'
+import {
+  applyCurrentPeriodRollForwardFilter,
+  buildRollForwardSnapshot,
+  computeOutstandingAtEndOfChain,
+  filterBroughtForwardLodgments,
+  type BroughtForwardUnpresentedItem,
+  type RollForwardProjectSnapshot,
+} from '../services/brsRollForward.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -169,6 +177,85 @@ function dedupeTransactions<T extends TxLike>(txs: T[]): T[] {
     seen.add(key)
     return true
   })
+}
+
+type RollForwardPrismaProject = {
+  id: string
+  name: string
+  rollForwardFromProjectId: string | null
+  bankAccounts?: { name?: string | null; bankName?: string | null }[]
+  documents: { type: string; bankAccountId?: string | null; transactions?: unknown[] }[]
+  matches: { matchItems: { transactionId: string; side: string }[] }[]
+}
+
+async function loadRollForwardChain(
+  orgId: string,
+  fromProjectId: string,
+  bankAccountId: string | undefined,
+  toTxFn: (t: {
+    id: string
+    date: Date | null
+    name: string | null
+    details: string | null
+    chqNo?: string | null
+    docRef?: string | null
+    amount: unknown
+  }) => TxLike
+): Promise<RollForwardProjectSnapshot[]> {
+  const chain: RollForwardProjectSnapshot[] = []
+  const visited = new Set<string>()
+  let projectId: string | null = fromProjectId
+  while (projectId && !visited.has(projectId)) {
+    visited.add(projectId)
+    const project = (await prisma.project.findFirst({
+      where: { id: projectId, organizationId: orgId },
+      include: {
+        bankAccounts: true,
+        documents: { include: { transactions: true } },
+        matches: { include: { matchItems: true } },
+      },
+    })) as RollForwardPrismaProject | null
+    if (!project) break
+    const receipts = project.documents
+      .filter((d) => d.type === 'cash_book_receipts')
+      .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
+    const payments = project.documents
+      .filter((d) => d.type === 'cash_book_payments')
+      .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
+    const credits = project.documents
+      .filter((d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId))
+      .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
+    const debits = project.documents
+      .filter((d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId))
+      .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
+    chain.unshift(
+      buildRollForwardSnapshot({
+        name: project.name,
+        bankAccounts: project.bankAccounts || [],
+        receipts,
+        payments,
+        debits,
+        credits,
+        matches: project.matches,
+      })
+    )
+    projectId = project.rollForwardFromProjectId
+  }
+  return chain
+}
+
+async function resolveBroughtForwardUnpresented(
+  orgId: string,
+  fromProjectId: string,
+  bankAccountId: string | undefined,
+  current: { payments: TxLike[]; debits: TxLike[]; credits: TxLike[] },
+  workbookNetting: boolean
+): Promise<BroughtForwardUnpresentedItem[]> {
+  const chain = await loadRollForwardChain(orgId, fromProjectId, bankAccountId, toTx)
+  if (chain.length === 0) return []
+  const outstanding = computeOutstandingAtEndOfChain(chain, { workbookNetting })
+  const fromProject = chain[chain.length - 1]!.name
+  return applyCurrentPeriodRollForwardFilter(outstanding, current, fromProject, { workbookNetting })
 }
 
 export function normalizeRefToken(value: string | null | undefined): string {
@@ -429,7 +516,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const credits = dedupeTransactions(creditsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
   const debits = dedupeTransactions(debitsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
 
-  let broughtForwardItems: { date: string; name: string; chqNo: string | null; amount: number; fromProject: string }[] = []
+  let broughtForwardItems: BroughtForwardUnpresentedItem[] = []
   let broughtForwardLodgments: { date: string; name: string; docRef: string | null; amount: number; fromProject: string; source: 'cash_book_receipts' | 'bank_credits' }[] = []
   if (project.rollForwardFromProjectId && project.rollForwardFrom) {
     const prevProject = await prisma.project.findFirst({
@@ -440,16 +527,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       },
     })
     if (prevProject) {
-      const prevPaymentsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_payments')
       const prevReceiptsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_receipts')
       const prevCreditsDocs = prevProject.documents.filter(
         (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
       )
-      const prevDebitsDocs = prevProject.documents.filter(
-        (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
-      )
       const prevReceipts = prevReceiptsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
-      const prevPayments = prevPaymentsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
       const prevCredits = prevCreditsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
       const prevMatchedCbIds = new Set<string>()
       const prevMatchedBankIds = new Set<string>()
@@ -459,51 +541,34 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
           else prevMatchedBankIds.add(mi.transactionId)
         }
       }
-      const prevUnmatchedPayments = prevPayments.filter((t) => !prevMatchedCbIds.has(t.id))
       const prevUnmatchedReceipts = prevReceipts.filter((t) => !prevMatchedCbIds.has(t.id))
       const prevUnmatchedCredits = prevCredits.filter((t) => !prevMatchedBankIds.has(t.id))
       const prevFmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
-      
-      const isAlreadyInCurrent = (t: TxLike, currentSet: TxLike[]) => {
-        const dStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : ''
-        const key = `${dStr}|${Number(t.amount).toFixed(2)}|${(t.chqNo || '').toLowerCase()}|${(t.docRef || '').toLowerCase()}|${(t.name || t.details || '').toLowerCase().trim()}`
-        return currentSet.some(c => {
-          const cdStr = c.date ? new Date(c.date).toISOString().slice(0, 10) : ''
-          const cKey = `${cdStr}|${Number(c.amount).toFixed(2)}|${(c.chqNo || '').toLowerCase()}|${(c.docRef || '').toLowerCase()}|${(c.name || c.details || '').toLowerCase().trim()}`
-          return key === cKey
-        })
-      }
 
-      broughtForwardItems = prevUnmatchedPayments
-        .filter(t => !isAlreadyInCurrent(t, payments))
-        .map((t) => ({
+      broughtForwardItems = await resolveBroughtForwardUnpresented(
+        orgId,
+        project.rollForwardFromProjectId,
+        bankAccountId,
+        { payments, debits, credits },
+        workbookNettingRequested
+      )
+      broughtForwardLodgments = [
+        ...filterBroughtForwardLodgments(prevUnmatchedReceipts, receipts).map((t) => ({
           date: prevFmt(t.date),
           name: t.name || t.details || '—',
-          chqNo: t.chqNo || null,
+          docRef: t.docRef || null,
           amount: t.amount,
           fromProject: prevProject.name,
-        }))
-      broughtForwardLodgments = [
-        ...prevUnmatchedReceipts
-          .filter(t => !isAlreadyInCurrent(t, receipts))
-          .map((t) => ({
-            date: prevFmt(t.date),
-            name: t.name || t.details || '—',
-            docRef: t.docRef || null,
-            amount: t.amount,
-            fromProject: prevProject.name,
-            source: 'cash_book_receipts' as const,
-          })),
-        ...prevUnmatchedCredits
-          .filter(t => !isAlreadyInCurrent(t, credits))
-          .map((t) => ({
-            date: prevFmt(t.date),
-            name: t.name || t.details || '—',
-            docRef: t.docRef || null,
-            amount: t.amount,
-            fromProject: prevProject.name,
-            source: 'bank_credits' as const,
-          })),
+          source: 'cash_book_receipts' as const,
+        })),
+        ...filterBroughtForwardLodgments(prevUnmatchedCredits, credits).map((t) => ({
+          date: prevFmt(t.date),
+          name: t.name || t.details || '—',
+          docRef: t.docRef || null,
+          amount: t.amount,
+          fromProject: prevProject.name,
+          source: 'bank_credits' as const,
+        })),
       ]
     }
   }
@@ -705,13 +770,22 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const unpresentedChequesTotal = unpresentedResolved.total
   const unpresentedChequeRowsForBrs = unpresentedResolved.rows
   const unpresentedForAgeing = ecobankProfile.active
-    ? unpresentedChequeRowsForBrs.map((t) => ({
-        date: t.date ?? null,
-        name: t.name ?? null,
-        chqNo: t.chqNo,
-        amount: t.amount,
-        fromProject: project.name,
-      }))
+    ? [
+        ...unpresentedChequeRowsForBrs.map((t) => ({
+          date: t.date ?? null,
+          name: t.name ?? null,
+          chqNo: t.chqNo,
+          amount: t.amount,
+          fromProject: project.name,
+        })),
+        ...broughtForwardItems.map((t) => ({
+          date: t.date,
+          name: t.name,
+          chqNo: t.chqNo,
+          amount: t.amount,
+          fromProject: t.fromProject,
+        })),
+      ]
     : [
         ...unmatchedPayments.map((t) => ({ ...t, fromProject: project.name })),
         ...broughtForwardItems.map((t) => ({
@@ -1134,6 +1208,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const mappedBankOnlyExport = scopeRaw === 'mapped_bank'
   const signedAmounts = String(req.query.signedAmounts || '').toLowerCase()
   const useSignedAmounts = signedAmounts === '1' || signedAmounts === 'true' || signedAmounts === 'yes'
+  const workbookNettingQueryExport = String(req.query.workbookNetting || '').toLowerCase()
+  const workbookNettingRequestedExport =
+    workbookNettingQueryExport === '1' ||
+    workbookNettingQueryExport === 'true' ||
+    workbookNettingQueryExport === 'yes'
   const orgId = req.auth!.orgId
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
@@ -1176,7 +1255,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const credits = dedupeTransactions(creditsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
   const debits = dedupeTransactions(debitsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
 
-  let broughtForwardItemsExport: { date: string; name: string; chqNo: string | null; amount: number; fromProject: string }[] = []
+  let broughtForwardItemsExport: BroughtForwardUnpresentedItem[] = []
   let broughtForwardLodgmentsExport: { amount: number; source: 'cash_book_receipts' | 'bank_credits' }[] = []
   if (project.rollForwardFromProjectId && project.rollForwardFrom) {
     const prevProject = await prisma.project.findFirst({
@@ -1187,16 +1266,11 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       },
     })
     if (prevProject) {
-      const prevPaymentsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_payments')
       const prevReceiptsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_receipts')
       const prevCreditsDocs = prevProject.documents.filter(
         (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
       )
-      const prevDebitsDocs = prevProject.documents.filter(
-        (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
-      )
       const prevReceipts = prevReceiptsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
-      const prevPayments = prevPaymentsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
       const prevCredits = prevCreditsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
       const prevMatchedCbIds = new Set<string>()
       const prevMatchedBankIds = new Set<string>()
@@ -1206,37 +1280,25 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
           else prevMatchedBankIds.add(mi.transactionId)
         }
       }
-      const prevFmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
-      
-      const isAlreadyInCurrent = (t: TxLike, currentSet: TxLike[]) => {
-        const dStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : ''
-        const key = `${dStr}|${Number(t.amount).toFixed(2)}|${(t.chqNo || '').toLowerCase()}|${(t.docRef || '').toLowerCase()}|${(t.name || t.details || '').toLowerCase().trim()}`
-        return currentSet.some(c => {
-          const cdStr = c.date ? new Date(c.date).toISOString().slice(0, 10) : ''
-          const cKey = `${cdStr}|${Number(c.amount).toFixed(2)}|${(c.chqNo || '').toLowerCase()}|${(c.docRef || '').toLowerCase()}|${(c.name || c.details || '').toLowerCase().trim()}`
-          return key === cKey
-        })
-      }
+      const prevUnmatchedReceipts = prevReceipts.filter((t) => !prevMatchedCbIds.has(t.id))
+      const prevUnmatchedCredits = prevCredits.filter((t) => !prevMatchedBankIds.has(t.id))
 
-      broughtForwardItemsExport = prevPayments
-        .filter((t) => !prevMatchedCbIds.has(t.id))
-        .filter(t => !isAlreadyInCurrent(t, payments))
-        .map((t) => ({
-          date: prevFmt(t.date),
-          name: t.name || t.details || '—',
-          chqNo: t.chqNo || null,
-          amount: t.amount,
-          fromProject: prevProject.name,
-        }))
+      broughtForwardItemsExport = await resolveBroughtForwardUnpresented(
+        orgId,
+        project.rollForwardFromProjectId,
+        bankAccountId,
+        { payments, debits, credits },
+        workbookNettingRequestedExport
+      )
       broughtForwardLodgmentsExport = [
-        ...prevReceipts
-          .filter((t) => !prevMatchedCbIds.has(t.id))
-          .filter(t => !isAlreadyInCurrent(t, receipts))
-          .map((t) => ({ amount: t.amount, source: 'cash_book_receipts' as const })),
-        ...prevCredits
-          .filter((t) => !prevMatchedBankIds.has(t.id))
-          .filter(t => !isAlreadyInCurrent(t, credits))
-          .map((t) => ({ amount: t.amount, source: 'bank_credits' as const })),
+        ...filterBroughtForwardLodgments(prevUnmatchedReceipts, receipts).map((t) => ({
+          amount: t.amount,
+          source: 'cash_book_receipts' as const,
+        })),
+        ...filterBroughtForwardLodgments(prevUnmatchedCredits, credits).map((t) => ({
+          amount: t.amount,
+          source: 'bank_credits' as const,
+        })),
       ]
     }
   }
@@ -1428,11 +1490,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const unmatchedPaymentsTotalExport = clearingBrsTotalsExport.unmatchedPaymentsTotal
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
   const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
-  const workbookNettingQueryExport = String(req.query.workbookNetting || '').toLowerCase()
-  const workbookNettingRequestedExport =
-    workbookNettingQueryExport === '1' ||
-    workbookNettingQueryExport === 'true' ||
-    workbookNettingQueryExport === 'yes'
   const ecobankProfileExport = resolveEcobankGhanaProfile({
     bankAccounts: project.bankAccounts || [],
     sampleBankText: [...credits, ...debits]
@@ -1489,12 +1546,20 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const unmatchedDebitsLinkedToCashBookTotalExport =
     unmatchedDebitsTotalExport - bankOnlyDebitsNotInCashBookTotalExport
   const unpresentedForAgeingExport = ecobankProfileExport.active
-    ? unpresentedChequeRowsForBrsExport.map((t) => ({
-        date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
-        name: t.name || t.details || '—',
-        chqNo: t.chqNo || null,
-        amount: t.amount,
-      }))
+    ? [
+        ...unpresentedChequeRowsForBrsExport.map((t) => ({
+          date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
+          name: t.name || t.details || '—',
+          chqNo: t.chqNo || null,
+          amount: t.amount,
+        })),
+        ...broughtForwardItemsExport.map((t) => ({
+          date: t.date,
+          name: t.name,
+          chqNo: t.chqNo,
+          amount: t.amount,
+        })),
+      ]
     : [
         ...payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => ({
           date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
