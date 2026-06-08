@@ -192,10 +192,10 @@ function paymentIsStatutoryDeposit(payment: ClearingTxLike): boolean {
   return STATUTORY_DEPOSIT_PAIRS.some(({ payment: payRe }) => payRe.test(payText))
 }
 
-function statutoryDepositBankLines(
-  bankCredits: ClearingTxLike[],
-  bankDebits: ClearingTxLike[] = []
-): ClearingTxLike[] {
+function statutoryDepositBankLines<T extends ClearingTxLike>(
+  bankCredits: T[],
+  bankDebits: T[] = []
+): T[] {
   return [
     ...bankCredits.filter((c) => isEcobankClearingCredit(c)),
     ...bankDebits.filter((d) => isEcobankHseStatutoryDepositLine(d)),
