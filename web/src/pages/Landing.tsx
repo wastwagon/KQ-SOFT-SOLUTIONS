@@ -38,6 +38,7 @@ import {
   mergeWithApiPlans,
   type MarketingPlan,
 } from '../lib/plans'
+import { maxYearlyDiscountPercent } from '../lib/planPricing'
 
 /* ---------------------------------------------------------------------------
  * Premium SaaS landing page — KQ-SOFT Bank Reconciliation
@@ -1000,6 +1001,12 @@ function Pricing({
   showCompare: boolean
   setShowCompare: (b: boolean) => void
 }) {
+  const maxYearlyDiscount = maxYearlyDiscountPercent(plans)
+  const yearlySavingsCopy =
+    maxYearlyDiscount != null && maxYearlyDiscount > 0
+      ? `save up to ${maxYearlyDiscount}%`
+      : 'pay annually'
+
   return (
     <section id="pricing" className="relative py-24 sm:py-32 bg-gray-50/40 overflow-hidden">
       <div aria-hidden className="absolute -top-32 right-0 h-[420px] w-[420px] rounded-full bg-primary-200/25 blur-3xl" />
@@ -1017,7 +1024,7 @@ function Pricing({
             Simple pricing — billed in GHS via Paystack.
           </h2>
           <p className="mt-2 text-base sm:text-lg text-gray-600">
-            Start free. Pay monthly or save ~17% annually. Checkout is always in{' '}
+            Start free. Pay monthly or {yearlySavingsCopy} annually. Checkout is always in{' '}
             <abbr title="Ghana cedis">GHS</abbr> via Paystack; use the reference converter below for USD, EUR, or GBP.
             Each project&apos;s BRS currency (GHS, USD, or EUR) is chosen in the app.
           </p>
@@ -1052,7 +1059,7 @@ function Pricing({
                     : 'bg-green-100 text-green-700'
                 }`}
               >
-                save ~17%
+                {yearlySavingsCopy}
               </span>
             </button>
           </div>

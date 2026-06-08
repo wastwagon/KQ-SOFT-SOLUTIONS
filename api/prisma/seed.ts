@@ -126,18 +126,20 @@ async function main() {
       if (t.plan === 'basic') {
         // Keep basic without payment to exercise trial/free experience.
       } else {
-        const monthlyAmount =
-          t.plan === 'standard' ? 400 :
-          t.plan === 'premium' ? 900 :
-          t.plan === 'firm' ? 1500 : 0
-        const yearlyAmount =
-          t.plan === 'standard' ? 4000 :
-          t.plan === 'premium' ? 9000 :
-          t.plan === 'firm' ? 15000 : 0
+        const planRow = await prisma.plan.findUnique({
+          where: { slug: t.plan },
+          select: { monthlyGhs: true, yearlyGhs: true },
+        })
         const period: 'monthly' | 'yearly' = t.plan === 'firm' ? 'yearly' : 'monthly'
-        const amount = period === 'monthly' ? monthlyAmount : yearlyAmount
+        const amount =
+          period === 'monthly'
+            ? (planRow?.monthlyGhs ?? 0)
+            : t.plan === 'firm'
+              ? 15000 // custom firm demo contract
+              : (planRow?.yearlyGhs ?? 0)
         if (amount > 0) {
           const reference = `seed_${org.id}_${period}_active`
+          const now = new Date()
           await prisma.payment.upsert({
             where: { reference },
             create: {
@@ -148,6 +150,7 @@ async function main() {
               period,
               status: 'success',
               reference,
+              createdAt: now,
               paystackData: { seeded: true, source: 'prisma-seed' },
             },
             update: {
@@ -155,6 +158,7 @@ async function main() {
               plan: t.plan,
               period,
               status: 'success',
+              createdAt: now,
             },
           })
         }

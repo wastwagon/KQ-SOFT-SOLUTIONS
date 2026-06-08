@@ -7,16 +7,32 @@ import { useAuth } from '../../store/auth'
 import Card from '../../components/ui/Card'
 import PageHeader from '../../components/layout/PageHeader'
 
+type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'free'
+
 type Org = {
   id: string
   name: string
   slug: string
   plan: string
   suspendedAt: string | null
+  subscriptionStatus: SubscriptionStatus
   createdAt: string
   lastPayment: { amount: number; createdAt: string; plan: string; period: string } | null
   totalPaid: number
   _count: { members: number; projects: number; clients: number }
+}
+
+function subscriptionBadgeClass(status: SubscriptionStatus): string {
+  switch (status) {
+    case 'active':
+      return 'bg-green-100 text-green-700'
+    case 'trial':
+      return 'bg-blue-100 text-blue-700'
+    case 'expired':
+      return 'bg-amber-100 text-amber-800'
+    default:
+      return 'bg-gray-100 text-gray-600'
+  }
 }
 
 export default function AdminSubscribers() {
@@ -151,7 +167,8 @@ export default function AdminSubscribers() {
                 />
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subscription</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total paid</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Members</th>
@@ -180,10 +197,17 @@ export default function AdminSubscribers() {
                       Suspended
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                      Active
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                      OK
                     </span>
                   )}
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${subscriptionBadgeClass(o.subscriptionStatus)}`}
+                  >
+                    {o.subscriptionStatus}
+                  </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600 capitalize">{o.plan}</td>
                 <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">{fmt(o.totalPaid)}</td>

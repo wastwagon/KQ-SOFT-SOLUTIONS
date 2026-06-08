@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { getUsageWithLimits } from '../../services/usage.js'
 import { getSubscriptionSnapshot } from '../../services/subscriptionState.js'
-import { fetchSubscriptionOverrides } from '../../services/subscriptionOverrides.js'
+import { fetchSubscriptionOverrides, fetchSubscriptionOverridesBatch } from '../../services/subscriptionOverrides.js'
 import { normalizeOrgMemberRole } from '../../lib/orgMemberRole.js'
 import type { AuthRequest } from '../../middleware/auth.js'
 
@@ -80,6 +80,7 @@ router.get('/', async (req, res) => {
         introOfferUsedAt: true,
         _count: { select: { members: true, projects: true, clients: true } },
         payments: {
+          where: { status: 'success' },
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: { amount: true, createdAt: true, plan: true, period: true },
@@ -89,9 +90,22 @@ router.get('/', async (req, res) => {
     prisma.organization.count({ where }),
   ])
 
+  const orgIds = orgs.map((o) => o.id)
+  const overrideMap = await fetchSubscriptionOverridesBatch(orgIds)
+
   const organizations = orgs.map((o) => {
     const lastPayment = o.payments[0]
-    const totalPaid = { sum: 0 } // will be computed below
+    const subscription = getSubscriptionSnapshot(
+      { createdAt: o.createdAt },
+      lastPayment
+        ? {
+            createdAt: lastPayment.createdAt,
+            period: lastPayment.period as 'monthly' | 'yearly',
+            amount: lastPayment.amount,
+          }
+        : null,
+      overrideMap.get(o.id)
+    )
     return {
       id: o.id,
       name: o.name,
@@ -100,13 +114,20 @@ router.get('/', async (req, res) => {
       suspendedAt: o.suspendedAt,
       createdAt: o.createdAt,
       introOfferUsedAt: o.introOfferUsedAt,
-      lastPayment: lastPayment ? { amount: Number(lastPayment.amount), createdAt: lastPayment.createdAt, plan: lastPayment.plan, period: lastPayment.period } : null,
+      subscriptionStatus: subscription.status,
+      lastPayment: lastPayment
+        ? {
+            amount: Number(lastPayment.amount),
+            createdAt: lastPayment.createdAt,
+            plan: lastPayment.plan,
+            period: lastPayment.period,
+          }
+        : null,
       _count: o._count,
     }
   })
 
   // Fetch total paid per org for displayed page
-  const orgIds = organizations.map((o) => o.id)
   const totals = await prisma.payment.groupBy({
     by: ['organizationId'],
     where: { organizationId: { in: orgIds }, status: 'success' },
@@ -139,28 +160,45 @@ router.get('/export/csv', async (req, res) => {
       createdAt: true,
       _count: { select: { members: true, projects: true } },
       payments: {
+        where: { status: 'success' },
         orderBy: { createdAt: 'desc' },
         take: 1,
-        select: { amount: true, createdAt: true },
+        select: { amount: true, createdAt: true, period: true },
       },
     },
   })
 
-  const totals = await prisma.payment.groupBy({
-    by: ['organizationId'],
-    where: { organizationId: { in: orgs.map((o) => o.id) }, status: 'success' },
-    _sum: { amount: true },
-  })
+  const exportOrgIds = orgs.map((o) => o.id)
+  const [totals, exportOverrideMap] = await Promise.all([
+    prisma.payment.groupBy({
+      by: ['organizationId'],
+      where: { organizationId: { in: exportOrgIds }, status: 'success' },
+      _sum: { amount: true },
+    }),
+    fetchSubscriptionOverridesBatch(exportOrgIds),
+  ])
   const totalByOrg = new Map(totals.map((t) => [t.organizationId, Number(t._sum.amount ?? 0)]))
 
-  const header = 'Name,Slug,Plan,Members,Projects,Last Payment,Total Paid (GHS),Joined'
+  const header = 'Name,Slug,Plan,Subscription,Members,Projects,Last Payment,Total Paid (GHS),Joined'
   const rows = orgs.map((o) => {
     const last = o.payments[0]
     const total = totalByOrg.get(o.id) ?? 0
+    const subscriptionStatus = getSubscriptionSnapshot(
+      { createdAt: o.createdAt },
+      last
+        ? {
+            createdAt: last.createdAt,
+            period: last.period as 'monthly' | 'yearly',
+            amount: last.amount,
+          }
+        : null,
+      exportOverrideMap.get(o.id)
+    ).status
     return [
       `"${(o.name || '').replace(/"/g, '""')}"`,
       o.slug,
       o.plan,
+      subscriptionStatus,
       o._count.members,
       o._count.projects,
       last ? new Date(last.createdAt).toISOString().slice(0, 10) : '',
@@ -191,7 +229,7 @@ router.get('/:id', async (req, res) => {
   })
   if (!org) return res.status(404).json({ error: 'Organization not found' })
   const usage = await getUsageWithLimits(org.id, org.plan)
-  const latestPayment = org.payments[0]
+  const latestPayment = org.payments.find((p) => p.status === 'success') ?? null
   const overrides = await fetchSubscriptionOverrides(org.id)
   const subscription = getSubscriptionSnapshot(
     { createdAt: org.createdAt },

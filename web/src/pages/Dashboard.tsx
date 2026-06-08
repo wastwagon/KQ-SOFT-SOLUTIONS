@@ -384,6 +384,11 @@ export default function Dashboard() {
         <div className="space-y-6">
           <Card title="Plan features" className="shadow-sm">
             <p className="text-xs text-gray-500 mb-5 uppercase font-bold tracking-widest">Included in your plan</p>
+            {showSubscriptionPaywallBanner && (
+              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                Subscription inactive — renew to unlock plan features below.
+              </p>
+            )}
             <ul className="space-y-3">
               {[
                 { id: 'bulk_match', label: 'Bulk Match (50 items)' },
@@ -392,24 +397,36 @@ export default function Dashboard() {
                 { id: 'discrepancy_report', label: 'Discrepancy Reporting' },
                 { id: 'full_branding', label: 'Custom Branding' },
                 { id: 'multi_client', label: 'Multi-Client Support' },
-              ].map((f) => (
-                <li
-                  key={f.id}
-                  className={`flex items-center gap-3 text-sm ${features[f.id] ? 'text-gray-900' : 'text-gray-400'}`}
-                >
-                  {features[f.id] ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" aria-hidden />
-                  ) : (
-                    <CircleDot className="w-4 h-4 shrink-0 text-gray-300" aria-hidden />
-                  )}
-                  <span className="flex-1 min-w-0">{f.label}</span>
-                  {!features[f.id] && (
-                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                      Upgrade
-                    </span>
-                  )}
-                </li>
-              ))}
+              ].map((f) => {
+                const included = !!features[f.id]
+                const lockedBySubscription = included && showSubscriptionPaywallBanner
+                return (
+                  <li
+                    key={f.id}
+                    className={`flex items-center gap-3 text-sm ${
+                      included && !lockedBySubscription ? 'text-gray-900' : 'text-gray-400'
+                    }`}
+                  >
+                    {included && !lockedBySubscription ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" aria-hidden />
+                    ) : lockedBySubscription ? (
+                      <CircleDot className="w-4 h-4 shrink-0 text-amber-500" aria-hidden />
+                    ) : (
+                      <CircleDot className="w-4 h-4 shrink-0 text-gray-300" aria-hidden />
+                    )}
+                    <span className="flex-1 min-w-0">{f.label}</span>
+                    {lockedBySubscription ? (
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                        Renew
+                      </span>
+                    ) : !included ? (
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                        Upgrade
+                      </span>
+                    ) : null}
+                  </li>
+                )
+              })}
             </ul>
             {isAdmin && (
               <Link

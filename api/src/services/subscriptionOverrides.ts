@@ -1,5 +1,19 @@
 import { prisma } from '../lib/prisma.js'
-import type { SubscriptionOverrides } from './subscriptionState.js'
+import type { SubscriptionOverrides, SubscriptionStatus } from './subscriptionState.js'
+
+function parseSubscriptionOverrides(
+  trialValue: unknown,
+  statusValue: unknown
+): SubscriptionOverrides {
+  const trialEndsAtRaw = (trialValue as { trialEndsAt?: string } | null)?.trialEndsAt
+  const trialEndsAt = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null
+  const status =
+    (statusValue as { status?: SubscriptionStatus } | null)?.status ?? null
+  return {
+    trialEndsAt: trialEndsAt && !Number.isNaN(trialEndsAt.getTime()) ? trialEndsAt : null,
+    status,
+  }
+}
 
 /** Platform admin overrides for trial end and forced subscription status. */
 export async function fetchSubscriptionOverrides(orgId: string): Promise<SubscriptionOverrides> {
@@ -10,12 +24,34 @@ export async function fetchSubscriptionOverrides(orgId: string): Promise<Subscri
       select: { value: true },
     }),
   ])
-  const trialEndsAtRaw = (trialOverride?.value as { trialEndsAt?: string } | null)?.trialEndsAt
-  const trialEndsAt = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null
-  const status =
-    (statusOverride?.value as { status?: 'trial' | 'active' | 'expired' | 'free' } | null)?.status ?? null
-  return {
-    trialEndsAt: trialEndsAt && !Number.isNaN(trialEndsAt.getTime()) ? trialEndsAt : null,
-    status,
+  return parseSubscriptionOverrides(trialOverride?.value, statusOverride?.value)
+}
+
+/** Batch-fetch overrides for org list endpoints (avoids N+1). */
+export async function fetchSubscriptionOverridesBatch(
+  orgIds: string[]
+): Promise<Map<string, SubscriptionOverrides>> {
+  const result = new Map<string, SubscriptionOverrides>()
+  if (orgIds.length === 0) return result
+
+  const keys = orgIds.flatMap((id) => [
+    `org_trial_override:${id}`,
+    `org_subscription_status_override:${id}`,
+  ])
+  const settings = await prisma.platformSettings.findMany({
+    where: { key: { in: keys } },
+    select: { key: true, value: true },
+  })
+  const byKey = new Map(settings.map((s) => [s.key, s.value]))
+
+  for (const orgId of orgIds) {
+    result.set(
+      orgId,
+      parseSubscriptionOverrides(
+        byKey.get(`org_trial_override:${orgId}`),
+        byKey.get(`org_subscription_status_override:${orgId}`)
+      )
+    )
   }
+  return result
 }

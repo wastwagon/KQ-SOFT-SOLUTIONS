@@ -1,6 +1,7 @@
 import Card from '../ui/Card'
 import { canManageBilling } from '../../lib/permissions'
 import type { OrgRole } from '../../lib/permissions'
+import { formatYearlyDiscountLabel } from '../../lib/planPricing'
 
 /** Minimal shapes from subscription API — kept loose for forward compatibility. */
 interface BillingProps {
@@ -106,7 +107,7 @@ export default function SettingsBillingTab({
                   )}
                 </p>
                 <p className="text-sm text-gray-500">
-                  or GH₵{p.yearlyGhs}/yr (17% off)
+                  or GH₵{p.yearlyGhs}/yr ({formatYearlyDiscountLabel(p.monthlyGhs, p.yearlyGhs)})
                   {firstYearGhs != null && ` · First payment: GH₵${firstYearGhs}`}
                 </p>
                 <div className="mt-5 flex flex-col gap-3 flex-1 justify-end">
