@@ -133,6 +133,12 @@ export function chequeOrRefLink(left: ClearingTxLike, right: ClearingTxLike): bo
   return false
 }
 
+/** Judgment / timing lines the manual workbook keeps off bank-only debit schedules. */
+export function isEcobankJudgmentSchedulePayment(payment: ClearingTxLike): boolean {
+  const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
+  return /VODAFONE|GRA\b|SSNIT|SODIUM|DORIS|RITA KORKOI/i.test(text)
+}
+
 /** IBAG / inland levy lines are reconciled via clearing schedules, not unpresented timing cheques. */
 export function isLevyPayment(payment: ClearingTxLike): boolean {
   const text = [payment.details, payment.name].filter(Boolean).join(' ')
@@ -165,10 +171,25 @@ function paymentMatchesStatutoryBankLine(payment: ClearingTxLike, bankLine: Clea
   )
 }
 
+/** HSE cheque deposit lines (may post to debit or credit column). */
+export function isEcobankHseDepositLine(tx: ClearingTxLike): boolean {
+  const text = bankText(tx)
+  return /CHEQUE\s+DEPOSIT\s*-\s*HSE|HSE\s+CHEQUE(?:-EGH|-EBG)?/i.test(text)
+}
+
 /** HSE statutory deposits sometimes post to the debit column on Ecobank exports. */
 export function isEcobankHseStatutoryDepositLine(tx: ClearingTxLike): boolean {
   const text = bankText(tx)
-  return /HSE\s+CHEQUE/i.test(text) && /\bDEP/i.test(text) && /\b(GRA|SSNIT|NBC|ECG|ENTERPRISE\s+TRUSTEES)\b/i.test(text)
+  return (
+    isEcobankHseDepositLine(tx) &&
+    /\bDEP/i.test(text) &&
+    /\b(GRA|SSNIT|NBC|ECG|ENTERPRISE\s+TRUSTEES)\b/i.test(text)
+  )
+}
+
+function paymentIsStatutoryDeposit(payment: ClearingTxLike): boolean {
+  const payText = [payment.name, payment.details].filter(Boolean).join(' ')
+  return STATUTORY_DEPOSIT_PAIRS.some(({ payment: payRe }) => payRe.test(payText))
 }
 
 function statutoryDepositBankLines(
@@ -463,13 +484,62 @@ export function isCreditReclassifiedAsDebit(credit: ClearingTxLike): boolean {
   return isEcobankClearingCredit(credit) || FT_CONSOLIDATION_RE.test(text)
 }
 
+export interface BankOnlyDebitsContext {
+  workbookNetting?: boolean
+  matchedPaymentIds?: Set<string>
+}
+
+/** Clearing / HSE lines that pair to a cash-book payment (debit or credit column). */
+export function ecobankClearingLineHasPaymentCounterpart(
+  line: ClearingTxLike,
+  payments: ClearingTxLike[],
+  amountTolerance = 0.01,
+  ctx?: BankOnlyDebitsContext
+): boolean {
+  const lineText = bankText(line)
+  const clearingOrHse =
+    (isEcobankClearingCredit(line) || isEcobankHseDepositLine(line)) &&
+    !FT_CONSOLIDATION_RE.test(lineText)
+  if (!clearingOrHse) return false
+  if (ctx?.workbookNetting && isEcobankHseDepositLine(line)) {
+    const statutoryAtAmount = payments.filter(
+      (p) =>
+        paymentIsStatutoryDeposit(p) && amountsMatch(p.amount, line.amount, amountTolerance)
+    )
+    if (statutoryAtAmount.length >= 1) return true
+  }
+  const judgmentAtAmount = payments.filter(
+    (p) =>
+      isEcobankJudgmentSchedulePayment(p) &&
+      amountsMatch(p.amount, line.amount, amountTolerance)
+  )
+  const unmatchedJudgmentAtAmount = judgmentAtAmount.filter(
+    (p) => !ctx?.matchedPaymentIds?.has(p.id)
+  )
+  if (judgmentAtAmount.length === 1) return true
+  if (unmatchedJudgmentAtAmount.length === 1) return true
+  for (const p of payments) {
+    if (!amountsMatch(p.amount, line.amount, amountTolerance)) continue
+    if (chequeOrRefLink(p, line)) return true
+    if (paymentChqMentionedOnBankStatement(p, [line], [])) return true
+    if (paymentMatchesStatutoryBankLine(p, line)) return true
+    const tokens = payeeTokens(p)
+    if (tokens.length && tokens.some((t) => lineText.toUpperCase().includes(t))) return true
+  }
+  return false
+}
+
 /** True when a bank debit corresponds to any cash-book payment (matched or unmatched). */
 export function debitHasPaymentCounterpart(
   debit: ClearingTxLike,
   payments: ClearingTxLike[],
   amountTolerance = 0.01,
-  matchedPaymentIds?: Set<string>
+  matchedPaymentIds?: Set<string>,
+  ctx?: BankOnlyDebitsContext
 ): boolean {
+  if (ecobankClearingLineHasPaymentCounterpart(debit, payments, amountTolerance, ctx)) {
+    return true
+  }
   const text = bankText(debit).toUpperCase()
   const isTransfer = TRANSFER_DEBIT_RE.test(text)
   const isWithdrawal = WITHDRAWAL_DEBIT_RE.test(text)
@@ -526,18 +596,42 @@ export function creditHasCashBookCounterpart(
   return false
 }
 
+/** Inward clearing credits reclassified as debits that pair to a cash-book payment. */
+export function clearingCreditHasPaymentCounterpart(
+  credit: ClearingTxLike,
+  payments: ClearingTxLike[],
+  amountTolerance = 0.01,
+  ctx?: BankOnlyDebitsContext
+): boolean {
+  if (!isCreditReclassifiedAsDebit(credit)) return false
+  return ecobankClearingLineHasPaymentCounterpart(credit, payments, amountTolerance, ctx)
+}
+
 export function computeBankOnlyDebitsTotal(
   unmatchedDebits: ClearingTxLike[],
   unmatchedCredits: ClearingTxLike[],
   allPayments: ClearingTxLike[],
   amountTolerance = 0.01,
-  matchedPaymentIds?: Set<string>
+  matchedPaymentIds?: Set<string>,
+  excludeBankIds?: Set<string>,
+  ctx?: BankOnlyDebitsContext
 ): number {
+  const excluded = excludeBankIds ?? new Set<string>()
+  const fullCtx: BankOnlyDebitsContext = {
+    ...ctx,
+    matchedPaymentIds: matchedPaymentIds ?? ctx?.matchedPaymentIds,
+  }
   const debitTotal = unmatchedDebits
-    .filter((d) => !debitHasPaymentCounterpart(d, allPayments, amountTolerance, matchedPaymentIds))
+    .filter((d) => !excluded.has(d.id))
+    .filter(
+      (d) =>
+        !debitHasPaymentCounterpart(d, allPayments, amountTolerance, matchedPaymentIds, fullCtx)
+    )
     .reduce((s, t) => s + t.amount, 0)
   const reclassified = unmatchedCredits
+    .filter((c) => !excluded.has(c.id))
     .filter((c) => isCreditReclassifiedAsDebit(c))
+    .filter((c) => !clearingCreditHasPaymentCounterpart(c, allPayments, amountTolerance, fullCtx))
     .reduce((s, t) => s + t.amount, 0)
   return debitTotal + reclassified
 }
@@ -554,13 +648,27 @@ export function buildBankOnlyScheduleRows(
   allPayments: ClearingTxLike[],
   allReceipts: ClearingTxLike[],
   amountTolerance = 0.01,
-  matchedPaymentIds?: Set<string>
+  matchedPaymentIds?: Set<string>,
+  excludeBankIds?: Set<string>,
+  ctx?: BankOnlyDebitsContext
 ): BankOnlyScheduleRows {
+  const excluded = excludeBankIds ?? new Set<string>()
+  const fullCtx: BankOnlyDebitsContext = {
+    ...ctx,
+    matchedPaymentIds: matchedPaymentIds ?? ctx?.matchedPaymentIds,
+  }
   const debits = [
     ...unmatchedDebits.filter(
-      (d) => !debitHasPaymentCounterpart(d, allPayments, amountTolerance, matchedPaymentIds)
+      (d) =>
+        !excluded.has(d.id) &&
+        !debitHasPaymentCounterpart(d, allPayments, amountTolerance, matchedPaymentIds, fullCtx)
     ),
-    ...unmatchedCredits.filter((c) => isCreditReclassifiedAsDebit(c)),
+    ...unmatchedCredits.filter(
+      (c) =>
+        !excluded.has(c.id) &&
+        isCreditReclassifiedAsDebit(c) &&
+        !clearingCreditHasPaymentCounterpart(c, allPayments, amountTolerance, fullCtx)
+    ),
   ]
   const credits = unmatchedCredits.filter(
     (c) =>

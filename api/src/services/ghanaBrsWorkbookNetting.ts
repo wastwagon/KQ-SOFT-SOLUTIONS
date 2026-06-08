@@ -454,3 +454,22 @@ export function unpresentedWithOptionalWorkbookNetting(
     workbook,
   }
 }
+
+/**
+ * Manual workbook block C/D lines belong on netting schedules, not bank-only debits.
+ */
+export function workbookBankOnlyExcludedBankIds(
+  workbook: WorkbookNettingResult,
+  allBankDebits: ClearingTxLike[],
+  allBankCredits: ClearingTxLike[],
+  amountTolerance = 0.01
+): Set<string> {
+  const ids = new Set<string>()
+  for (const pair of workbook.round1Pairs) ids.add(pair.bankId)
+  for (const pair of workbook.round1MatchedPairs) ids.add(pair.bankId)
+  for (const pair of workbook.round2Pairs) ids.add(pair.bankId)
+  for (const line of [...allBankDebits, ...allBankCredits]) {
+    if (isRound2BlockBank(line, amountTolerance)) ids.add(line.id)
+  }
+  return ids
+}

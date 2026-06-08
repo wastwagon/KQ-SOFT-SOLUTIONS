@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeWorkbookNettedUnpresented,
   unpresentedWithOptionalWorkbookNetting,
+  workbookBankOnlyExcludedBankIds,
 } from './ghanaBrsWorkbookNetting.js'
 import type { ClearingTxLike } from './ecobankClearingMatcher.js'
 
@@ -113,6 +114,41 @@ describe('computeWorkbookNettedUnpresented', () => {
     expect(withMatched.sectionCOffsetTotal).toBe(without.sectionCOffsetTotal + 5000)
     expect(withMatched.group2Net).toBeCloseTo(without.group2Net, 2)
     expect(withMatched.round1MatchedPairs).toHaveLength(1)
+  })
+
+  it('collects round-1/2 and block-D bank ids for bank-only debit exclusion', () => {
+    const debits = [
+      tx({ id: 'r1w', amount: 5000, details: 'WITHDRAWAL CHQ 925976' }),
+      tx({ id: 'r2w', amount: 3000, details: 'WITHDRAWAL CHQ 925987' }),
+      tx({ id: 'ft', amount: 10000, details: 'FT Consolidation for SDMC' }),
+    ]
+    const credits = [
+      tx({
+        id: 'r2c',
+        amount: 3214.89,
+        details: 'CHEQUE CLEARING INWARD CHQ 926042 received from Clearing',
+      }),
+    ]
+    const payments = [
+      tx({ id: 'b1', amount: 5000, chqNo: '925976', name: 'Philip', details: 'ED fuel' }),
+      tx({ id: 'r2p', amount: 3000, chqNo: '925987', name: 'Philip' }),
+      tx({ id: 'r2paye', amount: 3214.89, chqNo: '926042', name: 'SSNIT' }),
+    ]
+    const workbook = computeWorkbookNettedUnpresented(
+      [payments[0]!],
+      debits,
+      credits,
+      debits,
+      credits,
+      0,
+      0.01,
+      payments
+    )
+    const excluded = workbookBankOnlyExcludedBankIds(workbook, debits, credits)
+    expect(excluded.has('r1w')).toBe(workbook.round1Pairs.some((p) => p.bankId === 'r1w'))
+    expect(excluded.has('r2w')).toBe(true)
+    expect(excluded.has('r2c')).toBe(true)
+    expect(excluded.has('ft')).toBe(false)
   })
 
   it('returns legacy totals when workbook netting is disabled', () => {

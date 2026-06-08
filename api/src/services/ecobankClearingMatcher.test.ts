@@ -11,6 +11,8 @@ import {
   isLevyPayment,
   computeBankOnlyCreditsTotal,
   computeBankOnlyDebitsTotal,
+  clearingCreditHasPaymentCounterpart,
+  ecobankClearingLineHasPaymentCounterpart,
   creditHasCashBookCounterpart,
   isCreditReclassifiedAsDebit,
   suggestEcobankPaymentDebitMatches,
@@ -296,6 +298,75 @@ describe('computeBankOnlyDebitsTotal', () => {
     const debits = [tx({ id: 'd1', amount: 13000, details: 'CHEQUE WITHDRAWAL EGH CHQ 2132 PAID TO ALEX' })]
     const payments = [tx({ id: 'p1', amount: 13000, chqNo: '002102', name: 'Philip Akuffo' })]
     const total = computeBankOnlyDebitsTotal(debits, [], payments, 0.01, new Set(['p1']))
+    expect(total).toBe(0)
+  })
+
+  it('excludes reclassified clearing credits linked to a judgment payment', () => {
+    const credits = [
+      tx({
+        id: 'c1',
+        amount: 2244,
+        chqNo: '925881',
+        details: 'CHEQUE CLEARING - INWARD LCY ECOBANK CHQ NO 925881',
+      }),
+    ]
+    const payments = [
+      tx({ id: 'p1', amount: 2244, chqNo: '926062', name: 'Sodium Solutions', details: 'Judgment debt' }),
+    ]
+    expect(clearingCreditHasPaymentCounterpart(credits[0]!, payments)).toBe(true)
+    const total = computeBankOnlyDebitsTotal([], credits, payments)
+    expect(total).toBe(0)
+  })
+
+  it('excludes debit-posted clearing lines for sole judgment payments (9033 Doris/Rita)', () => {
+    const debits = [
+      tx({ id: 'd1', amount: 2500, details: 'CHQ NO 925886 received from Clearing' }),
+      tx({
+        id: 'd2',
+        amount: 785,
+        details: 'CHEQUE CLEARING - INWARD LCY ECOBANK CHQ NO 925880 received from Clearing',
+      }),
+    ]
+    const payments = [
+      tx({ id: 'p1', amount: 2500, chqNo: '925978', name: 'Doris Quayson' }),
+      tx({ id: 'p2', amount: 2500, chqNo: '926118', name: 'Doris Quayson' }),
+      tx({ id: 'p3', amount: 2500, chqNo: '926062', name: 'Doris Quayson' }),
+      tx({ id: 'p4', amount: 785, chqNo: '925972', name: 'Rita Korkoi Mensah (Brice)' }),
+      tx({ id: 'p5', amount: 785, chqNo: '926100', name: 'Rita Korkoi Mensah (Brice)' }),
+      tx({ id: 'p6', amount: 785, chqNo: '926057', name: 'Rita Korkoi Mensah (Brice)' }),
+    ]
+    const matched = new Set(['p1', 'p2', 'p4', 'p5'])
+    expect(
+      ecobankClearingLineHasPaymentCounterpart(debits[0]!, payments, 0.01, { matchedPaymentIds: matched })
+    ).toBe(true)
+    expect(
+      ecobankClearingLineHasPaymentCounterpart(debits[1]!, payments, 0.01, { matchedPaymentIds: matched })
+    ).toBe(true)
+    const total = computeBankOnlyDebitsTotal(debits, [], payments, 0.01, matched)
+    expect(total).toBe(0)
+  })
+
+  it('excludes HSE deposits paired to statutory payments when workbook netting is on', () => {
+    const debits = [
+      tx({
+        id: 'd1',
+        amount: 2981.81,
+        chqNo: '926094',
+        details: 'HSE CHEQUE-EGH CHQ NO 926094 B/O LORDSHIP INSURANCE BROKERS LIMITED',
+      }),
+    ]
+    const payments = [
+      tx({ id: 'p1', amount: 2981.81, chqNo: '926092', name: 'GRA', details: 'Payment of staff PAYE' }),
+    ]
+    const total = computeBankOnlyDebitsTotal(debits, [], payments, 0.01, undefined, undefined, {
+      workbookNetting: true,
+    })
+    expect(total).toBe(0)
+  })
+
+  it('honours workbook exclude bank ids', () => {
+    const debits = [tx({ id: 'd1', amount: 3000, details: 'CHEQUE WITHDRAWAL CHQ 925989' })]
+    const total = computeBankOnlyDebitsTotal(debits, [], [], 0.01, undefined, new Set(['d1']))
     expect(total).toBe(0)
   })
 })
