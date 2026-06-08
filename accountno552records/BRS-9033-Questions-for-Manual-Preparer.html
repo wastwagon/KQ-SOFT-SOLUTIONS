@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BRS Reconciliation Questions — Ecobank 9033 Q1 2026</title>
+  <style>
+    @page { margin: 18mm 16mm; size: A4; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 12mm 10mm;
+    }
+    h1 {
+      font-size: 17pt;
+      color: #0f3d5c;
+      margin: 0 0 4px;
+      border-bottom: 3px solid #0f3d5c;
+      padding-bottom: 8px;
+    }
+    h2 {
+      font-size: 12pt;
+      color: #0f3d5c;
+      margin: 20px 0 8px;
+      page-break-after: avoid;
+    }
+    h3 { font-size: 10.5pt; margin: 14px 0 6px; color: #333; }
+    .meta { font-size: 9.5pt; color: #444; margin-bottom: 14px; }
+    .meta strong { color: #1a1a1a; }
+    .summary-box {
+      background: #f0f6fa;
+      border: 1px solid #b8d4e8;
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin: 12px 0 18px;
+    }
+    .summary-box table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+    .summary-box td { padding: 3px 8px 3px 0; vertical-align: top; }
+    .summary-box td:last-child { text-align: right; font-weight: 600; }
+    .ok { color: #166534; }
+    .gap { color: #b45309; }
+    p { margin: 6px 0; }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      margin: 8px 0 12px;
+    }
+    table.data th, table.data td {
+      border: 1px solid #ccc;
+      padding: 5px 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.data th { background: #e8eef2; font-weight: 600; }
+    ol.questions { margin: 6px 0 0 18px; padding: 0; }
+    ol.questions li { margin-bottom: 6px; }
+    .formula {
+      font-family: "Courier New", monospace;
+      font-size: 9.5pt;
+      background: #f8f8f8;
+      border-left: 4px solid #0f3d5c;
+      padding: 10px 12px;
+      margin: 10px 0;
+    }
+    .footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+      font-size: 8.5pt;
+      color: #666;
+    }
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+
+<h1>BRS Reconciliation — Questions for Manual Preparer</h1>
+<p class="meta">
+  <strong>Client:</strong> Lordship Insurance Company Limited &nbsp;|&nbsp;
+  <strong>Bank:</strong> Ecobank Tesano Account 1441001519033 (9033)<br />
+  <strong>Period:</strong> Q1 2026 &nbsp;|&nbsp;
+  <strong>Reconciliation date:</strong> 31 March 2026<br />
+  <strong>Reference workbook:</strong> Account901 brs as at 31.3.2026.xlsx<br />
+  <strong>Prepared by:</strong> KQ Soft Solutions &nbsp;|&nbsp;
+  <strong>Date:</strong> 6 June 2026
+</p>
+
+<div class="summary-box">
+  <p style="margin-top:0"><strong>Status — platform vs your manual BRS</strong></p>
+  <table>
+    <tr><td>Bank closing balance</td><td class="ok">18,643.29 — Match</td></tr>
+    <tr><td>Cash book balance</td><td class="ok">378,557.29 — Match</td></tr>
+    <tr><td>Uncredited lodgments</td><td class="ok">0.00 — Match</td></tr>
+    <tr><td>Bank-only credits</td><td class="ok">3,479.73 — Match</td></tr>
+    <tr><td>Unpresented cheques (BRS line)</td><td class="gap">Manual 10,660.97 vs Platform 19,754.86</td></tr>
+    <tr><td>Bank-only debits (BRS line)</td><td class="gap">Manual 374,054.70 vs Platform 393,412.21</td></tr>
+  </table>
+  <p style="margin-bottom:0;font-size:9pt">
+    We believe the remaining gaps relate to <strong>netting steps and matching judgment</strong> in your workbook
+    that our system does not yet automate. Your answers below will help us align the platform with your process.
+  </p>
+</div>
+
+<p>
+  We have uploaded the same source files you used:
+  <strong>LIBcashbk1 2026 1qtr.xlsx</strong> (cash book) and
+  <strong>1778163944552 dated 4.6.26.xlsx</strong> (bank statement).
+  Please reply with confirmations, corrections, and pairing details where requested.
+</p>
+
+<h2>1. How did you arrive at 10,660.97 for unpresented cheques?</h2>
+<p>On Sheet1 of your workbook we see these sections and totals:</p>
+<table class="data">
+  <thead><tr><th>Section</th><th>Total (GHS)</th></tr></thead>
+  <tbody>
+    <tr><td>Unpresented cheques (4 rows: 926073, 926072, 926023, 925928)</td><td>8,000.26</td></tr>
+    <tr><td>Unmatched payments in cash book — block 1</td><td>26,750.80</td></tr>
+    <tr><td>Unmatched debits in bank statement — block 1</td><td>−17,875.20</td></tr>
+    <tr><td><strong>Subtotal</strong></td><td><strong>16,875.86</strong></td></tr>
+    <tr><td>Unmatched debits in bank statement — block 2</td><td>21,429.78</td></tr>
+    <tr><td>Unmatched payments in cash book — block 2 (contra / negative)</td><td>−15,214.89</td></tr>
+    <tr><td><strong>Round 2 net offset</strong></td><td><strong>6,214.89</strong></td></tr>
+  </tbody>
+</table>
+<div class="formula">
+  Our reading: BRS unpresented = 16,875.86 − 6,214.89 = <strong>10,660.97</strong>
+</div>
+<ol class="questions">
+  <li>Is this the correct formula for the <strong>“Less: Unpresented cheques”</strong> line on the main BRS?</li>
+  <li>Or do you use a different method (for example, only the 4-row section totalling 8,000.26)?</li>
+  <li>What is the amount <strong>1,767.43</strong> shown on row 74? How does it tie to the bank closing balance of 18,643.29?</li>
+</ol>
+
+<h2>2. Round 1 netting — payments matched to bank debits (block 1)</h2>
+<p>Block 1 bank debits total <strong>−17,875.20</strong> and appear to offset these payments:</p>
+<table class="data">
+  <thead><tr><th>Cash book chq</th><th>Amount</th><th>Bank side (summary)</th></tr></thead>
+  <tbody>
+    <tr><td>925976</td><td>5,000.00</td><td>Withdrawal — chq 925976</td></tr>
+    <tr><td>926102</td><td>5,000.00</td><td>Withdrawal — chq 926102</td></tr>
+    <tr><td>926059</td><td>5,000.00</td><td>Withdrawal — chq 926059</td></tr>
+    <tr><td>925975</td><td>975.20</td><td>Clearing — chq 925975</td></tr>
+    <tr><td>925881</td><td>950.00</td><td>Clearing — chq 925881</td></tr>
+    <tr><td>925973</td><td>950.00</td><td>Clearing — chq 925973</td></tr>
+  </tbody>
+</table>
+<ol class="questions" start="4">
+  <li>Are these <strong>one-to-one pairings</strong> (each payment matched to that specific bank line)?</li>
+  <li>For <strong>925973</strong> — which cash book payment does it pair with? We see 925881 (950) in the payment list but not 925973.</li>
+  <li>After this round, which items from block 1 (e.g. Samuel Narh <strong>926101</strong>, Skones <strong>926105</strong>, Royal Adjei <strong>926075</strong>) remain as timing items versus fully netted away?</li>
+</ol>
+
+<h2>3. Round 2 netting — contra (negative) payment entries</h2>
+<p>Block 2 shows these <strong>negative</strong> payment amounts totalling <strong>−15,214.89</strong>:</p>
+<table class="data">
+  <thead><tr><th>Cash book chq</th><th>Amount shown</th><th>Payee</th></tr></thead>
+  <tbody>
+    <tr><td>926042</td><td>−3,214.89</td><td>SSNIT</td></tr>
+    <tr><td>925987</td><td>−3,000.00</td><td>Philip akuffo</td></tr>
+    <tr><td>926113</td><td>−3,000.00</td><td>Philip Akuffo</td></tr>
+    <tr><td>926069</td><td>−3,000.00</td><td>Philip Akuffo</td></tr>
+    <tr><td>925945</td><td>−3,000.00</td><td>(blank)</td></tr>
+  </tbody>
+</table>
+<p>Against bank debits block 2 total of <strong>21,429.78</strong> (net offset <strong>6,214.89</strong>).</p>
+<ol class="questions" start="7">
+  <li>Why are these payments shown as <strong>negative</strong>? Are they explicit offsets to specific bank debits in block 2?</li>
+  <li>Please list the <strong>exact bank line</strong> each contra payment pairs with (date, description, amount).</li>
+  <li>Is <strong>926042</strong> (SSNIT) paired to clearing 926042 on the bank, or to a different bank line?</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>4. Cross–cheque matches (different chq on cash book vs bank)</h2>
+<p>These are <strong>matched in your Sheet4</strong> but the cheque numbers differ between cash book and bank:</p>
+<table class="data">
+  <thead><tr><th>Cash book chq</th><th>Payee</th><th>Amount</th><th>Bank line you matched to</th></tr></thead>
+  <tbody>
+    <tr><td>926044</td><td>GRA (PAYE Dec 25)</td><td>2,981.81</td><td><em>Please specify</em></td></tr>
+    <tr><td>926092</td><td>GRA (PAYE Jan 26)</td><td>2,981.81</td><td><em>Please specify</em></td></tr>
+    <tr><td>926062</td><td>Doris Quayson (Mar 26)</td><td>2,500.00</td><td><em>Please specify — HSE 926118?</em></td></tr>
+  </tbody>
+</table>
+<ol class="questions" start="10">
+  <li>For each row above, which <strong>exact bank transaction</strong> did you match to (date + description)?</li>
+  <li>What rule did you use — <strong>amount + payee name</strong> (GRA, Doris), <strong>amount only</strong>, or something else?</li>
+  <li>Can several cash book cheques legitimately match <strong>one</strong> HSE deposit line on the bank?</li>
+</ol>
+
+<h2>5. Utilities — no cheque number on bank statement</h2>
+<p>Matched in your Sheet4 but the bank statement has <strong>no line containing that cheque number</strong>:</p>
+<table class="data">
+  <thead><tr><th>Cash book chq</th><th>Payee</th><th>Amount</th><th>Bank line you matched to</th></tr></thead>
+  <tbody>
+    <tr><td>925981</td><td>VODAFONE</td><td>700.00</td><td><em>Please specify</em></td></tr>
+    <tr><td>926109</td><td>Vodafone Ghana</td><td>700.00</td><td><em>Please specify</em></td></tr>
+  </tbody>
+</table>
+<ol class="questions" start="13">
+  <li>Which <strong>bank transaction(s)</strong> did you match each payment to (date, description, amount)?</li>
+  <li>Was the match by <strong>amount (700)</strong> only, by <strong>payee name</strong> in the bank narrative, or another rule?</li>
+</ol>
+
+<h2>6. Incomplete bank row — chq 926114</h2>
+<p>In the bank Excel export we have a row with <strong>description only</strong>:</p>
+<p><em>“CHQ NO 926114 received from Clearing”</em> — no transaction date and no amount.</p>
+<p>Your cash book shows <strong>Sodium Brand Solutions</strong>, chq <strong>926114</strong>, amount <strong>2,244.00</strong>, matched in Sheet4.</p>
+<ol class="questions" start="15">
+  <li>What <strong>date and amount</strong> did you use for this bank line?</li>
+  <li>Was it taken from the PDF, another export, or entered manually?</li>
+</ol>
+
+<h2>7. Treatment of remaining cheques</h2>
+<p>Please confirm how <strong>you</strong> treated each item on the BRS (Unpresented / Matched / Netted in worksheet):</p>
+<table class="data">
+  <thead><tr><th>Chq</th><th>Payee</th><th>Amount</th><th>Your treatment</th></tr></thead>
+  <tbody>
+    <tr><td>926101</td><td>Samuel Narh</td><td>950.00</td><td></td></tr>
+    <tr><td>926058</td><td>Samuel Narh</td><td>950.00</td><td></td></tr>
+    <tr><td>926105</td><td>Skones Security</td><td>975.20</td><td></td></tr>
+    <tr><td>926061</td><td>Skones Security</td><td>975.20</td><td></td></tr>
+    <tr><td>925942</td><td>Skones (Dec 25)</td><td>975.20</td><td></td></tr>
+    <tr><td>926057</td><td>Rita Korkoi Mensah</td><td>785.00</td><td></td></tr>
+    <tr><td>926073</td><td>ECG</td><td>4,839.56</td><td></td></tr>
+    <tr><td>926072</td><td>Server repairs</td><td>650.00</td><td></td></tr>
+    <tr><td>926023</td><td>Alex Avorkpo</td><td>510.70</td><td></td></tr>
+    <tr><td>925928</td><td>(blank)</td><td>2,000.00</td><td></td></tr>
+  </tbody>
+</table>
+<ol class="questions" start="17">
+  <li>For each row in the table, which category applies?</li>
+  <li>Are the <strong>four cheques totalling 8,000.26</strong> (926073, 926072, 926023, 925928) the only true unpresented cheques on the BRS line after all netting?</li>
+</ol>
+
+<h2>8. Bank-only debits schedule (374,054.70)</h2>
+<ol class="questions" start="19">
+  <li>Does the total <strong>374,054.70</strong> include inward clearing / HSE deposit lines that you have <strong>already matched</strong> to cash book payments elsewhere on the worksheet?</li>
+  <li>Once a clearing credit is matched to a payment, is it <strong>removed</strong> from the bank-only debits schedule?</li>
+  <li>Are <strong>FT Consolidation for SDMC</strong> lines always treated as bank-only (never recorded in the cash book)?</li>
+</ol>
+
+<h2>9. Match count (~54 manual vs 44 automated)</h2>
+<ol class="questions" start="22">
+  <li>Are the roughly <strong>10 extra pairs</strong> in your workbook mostly the cross-chq, utility, and judgment cases described above?</li>
+  <li>Is there a list of matches you consider <strong>manual only</strong> that you would not expect a system to auto-match?</li>
+</ol>
+
+<h2>What we need back</h2>
+<ol class="questions">
+  <li>Confirmation or correction of the <strong>unpresented formula</strong> (Section 1).</li>
+  <li><strong>Pairing tables</strong> for Sections 2–6 (cash book row ↔ bank row).</li>
+  <li><strong>Treatment</strong> for each cheque in Section 7.</li>
+  <li>Short answers on <strong>bank-only debits</strong> rules (Section 8).</li>
+</ol>
+<p>
+  With your replies we can replicate your workbook logic in our platform or document acceptable
+  differences between manual judgment and automated rules.
+</p>
+
+<div class="footer">
+  <strong>KQ Soft Solutions</strong> — Bank Reconciliation System<br />
+  Project: Lordship – Ecobank 9033 Q1 2026 &nbsp;|&nbsp;
+  Files: LIBcashbk1 2026 1qtr.xlsx, 1778163944552 dated 4.6.26.xlsx, Account901 brs as at 31.3.2026.xlsx
+</div>
+
+</body>
+</html>
