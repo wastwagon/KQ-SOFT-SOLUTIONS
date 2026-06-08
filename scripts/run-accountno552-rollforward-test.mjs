@@ -24,6 +24,7 @@ import {
   chqAmountMap,
   ensureProjectCompleted,
   ensureQ1Project,
+  Q1_PROJECT_SLUG,
   login,
   normalizeChqNo,
   q1RollForwardRawTotal,
@@ -40,7 +41,8 @@ const API = process.env.API_URL || 'http://localhost:9011'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
 const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 
-const Q2_PROJECT_NAME = 'Lordship – Ecobank 9033 Q2 2026 (accountno552 rollforward test)'
+const Q2_PROJECT_NAME =
+  process.env.BRS_Q2_PROJECT_NAME || 'Lordship – Ecobank 9033 Q2 2026 (accountno552 rollforward test)'
 const Q2_RECON_DATE = '2026-06-30T00:00:00.000Z'
 
 const AFTER_PARTIAL_BF = {
@@ -182,10 +184,22 @@ async function main() {
   console.log('Login OK\n')
 
   console.log('--- Phase 0: Q1 reconcile ---')
-  const { project: q1, totalMatched, locked: q1Locked } = await ensureQ1Project(API, token)
-  console.log(
-    `Q1 project: ${q1.slug}${q1Locked ? ` (locked: ${q1.status})` : ` (bulk matched ${totalMatched})`}`
-  )
+  let q1
+  let totalMatched = 0
+  let q1Locked = false
+  if (Q1_PROJECT_SLUG) {
+    q1 = await api(API, 'GET', `/projects/${Q1_PROJECT_SLUG}`, token)
+    q1Locked = ['completed', 'approved', 'submitted_for_review'].includes(q1.status)
+    console.log(`Q1 project: ${q1.slug} (existing production: ${q1.status})`)
+  } else {
+    const setup = await ensureQ1Project(API, token)
+    q1 = setup.project
+    totalMatched = setup.totalMatched
+    q1Locked = setup.locked
+    console.log(
+      `Q1 project: ${q1.slug}${q1Locked ? ` (locked: ${q1.status})` : ` (bulk matched ${totalMatched})`}`
+    )
+  }
 
   const q1Report = await fetchReport(API, token, q1.slug)
   const q1Brs = q1Report.brsStatement || {}

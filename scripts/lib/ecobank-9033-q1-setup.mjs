@@ -10,7 +10,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const ROOT = path.join(__dirname, '../..')
 export const DATA = path.join(ROOT, 'accountno552records')
 
-export const Q1_PROJECT_NAME = 'Lordship – Ecobank 9033 Q1 2026 (accountno552)'
+export const Q1_PROJECT_NAME =
+  process.env.BRS_Q1_PROJECT_NAME || 'Lordship – Ecobank 9033 Q1 2026 (accountno552)'
+export const Q1_PROJECT_SLUG = process.env.BRS_Q1_SLUG || null
 export const Q1_RECON_DATE = '2026-03-31T00:00:00.000Z'
 
 /** From Account901 brs as at 31.3.2026.xlsx — Ecobank 1441001519033 */
