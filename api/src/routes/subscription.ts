@@ -12,7 +12,10 @@ import { PLAN_PRICES } from '../config/subscription.js'
 import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
 import { fetchSubscriptionOverrides } from '../services/subscriptionOverrides.js'
-import { isSubscriptionPaywallEnabled } from '../services/orgSubscriptionAccess.js'
+import {
+  invalidateOrgSubscriptionCache,
+  isSubscriptionPaywallEnabled,
+} from '../services/orgSubscriptionAccess.js'
 import { getPlanQuotaLimits } from '../services/planLimits.js'
 import { logger } from '../middleware/logging.js'
 import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
@@ -307,6 +310,7 @@ export async function handlePaystackWebhook(req: express.Request, res: express.R
             },
           }),
         ])
+        invalidateOrgSubscriptionCache(orgId)
       } catch (e) {
         // Webhooks are retried; duplicate reference should be treated as idempotent success.
         if (!isUniqueConstraintError(e)) {

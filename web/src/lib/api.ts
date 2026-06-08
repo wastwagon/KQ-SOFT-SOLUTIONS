@@ -454,9 +454,23 @@ export async function api(path: string, options: RequestInit = {}) {
 
 export const auth = {
   me: () => api('/auth/me') as Promise<{ user: { id: string; email: string; name?: string }; org: { id: string; name: string }; role: string; isPlatformAdmin: boolean }>,
-  register: (body: { email: string; password: string; name?: string; orgName: string }) =>
+  getInvite: (token: string) =>
+    api(`/auth/invite/${encodeURIComponent(token)}`) as Promise<{
+      email: string
+      role: string
+      organization: { id: string; name: string }
+      expiresAt: string
+    }>,
+  acceptInvite: (token: string) =>
+    api('/auth/accept-invite', { method: 'POST', body: JSON.stringify({ token }) }) as Promise<{
+      ok: boolean
+      org: { id: string; name?: string }
+      role: string
+      token?: string
+    }>,
+  register: (body: { email: string; password: string; name?: string; orgName?: string; inviteToken?: string }) =>
     api('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  login: (body: { email: string; password: string }) =>
+  login: (body: { email: string; password: string; inviteToken?: string }) =>
     api('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   forgotPassword: (email: string) =>
     api('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
@@ -692,6 +706,11 @@ export const settings = {
     api(`/settings/members/${userId}`, { method: 'DELETE' }),
   updateMemberRole: (userId: string, role: string) =>
     api(`/settings/members/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  inviteMember: (body: { email: string; role?: string }) =>
+    api('/settings/members/invite', { method: 'POST', body: JSON.stringify(body) }) as Promise<{
+      ok: boolean
+      inviteId: string
+    }>,
   updateBranding: (body: {
     logoUrl?: string
     primaryColor?: string

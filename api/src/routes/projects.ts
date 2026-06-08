@@ -45,7 +45,9 @@ const createSchema = z.object({
 
 router.get('/', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
-  const clientId = req.query.clientId as string | undefined
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } })
+  const multiClient = org ? hasPlanFeature(org.plan, 'multi_client') : false
+  const clientId = multiClient ? (req.query.clientId as string | undefined) : undefined
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
 
@@ -92,6 +94,8 @@ router.post('/', async (req: AuthRequest, res) => {
     if (!org) return res.status(404).json({ error: 'Organization not found' })
     const limitCheck = await canCreateProject(orgId, org.plan)
     if (!limitCheck.ok) return res.status(403).json({ error: limitCheck.message })
+    const multiClient = hasPlanFeature(org.plan, 'multi_client')
+    const clientId = multiClient && body.clientId ? body.clientId : null
     let rollForwardId: string | null = null
     if (body.rollForwardFromProjectId) {
       if (!hasPlanFeature(org.plan, 'roll_forward')) {
@@ -115,7 +119,7 @@ router.post('/', async (req: AuthRequest, res) => {
         organizationId: orgId,
         name: body.name,
         slug,
-        clientId: body.clientId || null,
+        clientId,
         rollForwardFromProjectId: rollForwardId,
         reconciliationDate: body.reconciliationDate ? new Date(body.reconciliationDate) : null,
         currency: (body.currency || 'GHS').toUpperCase(),
@@ -176,6 +180,15 @@ router.patch('/:id', async (req: AuthRequest, res) => {
   }
   try {
     const body = updateSchema.parse(req.body)
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } })
+    const multiClient = org ? hasPlanFeature(org.plan, 'multi_client') : false
+    if (body.clientId !== undefined && body.clientId != null && !multiClient) {
+      return res.status(403).json({
+        error: 'Multi-client workspace requires Firm plan.',
+        code: 'PLAN_FEATURE_REQUIRED',
+        feature: 'multi_client',
+      })
+    }
     const data: {
       name?: string
       clientId?: string | null

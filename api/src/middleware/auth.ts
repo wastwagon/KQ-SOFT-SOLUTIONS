@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma.js'
+import { membershipAccessBlocked } from '../lib/membershipAccess.js'
 import type { OrgRole } from '../lib/permissions.js'
 
 export function requireJwtSecret(): string {
@@ -42,10 +43,23 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     const payload = jwt.verify(token, JWT_SECRET) as unknown as { userId: string; orgId: string }
     const membership = await prisma.organizationMember.findFirst({
       where: { userId: payload.userId, organizationId: payload.orgId },
-      select: { role: true },
+      select: {
+        role: true,
+        user: { select: { email: true, suspendedAt: true } },
+        organization: { select: { suspendedAt: true } },
+      },
     })
     if (!membership) {
       return res.status(401).json({ error: 'Membership not found' })
+    }
+    const access = membershipAccessBlocked({
+      role: membership.role,
+      userEmail: membership.user.email,
+      userSuspendedAt: membership.user.suspendedAt,
+      orgSuspendedAt: membership.organization.suspendedAt,
+    })
+    if (access.blocked) {
+      return res.status(403).json({ error: access.message, code: access.code })
     }
     req.auth = {
       userId: payload.userId,

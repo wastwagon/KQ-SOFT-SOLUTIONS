@@ -51,6 +51,23 @@ export interface PasswordResetOptions {
   orgName?: string | null
 }
 
+export async function sendOrgInvite(opts: {
+  to: string
+  orgName: string
+  role: string
+  inviteUrl: string
+  inviterName?: string
+}): Promise<boolean> {
+  const inviter = opts.inviterName ? ` from ${escapeHtml(opts.inviterName)}` : ''
+  const subject = `You're invited to ${opts.orgName} on ${APP_NAME}`
+  const html = `
+    <p>You have been invited${inviter} to join <strong>${escapeHtml(opts.orgName)}</strong> as <strong>${escapeHtml(opts.role)}</strong>.</p>
+    <p><a href="${opts.inviteUrl}">Accept invitation and create your account</a></p>
+    <p>This link expires in 7 days. If you did not expect this, you can ignore this email.</p>
+  `.trim()
+  return sendEmail({ to: opts.to, subject, html })
+}
+
 export async function sendPasswordReset(to: string, resetUrl: string, options?: PasswordResetOptions): Promise<boolean> {
   const displayName = options?.orgName?.trim() || APP_NAME
   const subject = `Reset your ${displayName} password`

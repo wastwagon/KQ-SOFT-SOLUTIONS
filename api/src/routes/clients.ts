@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { orgHasPlanFeature } from '../lib/planGate.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -14,6 +15,10 @@ const createSchema = z.object({
 
 router.get('/', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
+  const multiClient = await orgHasPlanFeature(orgId, 'multi_client')
+  if (!multiClient) {
+    return res.json([])
+  }
   const clients = await prisma.client.findMany({
     where: { organizationId: orgId },
     include: { _count: { select: { projects: true } } },
@@ -24,8 +29,16 @@ router.get('/', async (req: AuthRequest, res) => {
 
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const body = createSchema.parse(req.body)
     const orgId = req.auth!.orgId
+    const multiClient = await orgHasPlanFeature(orgId, 'multi_client')
+    if (!multiClient) {
+      return res.status(403).json({
+        error: 'Multi-client workspace requires Firm plan.',
+        code: 'PLAN_FEATURE_REQUIRED',
+        feature: 'multi_client',
+      })
+    }
+    const body = createSchema.parse(req.body)
     const client = await prisma.client.upsert({
       where: {
         organizationId_name: { organizationId: orgId, name: body.name.trim() },

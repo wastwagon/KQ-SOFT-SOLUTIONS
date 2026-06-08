@@ -51,6 +51,7 @@ services:
       PAYSTACK_WEBHOOK_SECRET: ${PAYSTACK_WEBHOOK_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      SUBSCRIPTION_PAYWALL: ${SUBSCRIPTION_PAYWALL:-true}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

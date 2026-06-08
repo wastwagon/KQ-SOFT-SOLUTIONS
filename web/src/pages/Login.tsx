@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
@@ -16,14 +16,34 @@ import { useToast } from '../components/ui/Toast'
 export default function Login() {
   const [searchParams] = useSearchParams()
   const sessionExpired = searchParams.get('session') === 'expired'
+  const inviteToken = searchParams.get('invite')?.trim() || ''
   const isAuthenticated = useAuth((s) => !!s.token)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteOrgName, setInviteOrgName] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuth((s) => s.setAuth)
   const toast = useToast()
+
+  useEffect(() => {
+    if (!inviteToken) return
+    let cancelled = false
+    auth
+      .getInvite(inviteToken)
+      .then((invite) => {
+        if (cancelled) return
+        setEmail(invite.email)
+        setInviteOrgName(invite.organization.name)
+      })
+      .catch(() => {
+        if (!cancelled) setInviteOrgName(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [inviteToken])
 
   if (isAuthenticated && !sessionExpired) {
     return <Navigate to="/dashboard" replace />
@@ -34,8 +54,15 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const { user, org, token, role, isPlatformAdmin } = await auth.login({ email, password })
+      const { user, org, token, role, isPlatformAdmin } = await auth.login({
+        email,
+        password,
+        inviteToken: inviteToken || undefined,
+      })
       setAuth(user, org, token, role, isPlatformAdmin)
+      if (inviteToken && inviteOrgName) {
+        toast.success('Invitation accepted', `You joined ${org.name}.`)
+      }
       navigate(isPlatformAdmin ? '/platform-admin' : '/dashboard')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed'
@@ -48,9 +75,13 @@ export default function Login() {
 
   return (
     <AuthLayout
-      eyebrow="Welcome back"
-      title="Sign in"
-      subtitle="Use your organisation email to access projects, reconciliations, and reports."
+      eyebrow={inviteOrgName ? 'Team invitation' : 'Welcome back'}
+      title={inviteOrgName ? `Join ${inviteOrgName}` : 'Sign in'}
+      subtitle={
+        inviteOrgName
+          ? 'Sign in with the invited email to accept and open this organisation.'
+          : 'Use your organisation email to access projects, reconciliations, and reports.'
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {sessionExpired && (

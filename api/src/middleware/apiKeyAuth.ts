@@ -58,7 +58,7 @@ export async function apiKeyAuthMiddleware(req: AuthRequest, res: Response, next
   }
   const keyRecord = await prisma.apiKey.findFirst({
     where: { keyPrefix: prefix },
-    include: { organization: true },
+    include: { organization: { select: { id: true, suspendedAt: true } } },
   })
   if (!keyRecord) {
     return res.status(401).json({ error: 'Invalid API key' })
@@ -68,6 +68,12 @@ export async function apiKeyAuthMiddleware(req: AuthRequest, res: Response, next
   }
   if (!verifyApiKey(apiKey, keyRecord.keyHash)) {
     return res.status(401).json({ error: 'Invalid API key' })
+  }
+  if (keyRecord.organization.suspendedAt != null) {
+    return res.status(403).json({
+      error: 'Organization suspended. Contact support.',
+      code: 'ORG_SUSPENDED',
+    })
   }
   await prisma.apiKey.update({
     where: { id: keyRecord.id },

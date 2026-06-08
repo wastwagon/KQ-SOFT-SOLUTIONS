@@ -26,6 +26,7 @@ model User {
   approvedProjects    Project[]          @relation("ApprovedBy")
   brsAttachments      BrsAttachment[]
   auditLogs           AuditLog[]
+  organizationInvites OrganizationInvite[] @relation("InviteSentBy")
 
   @@map("users")
 }
@@ -84,8 +85,28 @@ model Organization {
   usageLogs   UsageLog[]
   auditLogs   AuditLog[]
   apiKeys     ApiKey[]
+  invites     OrganizationInvite[]
 
   @@map("organizations")
+}
+
+model OrganizationInvite {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  email          String
+  role           String    @default("preparer")
+  token          String    @unique
+  invitedById    String?   @map("invited_by_id")
+  expiresAt      DateTime  @map("expires_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("InviteSentBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, email])
+  @@index([token])
+  @@map("organization_invites")
 }
 
 model ApiKey {
@@ -188,6 +209,7 @@ model Project {
   attachments          BrsAttachment[]
   auditLogs            AuditLog[]
 
+  @@index([organizationId])
   @@map("projects")
 }
 
@@ -265,6 +287,7 @@ model Transaction {
   document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
   matchItems MatchItem[]
 
+  @@index([documentId])
   @@map("transactions")
 }
 
@@ -281,6 +304,7 @@ model Match {
   matchItems MatchItem[]
   attachments BrsAttachment[]
 
+  @@index([projectId])
   @@map("matches")
 }
 

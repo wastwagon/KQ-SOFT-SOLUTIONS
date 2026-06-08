@@ -5,6 +5,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBranding, canManageMembers } from '../lib/permissions.js'
 import { hasPlanFeature, getUserLimit } from '../config/planFeatures.js'
 import { normalizeOrgMemberRole } from '../lib/orgMemberRole.js'
+import { createOrganizationInvite } from '../services/orgInvite.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -140,6 +141,33 @@ router.get('/members', async (req: AuthRequest, res) => {
     limit: limit < 0 ? null : limit,
     currentCount: members.length,
   })
+})
+
+const inviteMemberSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['member', 'viewer', 'preparer', 'reviewer']).default('preparer'),
+})
+
+/** POST /settings/members/invite - email invite link (7-day token) */
+router.post('/members/invite', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canManageMembers(role)) {
+    return res.status(403).json({ error: 'Only admins can invite members.' })
+  }
+  const parse = inviteMemberSchema.safeParse(req.body)
+  if (!parse.success) {
+    return res.status(400).json({ error: parse.error.errors[0]?.message ?? 'Invalid input' })
+  }
+  const result = await createOrganizationInvite({
+    orgId: req.auth!.orgId,
+    email: parse.data.email,
+    role: parse.data.role,
+    invitedByUserId: req.auth!.userId,
+  })
+  if (!result.ok) {
+    return res.status(result.status).json({ error: result.error })
+  }
+  res.status(201).json({ ok: true, inviteId: result.inviteId })
 })
 
 /** POST /settings/members - add member by email (user must already exist) */

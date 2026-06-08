@@ -10,6 +10,7 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
   const confirm = useConfirm()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<string>('preparer')
+  const [addMode, setAddMode] = useState<'invite' | 'existing'>('invite')
 
   const { data, isLoading, error: membersQueryError } = useQuery({
     queryKey: ['settings', 'members'],
@@ -27,6 +28,20 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) =>
         toast.error('Could not add member', e instanceof Error ? e.message : undefined)
+      ),
+  })
+
+  const inviteMutation = useMutation({
+    mutationFn: (body: { email: string; role: string }) => settings.inviteMember(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })
+      setEmail('')
+      setRole('preparer')
+      toast.success('Invitation sent', 'They can join via the email link (valid 7 days).')
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not send invite', e instanceof Error ? e.message : undefined)
       ),
   })
 
@@ -83,37 +98,86 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
   return (
     <div className="space-y-4">
       {canManage && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (email.trim() && !atLimit) addMutation.mutate({ email: email.trim(), role })
-          }}
-          className="flex flex-wrap gap-2"
-        >
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email (user must already be registered)"
-            className="flex-1 min-w-0 sm:min-w-[200px] px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setAddMode('invite')}
+              className={`px-3 py-1.5 rounded-lg border ${
+                addMode === 'invite'
+                  ? 'border-primary-600 bg-primary-50 text-primary-800'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Invite by email
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddMode('existing')}
+              className={`px-3 py-1.5 rounded-lg border ${
+                addMode === 'existing'
+                  ? 'border-primary-600 bg-primary-50 text-primary-800'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Add existing user
+            </button>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!email.trim() || atLimit) return
+              const body = { email: email.trim(), role }
+              if (addMode === 'invite') inviteMutation.mutate(body)
+              else addMutation.mutate(body)
+            }}
+            className="flex flex-wrap gap-2"
           >
-            <option value="viewer">Viewer</option>
-            <option value="preparer">Preparer</option>
-            <option value="reviewer">Reviewer</option>
-          </select>
-          <button
-            type="submit"
-            disabled={addMutation.isPending || !email.trim() || atLimit}
-            className="px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all"
-          >
-            {addMutation.isPending ? 'Adding...' : 'Add member'}
-          </button>
-        </form>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={
+                addMode === 'invite'
+                  ? 'Email to send invitation'
+                  : 'Email (user must already be registered)'
+              }
+              className="flex-1 min-w-0 sm:min-w-[200px] px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="viewer">Viewer</option>
+              <option value="preparer">Preparer</option>
+              <option value="reviewer">Reviewer</option>
+            </select>
+            <button
+              type="submit"
+              disabled={
+                (addMode === 'invite' ? inviteMutation.isPending : addMutation.isPending) ||
+                !email.trim() ||
+                atLimit
+              }
+              className="px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all"
+            >
+              {addMode === 'invite'
+                ? inviteMutation.isPending
+                  ? 'Sending...'
+                  : 'Send invite'
+                : addMutation.isPending
+                  ? 'Adding...'
+                  : 'Add member'}
+            </button>
+          </form>
+          {addMode === 'invite' && (
+            <p className="text-xs text-gray-500">
+              New users register via the link; existing users can sign in with the same link to join
+              your organisation.
+            </p>
+          )}
+        </div>
       )}
       {atLimit && canManage && (
         <p className="text-sm text-amber-600">

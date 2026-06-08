@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Building2, Mail, User } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
@@ -13,20 +13,51 @@ import AuthLayout, {
 import { useToast } from '../components/ui/Toast'
 
 export default function Register() {
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('invite')?.trim() || ''
   const isAuthenticated = useAuth((s) => !!s.token)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [orgName, setOrgName] = useState('')
+  const [inviteOrgName, setInviteOrgName] = useState<string | null>(null)
+  const [inviteLoading, setInviteLoading] = useState(!!inviteToken)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuth((s) => s.setAuth)
   const toast = useToast()
 
+  useEffect(() => {
+    if (!inviteToken) return
+    let cancelled = false
+    setInviteLoading(true)
+    auth
+      .getInvite(inviteToken)
+      .then((invite) => {
+        if (cancelled) return
+        setEmail(invite.email)
+        setInviteOrgName(invite.organization.name)
+        setError('')
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setInviteOrgName(null)
+        setError(err instanceof Error ? err.message : 'Invite is invalid or has expired.')
+      })
+      .finally(() => {
+        if (!cancelled) setInviteLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [inviteToken])
+
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
   }
+
+  const joiningOrg = !!inviteToken && !!inviteOrgName
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -37,15 +68,21 @@ export default function Register() {
         email,
         password,
         name: name || undefined,
-        orgName,
+        orgName: joiningOrg ? undefined : orgName,
+        inviteToken: joiningOrg ? inviteToken : undefined,
       })
       setAuth(user, org, token, role, isPlatformAdmin)
-      toast.success('Workspace created', `Welcome to KQ-SOFT, ${name || email.split('@')[0]}.`)
+      toast.success(
+        joiningOrg ? 'Welcome to the team' : 'Workspace created',
+        joiningOrg
+          ? `You joined ${org.name}.`
+          : `Welcome to KQ-SOFT, ${name || email.split('@')[0]}.`
+      )
       navigate('/dashboard')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Registration failed'
       setError(msg)
-      toast.error('Could not create workspace', msg)
+      toast.error(joiningOrg ? 'Could not join organisation' : 'Could not create workspace', msg)
     } finally {
       setLoading(false)
     }
@@ -53,9 +90,13 @@ export default function Register() {
 
   return (
     <AuthLayout
-      eyebrow="Get started"
-      title="Create your workspace"
-      subtitle="One organisation per account. You can invite teammates from Settings after you sign up."
+      eyebrow={joiningOrg ? 'Team invitation' : 'Get started'}
+      title={joiningOrg ? `Join ${inviteOrgName}` : 'Create your workspace'}
+      subtitle={
+        joiningOrg
+          ? 'Create your account to accept the invitation. Use the email address the invite was sent to.'
+          : 'One organisation per account. You can invite teammates from Settings after you sign up.'
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
@@ -64,24 +105,26 @@ export default function Register() {
           </div>
         )}
 
-        <div>
-          <label htmlFor="register-org" className={authLabelClass}>
-            Organisation name
-          </label>
-          <div className="relative">
-            <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              id="register-org"
-              type="text"
-              autoComplete="organization"
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              required
-              className={`${authFieldClass} pl-11`}
-              placeholder="Your firm or company name"
-            />
+        {!joiningOrg && (
+          <div>
+            <label htmlFor="register-org" className={authLabelClass}>
+              Organisation name
+            </label>
+            <div className="relative">
+              <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
+              <input
+                id="register-org"
+                type="text"
+                autoComplete="organization"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                required
+                className={`${authFieldClass} pl-11`}
+                placeholder="Your firm or company name"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div>
           <label htmlFor="register-name" className={authLabelClass}>
@@ -114,7 +157,8 @@ export default function Register() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className={`${authFieldClass} pl-11`}
+              readOnly={joiningOrg}
+              className={`${authFieldClass} pl-11 ${joiningOrg ? 'bg-gray-50' : ''}`}
               placeholder="you@firm.com"
             />
           </div>
@@ -137,8 +181,20 @@ export default function Register() {
           </p>
         </div>
 
-        <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
-          {loading ? 'Creating workspace…' : 'Create workspace'}
+        <button
+          type="submit"
+          disabled={loading || inviteLoading || (joiningOrg && !inviteOrgName)}
+          className={authPrimaryButtonClass}
+        >
+          {loading
+            ? joiningOrg
+              ? 'Joining…'
+              : 'Creating workspace…'
+            : inviteLoading
+              ? 'Loading invite…'
+              : joiningOrg
+                ? 'Join organisation'
+                : 'Create workspace'}
         </button>
 
         <p className="text-center text-xs leading-relaxed text-gray-500">
@@ -156,7 +212,7 @@ export default function Register() {
         <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
           Already have an account?{' '}
           <Link
-            to="/login"
+            to={inviteToken ? `/login?invite=${encodeURIComponent(inviteToken)}` : '/login'}
             className="font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
           >
             Sign in

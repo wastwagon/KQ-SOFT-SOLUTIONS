@@ -208,6 +208,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
         useChequeNo: matchParams.useChequeNo,
       }) as Promise<ReconcileApiResponse>,
     enabled: !!projectId,
+    staleTime: 60_000,
   })
   const { data, isLoading, isError: reconcileQueryFailed } = reconcileQuery
   const subscriptionPaywallBlocked = isSubscriptionInactiveError(reconcileQuery.error)

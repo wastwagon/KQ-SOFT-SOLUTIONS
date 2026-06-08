@@ -100,6 +100,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         bankAccountId: bankAccountId || undefined,
       }),
     enabled: !!projectId,
+    staleTime: 60_000,
   })
   const { data, isLoading, isError: reportQueryFailed } = reportQuery
   const attachmentsQuery = useQuery({
@@ -386,12 +387,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     setEditingComments(true)
   }
 
-  useEffect(() => {
-    if (data) {
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-    }
-  }, [data, projectId, queryClient])
   const preHasSignAnomaly = !!data?.sourceFilterLogic && [
     data.sourceFilterLogic.cashBookReceipts,
     data.sourceFilterLogic.cashBookPayments,

@@ -12,6 +12,7 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
+import { autoMapAfterUpload } from '../lib/deferredAutoMap.js'
 
 const router = Router()
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
@@ -150,8 +151,7 @@ router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequ
     action: 'document_uploaded',
     details: { documentId: doc.id, documentType: type, filename: safeFilename },
   })
-  const { tryAutoMapDocument } = await import('../services/autoMapDocument.js')
-  const autoMap = await tryAutoMapDocument(doc.id)
+  const autoMap = await autoMapAfterUpload(doc.id)
   res.status(201).json({ ...doc, autoMap })
 })
 
@@ -252,8 +252,7 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
     action: 'document_uploaded',
     details: { documentId: doc.id, documentType: type, filename: safeFilename },
   })
-  const { tryAutoMapDocument } = await import('../services/autoMapDocument.js')
-  const autoMap = await tryAutoMapDocument(doc.id)
+  const autoMap = await autoMapAfterUpload(doc.id)
   res.status(201).json({ ...doc, autoMap })
 })
 

@@ -60,6 +60,7 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-0}
       GHANA_BRS_WORKBOOK_NETTING: ${GHANA_BRS_WORKBOOK_NETTING:-0}
+      SUBSCRIPTION_PAYWALL: ${SUBSCRIPTION_PAYWALL:-true}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

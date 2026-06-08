@@ -23,6 +23,7 @@ import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
 import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { heavyOrgRouteLimiter } from '../middleware/heavyRouteLimiter.js'
 import { brsSignOffRowsForExcel, drawBrsWorkbookSignOffPdf } from '../lib/brsSignOff.js'
 import {
   brsTotalsExcludingLinkedClearingPairs,
@@ -49,6 +50,7 @@ import {
 const router = Router()
 router.use(authMiddleware)
 router.use(requireOrgSubscriptionForApp)
+router.use(heavyOrgRouteLimiter)
 
 interface TxLike {
   id: string
@@ -487,6 +489,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const bankAccountId = (req.query.bankAccountId as string) || undefined
+  const summaryOnly =
+    req.query.summaryOnly === '1' ||
+    req.query.summaryOnly === 'true' ||
+    req.query.scope === 'summary'
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
     include: {
@@ -961,7 +967,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   }
   const reportCompletedAt = project.approvedAt || project.reviewedAt || project.preparedAt || new Date()
 
-  res.json({
+  const reportPayload: Record<string, unknown> = {
     bankAccounts: project.bankAccounts || [],
     bankAccountId: bankAccountId || null,
     selectedBankAccountName: headerBankAccount ? headerBankAccount.name : null,
@@ -1077,6 +1083,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         receipts.length + credits.length + payments.length + debits.length,
     },
     sourceFilterLogic,
+    currency: project.currency || 'GHS',
+    reportCompletedAt: reportCompletedAt.toISOString(),
+    generatedAt: new Date().toISOString(),
+    ...(summaryOnly ? { reportMode: 'summary' as const } : {}),
+  }
+
+  if (!summaryOnly) {
+    Object.assign(reportPayload, {
     matchedPairs: (() => {
       return matchPairs.map((p) => {
         const isReceipt = receiptIds.has(p.cb.id)
@@ -1211,10 +1225,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     })),
     broughtForwardItems,
     broughtForwardLodgments,
-    currency: project.currency || 'GHS',
-    reportCompletedAt: reportCompletedAt.toISOString(),
-    generatedAt: new Date().toISOString(),
-  })
+    })
+  }
+
+  res.json(reportPayload)
 })
 
 router.get('/:projectId/export', async (req: AuthRequest, res) => {

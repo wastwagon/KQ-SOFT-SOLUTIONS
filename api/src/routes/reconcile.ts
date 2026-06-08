@@ -22,10 +22,12 @@ import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveWorkbookNetting } from '../lib/brsQueryFlags.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { heavyOrgRouteLimiter } from '../middleware/heavyRouteLimiter.js'
 
 const router = Router()
 router.use(authMiddleware)
 router.use(requireOrgSubscriptionForApp)
+router.use(heavyOrgRouteLimiter)
 
 const RECONCILE_DEFAULT_LIMIT = 1500
 const RECONCILE_MAX_LIMIT = 5000
