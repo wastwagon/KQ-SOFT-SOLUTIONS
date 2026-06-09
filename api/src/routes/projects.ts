@@ -432,7 +432,15 @@ router.patch('/:id/reopen', async (req: AuthRequest, res) => {
   }
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: 'reconciling' },
+    data: {
+      status: 'reconciling',
+      preparedById: null,
+      preparedAt: null,
+      reviewedById: null,
+      reviewedAt: null,
+      approvedById: null,
+      approvedAt: null,
+    },
   })
   await logAudit({
     organizationId: orgId,
@@ -440,7 +448,7 @@ router.patch('/:id/reopen', async (req: AuthRequest, res) => {
     projectId,
     action: 'project_reopened',
   })
-  res.json({ status: 'reconciling' })
+  res.json({ status: 'reconciling', signOffCleared: true })
 })
 
 // Phase 8: Undo reconciliation — clear all matches, reset sign-off, reopen

@@ -151,6 +151,13 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
 
   const projectStatus = (data?.project as { status?: string })?.status ?? ''
 
+  const receiptIdSet = new Set((data?.receipts?.transactions || []).map((t: Tx) => t.id))
+  const matchRows = (data?.matches || []) as { cashBookTxId?: string; cbTx?: { id: string } }[]
+  const matchedReceiptsCreditsCount = matchRows.filter((m) =>
+    receiptIdSet.has(m.cashBookTxId ?? m.cbTx?.id ?? '')
+  ).length
+  const matchedPaymentsDebitsCount = (data?.existingMatches ?? 0) - matchedReceiptsCreditsCount
+
   const currency = (data?.project as { currency?: string })?.currency || 'GHS'
   const fmtAmt = (n: number) => formatAmountNumber(Number.isFinite(n) ? n : 0)
 
@@ -170,7 +177,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           <p className="text-sm text-green-700 font-medium">Matched</p>
           <p className="text-xl font-bold text-green-800">{data.existingMatches ?? 0}</p>
           <p className="text-xs text-green-700 mt-1">
-            Receipts/Credits: {data.summary?.matchedReceiptsCreditsCount ?? 0} · Payments/Debits: {data.summary?.matchedPaymentsDebitsCount ?? 0}
+            Receipts/Credits: {matchedReceiptsCreditsCount} · Payments/Debits: {matchedPaymentsDebitsCount}
           </p>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">

@@ -256,6 +256,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project reopened', 'Sign-off cleared — re-submit and approve when the BRS is final.')
       onReopen?.()
     },
     onError: (err) =>
@@ -555,6 +556,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   }
 
   const showExtendedSections = false
+  const projectStatus = data?.project?.status ?? ''
+  const reopenableStatuses = ['completed', 'approved', 'submitted_for_review'] as const
+  const isReopenedForEditing = projectStatus === 'reconciling'
 
   return (
     <div className="space-y-6">
@@ -563,6 +567,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         title="Bank reconciliation statement"
         subtitle="Live preview of balances, narratives, and attachments. Use Export & download for Excel/PDF and attachments; adjust bank account and display currency below."
       />
+      {isReopenedForEditing && (
+        <div
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm print:hidden"
+          role="status"
+        >
+          <strong className="font-semibold">Reopened for editing.</strong> This BRS is a working draft until you
+          submit for review and approve again. Prior sign-off is not valid for export as a final report.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-end gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           {bankAccounts.length > 0 && (
@@ -714,13 +727,16 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <p className="text-xs text-gray-500 max-w-sm">Uses this report as the <strong>previous period BRS</strong>; unpresented cheques are carried forward to the new project.</p>
             </div>
           )}
-          {onReopen && canReopen && canReopenProject(role) && (
+          {onReopen &&
+            canReopen &&
+            canReopenProject(role) &&
+            reopenableStatuses.includes(projectStatus as (typeof reopenableStatuses)[number]) && (
             <>
               <button
                 onClick={() => reopenMutation.mutate()}
                 disabled={reopenMutation.isPending}
                 className="rounded-xl border border-amber-300 px-4 py-2 text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-                title="Reopen to make more changes to matches"
+                title="Reopen to edit matches and clear sign-off"
               >
                 {reopenMutation.isPending ? 'Reopening...' : 'Reopen for editing'}
               </button>

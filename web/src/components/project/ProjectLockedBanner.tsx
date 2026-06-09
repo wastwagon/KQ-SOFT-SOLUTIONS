@@ -25,7 +25,9 @@ export default function ProjectLockedBanner({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       void queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Project reopened', 'You can edit uploads, mapping, and matches again.')
+      void queryClient.invalidateQueries({ queryKey: ['report', projectId] })
+      void queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+      toast.success('Project reopened', 'Sign-off cleared — you can edit uploads, mapping, and matches again.')
       onReopened?.()
     },
     onError: (err) =>
