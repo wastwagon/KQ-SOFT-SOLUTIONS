@@ -1,17 +1,45 @@
 import { prisma } from '../lib/prisma.js'
 import type { SubscriptionOverrides, SubscriptionStatus } from './subscriptionState.js'
 
+type OverrideValue = {
+  trialEndsAt?: string
+  status?: SubscriptionStatus
+  reason?: string
+  updatedAt?: string
+}
+
 function parseSubscriptionOverrides(
   trialValue: unknown,
   statusValue: unknown
 ): SubscriptionOverrides {
-  const trialEndsAtRaw = (trialValue as { trialEndsAt?: string } | null)?.trialEndsAt
+  const trialEndsAtRaw = (trialValue as OverrideValue | null)?.trialEndsAt
   const trialEndsAt = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null
   const status =
-    (statusValue as { status?: SubscriptionStatus } | null)?.status ?? null
+    (statusValue as OverrideValue | null)?.status ?? null
   return {
     trialEndsAt: trialEndsAt && !Number.isNaN(trialEndsAt.getTime()) ? trialEndsAt : null,
     status,
+  }
+}
+
+export interface SubscriptionOverrideMeta {
+  statusOverride: SubscriptionStatus | null
+  statusOverrideReason: string | null
+  trialOverrideEndsAt: string | null
+  trialOverrideReason: string | null
+}
+
+function parseOverrideMeta(trialValue: unknown, statusValue: unknown): SubscriptionOverrideMeta {
+  const trial = trialValue as OverrideValue | null
+  const status = statusValue as OverrideValue | null
+  const trialEndsAtRaw = trial?.trialEndsAt
+  const trialEndsAt = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null
+  return {
+    statusOverride: status?.status ?? null,
+    statusOverrideReason: status?.reason ?? null,
+    trialOverrideEndsAt:
+      trialEndsAt && !Number.isNaN(trialEndsAt.getTime()) ? trialEndsAt.toISOString() : null,
+    trialOverrideReason: trial?.reason ?? null,
   }
 }
 
@@ -25,6 +53,18 @@ export async function fetchSubscriptionOverrides(orgId: string): Promise<Subscri
     }),
   ])
   return parseSubscriptionOverrides(trialOverride?.value, statusOverride?.value)
+}
+
+/** Override metadata for platform admin (reasons, applied values). */
+export async function fetchSubscriptionOverrideMeta(orgId: string): Promise<SubscriptionOverrideMeta> {
+  const [trialOverride, statusOverride] = await Promise.all([
+    prisma.platformSettings.findUnique({ where: { key: `org_trial_override:${orgId}` }, select: { value: true } }),
+    prisma.platformSettings.findUnique({
+      where: { key: `org_subscription_status_override:${orgId}` },
+      select: { value: true },
+    }),
+  ])
+  return parseOverrideMeta(trialOverride?.value, statusOverride?.value)
 }
 
 /** Batch-fetch overrides for org list endpoints (avoids N+1). */

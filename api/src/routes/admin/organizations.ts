@@ -3,7 +3,12 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { getUsageWithLimits } from '../../services/usage.js'
 import { getSubscriptionSnapshot } from '../../services/subscriptionState.js'
-import { fetchSubscriptionOverrides, fetchSubscriptionOverridesBatch } from '../../services/subscriptionOverrides.js'
+import {
+  fetchSubscriptionOverrideMeta,
+  fetchSubscriptionOverrides,
+  fetchSubscriptionOverridesBatch,
+} from '../../services/subscriptionOverrides.js'
+import { invalidateOrgSubscriptionCache } from '../../services/orgSubscriptionAccess.js'
 import { normalizeOrgMemberRole } from '../../lib/orgMemberRole.js'
 import type { AuthRequest } from '../../middleware/auth.js'
 
@@ -230,13 +235,18 @@ router.get('/:id', async (req, res) => {
   if (!org) return res.status(404).json({ error: 'Organization not found' })
   const usage = await getUsageWithLimits(org.id, org.plan)
   const latestPayment = org.payments.find((p) => p.status === 'success') ?? null
-  const overrides = await fetchSubscriptionOverrides(org.id)
-  const subscription = getSubscriptionSnapshot(
+  const [overrides, overrideMeta] = await Promise.all([
+    fetchSubscriptionOverrides(org.id),
+    fetchSubscriptionOverrideMeta(org.id),
+  ])
+  const paymentForSnapshot = latestPayment
+    ? { createdAt: latestPayment.createdAt, period: latestPayment.period as 'monthly' | 'yearly', amount: latestPayment.amount }
+    : null
+  const subscription = getSubscriptionSnapshot({ createdAt: org.createdAt }, paymentForSnapshot, overrides)
+  const computedSubscription = getSubscriptionSnapshot(
     { createdAt: org.createdAt },
-    latestPayment
-      ? { createdAt: latestPayment.createdAt, period: latestPayment.period as 'monthly' | 'yearly', amount: latestPayment.amount }
-      : null,
-    overrides
+    paymentForSnapshot,
+    { trialEndsAt: overrides.trialEndsAt, status: null }
   )
   const totalPaid = await prisma.payment.aggregate({
     where: { organizationId: org.id, status: 'success' },
@@ -246,6 +256,10 @@ router.get('/:id', async (req, res) => {
     ...org,
     usage,
     subscription,
+    subscriptionMeta: {
+      computedStatus: computedSubscription.status,
+      ...overrideMeta,
+    },
     totalPaid: Number(totalPaid._sum.amount ?? 0),
   })
 })
@@ -309,6 +323,7 @@ router.post('/:id/subscription/trial', async (req: AuthRequest, res) => {
       details: { trialEndsAt: trialEndsAt.toISOString(), reason: body.reason },
     },
   })
+  invalidateOrgSubscriptionCache(orgId)
   res.json({ updated: true, trialEndsAt: trialEndsAt.toISOString() })
 })
 
@@ -344,6 +359,7 @@ router.post('/:id/subscription/status', async (req: AuthRequest, res) => {
       details: { status: body.status, reason: body.reason },
     },
   })
+  invalidateOrgSubscriptionCache(orgId)
   res.json({ updated: true, status: body.status })
 })
 
@@ -360,6 +376,7 @@ router.delete('/:id/subscription/trial', async (req: AuthRequest, res) => {
       details: { reason: body.reason },
     },
   })
+  invalidateOrgSubscriptionCache(orgId)
   res.json({ cleared: true })
 })
 
@@ -376,6 +393,7 @@ router.delete('/:id/subscription/status', async (req: AuthRequest, res) => {
       details: { reason: body.reason },
     },
   })
+  invalidateOrgSubscriptionCache(orgId)
   res.json({ cleared: true })
 })
 

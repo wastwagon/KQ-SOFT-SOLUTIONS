@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Trash2, Building2, Ban } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Building2, Ban, BadgeCheck } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
@@ -10,6 +10,7 @@ import { useConfirm } from '../../components/ui/ConfirmDialog'
 import PageHeader from '../../components/layout/PageHeader'
 
 const ROLES = ['admin', 'reviewer', 'preparer', 'viewer'] as const
+const COMPLIMENTARY_ACCESS_REASON = 'Complimentary platform admin access'
 
 export default function AdminOrgDetail() {
   const { slug } = useParams<{ slug: string }>()
@@ -21,7 +22,7 @@ export default function AdminOrgDetail() {
   const [editName, setEditName] = useState('')
   const [editSlug, setEditSlug] = useState('')
   const [trialEndsAt, setTrialEndsAt] = useState('')
-  const [manualStatus, setManualStatus] = useState<'trial' | 'active' | 'expired' | 'free'>('active')
+  const [manualStatus, setManualStatus] = useState<'trial' | 'active' | 'expired' | 'free'>('trial')
   const [trialReason, setTrialReason] = useState('')
   const [statusReason, setStatusReason] = useState('')
   const [clearTrialReason, setClearTrialReason] = useState('')
@@ -50,9 +51,31 @@ export default function AdminOrgDetail() {
         latestPaymentPeriod: 'monthly' | 'yearly' | null
         latestPaymentAmount: number | null
       }
+      subscriptionMeta?: {
+        computedStatus: 'trial' | 'active' | 'expired' | 'free'
+        statusOverride: 'trial' | 'active' | 'expired' | 'free' | null
+        statusOverrideReason: string | null
+        trialOverrideEndsAt: string | null
+        trialOverrideReason: string | null
+      }
     }>,
     enabled: !!slug,
   })
+
+  useEffect(() => {
+    if (!org) return
+    const effective = org.subscription?.status
+    if (effective) setManualStatus(effective)
+    if (org.subscriptionMeta?.trialOverrideEndsAt) {
+      const d = new Date(org.subscriptionMeta.trialOverrideEndsAt)
+      if (!Number.isNaN(d.getTime())) {
+        const pad = (n: number) => String(n).padStart(2, '0')
+        setTrialEndsAt(
+          `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+        )
+      }
+    }
+  }, [org?.id, org?.subscription?.status, org?.subscriptionMeta?.trialOverrideEndsAt])
 
   const { data: plans = [] } = useQuery({
     queryKey: ['admin', 'plans'],
@@ -162,6 +185,26 @@ export default function AdminOrgDetail() {
     },
   })
 
+  const grantComplimentaryMutation = useMutation({
+    mutationFn: async (current: { plan: string }) => {
+      if (current.plan !== 'premium') {
+        await api(`/admin/organizations/${slug}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ plan: 'premium' }),
+        })
+      }
+      await api(`/admin/organizations/${slug}/subscription/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status: 'active', reason: COMPLIMENTARY_ACCESS_REASON }),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'organization', slug] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subscribers'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] })
+    },
+  })
+
   if (!slug) {
     return (
       <div className="space-y-6">
@@ -198,6 +241,8 @@ export default function AdminOrgDetail() {
 
   const fmt = (n: number) => new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(n)
   const suspended = org.suspendedAt != null
+  const hasComplimentaryAccess =
+    org.plan === 'premium' && org.subscription?.status === 'active'
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
@@ -323,6 +368,38 @@ export default function AdminOrgDetail() {
         <Card className="p-4 shadow-sm">
           <p className="text-sm text-gray-500 font-medium">Subscription</p>
           <p className="text-lg font-bold text-gray-900 mt-1 capitalize">{org.subscription?.status || '—'}</p>
+          {org.subscriptionMeta?.statusOverride && (
+            <p className="text-xs text-amber-800 mt-1">
+              Status override active
+              {org.subscriptionMeta.computedStatus !== org.subscription?.status && (
+                <> (computed: <span className="capitalize">{org.subscriptionMeta.computedStatus}</span>)</>
+              )}
+            </p>
+          )}
+          {org.subscriptionMeta?.trialOverrideEndsAt && (
+            <p className="text-xs text-amber-800 mt-1">
+              Trial end override:{' '}
+              {formatDate(org.subscriptionMeta.trialOverrideEndsAt, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
+          {org.subscription?.trialEndsAt && !org.subscriptionMeta?.statusOverride && (
+            <p className="text-xs text-gray-500 mt-1">
+              Trial ends:{' '}
+              {formatDate(org.subscription.trialEndsAt, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
           {org.subscription?.currentPeriodEnd && (
             <p className="text-xs text-gray-500 mt-1">Period ends: {formatDate(org.subscription.currentPeriodEnd, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
           )}
@@ -397,6 +474,41 @@ export default function AdminOrgDetail() {
         </Card>
       </div>
 
+      <Card className="shadow-sm border-primary-100 bg-primary-50/30">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-900">Complimentary access</h3>
+            <p className="text-sm text-gray-600 mt-1 max-w-2xl">
+              One-click setup for internal or partner orgs: sets plan to <strong>Premium</strong> and subscription
+              status to <strong>Active</strong> without payment. Removes inactive banners in the app immediately.
+            </p>
+            {hasComplimentaryAccess && (
+              <p className="text-xs text-green-800 mt-2 font-medium">
+                This org already has Premium plan and Active subscription.
+              </p>
+            )}
+          </div>
+          <Button
+            className="shrink-0"
+            onClick={async () => {
+              const planChange = org.plan !== 'premium' ? ` Plan will change from ${org.plan} to premium.` : ''
+              const ok = await confirm({
+                title: 'Grant complimentary access?',
+                description: `Subscription will be set to active without payment.${planChange} Reason: "${COMPLIMENTARY_ACCESS_REASON}".`,
+                confirmLabel: 'Grant access',
+                tone: 'warning',
+              })
+              if (!ok) return
+              grantComplimentaryMutation.mutate({ plan: org.plan })
+            }}
+            disabled={grantComplimentaryMutation.isPending || hasComplimentaryAccess || suspended}
+          >
+            <BadgeCheck className="w-4 h-4 mr-1.5" aria-hidden />
+            {grantComplimentaryMutation.isPending ? 'Granting...' : 'Grant complimentary access'}
+          </Button>
+        </div>
+      </Card>
+
       <Card className="shadow-sm">
         <h3 className="font-semibold text-gray-900 mb-4">Subscription controls (admin)</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -460,6 +572,18 @@ export default function AdminOrgDetail() {
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium text-gray-800">Override subscription status</p>
+            {org.subscriptionMeta?.statusOverride ? (
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Override applied: <span className="font-semibold capitalize">{org.subscriptionMeta.statusOverride}</span>
+                {org.subscriptionMeta.statusOverrideReason && (
+                  <> — {org.subscriptionMeta.statusOverrideReason}</>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Effective status is computed from payments and trial window. Select a value below and apply to override.
+              </p>
+            )}
             <select
               value={manualStatus}
               onChange={(e) => setManualStatus(e.target.value as 'trial' | 'active' | 'expired' | 'free')}
