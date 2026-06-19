@@ -146,7 +146,7 @@ export async function applyDocumentMapping(
       const extracted = extractChqNoFromDescription(details)
       if (extracted) chqNo = extracted
     }
-    const fp = `${parseImportedDate(getVal(dateField))?.toISOString() ?? 'null'}|${normalizedAmount}|${(getVal('name') ?? '').toString().trim()}|${(details ?? '').trim()}|${(getVal('doc_ref') ?? '').toString().trim()}|${(chqNo ?? '').trim()}`
+    const fp = `${i}|${parseImportedDate(getVal(dateField))?.toISOString() ?? 'null'}|${normalizedAmount}|${(getVal('name') ?? '').toString().trim()}|${(details ?? '').trim()}|${(getVal('doc_ref') ?? '').toString().trim()}|${(chqNo ?? '').trim()}`
     if (duplicateRowFingerprints.has(fp)) {
       skippedDuplicateRows++
       continue

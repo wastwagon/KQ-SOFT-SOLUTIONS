@@ -24,7 +24,8 @@ export const ECOBANK_CLEARING_CREDIT_RE =
 
 const CHEQUE_REF_RE =
   /\b(?:CHQ|Cheque|REF|Ref)(?:\s*(?:No|NO|no)\.?)?\s*[#:.]?\s*(\d{2,10})(?=[A-Z]|\b|$)/gi
-const TRANSFER_DEBIT_RE = /FUNDS\s+TRANSFER|OUTWARD\s*-\s*LOCAL|NRT\s+BO/i
+const TRANSFER_DEBIT_RE = /FUNDS\s+TRANSFER|OUTWARD\s*-\s*LOCAL|NRT\s+BO|SWIFT\s+TRANSFER|FUND\s+TRANSFER|COMMISSION\/OUTWARD/i
+const GT_BANK_MIRROR_RE = /SWIFT\s+TRANSFER|FUND\s+TRANSFER|INWARD\s+TRANSFER|COMMISSION\/OUTWARD|SETTLE\s+CENTRALIZED\s+INWARD/i
 const FT_CONSOLIDATION_RE = /FT\s+Consolidation|PAYROLL\s+UPLOAD/i
 const WITHDRAWAL_DEBIT_RE = /CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i
 
@@ -603,6 +604,8 @@ export function debitHasPaymentCounterpart(
   }
   for (const p of payments) {
     if (!amountsMatch(p.amount, debit.amount, amountTolerance)) continue
+    const pText = bankText(p).toUpperCase()
+    if (GT_BANK_MIRROR_RE.test(pText) && GT_BANK_MIRROR_RE.test(text)) continue
     if (chequeOrRefLink(p, debit)) return true
     const tokens = payeeTokens(p)
     if (tokens.length && isWithdrawal && withdrawalPayeeMatchAllowed(p, debit, amountTolerance)) {
@@ -622,7 +625,69 @@ export function debitHasPaymentCounterpart(
       return true
     }
   }
+  // GT Bank / foreign-currency exports: one cash-book payment at the same amount and date window.
+  const atAmount = payments.filter((p) => amountsMatch(p.amount, debit.amount, amountTolerance))
+  if (atAmount.length === 1) {
+    const p = atAmount[0]!
+    if (!GT_BANK_MIRROR_RE.test(bankText(p).toUpperCase())) {
+      const da = debit.date ? new Date(debit.date) : null
+      const pd = p.date ? new Date(p.date) : null
+      if (da && pd && !Number.isNaN(da.getTime()) && !Number.isNaN(pd.getTime())) {
+        const dayDiff = Math.abs((da.getTime() - pd.getTime()) / (1000 * 60 * 60 * 24))
+        if (dayDiff <= 31) return true
+      }
+    }
+  }
   return false
+}
+
+/** Receipt lines duplicated from bank exports (positive FC) — exclude from timing uncredited. */
+export function isBankStatementMirrorReceipt(
+  receipt: ClearingTxLike,
+  unmatchedDebits: ClearingTxLike[],
+  unmatchedCredits: ClearingTxLike[] = [],
+  amountTolerance = 0.01
+): boolean {
+  const rt = bankText(receipt).toUpperCase()
+  if (!GT_BANK_MIRROR_RE.test(rt)) return false
+  const bankLines = [...unmatchedDebits, ...unmatchedCredits]
+  return bankLines.some(
+    (line) =>
+      amountsMatch(line.amount, receipt.amount, amountTolerance) &&
+      GT_BANK_MIRROR_RE.test(bankText(line).toUpperCase())
+  )
+}
+
+function bankLineDateCounterpart(
+  payment: ClearingTxLike,
+  bankLine: ClearingTxLike,
+  amountTolerance: number,
+  windowDays = 31
+): boolean {
+  if (!amountsMatch(payment.amount, bankLine.amount, amountTolerance)) return false
+  const da = payment.date ? new Date(payment.date) : null
+  const db = bankLine.date ? new Date(bankLine.date) : null
+  if (!da || !db || Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false
+  const dayDiff = Math.abs((da.getTime() - db.getTime()) / (1000 * 60 * 60 * 24))
+  return dayDiff <= windowDays
+}
+
+/** Payment cleared on bank as a debit (foreign-currency / GT-style exports). */
+export function paymentHasBankDebitCounterpart(
+  payment: ClearingTxLike,
+  bankDebits: ClearingTxLike[],
+  amountTolerance = 0.01
+): boolean {
+  return bankDebits.some((d) => bankLineDateCounterpart(payment, d, amountTolerance))
+}
+
+/** Payment paired to a bank credit (inward transfer) — not an unpresented cheque. */
+export function paymentHasBankCreditCounterpart(
+  payment: ClearingTxLike,
+  bankCredits: ClearingTxLike[],
+  amountTolerance = 0.01
+): boolean {
+  return bankCredits.some((c) => bankLineDateCounterpart(payment, c, amountTolerance))
 }
 
 /** True when a bank credit corresponds to a cash-book receipt or payment. */

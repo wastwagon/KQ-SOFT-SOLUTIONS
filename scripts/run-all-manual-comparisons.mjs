@@ -13,6 +13,7 @@ const API = process.env.API_URL || 'http://localhost:9101'
 
 const scripts = [
   { name: 'acct002 (Grace Baptist, Aug 2018)', file: 'run-acct002-test.mjs' },
+  { name: 'acct430 (TGL GT Bank EUR, Dec 2018)', file: 'run-acct430-test.mjs' },
   { name: 'acct4702 (TGL Properties SCB, Dec 2019)', file: 'run-acct4702-test.mjs' },
   { name: 'accountno095 (Ecobank 9035)', file: 'run-accountno095-test.mjs' },
   { name: 'accountno552 (Ecobank 9033)', file: 'run-accountno552-test.mjs' },

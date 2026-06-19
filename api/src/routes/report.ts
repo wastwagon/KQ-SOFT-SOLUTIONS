@@ -30,6 +30,9 @@ import {
   buildBankOnlyScheduleRows,
   computeBankOnlyCreditsTotal,
   computeBankOnlyDebitsTotal,
+  isBankStatementMirrorReceipt,
+  paymentHasBankCreditCounterpart,
+  paymentHasBankDebitCounterpart,
   resolveEcobankGhanaProfileForScope,
   resolveGhanaBankFormatLabel,
 } from '../services/ecobankClearingMatcher.js'
@@ -175,10 +178,8 @@ function toTx(t: { id: string; date: Date | null; name: string | null; details: 
 function dedupeTransactions<T extends TxLike>(txs: T[]): T[] {
   const seen = new Set<string>()
   return txs.filter((t) => {
-    const dStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : ''
-    const key = `${dStr}|${Number(t.amount).toFixed(2)}|${(t.chqNo || '').toLowerCase()}|${(t.docRef || '').toLowerCase()}|${(t.name || t.details || '').toLowerCase().trim()}`
-    if (seen.has(key)) return false
-    seen.add(key)
+    if (seen.has(t.id)) return false
+    seen.add(t.id)
     return true
   })
 }
@@ -730,7 +731,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   // Unpresented cheques = unmatched payments (cheques not in bank) + brought forward
   const computedCashBookBalance = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
   const declaredCashBookBalance = extractCashBookClosingBalanceFromDoc(receiptsDocs[0]?.filepath || paymentsDocs[0]?.filepath || '')
-  const balancePerCashBook = declaredCashBookBalance ?? computedCashBookBalance
+  let balancePerCashBook = declaredCashBookBalance ?? computedCashBookBalance
   const unmatchedReceiptsTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0)
   const unmatchedCreditsTotal = unmatchedCredits.reduce((s, t) => s + t.amount, 0)
   const broughtForwardLodgmentsTotal = broughtForwardLodgments.reduce((s, t) => s + t.amount, 0)
@@ -741,7 +742,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     .filter((t) => t.source === 'bank_credits')
     .reduce((s, t) => s + t.amount, 0)
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotal + unmatchedCreditsTotal + broughtForwardLodgmentsTotal
-  const uncreditedLodgmentsTimingTotal = unmatchedReceiptsTotal + broughtForwardReceiptLodgmentsTotal
+  let uncreditedLodgmentsTimingTotal = unmatchedReceiptsTotal + broughtForwardReceiptLodgmentsTotal
   const broughtForwardTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
   const clearingBrsTotals = brsTotalsExcludingLinkedClearingPairs(
     unmatchedPayments as TxLike[],
@@ -785,7 +786,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       matchedPaymentDebits: matchedPaymentDebitsForNetting,
     }
   )
-  const unpresentedChequesTotal = unpresentedResolved.total
+  let unpresentedChequesTotal = unpresentedResolved.total
   const unpresentedChequeRowsForBrs = unpresentedResolved.rows
   const unpresentedForAgeing = ecobankProfile.active
     ? [
@@ -881,6 +882,36 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const bankStatementClosingBalanceValue =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
+  if (!ecobankProfile.active) {
+    uncreditedLodgmentsTimingTotal =
+      unmatchedReceipts
+        .filter(
+          (r) =>
+            !isBankStatementMirrorReceipt(
+              r as TxLike,
+              unmatchedDebits as TxLike[],
+              unmatchedCredits as TxLike[]
+            )
+        )
+        .reduce((s, t) => s + t.amount, 0) + broughtForwardReceiptLodgmentsTotal
+    unpresentedChequesTotal =
+      unmatchedPayments
+        .filter(
+          (p) =>
+            !paymentHasBankDebitCounterpart(p as TxLike, debits as TxLike[]) &&
+            !paymentHasBankCreditCounterpart(p as TxLike, credits as TxLike[])
+        )
+        .reduce((s, t) => s + t.amount, 0) + broughtForwardTotal
+  }
+  if (declaredCashBookBalance == null && bankStatementClosingBalanceValue != null) {
+    balancePerCashBook = deriveCashBookFromWorkbookSchedule({
+      bankClosingBalance: bankStatementClosingBalanceValue,
+      uncreditedLodgmentsTimingTotal,
+      unpresentedChequesTotal,
+      bankOnlyDebitsNotInCashBookTotal,
+      bankOnlyCreditsNotInCashBookTotal,
+    })
+  }
   const {
     bankOnlyReconcilingNet,
     bankClosingBalanceLegacy,
@@ -1496,7 +1527,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
   const computedCashBookBalance = receipts.reduce((s, t) => s + t.amount, 0) - payments.reduce((s, t) => s + t.amount, 0)
   const declaredCashBookBalance = extractCashBookClosingBalanceFromDoc(receiptsDocs[0]?.filepath || paymentsDocs[0]?.filepath || '')
-  const balancePerCashBook = declaredCashBookBalance ?? computedCashBookBalance
+  let balancePerCashBook = declaredCashBookBalance ?? computedCashBookBalance
   const unmatchedReceiptsTotalExport = receipts.filter((t) => !matchedCbIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
   const unmatchedCreditsTotalExport = credits.filter((t) => !matchedBankIds.has(t.id)).reduce((s, t) => s + t.amount, 0)
   const unmatchedPaymentsOnlyExport = payments.filter((t) => !matchedCbIds.has(t.id))
@@ -1527,7 +1558,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   )
   const unmatchedPaymentsTotalExport = clearingBrsTotalsExport.unmatchedPaymentsTotal
   const uncreditedLodgmentsTotal = unmatchedReceiptsTotalExport + unmatchedCreditsTotalExport + broughtForwardLodgmentsTotalExport
-  const uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
+  let uncreditedLodgmentsTimingTotalExport = unmatchedReceiptsTotalExport + broughtForwardReceiptLodgmentsTotalExport
   const sampleBankTextExport = [...credits, ...debits]
     .slice(0, 12)
     .map((t) => [t.details, t.name].filter(Boolean).join(' '))
@@ -1561,7 +1592,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       matchedPaymentDebits: matchedPaymentDebitsForNettingExport,
     }
   )
-  const unpresentedChequesTotal = unpresentedResolvedExport.total
+  let unpresentedChequesTotal = unpresentedResolvedExport.total
   const unpresentedChequeRowsForBrsExport = unpresentedResolvedExport.rows
   const workbookBankOnlyExcludeIdsExport =
     ecobankProfileExport.workbookNetting && unpresentedResolvedExport.workbook
@@ -1639,6 +1670,28 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     receipts as TxLike[],
     broughtForwardBankCreditsTotalExport
   )
+  if (!ecobankProfileExport.active) {
+    uncreditedLodgmentsTimingTotalExport =
+      receipts
+        .filter((t) => !matchedCbIds.has(t.id))
+        .filter(
+          (r) =>
+            !isBankStatementMirrorReceipt(
+              r as TxLike,
+              unmatchedDebitsOnlyExport as TxLike[],
+              unmatchedCreditsOnlyExport as TxLike[]
+            )
+        )
+        .reduce((s, t) => s + t.amount, 0) + broughtForwardReceiptLodgmentsTotalExport
+    unpresentedChequesTotal =
+      unmatchedPaymentsOnlyExport
+        .filter(
+          (p) =>
+            !paymentHasBankDebitCounterpart(p as TxLike, debits as TxLike[]) &&
+            !paymentHasBankCreditCounterpart(p as TxLike, credits as TxLike[])
+        )
+        .reduce((s, t) => s + t.amount, 0) + broughtForwardChequesTotalExport
+  }
   const bankOnlyScheduleExport = buildBankOnlyScheduleRows(
     unmatchedDebitsOnlyExport as TxLike[],
     unmatchedCreditsOnlyExport as TxLike[],
@@ -1662,6 +1715,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const bankStatementClosingBalanceExport =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
+  if (declaredCashBookBalance == null && bankStatementClosingBalanceExport != null) {
+    balancePerCashBook = deriveCashBookFromWorkbookSchedule({
+      bankClosingBalance: bankStatementClosingBalanceExport,
+      uncreditedLodgmentsTimingTotal: uncreditedLodgmentsTimingTotalExport,
+      unpresentedChequesTotal,
+      bankOnlyDebitsNotInCashBookTotal: bankOnlyDebitsNotInCashBookTotalExport,
+      bankOnlyCreditsNotInCashBookTotal: bankOnlyCreditsNotInCashBookTotalExport,
+    })
+  }
   const {
     bankOnlyReconcilingNet: bankOnlyReconcilingNetExport,
     bankClosingBalanceGhanaStyle: bankClosingBalanceGhanaStyleExport,

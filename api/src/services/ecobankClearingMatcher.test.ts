@@ -283,6 +283,15 @@ describe('computeBankOnlyCreditsTotal', () => {
 })
 
 describe('computeBankOnlyDebitsTotal', () => {
+  it('excludes GT bank debits when a single payment shares amount and date', () => {
+    const debits = [tx({ id: 'd1', amount: 2529.8, date: '2018-01-17', details: 'SWIFT DUGOLF' })]
+    const payments = [
+      tx({ id: 'p1', amount: 2529.8, date: '2018-01-17', details: 'PYT SOFITEL' }),
+    ]
+    const total = computeBankOnlyDebitsTotal(debits, [], payments, 0.01, new Set())
+    expect(total).toBe(0)
+  })
+
   it('adds reclassified inward clearing and FT credits to bank-only debits', () => {
     const debits = [tx({ id: 'd1', amount: 10, details: 'FUNDS TRANSFER OUTWARD Charge on BO LORDSHIP' })]
     const credits = [
