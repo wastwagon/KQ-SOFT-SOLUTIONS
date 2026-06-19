@@ -47,19 +47,13 @@ function suggestedMappingHasDate(headers: string[], isCashBook: boolean, pre: Pr
   return sug[dateField] != null
 }
 
-/** For Excel: first worksheet whose merged suggestion includes the date field; otherwise 0. */
+/** For Excel: server-picked worksheet when omitted; else first sheet with date column. */
 async function resolveBestSheetPreview(
   docId: string,
-  isCashBook: boolean
+  _isCashBook: boolean
 ): Promise<{ chosenSheet: number; preview: DocumentPreviewResponse }> {
-  const pre0 = await documents.preview(docId)
-  const names = pre0.sheetNames ?? []
-  if (names.length <= 1) return { chosenSheet: 0, preview: pre0 }
-  for (let si = 0; si < names.length; si++) {
-    const p = si === 0 ? pre0 : await documents.preview(docId, { sheetIndex: si })
-    if (suggestedMappingHasDate(p.headers || [], isCashBook, p)) return { chosenSheet: si, preview: p }
-  }
-  return { chosenSheet: 0, preview: pre0 }
+  const pre = await documents.preview(docId)
+  return { chosenSheet: pre.sheetIndex ?? 0, preview: pre }
 }
 
 /** Same as {@link resolveBestSheetPreview} but reuses an already-fetched sheet-0 preview (fewer round trips). */
@@ -87,6 +81,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   const queryClient = useQueryClient()
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const [previewSheetIndex, setPreviewSheetIndex] = useState(0)
+  const [sheetIndexExplicit, setSheetIndexExplicit] = useState(false)
   const [mapping, setMapping] = useState<Record<string, number>>({})
   const [error, setError] = useState('')
   const [mapResult, setMapResult] = useState<MapDocumentResponse | null>(null)
@@ -103,8 +98,12 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   const { data: project, error: projectError, isError: projectQueryFailed, isPending: projectPending } = projectQuery
 
   const previewQuery = useQuery({
-    queryKey: ['document-preview', selectedDocId, previewSheetIndex],
-    queryFn: () => documents.preview(selectedDocId!, { sheetIndex: previewSheetIndex }),
+    queryKey: ['document-preview', selectedDocId, previewSheetIndex, sheetIndexExplicit],
+    queryFn: () =>
+      documents.preview(
+        selectedDocId!,
+        sheetIndexExplicit ? { sheetIndex: previewSheetIndex } : undefined
+      ),
     enabled: !!selectedDocId,
   })
   const {
@@ -237,7 +236,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   useEffect(() => {
     if (!preview || selectedDocId !== preview.documentId) return
     const si = preview.sheetIndex
-    if (si != null && si !== previewSheetIndex) {
+    if (si != null && si !== previewSheetIndex && !sheetIndexExplicit) {
       setPreviewSheetIndex(si)
       setMapping({})
       return
@@ -248,11 +247,12 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       const suggested = mergedSuggestedFromPreview(headers, isCashBook, preview)
       setMapping(suggested)
     }
-  }, [preview, selectedDoc, selectedDocId, mapping, previewSheetIndex])
+  }, [preview, selectedDoc, selectedDocId, mapping, previewSheetIndex, sheetIndexExplicit])
 
   useEffect(() => {
     if (!selectedDocId) {
       setPreviewSheetIndex(0)
+      setSheetIndexExplicit(false)
       worksheetPickResolvedRef.current = null
     }
   }, [selectedDocId])
@@ -540,10 +540,10 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               {applyingAll ? 'Applying…' : 'Apply suggested mapping to selected'}
             </button>
             <span className="text-xs text-gray-500 max-w-md">
-              We detect columns from the extracted table and apply mapping per file. For Excel workbooks with several
-              sheets, we use the <strong>first sheet where a date column is detected</strong>; otherwise the first sheet.
-              PDFs and scans do not have sheets—open each file below if the preview needs a check. To pick another Excel
-              tab, open that file below.
+              We detect columns from the extracted table and apply mapping per file. For Excel workbooks
+              with several sheets, we automatically use the <strong>best transaction sheet</strong>{' '}
+              (detail rows with date + amount columns). PDFs and scans do not have sheets—open each file
+              below if the preview needs a check. To pick another Excel tab, open that file below.
             </span>
           </div>
         </div>
@@ -560,6 +560,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             worksheetPickResolvedRef.current = null
             setSelectedDocId(e.target.value || null)
             setPreviewSheetIndex(0)
+            setSheetIndexExplicit(false)
             setMapping({})
           }}
           className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900"
@@ -601,14 +602,14 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 <label className="block max-w-md">
                   <span className="block text-sm font-medium text-gray-700 mb-1">Worksheet (Excel)</span>
                   <p className="text-xs text-gray-500 mb-1.5">
-                    When you open a file, we pick the first tab where a date column is detected. You can change the tab
-                    here anytime.
+                    We pick the best transaction sheet automatically. You can change the tab here anytime.
                   </p>
                   <select
                     value={previewSheetIndex}
                     onChange={(e) => {
                       const n = parseInt(e.target.value, 10)
                       if (!Number.isNaN(n)) {
+                        setSheetIndexExplicit(true)
                         setPreviewSheetIndex(n)
                         setMapping({})
                       }

@@ -65,6 +65,7 @@ export default function ProjectReconcile({
     unmatchMutation,
     clearAllMatchesMutation,
     evidenceUploadMutation,
+    phasedAutoMatchMutation,
     reconcileLimit,
     loadMore,
   } = session
@@ -286,6 +287,8 @@ export default function ProjectReconcile({
           bulkSelected={bulkSelected}
           onBulkSelectedChange={setBulkSelected}
           onBulkMatch={(pairs) => bulkMatchMutation.mutate(pairs)}
+          onPhasedAutoMatch={() => phasedAutoMatchMutation.mutate()}
+          isPhasedAutoMatching={phasedAutoMatchMutation.isPending}
           isMatching={bulkMatchMutation.isPending}
         />
       )}

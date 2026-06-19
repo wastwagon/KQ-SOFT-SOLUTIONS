@@ -10,6 +10,7 @@ import { detectGhanaBankFormat, type GhanaBankFormat } from '../services/ghanaBa
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { parseSheetIndexQuery } from '../lib/parseSheetIndexQuery.js'
+import { pickBestExcelSheetIndex } from '../services/cashBookExcel.js'
 import { getMappingConfidence } from '../services/suggestedMapping.js'
 import { getMappingDiagnostics } from '../services/mappingDiagnostics.js'
 import { applyDocumentMapping, sanitizeMapping, validateMapping } from '../services/applyDocumentMapping.js'
@@ -40,7 +41,10 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
     let result: Awaited<ReturnType<typeof parseDocumentFile>>
     let excelPreviewSheetIndex: number | undefined
     if (type === 'excel') {
-      const requested = parseSheetIndexQuery(req.query.sheetIndex)
+      const rawSheet = req.query.sheetIndex
+      const hasSheetQuery =
+        rawSheet !== undefined && rawSheet !== null && String(rawSheet).trim() !== ''
+      const requested = hasSheetQuery ? parseSheetIndexQuery(rawSheet) : pickBestExcelSheetIndex(doc.filepath, doc.type)
       result = await parseDocumentFile(doc.filepath, doc.type, requested)
       const names = result.sheetNames ?? []
       const active = result.activeSheet

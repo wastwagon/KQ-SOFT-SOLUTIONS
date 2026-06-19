@@ -7,6 +7,7 @@ import {
   isSubscriptionInactiveError,
   unlessSubscriptionInactive,
 } from '../../lib/api'
+import { runPhasedAutoMatchRounds } from '../../lib/phasedAutoMatch'
 import { useToast } from '../ui/Toast'
 import type {
   MatchParams,
@@ -163,6 +164,9 @@ export interface ReconcileSession {
   evidenceUploadMutation: ReturnType<
     typeof useMutation<unknown, Error, { file: File; matchId: string }>
   >
+  phasedAutoMatchMutation: ReturnType<
+    typeof useMutation<{ totalMatched: number; rounds: number }, Error, void>
+  >
 }
 
 export function useReconcileSession(projectId: string): ReconcileSession {
@@ -315,6 +319,35 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       ),
   })
 
+  const phasedAutoMatchMutation = useMutation<{ totalMatched: number; rounds: number }, Error, void>({
+    mutationFn: () =>
+      runPhasedAutoMatchRounds(
+        () =>
+          reconcile.get(projectId, {
+            bankAccountId: effectiveBankAccountId || undefined,
+            limit: reconcileLimit,
+            useDate: matchParams.useDate,
+            useDocRef: matchParams.useDocRef,
+            useChequeNo: matchParams.useChequeNo,
+          }) as Promise<ReconcileApiResponse>,
+        (matches) =>
+          reconcile.createMatchBulk(projectId, { matches }) as Promise<{ created: number }>
+      ),
+    onSuccess: (resp) => {
+      invalidateAll()
+      setBulkSelected(new Set())
+      setSelectedCbIds(new Set())
+      setSelectedBankIds(new Set())
+      toast.success(
+        `Auto-matched ${resp.totalMatched} pair${resp.totalMatched === 1 ? '' : 's'} (${resp.rounds} round${resp.rounds === 1 ? '' : 's'})`
+      )
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Auto-match failed', e instanceof Error ? e.message : 'Request failed')
+      ),
+  })
+
   const unmatchMutation = useMutation<unknown, Error, string>({
     mutationFn: (matchId) => reconcile.deleteMatch(projectId, matchId),
     onSuccess: () => {
@@ -409,5 +442,6 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     unmatchMutation,
     clearAllMatchesMutation,
     evidenceUploadMutation,
+    phasedAutoMatchMutation,
   }
 }

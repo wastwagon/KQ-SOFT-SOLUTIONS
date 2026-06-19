@@ -25,6 +25,8 @@ interface SuggestedMatchesPanelProps {
   bulkSelected: Set<number>
   onBulkSelectedChange: (next: Set<number>) => void
   onBulkMatch: (pairs: { cashBookTransactionId: string; bankTransactionId: string }[]) => void
+  onPhasedAutoMatch?: () => void
+  isPhasedAutoMatching?: boolean
   isMatching: boolean
 }
 
@@ -40,6 +42,8 @@ export default function SuggestedMatchesPanel({
   bulkSelected,
   onBulkSelectedChange,
   onBulkMatch,
+  onPhasedAutoMatch,
+  isPhasedAutoMatching = false,
   isMatching,
 }: SuggestedMatchesPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
@@ -85,6 +89,19 @@ export default function SuggestedMatchesPanel({
 
       {canBulk && (
         <div className="flex flex-wrap gap-2 mb-4">
+          {onPhasedAutoMatch && (
+            <button
+              type="button"
+              onClick={onPhasedAutoMatch}
+              disabled={isMatching || isPhasedAutoMatching}
+              className="px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-slate-900 disabled:opacity-50 transition-all"
+              title="Runs safe 90%+ matches, then Ecobank/receipt 85%+ — same as integration test scripts"
+            >
+              {isPhasedAutoMatching
+                ? 'Auto-matching…'
+                : 'Auto-match all (safe → Ecobank)'}
+            </button>
+          )}
           {highConfidence.length > 0 && (
             <button
               type="button"

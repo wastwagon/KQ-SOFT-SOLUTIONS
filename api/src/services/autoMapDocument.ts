@@ -4,6 +4,7 @@
 import type { DocumentType } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { parseDocumentFile } from './documentParse.js'
+import { detectFileType } from './parser.js'
 import {
   detectGhanaBankFormat,
   getSuggestedBankMapping,
@@ -11,6 +12,7 @@ import {
 } from './ghanaBankParsers.js'
 import { buildSmartSuggestedMapping, getMappingConfidence, type MappingConfidence } from './suggestedMapping.js'
 import { applyDocumentMapping, sanitizeMapping } from './applyDocumentMapping.js'
+import { pickBestExcelSheetIndex } from './cashBookExcel.js'
 
 const AUTO_MAP = process.env.AUTO_MAP_ON_UPLOAD !== 'false'
 
@@ -84,7 +86,10 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
   }
 
   try {
-    const parsed = await parseDocumentFile(doc.filepath, doc.type, 0)
+    const ft = detectFileType(doc.filepath)
+    const sheetIndex =
+      ft === 'excel' ? pickBestExcelSheetIndex(doc.filepath, doc.type) : 0
+    const parsed = await parseDocumentFile(doc.filepath, doc.type, sheetIndex)
     const sample = parsed.rows.slice(0, 20)
     let detectedBankFormat: GhanaBankFormat = null
     if (!doc.type.startsWith('cash_book_')) {
