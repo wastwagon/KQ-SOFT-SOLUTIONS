@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from 'express'
 import { Prisma } from '@prisma/client'
 import { ZodError } from 'zod'
 import { REQUEST_ID_HEADER } from './logging.js'
+import { resolveMaxUploadSizeMb } from '../config/importLimits.js'
 
 /**
  * Central error handler.  Replaces the inline handler in `index.ts` and adds:
@@ -43,7 +44,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       : undefined
   if (code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({
-      error: `File too large. Max ${process.env.MAX_UPLOAD_SIZE_MB || '10'}MB.`,
+      error: `File too large. Max ${resolveMaxUploadSizeMb()}MB.`,
       requestId,
     })
   }

@@ -15,6 +15,7 @@ import { getMappingConfidence } from '../services/suggestedMapping.js'
 import { getMappingDiagnostics } from '../services/mappingDiagnostics.js'
 import { applyDocumentMapping, sanitizeMapping, validateMapping } from '../services/applyDocumentMapping.js'
 import { buildSuggestedMappingForDocument } from '../services/autoMapDocument.js'
+import { MAP_PREVIEW_ROW_SAMPLE } from '../config/importLimits.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -57,7 +58,7 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
     } else {
       result = await parseDocumentFile(doc.filepath, doc.type, 0)
     }
-    const sample = result.rows.slice(0, 20)
+    const sample = result.rows.slice(0, MAP_PREVIEW_ROW_SAMPLE)
     let detectedBankFormat: GhanaBankFormat = null
     if (!doc.type.startsWith('cash_book_')) {
       detectedBankFormat = detectGhanaBankFormat(result.headers, sample)

@@ -47,16 +47,17 @@ export default function SuggestedMatchesPanel({
   isMatching,
 }: SuggestedMatchesPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
+  const [listCount, setListCount] = useState(150)
   const highConfidence = suggestions.filter((s) => s.confidence >= 0.95)
-  const visible = suggestions.slice(0, 50)
-  const canBulk = !!features.bulk_match
-  const safeSuggestions = visible.filter((s) => !s.duplicateWarning && s.confidence >= 0.9)
-  const phaseBSuggestions = visible.filter(
+  const safeSuggestions = suggestions.filter((s) => !s.duplicateWarning && s.confidence >= 0.9)
+  const phaseBSuggestions = suggestions.filter(
     (s) =>
       !s.duplicateWarning &&
       s.confidence >= 0.85 &&
       (s.matchKind === 'receipt' || s.ecobankPattern)
   )
+  const visible = suggestions.slice(0, listCount)
+  const canBulk = !!features.bulk_match
   return (
     <section className="rounded-xl border border-amber-200/80 bg-amber-50/80 p-5 shadow-sm">
       <header className="flex items-center justify-between mb-4">
@@ -179,7 +180,7 @@ export default function SuggestedMatchesPanel({
         </div>
       )}
 
-      <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
+      <ul className="space-y-2 max-h-96 overflow-y-auto pr-1">
         {visible.map((s, i) => {
           const isSelected =
             selectedCbIds.has(s.cashBookTx.id) && selectedBankIds.has(s.bankTx.id)
@@ -261,6 +262,15 @@ export default function SuggestedMatchesPanel({
           )
         })}
       </ul>
+      {suggestions.length > listCount && (
+        <button
+          type="button"
+          onClick={() => setListCount((n) => Math.min(n + 150, suggestions.length))}
+          className="mt-3 w-full py-2 text-sm font-medium text-amber-800 hover:text-amber-900 border border-amber-200 rounded-xl bg-white/80"
+        >
+          Show more suggestions ({listCount} of {suggestions.length})
+        </button>
+      )}
     </section>
   )
 }

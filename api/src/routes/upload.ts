@@ -13,6 +13,7 @@ import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
 import { autoMapAfterUpload } from '../lib/deferredAutoMap.js'
+import { resolveMaxUploadSizeBytes } from '../config/importLimits.js'
 
 const router = Router()
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
@@ -33,7 +34,7 @@ const storage = multer.diskStorage({
   },
 })
 
-const MAX_DOCUMENT_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE_MB || '10', 10) * 1024 * 1024
+const MAX_DOCUMENT_SIZE = resolveMaxUploadSizeBytes()
 const ALLOWED_DOCUMENT_EXTENSIONS = ['.xlsx', '.xls', '.csv', '.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp']
 
 const upload = multer({

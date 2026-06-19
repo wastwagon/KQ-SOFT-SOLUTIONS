@@ -6,8 +6,10 @@ import { prisma } from '../lib/prisma.js'
 import { parseImportedDate } from './dateParser.js'
 import { parseImportedAmount } from './amountParser.js'
 import { extractChqNoFromDescription } from './ghanaBankParsers.js'
+import { shouldSkipBankStatementImportRow } from './bankStatementImport.js'
 import { canAddTransactions, adjustTransactions } from './usage.js'
 import { classifyBySourceSign, summarizeSignBuckets, type SourceDocumentType } from './signClassifier.js'
+import { SIGN_WARNINGS_PREVIEW_MAX } from '../config/importLimits.js'
 import type { ParseResult } from './parser.js'
 
 export type MappingInput = Record<string, number>
@@ -104,6 +106,7 @@ export async function applyDocumentMapping(
   const duplicateRowFingerprints = new Set<string>()
   let skippedDuplicateRows = 0
   let skippedZeroAmountRows = 0
+  let skippedFooterRows = 0
   const sourceRowCount = result.rows.length
   const numCols = result.headers.length
 
@@ -134,6 +137,10 @@ export async function applyDocumentMapping(
 
     let details = getVal('details') != null ? String(getVal('details')) : null
     if (!details && getVal('description') != null) details = String(getVal('description'))
+    if (!isCashBook && shouldSkipBankStatementImportRow(details, normalizedAmount)) {
+      skippedFooterRows++
+      continue
+    }
     let chqNo = getVal('chq_no') != null ? String(getVal('chq_no')) : null
     if (!chqNo && !isCashBook && details) {
       const extracted = extractChqNoFromDescription(details)
@@ -199,7 +206,7 @@ export async function applyDocumentMapping(
     skippedDuplicateRows,
     skippedZeroAmountRows,
     signWarningsCount: signWarnings.length,
-    signWarningsPreview: signWarnings.slice(0, 25),
+    signWarningsPreview: signWarnings.slice(0, SIGN_WARNINGS_PREVIEW_MAX),
     signFilterSummary: signSummary,
   }
 }

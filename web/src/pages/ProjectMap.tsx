@@ -23,6 +23,7 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import { getMappingIssues, fieldLabel } from '../lib/mappingHints'
+import { DEFAULT_PDF_OCR_MAX_PAGES, SIGN_WARNINGS_PREVIEW_MAX } from '../lib/importLimits'
 
 const CASH_BOOK_FIELDS = ['date', 'name', 'details', 'doc_ref', 'chq_no', 'accode', 'amt_received', 'amt_paid']
 const BANK_FIELDS = ['transaction_date', 'description', 'credit', 'debit']
@@ -204,7 +205,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
           }
         }
         if (result.signWarningsPreview?.length) {
-          mergedWarnings = [...mergedWarnings, ...result.signWarningsPreview].slice(0, 25)
+          mergedWarnings = [...mergedWarnings, ...result.signWarningsPreview].slice(0, SIGN_WARNINGS_PREVIEW_MAX)
         }
         done++
       }
@@ -634,7 +635,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               </p>
               {(preview as { pdfTruncated?: boolean }).pdfTruncated && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                  <strong>PDF truncation:</strong> This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (PDF_OCR_MAX_PAGES limit). Some transactions may be missing. Split the PDF or increase the limit for full extraction.
+                  <strong>PDF truncation:</strong> This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (default limit {DEFAULT_PDF_OCR_MAX_PAGES}; set PDF_OCR_MAX_PAGES to raise). Some transactions may be missing. Split the PDF or increase the limit for full extraction.
                 </div>
               )}
               <div className="overflow-x-auto">

@@ -108,6 +108,7 @@ export function resolveGhanaBankFormatLabel(
     .toLowerCase()
   if (/ecobank/.test(text)) return 'ecobank'
   if (/\bgcb\b|ghana commercial/.test(text)) return 'gcb'
+  if (/standard\s*chartered|\bscb\b/.test(text)) return 'scb'
   if (/stanbic|standard bank/.test(text)) return 'stanbic'
   if (/fidelity/.test(text)) return 'fidelity'
   if (/\buba\b|united bank/.test(text)) return 'uba'

@@ -2,14 +2,16 @@
  * Subscription tier limits - matches PLANNING_DATA.json
  * -1 = unlimited
  */
+import { TIER_TRANSACTION_LIMITS } from './importLimits.js'
+
 export const TIER_LIMITS: Record<
   string,
   { projectsPerMonth: number; transactionsPerMonth: number; bankAccountsPerProject: number }
 > = {
-  basic: { projectsPerMonth: 5, transactionsPerMonth: 200, bankAccountsPerProject: 2 },
-  standard: { projectsPerMonth: 20, transactionsPerMonth: 2000, bankAccountsPerProject: -1 },
-  premium: { projectsPerMonth: 100, transactionsPerMonth: 10000, bankAccountsPerProject: -1 },
-  firm: { projectsPerMonth: -1, transactionsPerMonth: -1, bankAccountsPerProject: -1 },
+  basic: { projectsPerMonth: 5, transactionsPerMonth: TIER_TRANSACTION_LIMITS.basic, bankAccountsPerProject: 2 },
+  standard: { projectsPerMonth: 20, transactionsPerMonth: TIER_TRANSACTION_LIMITS.standard, bankAccountsPerProject: -1 },
+  premium: { projectsPerMonth: 100, transactionsPerMonth: TIER_TRANSACTION_LIMITS.premium, bankAccountsPerProject: -1 },
+  firm: { projectsPerMonth: -1, transactionsPerMonth: TIER_TRANSACTION_LIMITS.firm, bankAccountsPerProject: -1 },
 }
 
 /** Plan prices in GHS — fallback when no DB row; keep aligned with seed + admin defaults */

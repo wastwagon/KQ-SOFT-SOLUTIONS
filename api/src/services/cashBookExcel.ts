@@ -54,6 +54,12 @@ export function scoreExcelSheetForDocument(
   else score -= 40
   score += Math.min(rows.length, 80)
 
+  const cleanRows = rows.filter(
+    (r) => !r.some((c) => typeof c === 'string' && (c.includes('\r\n') || c.includes('\n')))
+  )
+  score += Math.min(cleanRows.length, 80)
+  score -= (rows.length - cleanRows.length) * 8
+
   const joined = headers.join(' ').toLowerCase()
   if (isCashBook && /received/.test(joined) && /paid/.test(joined) && !/date/.test(joined)) {
     score -= 50

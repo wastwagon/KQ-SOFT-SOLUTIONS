@@ -847,10 +847,11 @@ export const report = {
 }
 
 export const reconcile = {
-  get: (projectId: string, params?: { bankAccountId?: string; limit?: number; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean; workbookNetting?: boolean }) => {
+  get: (projectId: string, params?: { bankAccountId?: string; limit?: number; suggestionLimit?: number; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean; workbookNetting?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
     if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.suggestionLimit) q.set('suggestionLimit', String(params.suggestionLimit))
     if (typeof params?.useDate === 'boolean') q.set('useDate', String(params.useDate))
     if (typeof params?.useDocRef === 'boolean') q.set('useDocRef', String(params.useDocRef))
     if (typeof params?.useChequeNo === 'boolean') q.set('useChequeNo', String(params.useChequeNo))

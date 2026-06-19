@@ -30,7 +30,7 @@ describe('buildPublicPlans', () => {
       monthlyGhs: 150,
       yearlyGhs: 1500,
       projectsPerMonth: 5,
-      transactionsPerMonth: 200,
+      transactionsPerMonth: 5000,
     })
 
     const firm = plans.find((p) => p.id === 'firm')

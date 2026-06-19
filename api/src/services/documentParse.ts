@@ -16,7 +16,7 @@ import { resolveOcrLanguages } from './ocrLang.js'
 import Tesseract from 'tesseract.js'
 
 const require = createRequire(import.meta.url)
-const PDF_MAX_PAGES = parseInt(process.env.PDF_OCR_MAX_PAGES || '50', 10)
+import { resolvePdfOcrMaxPages } from '../config/importLimits.js'
 const PDF_OCR_SCALE = Math.min(3, Math.max(1, parseFloat(process.env.PDF_OCR_SCALE || '2') || 2))
 const PDF_USE_NATIVE_FIRST = process.env.PDF_USE_NATIVE_FIRST !== 'false'
 const NATIVE_MIN_CHARS = 50
@@ -49,7 +49,7 @@ function tryEcobankFromText(text: string, numpages?: number): ParsedDocument | n
   return { ...ecobank, pdfTotalPages: numpages, parseMethod: 'ecobank_pdf' }
 }
 
-async function parsePdfWithOcr(buffer: Buffer, maxPages = PDF_MAX_PAGES): Promise<ParsedDocument> {
+async function parsePdfWithOcr(buffer: Buffer, maxPages = resolvePdfOcrMaxPages()): Promise<ParsedDocument> {
   const { pdf } = await import('pdf-to-img')
   const doc = await pdf(buffer, { scale: PDF_OCR_SCALE })
   const totalPages = doc.length

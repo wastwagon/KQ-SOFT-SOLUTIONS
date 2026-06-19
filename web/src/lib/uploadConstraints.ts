@@ -1,10 +1,11 @@
 /**
  * Client-side limits for project document uploads.
- * Defaults mirror `api/src/routes/upload.ts` (MAX_UPLOAD_SIZE_MB default 10, extension list).
+ * Defaults mirror `api/src/config/importLimits.ts`.
  * Set `VITE_MAX_UPLOAD_SIZE_MB` if the API env differs.
  */
-const mb = parseInt(import.meta.env.VITE_MAX_UPLOAD_SIZE_MB ?? '10', 10)
-const safeMb = Number.isFinite(mb) && mb > 0 ? mb : 10
+import { MAX_UPLOAD_SIZE_MB } from './importLimits'
+
+const safeMb = MAX_UPLOAD_SIZE_MB
 
 export const MAX_PROJECT_DOCUMENT_UPLOAD_BYTES = safeMb * 1024 * 1024
 

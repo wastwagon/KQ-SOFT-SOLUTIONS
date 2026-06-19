@@ -9,6 +9,7 @@ import ReconcileTransactionsTables from '../components/reconcile/ReconcileTransa
 import SplitSuggestionsPanel from '../components/reconcile/SplitSuggestionsPanel'
 import SuggestedMatchesPanel from '../components/reconcile/SuggestedMatchesPanel'
 import { useReconcileSession } from '../components/reconcile/useReconcileSession'
+import { RECONCILE_CLIENT_LIMIT } from '../lib/importLimits'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
@@ -201,7 +202,7 @@ export default function ProjectReconcile({
       {anyTruncated && (
         <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
           <p className="text-sm text-amber-800">
-            Showing first {Math.min(reconcileLimit, 5000) / 4} transactions per category. Some
+            Showing first {Math.min(reconcileLimit, RECONCILE_CLIENT_LIMIT) / 4} transactions per category. Some
             transactions are hidden.
           </p>
           <button

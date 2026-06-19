@@ -50,7 +50,7 @@ export async function parseImage(filepath: string): Promise<OcrResult> {
   return textToTable(text)
 }
 
-const PDF_MAX_PAGES = parseInt(process.env.PDF_OCR_MAX_PAGES || '50', 10)
+import { resolvePdfOcrMaxPages } from '../config/importLimits.js'
 const PDF_OCR_SCALE = Math.min(3, Math.max(1, parseFloat(process.env.PDF_OCR_SCALE || '2') || 2))
 const PDF_USE_NATIVE_FIRST = process.env.PDF_USE_NATIVE_FIRST !== 'false'
 const NATIVE_MIN_CHARS = 50 // Minimum chars to consider native extraction useful
@@ -62,7 +62,7 @@ function shouldPreferEcobankParser(text: string, result: OcrResult): boolean {
   return result.headers.length < 5 || /payments?/.test(h) || result.rows.length > 150
 }
 
-export async function parsePdf(filepath: string, maxPages = PDF_MAX_PAGES): Promise<OcrResult> {
+export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPages()): Promise<OcrResult> {
   const ext = path.extname(filepath).toLowerCase()
   if (ext !== '.pdf') throw new Error('Not a PDF file')
 

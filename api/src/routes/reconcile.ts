@@ -17,6 +17,23 @@ import {
   suggestEcobankPaymentDebitMatches,
   suggestEcobankStatutoryDepositMatches,
 } from '../services/ecobankClearingMatcher.js'
+import {
+  isScbPatternMatchReason,
+  mergeReceiptSuggestions,
+  mergeScbPaymentSuggestions,
+  resolveScbProfile,
+  scbClearingRefsConflict,
+  suggestScbCashWithdrawalMatches,
+  suggestScbChqRefDebitMatches,
+  suggestScbInwardClearingFooterAmountMatches,
+  suggestScbInwardClearingAlternateDebitMatches,
+  suggestScbInwardClearingCrossRefMatches,
+  suggestScbWithdrawnToInwClgMatches,
+  suggestScbInwardClearingDebitMatches,
+  suggestScbOtRefMatches,
+  suggestScbReturnedChequeCreditMatches,
+  suggestScbSweepMatches,
+} from '../services/scbSweepMatcher.js'
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveWorkbookNetting } from '../lib/brsQueryFlags.js'
@@ -29,8 +46,38 @@ router.use(authMiddleware)
 router.use(requireOrgSubscriptionForApp)
 router.use(heavyOrgRouteLimiter)
 
-const RECONCILE_DEFAULT_LIMIT = 1500
-const RECONCILE_MAX_LIMIT = 5000
+import {
+  RECONCILE_DEFAULT_LIMIT,
+  resolveReconcileMaxLimit,
+  SUGGESTION_DEFAULT_CAP,
+} from '../config/importLimits.js'
+
+/** Auto-raise display limit when any lane exceeds default RECONCILE_DEFAULT_LIMIT / 4. */
+export function resolveReconcileFetchLimit(
+  requestedLimit: number | undefined,
+  categoryCounts: number[]
+): number {
+  const maxCategory = Math.max(0, ...categoryCounts)
+  const maxLimit = resolveReconcileMaxLimit()
+  const defaultPerCategory = Math.ceil(RECONCILE_DEFAULT_LIMIT / 4)
+  const defaultLimit =
+    maxCategory > defaultPerCategory ? maxLimit : RECONCILE_DEFAULT_LIMIT
+  const parsed = requestedLimit && requestedLimit > 0 ? requestedLimit : defaultLimit
+  return Math.min(parsed, maxLimit)
+}
+
+export function resolveSuggestionCap(
+  requestedCap: number | undefined,
+  categoryCounts: number[]
+): number {
+  const maxCategory = Math.max(0, ...categoryCounts)
+  const maxCap = resolveReconcileMaxLimit()
+  const defaultPerCategory = Math.ceil(RECONCILE_DEFAULT_LIMIT / 4)
+  const defaultCap =
+    maxCategory > defaultPerCategory ? maxCap : SUGGESTION_DEFAULT_CAP
+  const parsed = requestedCap && requestedCap > 0 ? requestedCap : defaultCap
+  return Math.min(parsed, maxCap)
+}
 
 function parseBooleanQuery(value: unknown, defaultValue: boolean): boolean {
   if (typeof value !== 'string') return defaultValue
@@ -66,10 +113,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const bankAccountId = (req.query.bankAccountId as string) || undefined
-  const limit = Math.min(
-    parseInt(req.query.limit as string) || RECONCILE_DEFAULT_LIMIT,
-    RECONCILE_MAX_LIMIT
-  )
+  const requestedLimit = parseInt(req.query.limit as string) || undefined
+  const requestedSuggestionCap = parseInt(req.query.suggestionLimit as string) || undefined
   const useDate = parseBooleanQuery(req.query.useDate, true)
   const useDocRef = parseBooleanQuery(req.query.useDocRef, true)
   const useChequeNo = parseBooleanQuery(req.query.useChequeNo, true)
@@ -109,6 +154,18 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const paymentsFull = paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx))
   const creditsFull = creditsDocs.flatMap((d) => (d.transactions || []).map(toTx))
   const debitsFull = debitsDocs.flatMap((d) => (d.transactions || []).map(toTx))
+  const limit = resolveReconcileFetchLimit(requestedLimit, [
+    receiptsFull.length,
+    paymentsFull.length,
+    creditsFull.length,
+    debitsFull.length,
+  ])
+  const suggestionCap = resolveSuggestionCap(requestedSuggestionCap, [
+    receiptsFull.length,
+    paymentsFull.length,
+    creditsFull.length,
+    debitsFull.length,
+  ])
   const perCategory = Math.ceil(limit / 4)
   const truncate = <T>(arr: T[]) => {
     if (arr.length <= perCategory) return { arr, truncated: false, totalCount: arr.length }
@@ -195,6 +252,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     sampleBankText,
     workbookNetting: workbookNettingRequested,
   })
+  const scbProfile = resolveScbProfile({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+  })
   const ghanaBankFormat = ecobankProfile.active
     ? 'ecobank'
     : resolveGhanaBankFormatLabel(project.bankAccounts || [], bankAccountId)
@@ -213,25 +275,123 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     list.map((s) => ({
       ...s,
       matchKind,
-      ecobankPattern: matchKind === 'payment' && isEcobankPatternMatchReason(s.reason),
+      ecobankPattern:
+        matchKind === 'payment' &&
+        (isEcobankPatternMatchReason(s.reason) || isScbPatternMatchReason(s.reason)),
     }))
 
+  const scbSweepSuggestions = scbProfile.active
+    ? suggestScbSweepMatches(
+        receiptsFull,
+        creditsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance
+      )
+    : []
+  const scbInwardClearingSuggestions = scbProfile.active
+    ? mergeScbPaymentSuggestions(
+        suggestScbInwardClearingDebitMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        ),
+        suggestScbInwardClearingCrossRefMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        ),
+        suggestScbInwardClearingAlternateDebitMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        ),
+        suggestScbInwardClearingFooterAmountMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        ),
+        suggestScbWithdrawnToInwClgMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        )
+      )
+    : []
+
+  const scbReturnedChequeSuggestions = scbProfile.active
+    ? suggestScbReturnedChequeCreditMatches(
+        receiptsFull,
+        creditsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance
+      )
+    : []
+  const scbCashWithdrawalSuggestions = scbProfile.active
+    ? suggestScbCashWithdrawalMatches(
+        paymentsFull,
+        debitsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance
+      )
+    : []
+  const scbChqRefSuggestions = scbProfile.active
+    ? suggestScbChqRefDebitMatches(
+        paymentsFull,
+        debitsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance
+      )
+    : []
+  const scbOtRefSuggestions = scbProfile.active
+    ? suggestScbOtRefMatches(
+        paymentsFull,
+        debitsFull,
+        matchedCbIds,
+        matchedBankIds,
+        matchOptions.amountTolerance
+      )
+    : []
+
   // Matching suggestions for all plans (intelligent matching clues)
-  const receiptSuggestions = suggestMatches(receipts, credits, matchedCbIds, matchedBankIds, {
-    ...matchOptions,
-    requireDateMatch: useDate,
-    useDate,
-    useDocRef,
-    useChequeNo,
-  })
-  const standardPaymentSuggestions = suggestMatches(payments, debits, matchedCbIds, matchedBankIds, {
-    ...matchOptions,
-    requireDateMatch: useDate,
-    requireRefForCheques: useDocRef || useChequeNo,
-    useDate,
-    useDocRef,
-    useChequeNo,
-  })
+  const receiptSuggestions = mergeReceiptSuggestions(
+    scbSweepSuggestions,
+    scbReturnedChequeSuggestions,
+    suggestMatches(receiptsFull, creditsFull, matchedCbIds, matchedBankIds, {
+      ...matchOptions,
+      requireDateMatch: useDate,
+      useDate,
+      useDocRef,
+      useChequeNo,
+    })
+  )
+  const standardPaymentSuggestions = suggestMatches(
+    paymentsFull,
+    debitsFull,
+    matchedCbIds,
+    matchedBankIds,
+    {
+      ...matchOptions,
+      requireDateMatch: useDate,
+      requireRefForCheques: useDocRef || useChequeNo,
+      useDate,
+      useDocRef,
+      useChequeNo,
+    }
+  ).filter((s) => !scbClearingRefsConflict(s.cashBookTx, s.bankTx))
   const clearingPaymentSuggestions = ecobankProfile.active
     ? suggestEcobankClearingMatches(
         paymentsFull,
@@ -269,9 +429,23 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
           mergePaymentSuggestions(clearingPaymentSuggestions, statutoryDepositSuggestions),
           ecobankPaymentDebitSuggestions
         ),
-        standardPaymentSuggestions
+        mergeScbPaymentSuggestions(
+          scbInwardClearingSuggestions,
+          scbCashWithdrawalSuggestions,
+          scbChqRefSuggestions,
+          scbOtRefSuggestions,
+          standardPaymentSuggestions
+        )
       )
-    : standardPaymentSuggestions
+    : scbProfile.active
+      ? mergeScbPaymentSuggestions(
+          scbInwardClearingSuggestions,
+          scbCashWithdrawalSuggestions,
+          scbChqRefSuggestions,
+          scbOtRefSuggestions,
+          standardPaymentSuggestions
+        )
+      : standardPaymentSuggestions
   const duplicateChequeWarnings = detectDuplicateChequePayments(paymentsFull)
 
   // Apply bank rules for rule-based suggestions and flagged txs (Standard+ only)
@@ -312,8 +486,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       }
     }
   }
-  addRuleSuggestions(receipts, credits, receiptSuggestions)
-  addRuleSuggestions(payments, debits, standardPaymentSuggestions)
+  addRuleSuggestions(receiptsFull, creditsFull, receiptSuggestions)
+  addRuleSuggestions(paymentsFull, debitsFull, standardPaymentSuggestions)
 
   // AI-style boost: learn from confirmed matches — if suggestion resembles a past match, boost confidence
   const learnedPatterns = matchList.map(({ cbTx, bankTx }) => ({
@@ -348,12 +522,20 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
 
   let splitSuggestions: { receipts: SuggestedSplitMatch[]; payments: SuggestedSplitMatch[] } = { receipts: [], payments: [] }
   if (hasSplitMatchingPlan) {
-    splitSuggestions.receipts = suggestSplitMatches(receipts, credits, matchedCbIds, matchedBankIds, {
-      ...matchOptions,
-    })
-    splitSuggestions.payments = suggestSplitMatches(payments, debits, matchedCbIds, matchedBankIds, {
-      ...matchOptions,
-    })
+    splitSuggestions.receipts = suggestSplitMatches(
+      receiptsFull,
+      creditsFull,
+      matchedCbIds,
+      matchedBankIds,
+      { ...matchOptions }
+    )
+    splitSuggestions.payments = suggestSplitMatches(
+      paymentsFull,
+      debitsFull,
+      matchedCbIds,
+      matchedBankIds,
+      { ...matchOptions }
+    )
   }
 
   res.json({
@@ -369,11 +551,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     /** @deprecated Use matchedBankIds (includes credits and debits) */
     matchedCreditIds: Array.from(matchedBankIds),
     suggestions: {
-      receipts: receiptSuggestionsOut.slice(0, 50),
-      payments: paymentSuggestionsOut.slice(0, 50),
-      clearingPayments: clearingPaymentSuggestions.slice(0, 50),
+      receipts: receiptSuggestionsOut.slice(0, suggestionCap),
+      payments: paymentSuggestionsOut.slice(0, suggestionCap),
+      clearingPayments: clearingPaymentSuggestions.slice(0, suggestionCap),
       split: splitSuggestions,
     },
+    reconcileFetchLimit: limit,
+    suggestionCap,
     reconcileProfile: ecobankProfile.active
       ? {
           bankFormat: 'ecobank' as const,

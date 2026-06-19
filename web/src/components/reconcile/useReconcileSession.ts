@@ -8,6 +8,7 @@ import {
   unlessSubscriptionInactive,
 } from '../../lib/api'
 import { runPhasedAutoMatchRounds } from '../../lib/phasedAutoMatch'
+import { RECONCILE_CLIENT_LIMIT } from '../../lib/importLimits'
 import { useToast } from '../ui/Toast'
 import type {
   MatchParams,
@@ -183,7 +184,8 @@ export function useReconcileSession(projectId: string): ReconcileSession {
   const [matchParams, setMatchParamsState] = useState<MatchParams>(() =>
     readSavedMatchParams(projectId)
   )
-  const [reconcileLimit, setReconcileLimit] = useState(1500)
+  const [reconcileLimit, setReconcileLimit] = useState(RECONCILE_CLIENT_LIMIT)
+  const suggestionLimit = reconcileLimit
 
   const { data: usageData } = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -199,6 +201,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       projectId,
       bankAccountId || null,
       reconcileLimit,
+      suggestionLimit,
       matchParams.useDate,
       matchParams.useDocRef,
       matchParams.useChequeNo,
@@ -207,6 +210,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       reconcile.get(projectId, {
         bankAccountId: bankAccountId || undefined,
         limit: reconcileLimit,
+        suggestionLimit,
         useDate: matchParams.useDate,
         useDocRef: matchParams.useDocRef,
         useChequeNo: matchParams.useChequeNo,
@@ -326,6 +330,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
           reconcile.get(projectId, {
             bankAccountId: effectiveBankAccountId || undefined,
             limit: reconcileLimit,
+            suggestionLimit,
             useDate: matchParams.useDate,
             useDocRef: matchParams.useDocRef,
             useChequeNo: matchParams.useChequeNo,
@@ -422,7 +427,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     setBankAccountId: setBankAccountIdState,
     bankAccounts,
     reconcileLimit,
-    loadMore: () => setReconcileLimit(5000),
+    loadMore: () => setReconcileLimit(RECONCILE_CLIENT_LIMIT),
     matchParams,
     setMatchParams: setMatchParamsState,
     resetMatchParams: () => setMatchParamsState(DEFAULT_MATCH_PARAMS),
