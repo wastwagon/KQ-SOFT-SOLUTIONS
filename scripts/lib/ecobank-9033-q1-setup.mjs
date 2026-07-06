@@ -5,6 +5,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { parseManualBrsXlsx, manualTargets9033 } from './parse-manual-brs-xlsx.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const ROOT = path.join(__dirname, '../..')
@@ -15,16 +16,10 @@ export const Q1_PROJECT_NAME =
 export const Q1_PROJECT_SLUG = process.env.BRS_Q1_SLUG || null
 export const Q1_RECON_DATE = '2026-03-31T00:00:00.000Z'
 
-/** From Account901 brs as at 31.3.2026.xlsx — Ecobank 1441001519033 */
-export const MANUAL_Q1 = {
-  bankClosing: 18643.29,
-  cashBookBalance: 378557.29,
-  uncredited: 0,
-  unpresented: 10660.97,
-  bankOnlyDebits: 374054.7,
-  bankOnlyCredits: 3479.73,
-  matchedPairs: 54,
-}
+const MANUAL_BRS_FILE = path.join(DATA, 'Account901 brs as at 31.3.2026.xlsx')
+
+/** From Account901 brs as at 31.3.2026.xlsx (updated Jul 2026) — Ecobank 1441001519033 */
+export const MANUAL_Q1 = manualTargets9033(parseManualBrsXlsx(MANUAL_BRS_FILE))
 
 export const CASH_MAP = {
   date: 0,

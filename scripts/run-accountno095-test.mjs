@@ -5,30 +5,27 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
+import { clean9035CashBookDuplicates } from './lib/clean-9035-cashbook.mjs'
+import { parseManualBrsXlsx, manualTargets9035 } from './lib/parse-manual-brs-xlsx.mjs'
+
+const require = createRequire(path.join(path.dirname(fileURLToPath(import.meta.url)), '../api/package.json'))
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 const DATA = path.join(ROOT, 'accountno095details')
 
-const API = process.env.API_URL || 'http://localhost:9011'
+const API = process.env.API_URL || 'http://localhost:9101'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
 const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 
 const PROJECT_NAME = 'Lordship – Ecobank 9035 Q1 2026 (accountno095)'
 const RECON_DATE = '2026-03-31T00:00:00.000Z'
+const MANUAL_BRS_FILE = path.join(DATA, 'Account902 brs as at 31.3.2026.xlsx')
 
-const MANUAL = {
-  bankClosing: 4899.28,
-  cashBookBalance: -63299.04,
-  uncredited: 0,
-  unpresented: 2623.18,
-  bankOnlyDebits: 236614,
-  bankOnlyCredits: 311018.52,
-  matchedPairs: 27,
-  /** Manual workbook schedule does not close arithmetically with the Ghana two-column formula. */
-  intrinsicTieOutVariance: 8829.38,
-}
+/** From Account902 brs as at 31.3.2026.xlsx (updated Jul 2026) — Ecobank 1441001519035 */
+const MANUAL = manualTargets9035(parseManualBrsXlsx(MANUAL_BRS_FILE))
 
 const CASH_MAP = {
   date: 0,
@@ -110,8 +107,15 @@ async function main() {
   for (const f of [
     'LIBcashbk2 2026 1qtr.xlsx',
     '1778676142095 dated 4.6.26.xlsx',
+    'Account902 brs as at 31.3.2026.xlsx',
   ]) {
     if (!fs.existsSync(path.join(DATA, f))) throw new Error(`Missing ${f}`)
+  }
+
+  const cbPath = path.join(DATA, 'LIBcashbk2 2026 1qtr.xlsx')
+  const cleaned = clean9035CashBookDuplicates(cbPath)
+  if (cleaned.removed) {
+    console.log(`Cash book: removed ${cleaned.removed} duplicate payment row(s) per updated manual BRS`)
   }
 
   const token = await login()
@@ -120,6 +124,12 @@ async function main() {
   const projectsRaw = await api('GET', '/projects', token)
   const projects = Array.isArray(projectsRaw) ? projectsRaw : projectsRaw.projects ?? []
   let project = projects.find((p) => p.name === PROJECT_NAME)
+
+  if (process.env.BRS_FORCE_REUPLOAD === '1' && project) {
+    await api('DELETE', `/projects/${project.slug}`, token)
+    console.log('Deleted existing project for clean re-upload:', project.slug)
+    project = null
+  }
   if (!project) {
     project = await api('POST', '/projects', token, {
       name: PROJECT_NAME,
