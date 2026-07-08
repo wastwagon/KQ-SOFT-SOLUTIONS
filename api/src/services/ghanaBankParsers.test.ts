@@ -54,6 +54,23 @@ describe('detectGhanaBankFormat', () => {
     const format = detectGhanaBankFormat(headers, rows)
     expect(format).toBe('absa')
   })
+
+  it('detects Bank of Africa from export headers', () => {
+    const headers = [
+      'Our Reference',
+      'Trxn Code',
+      'Account Number',
+      'Operation Date',
+      'Value Date',
+      'Description',
+      'DEBIT',
+      'CREDIT',
+      'CHEQUE NUMBER',
+      'BALANCE',
+    ]
+    const rows = [['AX21156', 'DCI', '00291410102', '2023-09-11', '2023-09-09', 'MAT.DEPOT', 0, 105960.08]]
+    expect(detectGhanaBankFormat(headers, rows)).toBe('boa')
+  })
 })
 
 describe('getSuggestedBankMapping', () => {
@@ -79,6 +96,16 @@ describe('getSuggestedBankMapping', () => {
     expect(mapping.transaction_date).toBeDefined()
     expect(mapping.description).toBeDefined()
     expect(mapping.credit).toBeDefined()
+  })
+
+  it('prefers Value Date for Bank of Africa', () => {
+    const headers = ['Operation Date', 'Value Date', 'Description', 'DEBIT', 'CREDIT']
+    const credits = getSuggestedBankMapping('boa', headers, 'credits')
+    expect(credits.transaction_date).toBe(1)
+    expect(credits.credit).toBe(4)
+    const debits = getSuggestedBankMapping('boa', headers, 'debits')
+    expect(debits.transaction_date).toBe(1)
+    expect(debits.debit).toBe(3)
   })
 })
 

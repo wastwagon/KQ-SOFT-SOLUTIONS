@@ -2,8 +2,24 @@ import * as XLSX from 'xlsx'
 import fs from 'fs'
 import path from 'path'
 import { parse as parseCsvSync } from 'csv-parse/sync'
-import { findCashBookTransactionHeaderRow } from './cashBookExcel.js'
+import {
+  findCashBookTransactionHeaderRow,
+  findErpGlCashBookHeaderRow,
+  isErpGlCashBookLayout,
+  isTglErpCashBookLayout,
+  normalizeErpGlCashBookTable,
+  normalizeTglErpCashBookTable,
+} from './cashBookExcel.js'
 import { findEcobankTransactionHeaderRow, normalizeEcobankExcelTable } from './ecobankStatement.js'
+import {
+  findBankOfAfricaTransactionHeaderRow,
+  normalizeBankOfAfricaExcelTable,
+} from './bankOfAfricaStatement.js'
+import { findBogTransactionHeaderRow, normalizeBogExcelTable } from './bogStatement.js'
+import {
+  findStanbicTransactionHeaderRow,
+  normalizeStanbicExcelTable,
+} from './stanbicStatement.js'
 
 export interface ParseResult {
   headers: string[]
@@ -14,7 +30,7 @@ export interface ParseResult {
 
 export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
   const ext = path.extname(filepath).toLowerCase()
-  if (!['.xlsx', '.xls'].includes(ext)) {
+  if (!['.xlsx', '.xls', '.xlsm'].includes(ext)) {
     throw new Error('Not an Excel file')
   }
   const buf = fs.readFileSync(filepath)
@@ -29,9 +45,39 @@ export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
   }) as unknown[][]
   const nonEmpty = data.filter((row) => row.some((c) => c != null && String(c).trim() !== ''))
   const ecobankHeaderRow = findEcobankTransactionHeaderRow(nonEmpty)
-  const cashBookHeaderRow = ecobankHeaderRow < 0 ? findCashBookTransactionHeaderRow(nonEmpty) : -1
+  const bogHeaderRow = ecobankHeaderRow < 0 ? findBogTransactionHeaderRow(nonEmpty) : -1
+  const stanbicHeaderRow =
+    ecobankHeaderRow < 0 && bogHeaderRow < 0 ? findStanbicTransactionHeaderRow(nonEmpty) : -1
+  const boaHeaderRow =
+    ecobankHeaderRow < 0 && bogHeaderRow < 0 && stanbicHeaderRow < 0
+      ? findBankOfAfricaTransactionHeaderRow(nonEmpty)
+      : -1
+  const erpGlHeaderRow =
+    ecobankHeaderRow < 0 && bogHeaderRow < 0 && stanbicHeaderRow < 0 && boaHeaderRow < 0
+      ? findErpGlCashBookHeaderRow(nonEmpty)
+      : -1
+  const cashBookHeaderRow =
+    ecobankHeaderRow < 0 &&
+    bogHeaderRow < 0 &&
+    stanbicHeaderRow < 0 &&
+    boaHeaderRow < 0 &&
+    erpGlHeaderRow < 0
+      ? findCashBookTransactionHeaderRow(nonEmpty)
+      : -1
   const headerRow =
-    ecobankHeaderRow >= 0 ? ecobankHeaderRow : cashBookHeaderRow >= 0 ? cashBookHeaderRow : findHeaderRow(nonEmpty)
+    ecobankHeaderRow >= 0
+      ? ecobankHeaderRow
+      : bogHeaderRow >= 0
+        ? bogHeaderRow
+        : stanbicHeaderRow >= 0
+          ? stanbicHeaderRow
+          : boaHeaderRow >= 0
+            ? boaHeaderRow
+            : erpGlHeaderRow >= 0
+              ? erpGlHeaderRow
+              : cashBookHeaderRow >= 0
+                ? cashBookHeaderRow
+                : findHeaderRow(nonEmpty)
   const headerRowData = nonEmpty[headerRow] || []
   const headers = headerRowData.map((c, i) =>
     String(c ?? '').trim() || `Col_${i}`
@@ -40,6 +86,16 @@ export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
   let result: ParseResult = { headers, rows, sheetNames, activeSheet: sheetName }
   if (ecobankHeaderRow >= 0) {
     result = normalizeEcobankExcelTable(result)
+  } else if (bogHeaderRow >= 0) {
+    result = normalizeBogExcelTable(result)
+  } else if (stanbicHeaderRow >= 0) {
+    result = normalizeStanbicExcelTable(result)
+  } else if (boaHeaderRow >= 0) {
+    result = normalizeBankOfAfricaExcelTable(result)
+  } else if (erpGlHeaderRow >= 0 && isErpGlCashBookLayout(headers)) {
+    result = normalizeErpGlCashBookTable(result)
+  } else if (cashBookHeaderRow >= 0 && isTglErpCashBookLayout(headers)) {
+    result = normalizeTglErpCashBookTable(result)
   }
   return result
 }
@@ -88,7 +144,7 @@ function findHeaderRow(data: unknown[][]): number {
 
 export function detectFileType(filepath: string): 'excel' | 'csv' | 'pdf' | 'image' {
   const ext = path.extname(filepath).toLowerCase()
-  if (['.xlsx', '.xls'].includes(ext)) return 'excel'
+  if (['.xlsx', '.xls', '.xlsm'].includes(ext)) return 'excel'
   if (ext === '.csv') return 'csv'
   if (ext === '.pdf') return 'pdf'
   if (['.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp'].includes(ext)) return 'image'

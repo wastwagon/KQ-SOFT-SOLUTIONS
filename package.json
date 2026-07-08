@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "manual:pdf": "node scripts/generate-pdf.js",
+    "manual:pdf": "node scripts/generate-pdf.js user",
+    "mapping-manual:pdf": "node scripts/generate-pdf.js mapping",
+    "export:corrected-specimens": "npx tsx scripts/export-corrected-specimens.mjs",
     "demo:flow": "bash scripts/run-full-flow.sh",
     "demo:flow:qtest": "bash scripts/run-qtest-licl-flow.sh"
   },

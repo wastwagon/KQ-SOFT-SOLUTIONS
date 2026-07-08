@@ -12,6 +12,7 @@ export const MAX_PROJECT_DOCUMENT_UPLOAD_BYTES = safeMb * 1024 * 1024
 export const PROJECT_DOCUMENT_ALLOWED_EXTENSIONS = [
   '.xlsx',
   '.xls',
+  '.xlsm',
   '.csv',
   '.pdf',
   '.png',

@@ -1,0 +1,557 @@
+{
+  "exportedAt": "2026-07-08T16:17:00.675Z",
+  "banks": [
+    {
+      "id": "01-ecobank",
+      "name": "Ecobank (Lordship)",
+      "files": [
+        {
+          "label": "Bank statement acct 9033",
+          "file": "1778163944552 (acct1).pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 93,
+          "sumDebit": 509114.2900000001,
+          "sumCredit": 508127.77,
+          "parseMethod": "ecobank_pdf"
+        },
+        {
+          "label": "Bank statement acct 9035",
+          "file": "1778676142095 (acct 2).pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 101,
+          "sumDebit": 653066.76,
+          "sumCredit": 623843.9900000001,
+          "parseMethod": "ecobank_pdf"
+        },
+        {
+          "label": "Cash book 1",
+          "file": "Lordship cash bk 1.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 69,
+          "sumDebit": 135070.35,
+          "sumCredit": 508115.54000000004,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Cash book 2",
+          "file": "Lordship cash bk 2.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 79,
+          "sumDebit": 394336.0399999999,
+          "sumCredit": 315825.47000000003,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "BRS summary acct 901",
+          "file": "2025 final brs for acct 901 (acct 1).xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Reference BRS workbook — not a bank upload format"
+        },
+        {
+          "label": "BRS summary acct 902",
+          "file": "2025 final brs for acct 902 (acct 2).xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Reference BRS workbook — not a bank upload format"
+        }
+      ]
+    },
+    {
+      "id": "02-nib",
+      "name": "NIB",
+      "files": [
+        {
+          "label": "Bank statement PDF",
+          "file": "NIB(1102037505201)[10535].pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 12,
+          "sumDebit": 40976,
+          "sumCredit": 108132.15,
+          "parseMethod": "nib_pdf"
+        },
+        {
+          "label": "NIB cash book (ERP G/L — different GL account from PDF)",
+          "file": "NIB cash bk.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 16,
+          "sumDebit": 3894.82,
+          "sumCredit": 49168.5,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "03-adb",
+      "name": "ADB",
+      "files": [
+        {
+          "label": "Call deposit statement",
+          "file": "ADB COCOA BOD PURCHASE ACC CALL[1061810015800001]-september,2023.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 59,
+          "sumDebit": 13317026.309999999,
+          "sumCredit": 13626604.73,
+          "parseMethod": "adb_pdf"
+        },
+        {
+          "label": "Purchase account statement",
+          "file": "adb COCOA BOD PURCHASE ACC[1061020015800001]-september,2023.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 51,
+          "sumDebit": 1267746.0899999999,
+          "sumCredit": 1267746.0899999999,
+          "parseMethod": "adb_pdf"
+        },
+        {
+          "label": "ERP cash book (GLPTLS1)",
+          "file": "ADB cash bk.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 18,
+          "sumDebit": 13323810.34,
+          "sumCredit": 13499243.509999998,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "04-gcb",
+      "name": "GCB",
+      "files": [
+        {
+          "label": "Republic House corporate statement",
+          "file": "gcb republic house corporate(1061130000070)-sept.2023.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 292,
+          "sumDebit": 5191022.260000001,
+          "sumCredit": 5208032.26,
+          "parseMethod": "gcb_pdf"
+        },
+        {
+          "label": "Republic House cash book (ERP)",
+          "file": "GCB REPUBLIC HOUSE CASHBOOK CURRENT (100-026-024)-September,2023Q.xls",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 537,
+          "sumDebit": 1292812.38,
+          "sumCredit": 6295825.720000002,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "05-absa",
+      "name": "Absa",
+      "files": [
+        {
+          "label": "Call deposit statement PDF",
+          "file": "ABSA cocoa purchases call deposit(2086268)-september,2023.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 8,
+          "sumDebit": 731178280.19,
+          "sumCredit": 731178282.19,
+          "parseMethod": "absa_pdf"
+        },
+        {
+          "label": "Call deposit statement Excel",
+          "file": "ABSA cocoa purchases call deposit(2086268)-september,2023.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 8,
+          "sumDebit": 731178280.19,
+          "sumCredit": 731178282.19,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "06-bank-of-africa",
+      "name": "Bank of Africa",
+      "files": [
+        {
+          "label": "Bank statement xlsm",
+          "file": "bank of africa.xlsm",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 17,
+          "sumDebit": 395366.36000000004,
+          "sumCredit": 406040.2899999999,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "COCOBOD current xlsm",
+          "file": "Excel Statement - COCOBOD CURRENT (1).xlsm",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 17,
+          "sumDebit": 395366.36000000004,
+          "sumCredit": 406040.2899999999,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "07-umb",
+      "name": "UMB",
+      "files": [
+        {
+          "label": "Cocoa Purchases statement PDF",
+          "file": "UMB Cocoa Purchases  main(1110005147028)- Sept 23.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 9,
+          "sumDebit": 61965360.36,
+          "sumCredit": 61965360.36,
+          "parseMethod": "umb_pdf"
+        },
+        {
+          "label": "UMB cleaned Excel (manual layout)",
+          "file": "umb 1110005147028 statement - cleaned.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 10,
+          "sumDebit": 61965360.36,
+          "sumCredit": 61965360.36,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "08-scb",
+      "name": "Standard Chartered (SCB)",
+      "files": [
+        {
+          "label": "SCB statement raw",
+          "file": "scb statement.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 1316,
+          "sumDebit": 23000852.631968394,
+          "sumCredit": 24291535.131031606,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "SCB statement cleaned",
+          "file": "scb statement - cleaned.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 721,
+          "sumDebit": 11054516.37,
+          "sumCredit": 11935945.709999999,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "09-tgl-acct4702",
+      "name": "TGL acct 4702 cash book",
+      "files": [
+        {
+          "label": "TGL ERP cash book",
+          "file": "acct4702 cashbk.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 779,
+          "sumDebit": 12296754.209999999,
+          "sumCredit": 11756548.180000002,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "10-prudential",
+      "name": "Prudential Bank",
+      "files": [
+        {
+          "label": "September 2023 statement",
+          "file": "Prudential bank(0091900180008)_sep 23[10235].pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 381,
+          "sumDebit": 420716564.8899997,
+          "sumCredit": 423285158.25999993,
+          "parseMethod": "prudential_pdf"
+        }
+      ]
+    },
+    {
+      "id": "11-lordship-9033-q1-2026",
+      "name": "Lordship Ecobank 9033 Q1 2026",
+      "files": [
+        {
+          "label": "Cash book Q1 2026",
+          "file": "LIBcashbk1 2026 1qtr.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 76,
+          "sumDebit": 149188.06000000003,
+          "sumCredit": 508115.54000000004,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Bank statement Q1 2026 (Excel upload)",
+          "file": "1778163944552 dated 4.6.26.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 95,
+          "sumDebit": 446566.51,
+          "sumCredit": 577610.55,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Bank statement Q1 2026 (PDF)",
+          "file": "1778163944552.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 93,
+          "sumDebit": 509114.2900000001,
+          "sumCredit": 508127.77,
+          "parseMethod": "ecobank_pdf"
+        },
+        {
+          "label": "Manual BRS workbook",
+          "file": "Account901 brs as at 31.3.2026.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Manual reconciliation target — compare platform report against this"
+        },
+        {
+          "label": "Platform export snapshot",
+          "file": "platform-export-acct552.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "BRS platform output for comparison"
+        },
+        {
+          "label": "Preparer questions PDF",
+          "file": "BRS-9033-Questions-for-Manual-Preparer.pdf",
+          "type": ".pdf",
+          "status": "reference-only",
+          "note": "Reference notes from manual review"
+        },
+        {
+          "label": "Updated manual BRS (Jul 2026)",
+          "file": "Account901 brs as at31.3.2026 updated.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Latest preparer workbook with pairing marks — same totals as prior manual BRS"
+        }
+      ]
+    },
+    {
+      "id": "12-lordship-9035-q1-2026",
+      "name": "Lordship Ecobank 9035 Q1 2026",
+      "files": [
+        {
+          "label": "Cash book Q1 2026 (duplicates removed)",
+          "file": "LIBcashbk2 2026 1qtr.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "correction": "Removed 0 duplicate payment row(s)",
+          "rowCount": 79,
+          "sumDebit": 394336.04,
+          "sumCredit": 315825.47000000003,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Bank statement Q1 2026 (Excel upload)",
+          "file": "1778676142095 dated 4.6.26.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 103,
+          "sumDebit": 392423.85,
+          "sumCredit": 890486.8999999999,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Bank statement Q1 2026 (PDF)",
+          "file": "1778676142095.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 101,
+          "sumDebit": 653066.76,
+          "sumCredit": 623843.9900000001,
+          "parseMethod": "ecobank_pdf"
+        },
+        {
+          "label": "Manual BRS workbook",
+          "file": "Account902 brs as at 31.3.2026.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Manual reconciliation target — compare platform report against this"
+        },
+        {
+          "label": "Platform export snapshot",
+          "file": "platform-export-acct095.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "BRS platform output for comparison"
+        },
+        {
+          "label": "Updated manual BRS (Jul 2026)",
+          "file": "Account902 brs as at 31.3.2026 updated.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Latest preparer workbook — flags 3 duplicate cash-book payments removed on upload"
+        }
+      ]
+    },
+    {
+      "id": "13-bog",
+      "name": "Bank of Ghana (BOG)",
+      "files": [
+        {
+          "label": "COCOBOD operational account statement",
+          "file": "BOG COCOBOD GHS ADV OPERATIONAL EXP ACCT(01102022-30092023).xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 46,
+          "sumDebit": 5812737.69,
+          "sumCredit": 2000000,
+          "parseMethod": "excel"
+        }
+      ]
+    },
+    {
+      "id": "14-acct002-test-data",
+      "name": "Account 002 test data",
+      "files": [
+        {
+          "label": "Cash book",
+          "file": "cash book acct 2.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 28,
+          "sumDebit": 0,
+          "sumCredit": 0,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Bank statement",
+          "file": "bs acct 2.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 57,
+          "sumDebit": 23580,
+          "sumCredit": 22725,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Manual BRS",
+          "file": "brs acct 2.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Reference manual BRS workbook"
+        },
+        {
+          "label": "Platform export",
+          "file": "platform-export-acct002.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "BRS platform output for comparison"
+        },
+        {
+          "label": "Platform export PDF",
+          "file": "platform-export-acct002.pdf",
+          "type": "pdf",
+          "status": "ok",
+          "rowCount": 139,
+          "sumDebit": 0,
+          "sumCredit": 0,
+          "parseMethod": "native_text"
+        }
+      ]
+    },
+    {
+      "id": "15-acct4702-test-data",
+      "name": "Account 4702 test data",
+      "files": [
+        {
+          "label": "Bank statement",
+          "file": "acct 4702 bank statement.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 1316,
+          "sumDebit": 23000852.631968394,
+          "sumCredit": 24291535.131031606,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Cash book (copy)",
+          "file": "acct4702 cashbk.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 779,
+          "sumDebit": 12296754.209999999,
+          "sumCredit": 11756548.180000002,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Manual BRS",
+          "file": "acct 4702 brs.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Reference manual BRS workbook"
+        },
+        {
+          "label": "Platform export",
+          "file": "platform-export-acct4702.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "BRS platform output for comparison"
+        }
+      ]
+    },
+    {
+      "id": "16-acct430-test-data",
+      "name": "Account 430 test data",
+      "files": [
+        {
+          "label": "Bank statement",
+          "file": "acct430 bank statement.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 10,
+          "sumDebit": 6803.71,
+          "sumCredit": 220,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Cash book",
+          "file": "acct430 cash book.xlsx",
+          "type": "excel",
+          "status": "ok",
+          "rowCount": 56,
+          "sumDebit": 55170.67,
+          "sumCredit": 96327.81999999999,
+          "parseMethod": "excel"
+        },
+        {
+          "label": "Manual BRS",
+          "file": "acct430 brs.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "Reference manual BRS workbook"
+        },
+        {
+          "label": "Platform export",
+          "file": "platform-export-acct430.xlsx",
+          "type": ".xlsx",
+          "status": "reference-only",
+          "note": "BRS platform output for comparison"
+        }
+      ]
+    }
+  ]
+}

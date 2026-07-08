@@ -31,7 +31,23 @@ Both files add preparer annotations (** pairing marks, √ verified lines, ?? in
 - Three cash-book payments marked **“duplication. Delete in cash book”** (Helina, Fred-Leon, Cocobod formal lines). The hyphen narration rows are kept and pair to bank clearing (**).
 - Unpresented **2,623.18**, bank closing **4,899.28**, cash book **-63,299.04**, bank-only debits **236,614**, bank-only credits **311,018.52**
 
-## Amendments applied in repo
+## Cleaned Excel outputs (project-ready)
+
+Run:
+
+```bash
+node scripts/clean-specimen-bank-statements.mjs
+```
+
+| Output file | Source | Sheet2 for mapping |
+|-------------|--------|-------------------|
+| `scb statement - cleaned.xlsx` | `scb statement.xlsx` | ENTRY DATE, VALUE DATE, DESCRIPTION, DEBITS, CREDITS, BALANCE |
+| `umb 1110005147028 statement - cleaned.xlsx` | UMB PDF | Same layout |
+
+Each cleaned workbook has:
+- **Sheet1** — statement header + transactions (human-readable)
+- **Sheet2** — header row + transactions only (use this sheet when uploading, like acct4702 `BANK_SHEET_INDEX = 1`)
+
 
 1. Copied updated BRS into each data folder (replacing `Account901…` / `Account902…`).
 2. `scripts/lib/parse-manual-brs-xlsx.mjs` — reads manual targets from those workbooks.

@@ -526,7 +526,7 @@ function FilePickerRow({
       <input
         type="file"
         multiple
-        accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
+        accept=".xlsx,.xls,.xlsm,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
         onChange={(e) => onFiles(Array.from(e.target.files || []))}
         className="text-xs text-gray-500 file:mr-2 file:cursor-pointer file:rounded-xl file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:text-primary-700"
       />

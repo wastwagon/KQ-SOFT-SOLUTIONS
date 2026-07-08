@@ -3,7 +3,7 @@
 **Product:** KQ Bank Reconciliation System (BRS)  
 **Company:** KQ SOFT SOLUTIONS  
 **Audience:** End users and operations teams  
-**Updated:** May 11, 2026
+**Updated:** June 22, 2026
 
 > Welcome to KQ BRS. This manual is your official guide for onboarding, day-to-day reconciliation, approvals, reporting, and support escalation.  
 > For best results, share this page with all new users during kickoff and role assignment.
@@ -12,6 +12,7 @@
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-06-22 | 1.3 | Added dedicated [Mapping & Matching guide](/mapping-and-matching-manual.md) with field reference, matching settings, troubleshooting, and training checklist. |
 | 2026-05-11 | 1.2 | FAQ on subscription (GHS) vs project reporting currency; Settings → Billing; New project currency hint; manual cross-references. |
 | 2026-05-07 | 1.1 | Added dedicated in-app online manual page (`/manual`), dashboard help shortcut, and live update process. |
 | 2026-05-01 | 1.0 | Initial commercial user manual release. |
@@ -148,7 +149,9 @@ Common fields include:
 
 Tips:
 - Always map date columns
-- Use "Apply suggested mapping to all documents" for speed
+- Use **Apply suggested mapping to selected** for speed (tick which files to include)
+
+**Detailed guide:** [Mapping & Matching Transactions](/mapping-and-matching-manual.md) — field reference, signed amount mode, Ghana bank tips, matching settings, troubleshooting, and a training checklist.
 
 ---
 
@@ -157,18 +160,26 @@ Tips:
 Work in:
 - **Receipts vs Credits**
 - **Payments vs Debits**
-- **Cash book (all)** for overview
+- **Cash book (all)** for overview (switch to Receipts or Payments to match)
 
 Matching modes:
 - 1:1 (base)
 - 1:many / many:1 / many:many (plan-based)
 
+Matching settings presets:
+- **Strict** — amount + date + reference + cheque
+- **Amount + Date**
+- **Amount only** (review carefully)
+
 Available actions:
-- manual matching
+- manual matching (select rows → **Confirm Match**)
 - suggested matching
-- bulk matching (plan-based)
+- bulk matching and auto-match (plan-based)
+- split suggestions for bulk deposits (Premium+)
 - unmatch
 - bank account filtering
+
+See [Mapping & Matching Transactions](/mapping-and-matching-manual.md) for the full walkthrough.
 
 ---
 

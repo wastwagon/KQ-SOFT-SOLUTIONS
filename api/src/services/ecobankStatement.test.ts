@@ -39,6 +39,19 @@ describe('ecobankStatement', () => {
     expect(r.headers).toContain('Credit')
   })
 
+  it('dedupes page-break duplicate transactions', () => {
+    const sample = `05-Mar-2026CHEQUE WITHDRAWAL
+CHEQUE WITHDRAWAL- EGH CHQ NO 926103 PD TO EMMANUEL TETTEH
+H55CQWL26064059705-Mar-2026GHS3,467.50GHS6,243.19
+05-Mar-2026CHEQUE WITHDRAWAL
+CHEQUE WITHDRAWAL- EGH CHQ NO 926103 PD TO EMMANUEL TETTEH NO
+0543280732
+H55CQWL26064057105-Mar-2026GHS3,467.50GHS6,243.19`
+    const r = parseEcobankPdfText(sample)
+    expect(r.rows.length).toBe(1)
+    expect(r.rows[0]![4]).toBe(3467.5)
+  })
+
   it('parses Ecobank PDF text blocks', () => {
     const sample = `Transaction DateDescriptionReference NumberValue DatePaymentsDepositsBalance
 31-Mar-2026CHEQUE DEPOSIT
