@@ -28,6 +28,13 @@ function parseScbAmount(v: unknown): number | '' {
   return Number.isFinite(n) ? n : ''
 }
 
+function scbDateCell(value: unknown, fallback?: unknown): string | number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const raw = value ?? fallback ?? ''
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  return String(raw).trim()
+}
+
 export function isScbGluedRow(row: unknown[]): boolean {
   const entry = String(row[0] ?? '')
   const desc = String(row[2] ?? row[3] ?? '')
@@ -190,8 +197,8 @@ export function extractScbTransactions(rows: unknown[][]): Array<{
 
     if (!isScbTransactionDate(row[0])) continue
     pushTx({
-      entryDate: row[0],
-      valueDate: row[1] || row[0],
+      entryDate: scbDateCell(row[0]),
+      valueDate: scbDateCell(row[1], row[0]),
       description: String(row[2] || row[3] || '').trim(),
       debit: parseScbAmount(row[4]),
       credit: parseScbAmount(row[5]),
