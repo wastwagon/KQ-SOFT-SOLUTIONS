@@ -9,6 +9,7 @@ import fs from 'fs'
 import path from 'path'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
+import { extractScbFromWorkbook, parseAmount } from './lib/scb-statement-clean.mjs'
 
 const require = createRequire(path.join(path.dirname(fileURLToPath(import.meta.url)), '../api/package.json'))
 const XLSX = require('xlsx')
@@ -21,13 +22,6 @@ const OUT_DIR = path.join(ROOT, 'specimenbankstatementformats')
 const HEADERS = ['ENTRY DATE', 'VALUE DATE', 'DESCRIPTION', '', 'DEBITS', 'CREDITS', 'BALANCE', '']
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function parseAmount(v) {
-  if (v === '-' || v === '' || v == null) return ''
-  if (typeof v === 'number' && Number.isFinite(v)) return v
-  const n = parseFloat(String(v).replace(/,/g, ''))
-  return Number.isFinite(n) ? n : ''
-}
 
 function formatDmy(value) {
   if (value == null || value === '') return ''
@@ -80,59 +74,6 @@ function writeBankWorkbook(filePath, meta, transactions) {
   return transactions.length
 }
 
-function extractScbFromWorkbook(filePath) {
-  const rows = XLSX.utils.sheet_to_json(XLSX.readFile(filePath).Sheets.Sheet1, { header: 1, defval: '' })
-  const metaRow = String(rows[0]?.[0] || '')
-  const periodRow = String(rows[1]?.[0] || '')
-  const accountNo = metaRow.match(/(\d{10,})/)?.[1] || '0100106024702'
-  const from = periodRow.match(/From\s+(.+?)\s+To/i)?.[1]?.trim() || '01-Feb-2019'
-  const to = periodRow.match(/To\s+(.+?)(?:\r|\n|CURRENCY)/i)?.[1]?.trim() || '31-Dec-2019'
-  const currency = periodRow.includes('GHS') || periodRow.includes('CEDI') ? 'GHANA CEDI' : 'GHS'
-
-  const seen = new Set()
-  const transactions = []
-  let keptBbf = false
-  for (const r of rows) {
-    if (!(typeof r[0] === 'number' && r[0] > 40000)) continue
-    const fp = [r[0], r[1], r[2], r[4], r[5], r[6]].join('|')
-    if (seen.has(fp)) continue
-    seen.add(fp)
-    const description = String(r[2] || '').trim()
-    const isBbf = /BALANCE BROUGHT FORWARD/i.test(description)
-    if (isBbf) {
-      if (keptBbf) continue
-      keptBbf = true
-    }
-    transactions.push({
-      entryDate: r[0],
-      valueDate: r[1] || r[0],
-      description,
-      debit: parseAmount(r[4]),
-      credit: parseAmount(r[5]),
-      balance: parseAmount(r[6]),
-    })
-  }
-  transactions.sort((a, b) => Number(a.entryDate) - Number(b.entryDate))
-
-  const opening = transactions.find((t) => /BALANCE BROUGHT FORWARD/i.test(t.description))
-  const closing = transactions[transactions.length - 1]
-
-  return {
-    meta: {
-      accountNo,
-      accountName: 'TGL PROPERTIES LTD',
-      careOf: 'C/O AFRICANUS NET LTD',
-      from,
-      to,
-      currency,
-      openingBalance: opening?.balance ?? '',
-      closingBalance: closing?.balance ?? '',
-    },
-    transactions,
-  }
-}
-
-
 function parseUmbPdfTextFallback() {
   return {
     meta: {
@@ -169,7 +110,7 @@ async function main() {
 
   const scbIn = path.join(OUT_DIR, 'scb statement.xlsx')
   if (fs.existsSync(scbIn)) {
-    const scb = extractScbFromWorkbook(scbIn)
+    const scb = extractScbFromWorkbook(XLSX, scbIn)
     const scbOut = path.join(OUT_DIR, 'scb statement - cleaned.xlsx')
     const n = writeBankWorkbook(scbOut, scb.meta, scb.transactions)
     console.log(`✓ SCB cleaned → ${path.basename(scbOut)} (${n} transactions)`)

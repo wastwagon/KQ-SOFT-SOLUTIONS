@@ -16,6 +16,7 @@ import {
   normalizeBankOfAfricaExcelTable,
 } from './bankOfAfricaStatement.js'
 import { findBogTransactionHeaderRow, normalizeBogExcelTable } from './bogStatement.js'
+import { isScbStatementLayout, normalizeScbExcelTable } from './scbStatement.js'
 import {
   findStanbicTransactionHeaderRow,
   normalizeStanbicExcelTable,
@@ -44,6 +45,9 @@ export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
     defval: null,
   }) as unknown[][]
   const nonEmpty = data.filter((row) => row.some((c) => c != null && String(c).trim() !== ''))
+  if (isScbStatementLayout(nonEmpty)) {
+    return { ...normalizeScbExcelTable(nonEmpty), sheetNames, activeSheet: sheetName }
+  }
   const ecobankHeaderRow = findEcobankTransactionHeaderRow(nonEmpty)
   const bogHeaderRow = ecobankHeaderRow < 0 ? findBogTransactionHeaderRow(nonEmpty) : -1
   const stanbicHeaderRow =

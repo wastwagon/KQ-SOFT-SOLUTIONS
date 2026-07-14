@@ -113,6 +113,38 @@ export function splitBogAmountCell(raw: unknown): { debit: number; credit: numbe
   return { debit: 0, credit: Math.max(first, second) }
 }
 
+/**
+ * BOG exports use either a merged amount cell (col 9) or, for some credits,
+ * 0.00 in col 9 with the credit amount in col 10 and balance in col 11.
+ */
+export function readBogAmounts(
+  row: unknown[],
+  amtIdx: number
+): { debit: number; credit: number; balance: number | null } {
+  let { debit, credit } = splitBogAmountCell(row[amtIdx])
+
+  const colAmt = parseImportedAmount(row[amtIdx])
+  const colNext = parseImportedAmount(row[amtIdx + 1])
+  const colBalance = parseImportedAmount(row[amtIdx + 2])
+
+  if (debit === 0 && credit === 0) {
+    if (colAmt < 0) debit = Math.abs(colAmt)
+    else if (colAmt === 0 && colNext > 0) credit = colNext
+    else if (colNext > 0) credit = colNext
+  }
+
+  let balance: number | null = null
+  if (credit > 0 && colNext === credit && Number.isFinite(colBalance)) {
+    balance = colBalance
+  } else if (Number.isFinite(colBalance) && String(row[amtIdx + 2] ?? '').trim() !== '') {
+    balance = colBalance
+  } else if (Number.isFinite(colNext) && colNext !== credit && String(row[amtIdx + 1] ?? '').trim() !== '') {
+    balance = colNext
+  }
+
+  return { debit, credit, balance }
+}
+
 function isNoiseLine(line: string): boolean {
   return /^book balance/i.test(line) || /^printed on/i.test(line)
 }
@@ -167,8 +199,6 @@ export function normalizeBogExcelTable(result: ParseResult): ParseResult {
   const refIdx = colIndex(headerCells, [/^reference$/])
   const valueIdx = colIndex(headerCells, [/^value date$/])
   const amtIdx = colIndex(headerCells, [/debit amt.*credit amt/])
-  const balIdx = colIndex(headerCells, [/^col_12$/, /^balance$/])
-  const balanceIdx = balIdx >= 0 ? balIdx : 12
 
   const headers = [
     'Post Date',
@@ -187,8 +217,7 @@ export function normalizeBogExcelTable(result: ParseResult): ParseResult {
     description: string
     reference: string
     valueDate: unknown
-    amountRaw: unknown
-    balance: unknown
+    sourceRow: unknown[]
   } | null = null
 
   const flush = () => {
@@ -204,10 +233,7 @@ export function normalizeBogExcelTable(result: ParseResult): ParseResult {
       .replace(/\s+/g, ' ')
       .trim()
     const description = [blockMeta.description, extra].filter(Boolean).join(' ').trim()
-    const { debit, credit } = splitBogAmountCell(blockMeta.amountRaw)
-    const balance = blockMeta.balance != null && String(blockMeta.balance).trim() !== ''
-      ? parseImportedAmount(blockMeta.balance)
-      : null
+    const { debit, credit, balance } = readBogAmounts(blockMeta.sourceRow, amtIdx)
 
     if (debit > 0 || credit > 0) {
       rows.push([
@@ -235,8 +261,7 @@ export function normalizeBogExcelTable(result: ParseResult): ParseResult {
         description: String((descIdx >= 0 ? row[descIdx] : row[1]) ?? '').trim(),
         reference: String((refIdx >= 0 ? row[refIdx] : row[3]) ?? '').trim(),
         valueDate: valueIdx >= 0 ? row[valueIdx] : row[8],
-        amountRaw: amtIdx >= 0 ? row[amtIdx] : row[9],
-        balance: row[balanceIdx],
+        sourceRow: row,
       }
       block = [postText]
       continue

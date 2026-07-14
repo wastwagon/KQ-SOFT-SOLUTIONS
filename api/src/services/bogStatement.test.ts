@@ -7,6 +7,7 @@ import {
   isBogStatementLayout,
   normalizeBogExcelTable,
   parseBogGluedTransactions,
+  readBogAmounts,
   splitBogAmountCell,
 } from './bogStatement.js'
 import { parseExcel } from './parser.js'
@@ -28,6 +29,15 @@ describe('bogStatement', () => {
     expect(splitBogAmountCell('-247,742.86 0.00')).toEqual({ debit: 247742.86, credit: 0 })
     expect(splitBogAmountCell('0.00             2,000,000.00')).toEqual({ debit: 0, credit: 2000000 })
     expect(splitBogAmountCell('-136939.16')).toEqual({ debit: 136939.16, credit: 0 })
+  })
+
+  it('reads credit-only rows where amount is in the next column (0.00 in debit col)', () => {
+    const row = [45086, 'Transfer', '', 'FT2316074433', '', '', '', 45086, '', 0, 5000000, 5051321.32, '']
+    expect(readBogAmounts(row, 9)).toEqual({
+      debit: 0,
+      credit: 5000000,
+      balance: 5051321.32,
+    })
   })
 
   it('recovers transactions from glued overflow cell', () => {
@@ -67,8 +77,15 @@ describe('bogStatement', () => {
 
     const sumDebit = parsed.rows.reduce((s, r) => s + (Number(r[4]) || 0), 0)
     const sumCredit = parsed.rows.reduce((s, r) => s + (Number(r[5]) || 0), 0)
-    expect(sumCredit).toBeCloseTo(2_000_000, 0)
+    expect(sumCredit).toBeCloseTo(7_000_000, 0)
     expect(sumDebit).toBeGreaterThan(5_000_000)
+
+    const jun9Credit = parsed.rows.find(
+      (r) => String(r[0]) === '09/06/2023' && Number(r[5]) === 5_000_000
+    )
+    expect(jun9Credit).toBeDefined()
+    expect(jun9Credit![1]).toMatch(/Transfer/i)
+    expect(jun9Credit![2]).toBe('FT2316074433')
   })
 })
 
