@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-07-08T16:17:00.675Z",
+  "exportedAt": "2026-07-14T13:50:03.394Z",
   "banks": [
     {
       "id": "01-ecobank",
@@ -246,9 +246,9 @@
           "file": "scb statement - cleaned.xlsx",
           "type": "excel",
           "status": "ok",
-          "rowCount": 721,
-          "sumDebit": 11054516.37,
-          "sumCredit": 11935945.709999999,
+          "rowCount": 841,
+          "sumDebit": 11756548.180000002,
+          "sumCredit": 12296754.209999999,
           "parseMethod": "excel"
         }
       ]
@@ -416,9 +416,9 @@
           "file": "BOG COCOBOD GHS ADV OPERATIONAL EXP ACCT(01102022-30092023).xlsx",
           "type": "excel",
           "status": "ok",
-          "rowCount": 46,
+          "rowCount": 47,
           "sumDebit": 5812737.69,
-          "sumCredit": 2000000,
+          "sumCredit": 7000000,
           "parseMethod": "excel"
         }
       ]

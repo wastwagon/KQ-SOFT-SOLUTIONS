@@ -1,6 +1,6 @@
 # Corrected bank statement specimens (BRS upload-ready)
 
-Exported: 2026-07-08T16:17:00.675Z
+Exported: 2026-07-14T13:50:03.394Z
 
 This folder packages every bank/cashbook specimen we fixed in the BRS platform. Each bank subfolder contains:
 
@@ -50,7 +50,7 @@ This folder packages every bank/cashbook specimen we fixed in the BRS platform. 
 
 ### Standard Chartered (SCB) (`08-scb/`)
   - SCB statement raw: 1316 rows, debits/payments 23,000,852.632, credits/receipts 24,291,535.131 (excel)
-  - SCB statement cleaned: 721 rows, debits/payments 11,054,516.37, credits/receipts 11,935,945.71 (excel)
+  - SCB statement cleaned: 841 rows, debits/payments 11,756,548.18, credits/receipts 12,296,754.21 (excel)
 
 ### TGL acct 4702 cash book (`09-tgl-acct4702/`)
   - TGL ERP cash book: 779 rows, debits/payments 12,296,754.21, credits/receipts 11,756,548.18 (excel)
@@ -76,7 +76,7 @@ This folder packages every bank/cashbook specimen we fixed in the BRS platform. 
   - Updated manual BRS (Jul 2026): Latest preparer workbook — flags 3 duplicate cash-book payments removed on upload
 
 ### Bank of Ghana (BOG) (`13-bog/`)
-  - COCOBOD operational account statement: 46 rows, debits/payments 5,812,737.69, credits/receipts 2,000,000 (excel)
+  - COCOBOD operational account statement: 47 rows, debits/payments 5,812,737.69, credits/receipts 7,000,000 (excel)
 
 ### Account 002 test data (`14-acct002-test-data/`)
   - Cash book: 28 rows, debits/payments 0, credits/receipts 0 (excel)
