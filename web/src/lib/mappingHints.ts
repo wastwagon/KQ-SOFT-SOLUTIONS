@@ -56,6 +56,13 @@ export function getMappingIssues(
         fix: 'Map the DATE column (often column C with Excel serial dates).',
       })
     }
+    if (isErpGlCashBookHeaders(headers)) {
+      issues.push({
+        severity: 'info',
+        message: 'ERP G/L cash book export detected (many rows).',
+        fix: 'Map Doc. Date (or Transaction Date) for date. Map Debits/Credits or AMT RECEIVED/AMT PAID. Filter to your bank GL account in the source system if the export is very large.',
+      })
+    }
   } else {
     const amountField = isCredits ? 'credit' : 'debit'
     if (mapping[amountField] == null) {
@@ -74,6 +81,27 @@ export function getMappingIssues(
         severity: 'warning',
         message: 'Ecobank Payments/Deposits layout detected.',
         fix: 'Prefer Excel (.xlsx) bank exports, or re-upload — we normalize Payments→Debit and Deposits→Credit. Map Debit for bank debits doc and Credit for bank credits doc.',
+      })
+    }
+    if (isScbHeaders(h)) {
+      issues.push({
+        severity: 'info',
+        message: 'Standard Chartered (SCB) statement layout detected.',
+        fix: 'Map VALUE DATE (or ENTRY DATE) for transaction date, DEBITS for bank debits, CREDITS for bank credits. Description is used for INW CLG / sweep matching.',
+      })
+    }
+    if (isBogHeaders(h)) {
+      issues.push({
+        severity: 'info',
+        message: 'Bank of Ghana (BOG) statement layout detected.',
+        fix: 'Map Post Date for transaction date. Use Credit for bank credits doc and Debit for bank debits doc.',
+      })
+    }
+    if (isGcbBankHeaders(h)) {
+      issues.push({
+        severity: 'info',
+        message: 'GCB bank statement layout detected.',
+        fix: 'After PDF upload we normalize to Transaction Date, Description, Debit, Credit. Map Debit/Credit for the respective document type.',
       })
     }
     if (mapping.credit != null && mapping.debit != null && mapping.credit === mapping.debit) {
@@ -100,6 +128,29 @@ export function getMappingIssues(
 function isEcobankHeaders(headers: string[]): boolean {
   const j = headers.join(' ')
   return /payments?/.test(j) && /deposits?/.test(j)
+}
+
+function isScbHeaders(headers: string[]): boolean {
+  const j = headers.join(' ')
+  return /entry date/.test(j) && /debits?/.test(j) && /credits?/.test(j)
+}
+
+function isBogHeaders(headers: string[]): boolean {
+  const j = headers.join(' ')
+  return /post date/.test(j) && /debit/.test(j) && /credit/.test(j)
+}
+
+function isGcbBankHeaders(headers: string[]): boolean {
+  const j = headers.join(' ')
+  return (
+    (/transaction date|value date/.test(j) && /debit/.test(j) && /credit/.test(j)) ||
+    (/particulars/.test(j) && /debit/.test(j) && /credit/.test(j))
+  )
+}
+
+function isErpGlCashBookHeaders(headers: string[]): boolean {
+  const j = headers.map((h) => (h || '').toLowerCase()).join(' ')
+  return /doc\.?\s*date/.test(j) && /debits?/.test(j) && /credits?/.test(j) && /reference/.test(j)
 }
 
 export function fieldLabel(field: string): string {

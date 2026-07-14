@@ -55,6 +55,24 @@ describe('detectGhanaBankFormat', () => {
     expect(format).toBe('absa')
   })
 
+  it('detects SCB from ENTRY DATE / DEBITS / CREDITS headers', () => {
+    const headers = ['ENTRY DATE', 'VALUE DATE', 'DESCRIPTION', 'Col_3', 'DEBITS', 'CREDITS', 'BALANCE']
+    const rows = [['01-02-2019', '01-02-2019', 'INW CLG 702823', '', 100, '', 50000]]
+    expect(detectGhanaBankFormat(headers, rows)).toBe('scb')
+  })
+
+  it('detects UBA from normalized PDF headers (Cheque No column)', () => {
+    const headers = ['Transaction Date', 'Description', 'Cheque No', 'Value Date', 'Debit', 'Credit', 'Balance']
+    const rows = [['01-Sep-2023', 'Transfer', '', '01-Sep-2023', 0, 1000, 5000]]
+    expect(detectGhanaBankFormat(headers, rows)).toBe('uba')
+  })
+
+  it('does not label UBA as Stanbic when headers share Transaction Date layout', () => {
+    const headers = ['Transaction Date', 'Description', 'Cheque No', 'Value Date', 'Debit', 'Credit', 'Balance']
+    const rows = [['01-Sep-2023', 'UBA transfer', '', '01-Sep-2023', 0, 1000, 5000]]
+    expect(detectGhanaBankFormat(headers, rows)).toBe('uba')
+  })
+
   it('detects Bank of Africa from export headers', () => {
     const headers = [
       'Our Reference',
@@ -106,6 +124,16 @@ describe('getSuggestedBankMapping', () => {
     const debits = getSuggestedBankMapping('boa', headers, 'debits')
     expect(debits.transaction_date).toBe(1)
     expect(debits.debit).toBe(3)
+  })
+
+  it('prefers Value Date for SCB over Entry Date', () => {
+    const headers = ['ENTRY DATE', 'VALUE DATE', 'DESCRIPTION', 'Col_3', 'DEBITS', 'CREDITS', 'BALANCE']
+    const credits = getSuggestedBankMapping('scb', headers, 'credits')
+    expect(credits.transaction_date).toBe(1)
+    expect(credits.credit).toBe(5)
+    const debits = getSuggestedBankMapping('scb', headers, 'debits')
+    expect(debits.transaction_date).toBe(1)
+    expect(debits.debit).toBe(4)
   })
 })
 

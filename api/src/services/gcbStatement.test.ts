@@ -7,6 +7,8 @@ import {
   shouldUseGcbPdfParser,
 } from './gcbStatement.js'
 import { parseBankPdf } from './documentParse.js'
+import { detectGhanaBankFormat } from './ghanaBankParsers.js'
+import { buildSuggestedMappingForDocument, canAutoMap } from './autoMapDocument.js'
 
 const GCB_PDF = path.resolve(
   import.meta.dirname,
@@ -91,5 +93,20 @@ Cheque Withdrawal // FRANCIS GYAMFI OCRAN
     expect(result.headers).toContain('Credit')
     expect(result.rows.length).toBeGreaterThan(285)
     expect(result.rows.length).toBeLessThan(295)
+  }, 20000)
+
+  it('detects gcb format and auto-maps credits and debits from real PDF', async () => {
+    if (!fs.existsSync(GCB_PDF)) return
+
+    const result = await parseBankPdf(GCB_PDF)
+    const format = detectGhanaBankFormat(result.headers, result.rows.slice(0, 5))
+    expect(format).toBe('gcb')
+
+    const cr = buildSuggestedMappingForDocument('bank_credits', result.headers, format)
+    const dr = buildSuggestedMappingForDocument('bank_debits', result.headers, format)
+    expect(canAutoMap('bank_credits', result.headers, cr)).toBe(true)
+    expect(canAutoMap('bank_debits', result.headers, dr)).toBe(true)
+    expect(cr.credit).toBe(5)
+    expect(dr.debit).toBe(4)
   }, 20000)
 })

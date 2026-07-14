@@ -64,7 +64,16 @@ export function buildSmartSuggestedMapping(
     }
   } else {
     if (out.transaction_date == null) {
-      const i = find([/^date$/, /transaction\s*date/, /value\s*date/, /txn\s*date/, /posting\s*date/, /transaction_date/])
+      const i = find([
+        /^date$/,
+        /transaction\s*date/,
+        /value\s*date/,
+        /entry\s*date/,
+        /post\s*date/,
+        /txn\s*date/,
+        /posting\s*date/,
+        /transaction_date/,
+      ])
       if (i >= 0) out.transaction_date = i
     }
     if (out.description == null) {
@@ -72,11 +81,11 @@ export function buildSmartSuggestedMapping(
       if (i >= 0) out.description = i
     }
     if (out.credit == null) {
-      const i = find([/^credit$/, /\bcr\b/, /^deposits?$/, /deposits?/, /in(?:ward)?/])
+      const i = find([/^credits?$/, /\bcr\b/, /^deposits?$/, /deposits?/, /in(?:ward)?/])
       if (i >= 0) out.credit = i
     }
     if (out.debit == null) {
-      const i = find([/^debit$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/, /out(?:ward)?/])
+      const i = find([/^debits?$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/, /out(?:ward)?/])
       if (i >= 0) out.debit = i
     }
     if (out.credit == null && out.debit == null) {
@@ -97,18 +106,25 @@ export function getMappingConfidence(
 ): Record<string, MappingConfidence> {
   const out: Record<string, MappingConfidence> = {}
   const STRONG: Record<string, RegExp[]> = {
-    date: [/^date$/, /transaction\s*date/, /value\s*date/, /posting\s*date/],
-    transaction_date: [/^date$/, /transaction\s*date/, /value\s*date/, /posting\s*date/],
+    date: [/^date$/, /transaction\s*date/, /value\s*date/, /entry\s*date/, /post\s*date/, /posting\s*date/],
+    transaction_date: [
+      /^date$/,
+      /transaction\s*date/,
+      /value\s*date/,
+      /entry\s*date/,
+      /post\s*date/,
+      /posting\s*date/,
+    ],
     description: [/^description$/, /particulars/, /narrative/, /details/, /memo/, /remarks/],
     name: [/^name$/, /payee/, /party/, /description/],
     details: [/^details$/, /particulars/, /narrative/, /memo/, /remarks/],
     doc_ref: [/^doc ref$/, /^doc_ref$/, /^ref$/, /reference/, /voucher/],
     chq_no: [/^chq no$/, /^chq_no$/, /cheque\s*no/, /cheque\s*number/],
     accode: [/^accode$/, /account\s*code/, /ac\s*code/],
-    amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credit$/, /\bcr\b/],
-    amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debit$/, /\bdr\b/],
-    credit: [/^credit$/, /\bcr\b/, /^deposits?$/, /deposits?/],
-    debit: [/^debit$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/],
+    amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credits?$/, /\bcr\b/],
+    amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debits?$/, /\bdr\b/],
+    credit: [/^credits?$/, /\bcr\b/, /^deposits?$/, /deposits?/],
+    debit: [/^debits?$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/],
   }
   const SOFT: Record<string, RegExp[]> = {
     doc_ref: [/ref/, /receipt/, /number/],

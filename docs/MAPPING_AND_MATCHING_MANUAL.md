@@ -149,12 +149,23 @@ This is common in accounting exports with a single “Amount” column.
 
 ### Ghana bank auto-detection
 
-For supported banks (Ecobank, GCB, Access, Stanbic, Fidelity, UBA, Absa), the system may:
+For supported banks, the system may:
 
 - Detect the bank format automatically (green badge on preview).
 - Suggest normalized column mappings.
+- Apply mapping on upload when confidence is medium or high.
+
+**Supported banks include:** Ecobank, GCB, Standard Chartered (SCB), NIB, ADB, Bank of Africa, Bank of Ghana (BOG), Prudential, UMB, Access, Stanbic, Fidelity, UBA, and Absa. See [Supported Ghana Banks](../docs/SUPPORTED_BANKS.md) for column layouts.
 
 **Ecobank tip:** If you see Payments/Deposits layout, prefer Excel exports. Map **Debit** for the bank debits document and **Credit** for the bank credits document (Payments → Debit, Deposits → Credit after normalization).
+
+**SCB tip:** Excel exports use ENTRY DATE, VALUE DATE, DEBITS, CREDITS. We prefer **Value Date** for transaction date. Description drives INW CLG / sweep matching in Reconcile.
+
+**BOG tip:** Map **Post Date** for transaction date.
+
+**GCB tip:** PDF uploads are normalized to Transaction Date, Description, Debit, Credit — map those columns for credits/debits documents.
+
+**ERP cash book tip:** Large G/L exports (Doc. Date, Debits, Credits) may contain hundreds of rows — map Doc. Date and amount columns; filter to your bank account in the source system when possible.
 
 ### After mapping — read the results
 

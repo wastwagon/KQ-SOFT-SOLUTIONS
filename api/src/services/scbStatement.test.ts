@@ -11,6 +11,8 @@ import {
   parseScbGluedRow,
 } from './scbStatement.js'
 import { parseExcel } from './parser.js'
+import { detectGhanaBankFormat } from './ghanaBankParsers.js'
+import { buildSuggestedMappingForDocument, canAutoMap } from './autoMapDocument.js'
 
 const SCB_RAW = path.resolve(import.meta.dirname, '../../../specimenbankstatementformats/scb statement.xlsx')
 
@@ -57,5 +59,20 @@ describe('scbStatement', () => {
     const txs = extractScbTransactions(rows)
     expect(txs.length).toBeGreaterThan(800)
     expect(normalizeScbExcelTable(rows).headers[0]).toBe('ENTRY DATE')
+  })
+
+  it('detects scb format and auto-maps credits and debits', () => {
+    if (!fs.existsSync(SCB_RAW)) return
+    const parsed = parseExcel(SCB_RAW, 0)
+    const format = detectGhanaBankFormat(parsed.headers, parsed.rows.slice(0, 5))
+    expect(format).toBe('scb')
+
+    const cr = buildSuggestedMappingForDocument('bank_credits', parsed.headers, format)
+    const dr = buildSuggestedMappingForDocument('bank_debits', parsed.headers, format)
+    expect(canAutoMap('bank_credits', parsed.headers, cr)).toBe(true)
+    expect(canAutoMap('bank_debits', parsed.headers, dr)).toBe(true)
+    expect(cr.transaction_date).toBe(1) // VALUE DATE preferred over ENTRY DATE
+    expect(cr.credit).toBe(5)
+    expect(dr.debit).toBe(4)
   })
 })

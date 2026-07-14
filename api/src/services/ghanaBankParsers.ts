@@ -9,8 +9,23 @@ import { looksLikeNibStatementText } from './nibStatement.js'
 import { looksLikeAdbStatementText } from './adbStatement.js'
 import { looksLikeEcobankStatementText } from './ecobankStatement.js'
 import { looksLikeUmbStatementText } from './umbStatement.js'
+import { looksLikeUbaStatementText } from './ubaStatement.js'
 
-export type GhanaBankFormat = 'ecobank' | 'gcb' | 'access' | 'stanbic' | 'fidelity' | 'uba' | 'absa' | 'boa' | 'bog' | 'prudential' | 'nib' | 'adb' | null
+export type GhanaBankFormat =
+  | 'ecobank'
+  | 'gcb'
+  | 'access'
+  | 'stanbic'
+  | 'fidelity'
+  | 'uba'
+  | 'absa'
+  | 'boa'
+  | 'bog'
+  | 'prudential'
+  | 'nib'
+  | 'adb'
+  | 'scb'
+  | null
 
 /** Ecobank: transaction_date, description, credit/debit. Sample patterns in description. */
 const ECOBANK_HEADERS = [
@@ -82,6 +97,20 @@ export function detectGhanaBankFormat(
   if (sourceText && looksLikeUmbStatementText(sourceText)) return 'nib'
   if (sourceText && looksLikeNibStatementText(sourceText)) return 'nib'
   if (sourceText && looksLikeAdbStatementText(sourceText)) return 'adb'
+  if (sourceText && looksLikeUbaStatementText(sourceText)) return 'uba'
+
+  const normalizedHeaderStr = headers.map((h) => norm(h)).join(' ')
+
+  // GCB normalized PDF (Chq No + Value Date — before Ecobank PDF column heuristic)
+  if (
+    headers.some((h) => norm(h) === 'chq no') &&
+    headers.some((h) => norm(h) === 'value date') &&
+    headers.some((h) => /^transaction date$/i.test(norm(h))) &&
+    headers.some((h) => /^debit$/i.test(norm(h))) &&
+    headers.some((h) => /^credit$/i.test(norm(h)))
+  ) {
+    return 'gcb'
+  }
 
   const hasEcobankPdfColumns =
     headers.some((h) => /reference\s*number/i.test(norm(h))) &&
@@ -90,37 +119,61 @@ export function detectGhanaBankFormat(
     headers.some((h) => /^credit$/i.test(norm(h)))
   if (hasEcobankPdfColumns) return 'ecobank'
 
-  // Check bank-specific content first (Stanbic, Fidelity, UBA, Absa) — before generic Ecobank
   const rowStr = (r: unknown[]) => String(r.join(' ')).toLowerCase()
   const allContent = headerStr + ' ' + sampleRows.slice(0, 5).map((r) => rowStr(r as unknown[])).join(' ')
-  const stanbicHeaderStr = headers.map((h) => norm(h)).join(' ')
+
+  // SCB / UMB Excel: ENTRY DATE + DEBITS + CREDITS (UMB PDF uses nib via sourceText above)
   if (
-    /transaction date/.test(stanbicHeaderStr) &&
-    (/transaction description/.test(stanbicHeaderStr) || /\bdescription\b/.test(stanbicHeaderStr)) &&
-    /\bdebit/.test(stanbicHeaderStr) &&
-    /\bcredit/.test(stanbicHeaderStr)
+    /entry date/.test(normalizedHeaderStr) &&
+    /\bdebits?\b/.test(normalizedHeaderStr) &&
+    /\bcredits?\b/.test(normalizedHeaderStr)
   ) {
-    return 'stanbic'
+    if (/united merchant bank|\bumb\b/i.test(allContent)) return 'nib'
+    return 'scb'
   }
-  if (/stanbic|standard bank/i.test(allContent)) {
-    const s = STANBIC_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
-    if (s >= 2) return 'stanbic'
+
+  // Normalized PDF parser outputs (distinct column sets — before generic Transaction Date heuristics)
+  if (
+    /transaction date/.test(normalizedHeaderStr) &&
+    /cheque no/.test(normalizedHeaderStr) &&
+    /\bdebit\b/.test(normalizedHeaderStr) &&
+    /\bcredit\b/.test(normalizedHeaderStr)
+  ) {
+    return 'uba'
   }
+
   if (/fidelity/i.test(allContent)) {
     const s = FIDELITY_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
     if (s >= 2) return 'fidelity'
-  }
-  const ubaHeaderStr = headers.map((h) => norm(h)).join(' ')
-  if (/transaction date/.test(ubaHeaderStr) && /\bdebit\b/.test(ubaHeaderStr) && /\bcredit\b/.test(ubaHeaderStr)) {
-    return 'uba'
   }
   if (/\buba\b|united bank for africa/i.test(allContent)) {
     const s = UBA_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
     if (s >= 2) return 'uba'
   }
+  if (/stanbic|standard bank/i.test(allContent)) {
+    const s = STANBIC_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
+    if (s >= 2) return 'stanbic'
+  }
   if (/absa|barclays/i.test(allContent)) {
     const s = ABSA_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
     if (s >= 2) return 'absa'
+  }
+  // Stanbic-specific column name — not shared with UBA/Prudential normalized PDF output
+  if (
+    /transaction description/.test(normalizedHeaderStr) &&
+    /\bdebit/.test(normalizedHeaderStr) &&
+    /\bcredit/.test(normalizedHeaderStr)
+  ) {
+    return 'stanbic'
+  }
+  // Stanbic Excel export includes a Fee column between description and amounts
+  if (
+    /transaction date/.test(normalizedHeaderStr) &&
+    /\bfee\b/.test(normalizedHeaderStr) &&
+    /\bdebit/.test(normalizedHeaderStr) &&
+    /\bcredit/.test(normalizedHeaderStr)
+  ) {
+    return 'stanbic'
   }
 
   const boaHeaderStr = headers.map((h) => norm(h)).join(' ')
@@ -172,7 +225,13 @@ export function detectGhanaBankFormat(
   }
 
   const pruHeaderStr = headers.map((h) => norm(h)).join(' ')
-  if (/transaction date/.test(pruHeaderStr) && /\bdebit\b/.test(pruHeaderStr) && /\bcredit\b/.test(pruHeaderStr)) {
+  if (
+    /transaction date/.test(pruHeaderStr) &&
+    headers.some((h) => norm(h) === 'reference') &&
+    !headers.some((h) => norm(h) === 'cheque no') &&
+    /\bdebit\b/.test(pruHeaderStr) &&
+    /\bcredit\b/.test(pruHeaderStr)
+  ) {
     return 'prudential'
   }
   if (/prudential\s+bank|ring\s+road\s+central/i.test(allContent)) {
@@ -323,7 +382,21 @@ export function getSuggestedBankMapping(
     return mapping
   }
 
-  const dateIdx = findCol([/transaction[\s_-]?date/i, /value\s*date/i, /date/i])
+  if (bankFormat === 'scb') {
+    const valueDateIdx = findCol([/^value date$/i])
+    const entryDateIdx = findCol([/^entry date$/i])
+    const descIdx = findCol([/^description$/i])
+    const creditIdx = type === 'credits' ? findCol([/^credits$/i, /^credit$/i]) : -1
+    const debitIdx = type === 'debits' ? findCol([/^debits$/i, /^debit$/i]) : -1
+    if (valueDateIdx >= 0) mapping.transaction_date = valueDateIdx
+    else if (entryDateIdx >= 0) mapping.transaction_date = entryDateIdx
+    if (descIdx >= 0) mapping.description = descIdx
+    if (creditIdx >= 0) mapping.credit = creditIdx
+    if (debitIdx >= 0) mapping.debit = debitIdx
+    return mapping
+  }
+
+  const dateIdx = findCol([/transaction[\s_-]?date/i, /value\s*date/i, /entry\s*date/i, /post\s*date/i, /date/i])
   const descIdx = findCol([/description/i, /particulars/i, /narrative/i])
   const creditIdx = type === 'credits'
     ? findCol([/^credit$/i, /deposits?/i, /deposit/i, /credit/i, /amount/i])
