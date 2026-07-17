@@ -3,6 +3,8 @@ import {
   detectGhanaBankFormat,
   getSuggestedBankMapping,
   extractChqNoFromDescription,
+  bankFormatFromParseMethod,
+  resolveDetectedBankFormat,
 } from './ghanaBankParsers.js'
 
 describe('detectGhanaBankFormat', () => {
@@ -71,6 +73,14 @@ describe('detectGhanaBankFormat', () => {
     const headers = ['Transaction Date', 'Description', 'Cheque No', 'Value Date', 'Debit', 'Credit', 'Balance']
     const rows = [['01-Sep-2023', 'UBA transfer', '', '01-Sep-2023', 0, 1000, 5000]]
     expect(detectGhanaBankFormat(headers, rows)).toBe('uba')
+  })
+
+  it('resolveDetectedBankFormat prefers prudential_pdf parseMethod', () => {
+    expect(bankFormatFromParseMethod('prudential_pdf')).toBe('prudential')
+    const headers = ['Transaction Date', 'Description', 'Reference', 'Value Date', 'Debit', 'Credit', 'Balance']
+    const rows = [['01/09/2023', 'PRINCIPAL PAYMENT', '/000', '02/09/2023', null, 50_000_000, 49_999_735]]
+    expect(resolveDetectedBankFormat(headers, rows, 'prudential_pdf')).toBe('prudential')
+    expect(resolveDetectedBankFormat(headers, rows, 'native_text')).toBe('prudential')
   })
 
   it('detects Bank of Africa from export headers', () => {

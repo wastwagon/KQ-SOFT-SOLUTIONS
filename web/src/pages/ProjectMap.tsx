@@ -627,12 +627,30 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               )}
               <p className="text-sm text-gray-500">
                 {preview.totalRows} rows
+                {preview.parseMethod && (
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                    {preview.parseMethod.replace(/_/g, ' ')}
+                  </span>
+                )}
                 {preview.detectedBankFormat && (
                   <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded">
                     {String(preview.detectedBankFormat).charAt(0).toUpperCase() + String(preview.detectedBankFormat).slice(1)} format detected
                   </span>
                 )}
               </p>
+              {preview.parseSummary &&
+                (preview.parseSummary.sumDebit != null || preview.parseSummary.sumCredit != null) && (
+                  <p className="text-xs text-gray-500">
+                    Parsed totals — debits:{' '}
+                    {preview.parseSummary.sumDebit != null
+                      ? preview.parseSummary.sumDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })
+                      : '—'}
+                    ; credits:{' '}
+                    {preview.parseSummary.sumCredit != null
+                      ? preview.parseSummary.sumCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })
+                      : '—'}
+                  </p>
+                )}
               {(preview as { pdfTruncated?: boolean }).pdfTruncated && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
                   <strong>PDF truncation:</strong> This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (default limit {DEFAULT_PDF_OCR_MAX_PAGES}; set PDF_OCR_MAX_PAGES to raise). Some transactions may be missing. Split the PDF or increase the limit for full extraction.

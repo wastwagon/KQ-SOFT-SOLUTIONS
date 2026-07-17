@@ -25,6 +25,7 @@ const { parseBankPdf } = await import('../api/src/services/documentParse.ts')
 const { parseExcel } = await import('../api/src/services/parser.ts')
 const { parseImportedAmount } = await import('../api/src/services/amountParser.ts')
 const { clean9035CashBookDuplicates } = await import('./lib/clean-9035-cashbook.mjs')
+const { writeParsedStatementPdf } = await import('./lib/write-parsed-statement-pdf.mjs')
 
 function safeName(name) {
   return name.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, ' ').trim()
@@ -77,11 +78,18 @@ async function exportPdf(srcPath, bankDir, label) {
   const base = safeName(path.basename(srcPath, path.extname(srcPath)))
   const originalDir = path.join(bankDir, 'original')
   const parsedDir = path.join(bankDir, 'parsed-excel')
+  const parsedPdfDir = path.join(bankDir, 'parsed-pdf')
   copyOriginal(srcPath, originalDir)
   const result = await parseBankPdf(srcPath)
-  const stats = writeParsedExcel(path.join(parsedDir, `${base} - parsed.xlsx`), result, {
+  const meta = {
     source: path.relative(ROOT, srcPath),
     parseMethod: result.parseMethod,
+  }
+  const stats = writeParsedExcel(path.join(parsedDir, `${base} - parsed.xlsx`), result, meta)
+  await writeParsedStatementPdf(path.join(parsedPdfDir, `${base} - corrected.pdf`), result, {
+    ...meta,
+    sumDebit: stats.sumDebit,
+    sumCredit: stats.sumCredit,
   })
   return { label, file: path.basename(srcPath), type: 'pdf', status: 'ok', ...stats }
 }
@@ -429,6 +437,7 @@ async function main() {
     const bankDir = path.join(OUT_ROOT, bank.id)
     fs.mkdirSync(path.join(bankDir, 'original'), { recursive: true })
     fs.mkdirSync(path.join(bankDir, 'parsed-excel'), { recursive: true })
+    fs.mkdirSync(path.join(bankDir, 'parsed-pdf'), { recursive: true })
 
     const bankEntry = { id: bank.id, name: bank.name, files: [] }
 
@@ -468,6 +477,7 @@ This folder packages every bank/cashbook specimen we fixed in the BRS platform. 
 
 - **original/** — your source PDF or Excel file (unchanged)
 - **parsed-excel/** — transaction table extracted by the BRS parser (what the system now reads on upload)
+- **parsed-pdf/** — same corrected transactions as a printable PDF extract (for PDF bank sources only)
 
 ## How to compare
 

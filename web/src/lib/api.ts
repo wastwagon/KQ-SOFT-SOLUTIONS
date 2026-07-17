@@ -85,6 +85,7 @@ export interface DocumentPreviewResponse {
   mappingConfidence?: Record<string, 'high' | 'medium' | 'low'>
   /** How the file was parsed (ecobank_pdf, excel, ocr, …) */
   parseMethod?: string
+  parseSummary?: { rowCount: number; sumDebit?: number; sumCredit?: number }
   mappingDiagnostics?: {
     severity: 'error' | 'warning' | 'info'
     field?: string

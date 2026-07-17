@@ -98,12 +98,26 @@ function isPruDateLine(line: string): boolean {
   return PRU_DATE.test(line.trim())
 }
 
+/** Value date lines often prefix ref digits: 19034915-SEP-23 → 15-SEP-23 */
+export function extractPruDateFromLine(line: string): string | null {
+  const trimmed = line.trim()
+  if (isPruDateLine(trimmed)) return trimmed
+  const m = trimmed.match(/(\d{2}-[A-Z]{3}-\d{2})\s*$/i)
+  return m?.[1] ?? null
+}
+
+function pickPruDateLine(line: string): string | null {
+  return extractPruDateFromLine(line)
+}
+
 function isDescriptionLine(line: string): boolean {
   const s = line.trim()
   if (!s || s.length < 3) return false
   if (isNoiseLine(s)) return false
   if (isPruDateLine(s)) return false
+  if (extractPruDateFromLine(s)) return false
   if (parsePruAmountLine(s)) return false
+  if (/^:\s/.test(s)) return false
   if (/^\/[\w]/.test(s)) return false
   if (/^\d{2}-[A-Z]{3}-\d{2}[\d,.]/i.test(s)) return false
   if (/^\d{6,}/.test(s) && s.includes('-SEP-')) return false
@@ -127,6 +141,14 @@ function classifyPruAmount(
 ): { debit: number; credit: number; nextBalance: number } {
   const delta = Math.round((balance - previousBalance) * 100) / 100
   const amt = Math.round(amount * 100) / 100
+  const head = description.trim()
+
+  if (/inward|principal\s+payment|\binterest\b/i.test(head)) {
+    return { debit: 0, credit: amt, nextBalance: balance }
+  }
+  if (/call\s+transactions\s*-\s*dr|nrt\s+ach\s+out|exp\s*:/i.test(head)) {
+    return { debit: amt, credit: 0, nextBalance: balance }
+  }
 
   if (Math.abs(delta - amt) < 0.02) {
     return { debit: 0, credit: amt, nextBalance: balance }
@@ -201,6 +223,7 @@ export function parsePrudentialPdfText(text: string): ParseResult {
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim()
+      .slice(0, 240)
 
     if (!description || /^\/[\w]/.test(description)) {
       pending = null
@@ -213,6 +236,27 @@ export function parsePrudentialPdfText(text: string): ParseResult {
       parsed.balance,
       previousBalance
     )
+
+    if (
+      parsed.amount <= 10 &&
+      Math.abs(parsed.balance) > 50_000 &&
+      /commission|\bcomm\b/i.test(`${pending.description} ${description}`)
+    ) {
+      pending = null
+      return
+    }
+
+    // Skip glued commission noise (e.g. 4.508,487,580.18DR) when balance delta does not match tiny amount
+    if (
+      parsed.amount > 0 &&
+      parsed.amount <= 10 &&
+      Math.abs(Math.abs(parsed.balance) - Math.abs(previousBalance)) > 1000 &&
+      Math.abs(parsed.amount - Math.abs(Math.abs(parsed.balance) - Math.abs(previousBalance))) > 1000
+    ) {
+      pending = null
+      return
+    }
+
     previousBalance = nextBalance
 
     if (debit === 0 && credit === 0) {
@@ -246,17 +290,47 @@ export function parsePrudentialPdfText(text: string): ParseResult {
 
     if (!pending) continue
 
-    if (!pending.transDate && isPruDateLine(line)) {
-      pending.transDate = line
-      continue
+    // Multi-line bank descriptions (NRT ACH OUT … then LTD:…) before dates
+    if (!pending.transDate && !pending.amountLine) {
+      if (isDescriptionLine(line)) {
+        pending = {
+          description: line,
+          transDate: '',
+          valueDate: '',
+          amountLine: '',
+          extra: [],
+        }
+        continue
+      }
+      if (!pickPruDateLine(line) && !parsePruAmountLine(line)) {
+        pending.extra.push(line)
+        continue
+      }
     }
 
-    if (pending.transDate && !pending.valueDate && isPruDateLine(line)) {
-      pending.valueDate = line
-      continue
+    if (!pending.transDate) {
+      const d = pickPruDateLine(line)
+      if (d) {
+        pending.transDate = d
+        continue
+      }
     }
 
-    if (pending.valueDate && !pending.amountLine) {
+    if (pending.transDate && !pending.valueDate) {
+      const d = pickPruDateLine(line)
+      if (d) {
+        pending.valueDate = d
+        continue
+      }
+      const amt = parsePruAmountLine(line)
+      if (amt) {
+        pending.valueDate = pending.transDate
+        pending.amountLine = line
+        continue
+      }
+    }
+
+    if (pending.transDate && pending.valueDate && !pending.amountLine) {
       const amt = parsePruAmountLine(line)
       if (amt) {
         pending.amountLine = line

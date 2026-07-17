@@ -6,7 +6,7 @@ import { prisma } from '../lib/prisma.js'
 import { parseDocumentFile } from './documentParse.js'
 import { detectFileType } from './parser.js'
 import {
-  detectGhanaBankFormat,
+  resolveDetectedBankFormat,
   getSuggestedBankMapping,
   type GhanaBankFormat,
 } from './ghanaBankParsers.js'
@@ -93,7 +93,7 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
     const sample = parsed.rows.slice(0, 20)
     let detectedBankFormat: GhanaBankFormat = null
     if (!doc.type.startsWith('cash_book_')) {
-      detectedBankFormat = detectGhanaBankFormat(parsed.headers, sample)
+      detectedBankFormat = resolveDetectedBankFormat(parsed.headers, sample, parsed.parseMethod)
     }
     const suggested = buildSuggestedMappingForDocument(doc.type, parsed.headers, detectedBankFormat)
     const mapping = sanitizeMapping(suggested, parsed.headers.length)

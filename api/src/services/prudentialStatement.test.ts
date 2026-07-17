@@ -5,10 +5,12 @@ import {
   looksLikePrudentialStatementText,
   parsePrudentialPdfText,
   parsePruAmountLine,
+  extractPruDateFromLine,
   shouldUsePrudentialPdfParser,
 } from './prudentialStatement.js'
 import { parseBankPdf } from './documentParse.js'
 import { buildSuggestedMappingForDocument, canAutoMap } from './autoMapDocument.js'
+import { resolveDetectedBankFormat } from './ghanaBankParsers.js'
 
 const PRU_PDF = path.resolve(
   import.meta.dirname,
@@ -42,6 +44,25 @@ PRINCIPAL PAYMENT
     })
   })
 
+  it('extracts trans date from ref-prefixed value date lines', () => {
+    expect(extractPruDateFromLine('19034915-SEP-23')).toBe('15-SEP-23')
+    expect(extractPruDateFromLine('15-SEP-23')).toBe('15-SEP-23')
+  })
+
+  it('parses inward clearing block with embedded value date', () => {
+    const text = `BALANCE BROUGHT FWD.
+01-SEP-23265.00DR
+INWARD CLEARING
+15-SEP-23
+19034915-SEP-23
+91,021.553,488,237.93DR
+: ENTERPRISE INSURANCE CO LTD  /0096744232580001`
+    const r = parsePrudentialPdfText(text)
+    expect(r.rows.length).toBe(1)
+    expect(r.rows[0]![5]).toBeCloseTo(91_021.55, 2)
+    expect(String(r.rows[0]![1])).toMatch(/INWARD CLEARING/i)
+  })
+
   it('shouldUsePrudentialPdfParser flags generic junk headers', () => {
     expect(
       shouldUsePrudentialPdfParser({
@@ -61,14 +82,26 @@ PRINCIPAL PAYMENT
     expect(result.rows.length).toBeGreaterThan(50)
     expect(result.rows.length).toBeLessThan(450)
 
+    const creditRows = result.rows.filter((r) => Number(r[5]) > 0)
+    expect(creditRows.length).toBeGreaterThanOrEqual(45)
+    expect(result.rows.some((r) => Math.abs(Number(r[5]) - 91_021.55) < 0.01)).toBe(true)
+    expect(result.rows.some((r) => Math.abs(Number(r[5]) - 351_241.25) < 0.01)).toBe(true)
+
+    const debits45 = result.rows.filter((r) => Number(r[4]) === 4.5).length
+    expect(debits45).toBeLessThan(20)
+
     const cr = buildSuggestedMappingForDocument('bank_credits', result.headers, 'prudential')
     const dr = buildSuggestedMappingForDocument('bank_debits', result.headers, 'prudential')
     expect(canAutoMap('bank_credits', result.headers, cr)).toBe(true)
     expect(canAutoMap('bank_debits', result.headers, dr)).toBe(true)
+    expect(resolveDetectedBankFormat(result.headers, result.rows.slice(0, 5), result.parseMethod)).toBe(
+      'prudential'
+    )
 
     const sumDebit = result.rows.reduce((s, r) => s + (Number(r[4]) || 0), 0)
     const sumCredit = result.rows.reduce((s, r) => s + (Number(r[5]) || 0), 0)
-    expect(sumCredit).toBeGreaterThan(20_000_000)
+    expect(sumCredit).toBeGreaterThan(423_285_158)
+    expect(sumCredit).toBeLessThan(440_000_000)
     expect(sumDebit).toBeGreaterThan(20_000_000)
 
     const firstCredit = result.rows.find((r) => Number(r[5]) === 50_000_000)

@@ -172,17 +172,17 @@ async function parsePdfWithOcr(buffer: Buffer, maxPages = resolvePdfOcrMaxPages(
       ? { ...nib, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
       : nib
   }
-  const uba = tryUbaFromText(ocrText, totalPages)
-  if (uba) {
-    return truncated
-      ? { ...uba, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
-      : uba
-  }
   const pru = tryPrudentialFromText(ocrText, totalPages)
   if (pru) {
     return truncated
       ? { ...pru, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
       : pru
+  }
+  const uba = tryUbaFromText(ocrText, totalPages)
+  if (uba) {
+    return truncated
+      ? { ...uba, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
+      : uba
   }
   const absa = tryAbsaFromText(ocrText, totalPages)
   if (absa) {
@@ -227,10 +227,10 @@ export async function parseBankPdf(filepath: string): Promise<ParsedDocument> {
     if (umb) return umb
     const nib = tryNibFromText(nativeResult.text, nativeResult.numpages)
     if (nib) return nib
-    const uba = tryUbaFromText(nativeResult.text, nativeResult.numpages)
-    if (uba) return uba
     const pru = tryPrudentialFromText(nativeResult.text, nativeResult.numpages)
     if (pru) return pru
+    const uba = tryUbaFromText(nativeResult.text, nativeResult.numpages)
+    if (uba) return uba
     const absa = tryAbsaFromText(nativeResult.text, nativeResult.numpages)
     if (absa) return absa
     const gcb = tryGcbFromText(nativeResult.text, nativeResult.numpages)

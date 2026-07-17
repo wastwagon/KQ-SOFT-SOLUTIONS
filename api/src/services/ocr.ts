@@ -12,7 +12,7 @@ import { textToTableFromOcrText } from './ocrLineSplit.js'
 import { looksLikeEcobankStatementText, parseEcobankPdfText } from './ecobankStatement.js'
 import { looksLikeGcbStatementText, parseGcbPdfText } from './gcbStatement.js'
 import { looksLikeAbsaStatementText, parseAbsaPdfText } from './absaStatement.js'
-import { looksLikePrudentialStatementText, parsePrudentialPdfText } from './prudentialStatement.js'
+import { looksLikePrudentialStatementText, parsePrudentialPdfText, shouldUsePrudentialPdfParser } from './prudentialStatement.js'
 import { looksLikeUbaStatementText, parseUbaPdfText } from './ubaStatement.js'
 import { looksLikeNibStatementText, parseNibPdfText } from './nibStatement.js'
 import { looksLikeUmbStatementText, parseUmbPdfText } from './umbStatement.js'
@@ -97,16 +97,16 @@ export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPage
           return { ...nib, pdfTotalPages: nativeResult.numpages }
         }
       }
-      if (looksLikeUbaStatementText(nativeResult.text)) {
-        const uba = parseUbaPdfText(nativeResult.text)
-        if (uba.rows.length > 0) {
-          return { ...uba, pdfTotalPages: nativeResult.numpages }
-        }
-      }
       if (looksLikePrudentialStatementText(nativeResult.text)) {
         const pru = parsePrudentialPdfText(nativeResult.text)
         if (pru.rows.length > 0) {
           return { ...pru, pdfTotalPages: nativeResult.numpages }
+        }
+      }
+      if (looksLikeUbaStatementText(nativeResult.text)) {
+        const uba = parseUbaPdfText(nativeResult.text)
+        if (uba.rows.length > 0) {
+          return { ...uba, pdfTotalPages: nativeResult.numpages }
         }
       }
       if (looksLikeAbsaStatementText(nativeResult.text)) {
@@ -128,6 +128,12 @@ export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPage
         }
       }
       const base = textToTable(nativeResult.text)
+      if (shouldUsePrudentialPdfParser(base)) {
+        const pru = parsePrudentialPdfText(nativeResult.text)
+        if (pru.rows.length > 0) {
+          return { ...pru, pdfTotalPages: nativeResult.numpages }
+        }
+      }
       if (shouldPreferEcobankParser(nativeResult.text, base)) {
         const ecobank = parseEcobankPdfText(nativeResult.text)
         if (ecobank.rows.length > 0) {
@@ -177,20 +183,20 @@ export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPage
         : { ...nib, pdfTotalPages: totalPages }
     }
   }
-  if (looksLikeUbaStatementText(ocrText)) {
-    const uba = parseUbaPdfText(ocrText)
-    if (uba.rows.length > 0) {
-      return truncated
-        ? { ...uba, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
-        : { ...uba, pdfTotalPages: totalPages }
-    }
-  }
   if (looksLikePrudentialStatementText(ocrText)) {
     const pru = parsePrudentialPdfText(ocrText)
     if (pru.rows.length > 0) {
       return truncated
         ? { ...pru, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
         : { ...pru, pdfTotalPages: totalPages }
+    }
+  }
+  if (looksLikeUbaStatementText(ocrText)) {
+    const uba = parseUbaPdfText(ocrText)
+    if (uba.rows.length > 0) {
+      return truncated
+        ? { ...uba, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
+        : { ...uba, pdfTotalPages: totalPages }
     }
   }
   if (looksLikeAbsaStatementText(ocrText)) {
@@ -218,6 +224,14 @@ export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPage
     }
   }
   const base = textToTable(ocrText)
+  if (shouldUsePrudentialPdfParser(base)) {
+    const pru = parsePrudentialPdfText(ocrText)
+    if (pru.rows.length > 0) {
+      return truncated
+        ? { ...pru, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
+        : { ...pru, pdfTotalPages: totalPages }
+    }
+  }
   if (shouldPreferEcobankParser(ocrText, base)) {
     const ecobank = parseEcobankPdfText(ocrText)
     if (ecobank.rows.length > 0) {

@@ -6,7 +6,8 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canMapDocuments, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { detectFileType } from '../services/parser.js'
 import { parseDocumentFile } from '../services/documentParse.js'
-import { detectGhanaBankFormat, type GhanaBankFormat } from '../services/ghanaBankParsers.js'
+import { resolveDetectedBankFormat, type GhanaBankFormat } from '../services/ghanaBankParsers.js'
+import { parseImportedAmount } from '../services/amountParser.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { parseSheetIndexQuery } from '../lib/parseSheetIndexQuery.js'
@@ -61,7 +62,23 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
     const sample = result.rows.slice(0, MAP_PREVIEW_ROW_SAMPLE)
     let detectedBankFormat: GhanaBankFormat = null
     if (!doc.type.startsWith('cash_book_')) {
-      detectedBankFormat = detectGhanaBankFormat(result.headers, sample)
+      detectedBankFormat = resolveDetectedBankFormat(result.headers, sample, result.parseMethod)
+    }
+    let parseSummary: { rowCount: number; sumDebit?: number; sumCredit?: number } | undefined
+    if (!doc.type.startsWith('cash_book_') && result.rows.length > 0) {
+      const debitCol = result.headers.findIndex((h) => /^debit$/i.test(String(h)))
+      const creditCol = result.headers.findIndex((h) => /^credit$/i.test(String(h)))
+      parseSummary = {
+        rowCount: result.rows.length,
+        sumDebit:
+          debitCol >= 0
+            ? result.rows.reduce((s, r) => s + parseImportedAmount(r[debitCol]), 0)
+            : undefined,
+        sumCredit:
+          creditCol >= 0
+            ? result.rows.reduce((s, r) => s + parseImportedAmount(r[creditCol]), 0)
+            : undefined,
+      }
     }
     const suggestedMapping = buildSuggestedMappingForDocument(doc.type, result.headers, detectedBankFormat)
     const mappingConfidence = getMappingConfidence(result.headers, suggestedMapping)
@@ -80,6 +97,7 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       mappingConfidence,
       mappingDiagnostics,
       parseMethod: result.parseMethod,
+      parseSummary,
       pdfTruncated: result.pdfTruncated,
       pdfPagesProcessed: result.pdfPagesProcessed,
       pdfTotalPages: result.pdfTotalPages,

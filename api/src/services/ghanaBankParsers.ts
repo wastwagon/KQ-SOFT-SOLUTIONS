@@ -270,6 +270,41 @@ export function detectGhanaBankFormat(
   return null
 }
 
+/** Bank format implied by dedicated PDF parser (upload auto-map must follow the parser, not heuristics alone). */
+export function bankFormatFromParseMethod(parseMethod?: string): GhanaBankFormat {
+  switch (parseMethod) {
+    case 'prudential_pdf':
+      return 'prudential'
+    case 'uba_pdf':
+      return 'uba'
+    case 'nib_pdf':
+      return 'nib'
+    case 'adb_pdf':
+      return 'adb'
+    case 'umb_pdf':
+      return 'umb'
+    case 'absa_pdf':
+      return 'absa'
+    case 'gcb_pdf':
+      return 'gcb'
+    case 'ecobank_pdf':
+      return 'ecobank'
+    default:
+      return null
+  }
+}
+
+/** Prefer parseMethod when a dedicated bank PDF parser ran; else infer from headers/sample rows. */
+export function resolveDetectedBankFormat(
+  headers: string[],
+  sampleRows: unknown[][],
+  parseMethod?: string
+): GhanaBankFormat {
+  const fromParser = bankFormatFromParseMethod(parseMethod)
+  if (fromParser) return fromParser
+  return detectGhanaBankFormat(headers, sampleRows)
+}
+
 /**
  * Build suggested column mapping for detected bank format.
  */
