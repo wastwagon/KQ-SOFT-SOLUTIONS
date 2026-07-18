@@ -21,6 +21,8 @@ services:
       - UPLOAD_DIR=/app/uploads
       - GHANA_BRS_WORKBOOK_NETTING=${GHANA_BRS_WORKBOOK_NETTING:-1}
       - SUBSCRIPTION_PAYWALL=${SUBSCRIPTION_PAYWALL:-false}
+      - PARSE_JOB_IN_API=${PARSE_JOB_IN_API:-1}
+      - PARSE_JOB_CONCURRENCY=${PARSE_JOB_CONCURRENCY:-1}
     volumes:
       - ./api:/app
       - api_node_modules:/app/node_modules
@@ -32,6 +34,29 @@ services:
         condition: service_started
     # Regenerate Prisma client, run migrations, then start dev server.
     command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+    restart: unless-stopped
+
+  parse-worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.development
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/brs_db
+      - REDIS_URL=redis://redis:6379
+      - UPLOAD_DIR=/app/uploads
+      - PARSE_JOB_CONCURRENCY=${PARSE_JOB_CONCURRENCY:-1}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+    volumes:
+      - ./api:/app
+      - api_node_modules:/app/node_modules
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: sh -c "npx prisma generate && npm run worker:parse"
     restart: unless-stopped
 
   web:

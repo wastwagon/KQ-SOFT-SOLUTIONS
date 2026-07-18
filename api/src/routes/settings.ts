@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
-import { canEditBranding, canManageMembers } from '../lib/permissions.js'
+import { canEditBranding, canManageMembers, canMapDocuments, canReconcile } from '../lib/permissions.js'
 import { hasPlanFeature, getUserLimit } from '../config/planFeatures.js'
 import { normalizeOrgMemberRole } from '../lib/orgMemberRole.js'
 import { createOrganizationInvite, revokeOrganizationInvite } from '../services/orgInvite.js'
@@ -322,6 +322,39 @@ router.patch('/members/:userId', async (req: AuthRequest, res) => {
     role: updated.role,
     createdAt: updated.createdAt,
   })
+})
+
+/** Forget a learned match pattern (Standard+ ai_suggestions). */
+router.delete('/match-memory/:id', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canReconcile(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to update match learning' })
+  }
+  const orgId = req.auth!.orgId
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { plan: true },
+  })
+  if (!org || !hasPlanFeature(org.plan, 'ai_suggestions')) {
+    return res.status(403).json({ error: 'Organisation match memory requires Standard plan or higher.' })
+  }
+  const { forgetOrganisationMatchMemory } = await import('../services/organizationMatchMemory.js')
+  const ok = await forgetOrganisationMatchMemory(orgId, req.params.id)
+  if (!ok) return res.status(404).json({ error: 'Match memory not found' })
+  res.json({ deleted: true })
+})
+
+/** Forget a saved document column layout for this organisation. */
+router.delete('/layout-memory/:id', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canMapDocuments(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to update layout learning' })
+  }
+  const orgId = req.auth!.orgId
+  const { forgetDocumentLayoutMemory } = await import('../services/documentLayoutMemory.js')
+  const ok = await forgetDocumentLayoutMemory(orgId, req.params.id)
+  if (!ok) return res.status(404).json({ error: 'Layout memory not found' })
+  res.json({ deleted: true })
 })
 
 export default router

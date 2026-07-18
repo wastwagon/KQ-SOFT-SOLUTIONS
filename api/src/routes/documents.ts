@@ -32,10 +32,15 @@ import {
   inferDocumentFamily,
 } from '../services/documentTypeInference.js'
 import { changeDocumentType } from '../services/changeDocumentType.js'
+import { uploadParseRouteLimiter } from '../middleware/heavyRouteLimiter.js'
+import { isOcrGateError } from '../lib/ocrGate.js'
+import { markDocumentParseReady } from '../lib/documentParseJob.js'
+import { incOpsMetric, observeParseQuality } from '../lib/opsMetrics.js'
 
 const router = Router()
 router.use(authMiddleware)
 router.use(requireOrgSubscriptionForApp)
+router.use(uploadParseRouteLimiter)
 
 const CANONICAL_CASH_BOOK = ['s_no', 'date', 'name', 'details', 'doc_ref', 'chq_no', 'accode', 'amt_received', 'amt_paid']
 const CANONICAL_BANK = ['transaction_date', 'description', 'credit', 'debit']
@@ -105,6 +110,24 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       result.headers,
       suggestedMapping
     )
+    if (layout.match && layout.appliedFields.length) {
+      incOpsMetric('parse.layout_memory_hit', {
+        labels: { exact: layout.match.exact ? 'true' : 'false' },
+        detail: { documentId: id, fields: layout.appliedFields.length, source: 'preview' },
+      })
+    }
+    if (result.parseQualityScore != null) {
+      observeParseQuality(result.parseQualityScore, {
+        documentId: id,
+        parseMethod: result.parseMethod,
+        source: 'preview',
+      })
+    }
+    if (result.ocrRetried) {
+      incOpsMetric('parse.ocr_retried', {
+        detail: { documentId: id, parseMethod: result.parseMethod, source: 'preview' },
+      })
+    }
     suggestedMapping = trimMappingForDocumentType(doc.type, layout.mapping)
     let mappingConfidence = getMappingConfidence(result.headers, suggestedMapping)
     if (layout.appliedFields.length) {
@@ -195,6 +218,7 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       },
       layoutMemoryApplied: layout.match && layout.appliedFields.length
         ? {
+            id: layout.match.id,
             exact: layout.match.exact,
             similarity: layout.match.similarity,
             fields: layout.appliedFields,
@@ -213,6 +237,9 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       parseQualityNotes: result.parseQualityNotes,
     })
   } catch (e) {
+    if (isOcrGateError(e)) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code })
+    }
     const msg = (e as Error).message || 'Parse failed'
     const fileType = detectFileType(doc.filepath)
     const hint =
@@ -292,6 +319,7 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
       mapping,
       parseMethodHint: result.parseMethod,
     }).catch(() => undefined)
+    await markDocumentParseReady(id, `Mapped ${applied.count} transaction(s)`).catch(() => undefined)
     res.json({
       count: applied.count,
       importStats: {
@@ -311,12 +339,36 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     if (e instanceof z.ZodError) {
       return res.status(400).json({ error: e.errors[0]?.message ?? 'Invalid mapping' })
     }
+    if (isOcrGateError(e)) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code })
+    }
     const msg = (e as Error).message
     if (msg.includes('column') || msg.includes('required') || msg.includes('mapping') || msg.includes('limit')) {
       return res.status(400).json({ error: msg })
     }
     res.status(500).json({ error: msg || 'Mapping failed. Check that column mapping is correct.' })
   }
+})
+
+router.get('/:id/parse-status', async (req: AuthRequest, res) => {
+  const { id } = req.params
+  const orgId = req.auth!.orgId
+  const doc = await prisma.document.findFirst({
+    where: { id },
+    include: { project: { select: { organizationId: true } } },
+  })
+  if (!doc || doc.project.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Document not found' })
+  }
+  res.json({
+    documentId: doc.id,
+    parseStatus: doc.parseStatus,
+    parseStatusMessage: doc.parseStatusMessage,
+    parseStartedAt: doc.parseStartedAt,
+    parseFinishedAt: doc.parseFinishedAt,
+    type: doc.type,
+    filename: doc.filename,
+  })
 })
 
 const changeTypeSchema = z.object({

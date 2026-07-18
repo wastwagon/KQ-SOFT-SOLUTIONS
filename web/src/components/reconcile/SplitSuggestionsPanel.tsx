@@ -10,17 +10,23 @@ import type { SuggestedSplitMatch, Tx } from './types'
 interface SplitSuggestionsPanelProps {
   suggestions: SuggestedSplitMatch[]
   currency: string
+  features?: Record<string, boolean>
   selectedCbIds: Set<string>
   selectedBankIds: Set<string>
   onSelectGroup: (cbIds: string[], bankIds: string[]) => void
+  onForgetMemory?: (memoryId: string) => void
+  isForgettingMemory?: boolean
 }
 
 export default function SplitSuggestionsPanel({
   suggestions,
   currency,
+  features,
   selectedCbIds,
   selectedBankIds,
   onSelectGroup,
+  onForgetMemory,
+  isForgettingMemory = false,
 }: SplitSuggestionsPanelProps) {
   return (
     <section className="rounded-xl border border-primary-200/80 bg-primary-50/50 p-5 shadow-sm">
@@ -57,12 +63,36 @@ export default function SplitSuggestionsPanel({
               <div className="flex justify-between items-start mb-1 gap-2">
                 <span className="text-[10px] font-bold text-primary-700 uppercase">{s.reason}</span>
                 <span className="flex items-center gap-1 shrink-0">
-                  {(s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
-                    <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 normal-case tracking-normal"
-                      title="Boosted because your organisation confirmed a similar split group before"
-                    >
-                      Learned
+                  {features?.ai_suggestions &&
+                    (s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 normal-case tracking-normal"
+                        title={
+                          s.orgMemoryConfirmations
+                            ? `Boosted from ${s.orgMemoryConfirmations} prior confirmation(s) of a similar split group`
+                            : 'Boosted because your organisation confirmed a similar split group before'
+                        }
+                      >
+                        Learned
+                        {s.orgMemoryConfirmations != null && s.orgMemoryConfirmations > 0
+                          ? ` · ${s.orgMemoryConfirmations}×`
+                          : ''}
+                      </span>
+                      {onForgetMemory && s.orgMemoryId && (
+                        <button
+                          type="button"
+                          disabled={isForgettingMemory}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onForgetMemory(s.orgMemoryId!)
+                          }}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-emerald-800/80 hover:bg-emerald-200/80 normal-case tracking-normal disabled:opacity-50"
+                          title="Stop boosting suggestions from this learned pattern"
+                        >
+                          Forget
+                        </button>
+                      )}
                     </span>
                   )}
                   <span className="text-[10px] font-bold text-gray-500">

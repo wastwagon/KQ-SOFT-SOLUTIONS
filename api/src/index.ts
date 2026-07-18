@@ -39,6 +39,7 @@ import { securityMiddleware } from './middleware/security.js';
 import { httpLogger, logger, REQUEST_ID_HEADER } from './middleware/logging.js';
 import { livenessHandler, readinessHandler } from './middleware/readiness.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import metricsScrapeRoutes from './routes/metricsScrape.js';
 
 const app = express();
 const PORT = process.env.PORT || 9001;
@@ -114,6 +115,8 @@ app.use(express.json());
 app.get('/health', livenessHandler);
 app.get('/healthz', livenessHandler);
 app.get('/readyz', readinessHandler);
+// Optional Prometheus scrape (requires METRICS_SCRAPE_TOKEN).
+app.use('/metrics', metricsScrapeRoutes);
 
 app.get('/api/v1', (_, res) => {
   res.json({
@@ -164,4 +167,13 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, `BRS API listening`);
+  void import('./lib/parseJobQueue.js')
+    .then(({ startParseJobWorker, parseJobInApi }) => {
+      if (parseJobInApi()) {
+        startParseJobWorker()
+      } else {
+        logger.info('PARSE_JOB_IN_API=0 — parse jobs handled by dedicated worker')
+      }
+    })
+    .catch((err) => logger.warn({ err }, 'parse job worker failed to start'));
 });

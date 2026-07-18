@@ -4,6 +4,7 @@ import {
   projects,
   documents,
   report,
+  settings,
   type MapDocumentResponse,
   type DocumentPreviewResponse,
   type SignBucket,
@@ -19,6 +20,7 @@ import { useAuth } from '../store/auth'
 import { canExportReport, isProjectEditable } from '../lib/permissions'
 import ProjectLockedBanner from '../components/project/ProjectLockedBanner'
 import { useToast } from '../components/ui/Toast'
+import { useConfirm } from '../components/ui/ConfirmDialog'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
@@ -79,6 +81,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   const id = projectId
   const role = useAuth((s) => s.role)
   const toast = useToast()
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const [previewSheetIndex, setPreviewSheetIndex] = useState(0)
@@ -95,6 +98,12 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     queryKey: ['project', id],
     queryFn: () => projects.get(id!),
     enabled: !!id,
+    refetchInterval: (q) => {
+      const docs = (q.state.data as { documents?: { parseStatus?: string }[] } | undefined)?.documents
+      if (!docs?.length) return false
+      const inflight = docs.some((d) => d.parseStatus === 'pending' || d.parseStatus === 'processing')
+      return inflight ? 2000 : false
+    },
   })
   const { data: project, error: projectError, isError: projectQueryFailed, isPending: projectPending } = projectQuery
 
@@ -157,12 +166,31 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       ),
   })
 
+  const forgetLayoutMutation = useMutation({
+    mutationFn: (memoryId: string) => settings.forgetLayoutMemory(memoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-preview', selectedDocId] })
+      toast.success('Saved layout forgotten', 'Similar uploads will use heuristics until you map again.')
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not forget layout', e instanceof Error ? e.message : undefined)
+      ),
+  })
+
   const [applyingAll, setApplyingAll] = useState(false)
   /** Document IDs included in bulk “apply suggested mapping”. New files default on; existing choices survive list refresh. */
   const [bulkDocIds, setBulkDocIds] = useState<Set<string>>(() => new Set())
   const bulkSelectionDocKeyRef = useRef('')
 
   const docs = project?.documents || []
+  const parseJobsInflight = useMemo(
+    () =>
+      (docs as { parseStatus?: string }[]).filter(
+        (d) => d.parseStatus === 'pending' || d.parseStatus === 'processing'
+      ).length,
+    [docs]
+  )
   const hasBankDocuments = useMemo(
     () =>
       (docs as { type: string }[]).some((d) => d.type === 'bank_credits' || d.type === 'bank_debits'),
@@ -414,6 +442,13 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       {!canMap && (
         <p className="text-sm text-amber-600">You have view-only access. Contact an admin, reviewer, or preparer to map documents.</p>
       )}
+      {parseJobsInflight > 0 && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          <strong>Background parse:</strong> {parseJobsInflight} file
+          {parseJobsInflight === 1 ? ' is' : 's are'} still parsing or auto-mapping. This page refreshes
+          automatically — map manually if a file stays unmapped after it finishes.
+        </div>
+      )}
       {error && (
         <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700 shadow-sm">{error}</div>
       )}
@@ -529,7 +564,15 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             </button>
           </div>
           <ul className="space-y-2 max-h-52 overflow-y-auto border border-gray-100 rounded-xl p-2 bg-gray-50/50">
-            {(docs as { id: string; filename: string; type: string }[]).map((d) => (
+            {(
+              docs as {
+                id: string
+                filename: string
+                type: string
+                parseStatus?: string
+                parseStatusMessage?: string | null
+              }[]
+            ).map((d) => (
               <li key={d.id} className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -548,6 +591,24 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 <span className="min-w-0 flex-1">
                   <span className="text-gray-900 break-words">{d.filename}</span>
                   <span className="text-gray-500 text-xs"> ({d.type})</span>
+                  {d.parseStatus === 'pending' && (
+                    <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                      Queued
+                    </span>
+                  )}
+                  {d.parseStatus === 'processing' && (
+                    <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                      Parsing…
+                    </span>
+                  )}
+                  {d.parseStatus === 'failed' && (
+                    <span
+                      className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-red-700"
+                      title={d.parseStatusMessage || 'Parse failed'}
+                    >
+                      Failed
+                    </span>
+                  )}
                 </span>
               </li>
             ))}
@@ -588,9 +649,14 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
           className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900"
         >
           <option value="">Select a document</option>
-          {docs.map((d: { id: string; filename: string; type: string }) => (
+          {docs.map((d: { id: string; filename: string; type: string; parseStatus?: string }) => (
             <option key={d.id} value={d.id}>
               {d.filename} ({d.type})
+              {d.parseStatus === 'pending' || d.parseStatus === 'processing'
+                ? ' — parsing…'
+                : d.parseStatus === 'failed'
+                  ? ' — parse failed'
+                  : ''}
             </option>
           ))}
         </select>
@@ -697,15 +763,41 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 </div>
               )}
               {preview.layoutMemoryApplied && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-950">
-                  <strong>Saved layout:</strong>{' '}
-                  {preview.layoutMemoryApplied.exact
-                    ? 'Using your organisation’s column map for this exact header layout'
-                    : `Using a similar saved column map (${Math.round(preview.layoutMemoryApplied.similarity * 100)}% match)`}
-                  {preview.layoutMemoryApplied.fields.length
-                    ? ` — ${preview.layoutMemoryApplied.fields.join(', ')}`
-                    : ''}
-                  . Adjust if needed; saving updates the memory for next time.
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-950 flex flex-wrap items-center gap-2 justify-between">
+                  <span>
+                    <strong>Saved layout:</strong>{' '}
+                    {preview.layoutMemoryApplied.exact
+                      ? 'Using your organisation’s column map for this exact header layout'
+                      : `Using a similar saved column map (${Math.round(preview.layoutMemoryApplied.similarity * 100)}% match) to fill missing columns only`}
+                    {preview.layoutMemoryApplied.fields.length
+                      ? ` — ${preview.layoutMemoryApplied.fields.join(', ')}`
+                      : ''}
+                    {preview.layoutMemoryApplied.useCount > 1
+                      ? ` (used ${preview.layoutMemoryApplied.useCount}×)`
+                      : ''}
+                    . Adjust if needed; saving updates the memory for next time.
+                  </span>
+                  {canMap &&
+                    isProjectEditable(project?.status) &&
+                    preview.layoutMemoryApplied.id && (
+                      <button
+                        type="button"
+                        disabled={forgetLayoutMutation.isPending}
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Forget this saved layout?',
+                            description:
+                              'This column map will no longer be suggested for similar uploads. You can save a new layout by mapping again.',
+                            confirmLabel: 'Forget layout',
+                            tone: 'warning',
+                          })
+                          if (ok) forgetLayoutMutation.mutate(preview.layoutMemoryApplied!.id!)
+                        }}
+                        className="shrink-0 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        {forgetLayoutMutation.isPending ? 'Forgetting…' : 'Forget layout'}
+                      </button>
+                    )}
                 </div>
               )}
               {preview.typeInference?.mismatch && (
@@ -723,11 +815,20 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                     <button
                       type="button"
                       disabled={changeTypeMutation.isPending}
-                      onClick={() =>
-                        changeTypeMutation.mutate(
+                      onClick={async () => {
+                        const family =
                           preview.typeInference!.family === 'cash_book' ? 'cash_book' : 'bank_statement'
-                        )
-                      }
+                        const label =
+                          family === 'cash_book' ? 'cash book' : 'bank statement'
+                        const ok = await confirm({
+                          title: `Switch to ${label}?`,
+                          description:
+                            'This remaps the document type and clears any mapped transactions for this file. You will need to map columns again.',
+                          confirmLabel: `Switch to ${label}`,
+                          tone: 'warning',
+                        })
+                        if (ok) changeTypeMutation.mutate(family)
+                      }}
                       className="mt-2 inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100 disabled:opacity-50"
                     >
                       {changeTypeMutation.isPending

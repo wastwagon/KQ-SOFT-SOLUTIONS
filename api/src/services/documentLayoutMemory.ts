@@ -72,10 +72,17 @@ export function applyLearnedFieldMapping(
   return out
 }
 
+/**
+ * Merge org layout memory onto heuristic suggestions.
+ * - Exact header fingerprint: learned values overwrite conflicts (user confirmed this layout).
+ * - Soft/similar headers: only fill missing fields — never override heuristics.
+ */
 export function mergeLearnedMapping(
   base: Record<string, number>,
-  learned: Record<string, number>
+  learned: Record<string, number>,
+  options: { overwriteConflicts?: boolean } = {}
 ): { mapping: Record<string, number>; appliedFields: string[] } {
+  const overwriteConflicts = options.overwriteConflicts === true
   const mapping = { ...base }
   const appliedFields: string[] = []
   for (const [field, idx] of Object.entries(learned)) {
@@ -83,9 +90,10 @@ export function mergeLearnedMapping(
       mapping[field] = idx
       appliedFields.push(field)
     } else if (mapping[field] !== idx) {
-      // Prefer learned layout for this org — user already confirmed it once.
-      mapping[field] = idx
-      appliedFields.push(field)
+      if (overwriteConflicts) {
+        mapping[field] = idx
+        appliedFields.push(field)
+      }
     } else {
       appliedFields.push(field)
     }
@@ -211,6 +219,47 @@ export async function rememberDocumentLayout(opts: {
       lastUsedAt: new Date(),
     },
   })
+
+  await pruneLayoutMemoryIfOverCap(opts.organizationId, opts.documentType)
+}
+
+/** Max layout memories per org + document type (env LAYOUT_MEMORY_CAP_PER_TYPE). */
+export function layoutMemoryCapPerType(): number {
+  const n = parseInt(process.env.LAYOUT_MEMORY_CAP_PER_TYPE || '80', 10)
+  return Number.isFinite(n) && n >= 10 ? n : 80
+}
+
+export async function pruneLayoutMemoryIfOverCap(
+  organizationId: string,
+  documentType: DocumentType
+): Promise<number> {
+  const cap = layoutMemoryCapPerType()
+  const count = await prisma.documentLayoutMemory.count({
+    where: { organizationId, documentType },
+  })
+  if (count <= cap) return 0
+  const excess = count - cap
+  const stale = await prisma.documentLayoutMemory.findMany({
+    where: { organizationId, documentType },
+    orderBy: [{ lastUsedAt: 'asc' }, { useCount: 'asc' }, { createdAt: 'asc' }],
+    take: excess,
+    select: { id: true },
+  })
+  if (!stale.length) return 0
+  const result = await prisma.documentLayoutMemory.deleteMany({
+    where: { id: { in: stale.map((r) => r.id) } },
+  })
+  return result.count
+}
+
+export async function forgetDocumentLayoutMemory(
+  organizationId: string,
+  memoryId: string
+): Promise<boolean> {
+  const result = await prisma.documentLayoutMemory.deleteMany({
+    where: { id: memoryId, organizationId },
+  })
+  return result.count > 0
 }
 
 export async function touchLayoutMemoryUse(id: string): Promise<void> {
@@ -242,6 +291,8 @@ export async function applyOrganisationLayoutMemory(
   if (Object.keys(learned).length === 0) {
     return { mapping: baseMapping, appliedFields: [], match: null }
   }
-  const { mapping, appliedFields } = mergeLearnedMapping(baseMapping, learned)
+  const { mapping, appliedFields } = mergeLearnedMapping(baseMapping, learned, {
+    overwriteConflicts: match.exact,
+  })
   return { mapping, appliedFields, match }
 }

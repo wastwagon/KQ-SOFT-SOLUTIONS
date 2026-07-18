@@ -4,11 +4,11 @@
  * - PDFs: Try native text extraction first (faster, more accurate for text-based PDFs); fall back to OCR for scanned PDFs.
  * - Images: Tesseract.js OCR. pdf-to-img used for PDF→image when native extraction yields no useful text.
  */
-import Tesseract from 'tesseract.js'
 import fs from 'fs'
 import path from 'path'
 import { resolveOcrLanguages } from './ocrLang.js'
 import { textToTableFromOcrText } from './ocrLineSplit.js'
+import { recognizeWithOcrGate } from '../lib/ocrGate.js'
 import { looksLikeEcobankStatementText, parseEcobankPdfText } from './ecobankStatement.js'
 import { looksLikeGcbStatementText, parseGcbPdfText } from './gcbStatement.js'
 import { looksLikeAbsaStatementText, parseAbsaPdfText } from './absaStatement.js'
@@ -38,7 +38,7 @@ function textToTable(text: string): OcrResult {
 
 async function ocrFromBuffer(buffer: Buffer): Promise<string> {
   const lang = resolveOcrLanguages()
-  const result = await Tesseract.recognize(buffer, lang, { logger: () => {} })
+  const result = await recognizeWithOcrGate(buffer, lang)
   return result.data.text
 }
 

@@ -67,6 +67,7 @@ export default function ProjectReconcile({
     clearAllMatchesMutation,
     evidenceUploadMutation,
     phasedAutoMatchMutation,
+    forgetMemoryMutation,
     reconcileLimit,
     loadMore,
   } = session
@@ -299,6 +300,8 @@ export default function ProjectReconcile({
           onPhasedAutoMatch={() => phasedAutoMatchMutation.mutate()}
           isPhasedAutoMatching={phasedAutoMatchMutation.isPending}
           isMatching={bulkMatchMutation.isPending}
+          onForgetMemory={(id) => forgetMemoryMutation.mutate(id)}
+          isForgettingMemory={forgetMemoryMutation.isPending}
         />
       )}
 
@@ -306,12 +309,15 @@ export default function ProjectReconcile({
         <SplitSuggestionsPanel
           suggestions={splitSuggestions}
           currency={currency}
+          features={features}
           selectedCbIds={selectedCbIds}
           selectedBankIds={selectedBankIds}
           onSelectGroup={(cbIds, bankIds) => {
             setSelectedCbIds(new Set(cbIds))
             setSelectedBankIds(new Set(bankIds))
           }}
+          onForgetMemory={(id) => forgetMemoryMutation.mutate(id)}
+          isForgettingMemory={forgetMemoryMutation.isPending}
         />
       )}
 

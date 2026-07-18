@@ -109,7 +109,10 @@ export default function ProjectUploadStep({
           data.corrections.slice(0, 2).join(' · ')
         )
       } else {
-        toast.success('Cash book uploaded', 'Map columns next so we can read your data.')
+        toast.success(
+          'Cash book uploaded',
+          'Parsing may continue in the background — open Map when ready.'
+        )
       }
     },
     onError: (err) => {
@@ -175,7 +178,10 @@ export default function ProjectUploadStep({
           data.corrections.slice(0, 2).join(' · ')
         )
       } else {
-        toast.success('Bank statement uploaded', 'Map columns next so we can read your data.')
+        toast.success(
+          'Bank statement uploaded',
+          'Parsing may continue in the background — open Map when ready.'
+        )
       }
     },
     onError: (err) => {

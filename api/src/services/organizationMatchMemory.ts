@@ -2,14 +2,20 @@
  * Organisation match memory: learn from confirmed 1:1 matches and boost
  * future suggestions that share amount + ref/cheque/narration fingerprints.
  */
+import type { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { tokenizeNarration, type Tx } from './matching.js'
+
+/** Default Prisma client or a transaction client for atomic confirm+remember. */
+export type MatchMemoryDb = Prisma.TransactionClient | typeof prisma
 
 export type MatchSideKind = 'receipt' | 'payment'
 
 const MEMORY_BOOST = 0.1
 const MEMORY_CONFIDENCE_CAP = 0.95
 const NARR_JACCARD_THRESHOLD = 0.55
+/** Soft (non-exact) fingerprint matches need repeated confirmations before boosting. */
+const SOFT_MATCH_MIN_CONFIRMATIONS = 2
 
 export type MatchMemoryTx = {
   name?: string | null
@@ -153,7 +159,21 @@ function pairFingerprintsMatch(storedCb: string, storedBk: string, cb: string, b
   return cbOk && bkOk
 }
 
+function pairFingerprintsExact(storedCb: string, storedBk: string, cb: string, bk: string): boolean {
+  return storedCb === cb && storedBk === bk
+}
+
+/** Exact fp → boost after 1 confirm; soft fp → need repeated confirms. */
+export function memoryEligibleForBoost(
+  confirmationCount: number,
+  exactFingerprint: boolean
+): boolean {
+  if (exactFingerprint) return confirmationCount >= 1
+  return confirmationCount >= SOFT_MATCH_MIN_CONFIRMATIONS
+}
+
 export type MatchMemoryRecord = {
+  id: string
   amountMinor: number
   cashBookFingerprint: string
   bankFingerprint: string
@@ -161,7 +181,15 @@ export type MatchMemoryRecord = {
 }
 
 export function applyOrganisationMatchMemoryBoost(
-  suggestions: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string; orgMemoryBoosted?: boolean }[],
+  suggestions: {
+    cashBookTx: Tx
+    bankTx: Tx
+    confidence: number
+    reason: string
+    orgMemoryBoosted?: boolean
+    orgMemoryId?: string
+    orgMemoryConfirmations?: number
+  }[],
   memories: MatchMemoryRecord[],
   amountTolerance = 0.01
 ): number {
@@ -174,28 +202,37 @@ export function applyOrganisationMatchMemoryBoost(
     const bk = buildSideFingerprint(s.bankTx)
     if (!cb.learnable || !bk.learnable) continue
     const amt = amountToMinor(s.cashBookTx.amount)
-    const hit = memories.some((m) => {
+    const hit = memories.find((m) => {
       // 1:1 boost ignores split (mset) memories
       if (m.cashBookFingerprint.startsWith('mset:') || m.bankFingerprint.startsWith('mset:')) {
         return false
       }
       if (Math.abs(m.amountMinor - amt) > tolMinor) return false
-      return (
-        fingerprintsMatch(m.cashBookFingerprint, cb.fingerprint) &&
-        fingerprintsMatch(m.bankFingerprint, bk.fingerprint)
+      if (
+        !fingerprintsMatch(m.cashBookFingerprint, cb.fingerprint) ||
+        !fingerprintsMatch(m.bankFingerprint, bk.fingerprint)
+      ) {
+        return false
+      }
+      const exact = pairFingerprintsExact(
+        m.cashBookFingerprint,
+        m.bankFingerprint,
+        cb.fingerprint,
+        bk.fingerprint
       )
+      return memoryEligibleForBoost(m.confirmationCount, exact)
     })
     if (!hit) continue
     const before = s.confidence
     s.confidence = Math.min(MEMORY_CONFIDENCE_CAP, s.confidence + MEMORY_BOOST)
-    if (s.confidence > before || hit) {
-      s.orgMemoryBoosted = true
-      if (s.confidence > before) boosted++
-      if (!/org memory/i.test(s.reason)) {
-        s.reason = s.reason
-          ? `${s.reason}, org memory`
-          : 'Organisation match memory'
-      }
+    s.orgMemoryBoosted = true
+    s.orgMemoryId = hit.id
+    s.orgMemoryConfirmations = hit.confirmationCount
+    if (s.confidence > before) boosted++
+    if (!/org memory/i.test(s.reason)) {
+      s.reason = s.reason
+        ? `${s.reason}, org memory`
+        : 'Organisation match memory'
     }
   }
   return boosted
@@ -207,6 +244,9 @@ export async function rememberOrganisationMatch(opts: {
   sideKind: MatchSideKind
   cashBookTx: MatchMemoryTx
   bankTx: MatchMemoryTx
+  /** When set (e.g. inside match create $transaction), skip prune until after commit. */
+  db?: MatchMemoryDb
+  prune?: boolean
 }): Promise<boolean> {
   const cb = buildSideFingerprint(opts.cashBookTx)
   const bk = buildSideFingerprint(opts.bankTx)
@@ -214,8 +254,9 @@ export async function rememberOrganisationMatch(opts: {
 
   const currency = (opts.currency || 'GHS').toUpperCase()
   const amountMinor = amountToMinor(opts.cashBookTx.amount)
+  const db = opts.db ?? prisma
 
-  await prisma.organizationMatchMemory.upsert({
+  await db.organizationMatchMemory.upsert({
     where: {
       organizationId_currency_sideKind_amountMinor_cashBookFingerprint_bankFingerprint: {
         organizationId: opts.organizationId,
@@ -241,7 +282,36 @@ export async function rememberOrganisationMatch(opts: {
       lastConfirmedAt: new Date(),
     },
   })
+  if (opts.prune !== false && !opts.db) {
+    await pruneMatchMemoryIfOverCap(opts.organizationId)
+  }
   return true
+}
+
+/** Max match memories per organisation (env MATCH_MEMORY_CAP_PER_ORG). */
+export function matchMemoryCapPerOrg(): number {
+  const n = parseInt(process.env.MATCH_MEMORY_CAP_PER_ORG || '2000', 10)
+  return Number.isFinite(n) && n >= 50 ? n : 2000
+}
+
+export async function pruneMatchMemoryIfOverCap(organizationId: string): Promise<number> {
+  const cap = matchMemoryCapPerOrg()
+  const count = await prisma.organizationMatchMemory.count({
+    where: { organizationId },
+  })
+  if (count <= cap) return 0
+  const excess = count - cap
+  const stale = await prisma.organizationMatchMemory.findMany({
+    where: { organizationId },
+    orderBy: [{ lastConfirmedAt: 'asc' }, { confirmationCount: 'asc' }, { createdAt: 'asc' }],
+    take: excess,
+    select: { id: true },
+  })
+  if (!stale.length) return 0
+  const result = await prisma.organizationMatchMemory.deleteMany({
+    where: { id: { in: stale.map((r) => r.id) } },
+  })
+  return result.count
 }
 
 /** Remember a confirmed 1:N or N:1 split — never invents pairwise Cartesian memories. */
@@ -252,6 +322,8 @@ export async function rememberOrganisationSplitMatch(opts: {
   structure: 'one_to_many' | 'many_to_one'
   cashBookTxs: MatchMemoryTx[]
   bankTxs: MatchMemoryTx[]
+  db?: MatchMemoryDb
+  prune?: boolean
 }): Promise<boolean> {
   let cbFp: { fingerprint: string; learnable: boolean }
   let bkFp: { fingerprint: string; learnable: boolean }
@@ -271,7 +343,8 @@ export async function rememberOrganisationSplitMatch(opts: {
   if (!cbFp.learnable || !bkFp.learnable) return false
 
   const currency = (opts.currency || 'GHS').toUpperCase()
-  await prisma.organizationMatchMemory.upsert({
+  const db = opts.db ?? prisma
+  await db.organizationMatchMemory.upsert({
     where: {
       organizationId_currency_sideKind_amountMinor_cashBookFingerprint_bankFingerprint: {
         organizationId: opts.organizationId,
@@ -297,6 +370,9 @@ export async function rememberOrganisationSplitMatch(opts: {
       lastConfirmedAt: new Date(),
     },
   })
+  if (opts.prune !== false && !opts.db) {
+    await pruneMatchMemoryIfOverCap(opts.organizationId)
+  }
   return true
 }
 
@@ -307,6 +383,8 @@ export function applyOrganisationSplitMatchMemoryBoost(
     confidence: number
     reason: string
     orgMemoryBoosted?: boolean
+    orgMemoryId?: string
+    orgMemoryConfirmations?: number
   }[],
   memories: MatchMemoryRecord[],
   amountTolerance = 0.01
@@ -339,19 +417,32 @@ export function applyOrganisationSplitMatchMemoryBoost(
     }
     if (!cbFp.learnable || !bkFp.learnable) continue
 
-    const hit = splitMemories.some((m) => {
+    const hit = splitMemories.find((m) => {
       if (Math.abs(m.amountMinor - amt) > tolMinor) return false
-      return pairFingerprintsMatch(
+      if (
+        !pairFingerprintsMatch(
+          m.cashBookFingerprint,
+          m.bankFingerprint,
+          cbFp.fingerprint,
+          bkFp.fingerprint
+        )
+      ) {
+        return false
+      }
+      const exact = pairFingerprintsExact(
         m.cashBookFingerprint,
         m.bankFingerprint,
         cbFp.fingerprint,
         bkFp.fingerprint
       )
+      return memoryEligibleForBoost(m.confirmationCount, exact)
     })
     if (!hit) continue
     const before = s.confidence
     s.confidence = Math.min(MEMORY_CONFIDENCE_CAP, s.confidence + MEMORY_BOOST)
     s.orgMemoryBoosted = true
+    s.orgMemoryId = hit.id
+    s.orgMemoryConfirmations = hit.confirmationCount
     if (s.confidence > before) boosted++
     if (!/org memory/i.test(s.reason)) {
       s.reason = s.reason ? `${s.reason}, org memory` : 'Organisation match memory'
@@ -360,37 +451,87 @@ export function applyOrganisationSplitMatchMemoryBoost(
   return boosted
 }
 
+export async function forgetOrganisationMatchMemory(
+  organizationId: string,
+  memoryId: string
+): Promise<boolean> {
+  const result = await prisma.organizationMatchMemory.deleteMany({
+    where: { id: memoryId, organizationId },
+  })
+  return result.count > 0
+}
+
 export async function loadOrganisationMatchMemories(opts: {
   organizationId: string
   currency?: string | null
   sideKind: MatchSideKind
   amountMinors: number[]
 }): Promise<MatchMemoryRecord[]> {
-  if (!opts.amountMinors.length) return []
+  const batch = await loadOrganisationMatchMemoriesBatch({
+    organizationId: opts.organizationId,
+    currency: opts.currency,
+    bySide: { [opts.sideKind]: opts.amountMinors },
+  })
+  return batch[opts.sideKind]
+}
+
+/**
+ * Single DB round-trip for receipt + payment match memories (and optional split amounts).
+ * Skips the query entirely when no amount minors are provided.
+ */
+export async function loadOrganisationMatchMemoriesBatch(opts: {
+  organizationId: string
+  currency?: string | null
+  bySide: Partial<Record<MatchSideKind, number[]>>
+}): Promise<Record<MatchSideKind, MatchMemoryRecord[]>> {
+  const empty: Record<MatchSideKind, MatchMemoryRecord[]> = { receipt: [], payment: [] }
   const currency = (opts.currency || 'GHS').toUpperCase()
+  const sideKinds = (['receipt', 'payment'] as const).filter(
+    (k) => (opts.bySide[k]?.length ?? 0) > 0
+  )
+  if (!sideKinds.length) return empty
+
   const expanded = new Set<number>()
-  for (const a of opts.amountMinors) {
-    expanded.add(a)
-    expanded.add(a - 1)
-    expanded.add(a + 1)
+  for (const k of sideKinds) {
+    for (const a of opts.bySide[k] || []) {
+      expanded.add(a)
+      expanded.add(a - 1)
+      expanded.add(a + 1)
+    }
   }
+  if (!expanded.size) return empty
+
   const rows = await prisma.organizationMatchMemory.findMany({
     where: {
       organizationId: opts.organizationId,
       currency,
-      sideKind: opts.sideKind,
+      sideKind: { in: [...sideKinds] },
       amountMinor: { in: [...expanded] },
     },
     orderBy: [{ confirmationCount: 'desc' }, { lastConfirmedAt: 'desc' }],
-    take: 400,
+    take: 800,
     select: {
+      id: true,
+      sideKind: true,
       amountMinor: true,
       cashBookFingerprint: true,
       bankFingerprint: true,
       confirmationCount: true,
     },
   })
-  return rows
+
+  const out: Record<MatchSideKind, MatchMemoryRecord[]> = { receipt: [], payment: [] }
+  for (const r of rows) {
+    const kind = r.sideKind === 'payment' ? 'payment' : 'receipt'
+    out[kind].push({
+      id: r.id,
+      amountMinor: r.amountMinor,
+      cashBookFingerprint: r.cashBookFingerprint,
+      bankFingerprint: r.bankFingerprint,
+      confirmationCount: r.confirmationCount,
+    })
+  }
+  return out
 }
 
 export function sideKindFromCashBookDocType(docType: string): MatchSideKind {

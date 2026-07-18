@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   attachments,
   reconcile,
+  settings,
   subscription,
   isSubscriptionInactiveError,
   unlessSubscriptionInactive,
@@ -174,6 +175,7 @@ export interface ReconcileSession {
   phasedAutoMatchMutation: ReturnType<
     typeof useMutation<{ totalMatched: number; rounds: number }, Error, void>
   >
+  forgetMemoryMutation: ReturnType<typeof useMutation<{ deleted: boolean }, Error, string>>
 }
 
 export function useReconcileSession(projectId: string): ReconcileSession {
@@ -399,6 +401,18 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       ),
   })
 
+  const forgetMemoryMutation = useMutation<{ deleted: boolean }, Error, string>({
+    mutationFn: (memoryId) => settings.forgetMatchMemory(memoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+      toast.success('Learned pattern forgotten', 'It will no longer boost similar suggestions.')
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not forget pattern', e instanceof Error ? e.message : 'Request failed')
+      ),
+  })
+
   const toggleCb = (id: string) => {
     setSelectedCbIds((prev) => {
       const next = new Set(prev)
@@ -454,5 +468,6 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     clearAllMatchesMutation,
     evidenceUploadMutation,
     phasedAutoMatchMutation,
+    forgetMemoryMutation,
   }
 }

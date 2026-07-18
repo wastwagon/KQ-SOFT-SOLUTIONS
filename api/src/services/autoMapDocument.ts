@@ -24,10 +24,16 @@ import {
   remapDocumentTypeToFamily,
   type DocumentTypeInference,
 } from './documentTypeInference.js'
+import {
+  markDocumentParseFailed,
+  markDocumentParseProcessing,
+  markDocumentParseReady,
+} from '../lib/documentParseJob.js'
+import { incOpsMetric, observeParseQuality } from '../lib/opsMetrics.js'
 
 const AUTO_MAP = process.env.AUTO_MAP_ON_UPLOAD !== 'false'
-/** Auto-correct misfiled cash-book ↔ bank uploads when inference confidence is high. */
-const AUTO_CORRECT_DOC_TYPE = process.env.AUTO_CORRECT_DOC_TYPE !== 'false'
+/** Opt-in: auto-correct misfiled cash-book ↔ bank uploads (clears bankAccountId when flipping to cash book). */
+const AUTO_CORRECT_DOC_TYPE = process.env.AUTO_CORRECT_DOC_TYPE === 'true'
 
 function isHighOrMedium(c: MappingConfidence | undefined): boolean {
   return c === 'high' || c === 'medium'
@@ -146,6 +152,10 @@ export type AutoMapOutcome =
 /** Parse file, apply suggested mapping when safe. Does not throw — for use after upload. */
 export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOutcome> {
   if (!AUTO_MAP) {
+    await markDocumentParseReady(documentId, 'Auto-map disabled — map manually').catch(() => undefined)
+    incOpsMetric('parse.auto_map_skipped', {
+      detail: { reason: 'disabled', documentId },
+    })
     return { status: 'skipped', reason: 'AUTO_MAP_ON_UPLOAD disabled' }
   }
 
@@ -156,6 +166,8 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
   if (!doc?.project?.organization) {
     return { status: 'skipped', reason: 'document not found' }
   }
+
+  await markDocumentParseProcessing(documentId).catch(() => undefined)
 
   try {
     let docType = doc.type
@@ -190,6 +202,24 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
       docType = nextType
       sheetIndex = ft === 'excel' ? pickBestExcelSheetIndex(doc.filepath, docType) : 0
       parsed = await parseDocumentFile(doc.filepath, docType, sheetIndex)
+      incOpsMetric('parse.type_corrected', {
+        detail: { documentId, from: typeCorrected.from, to: typeCorrected.to },
+      })
+    }
+
+    if (parsed.parseQualityScore != null) {
+      observeParseQuality(parsed.parseQualityScore, {
+        documentId,
+        parseMethod: parsed.parseMethod,
+      })
+    }
+    if (parsed.ocrRetried) {
+      incOpsMetric('parse.ocr_retried', {
+        detail: { documentId, parseMethod: parsed.parseMethod },
+      })
+    }
+    if (parsed.parseMethod === 'ocr_geometry') {
+      incOpsMetric('parse.ocr_geometry', { detail: { documentId } })
     }
 
     const sample = parsed.rows.slice(0, 20)
@@ -207,11 +237,27 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
       parsed.headers,
       suggested
     )
+    if (learned.match && learned.appliedFields.length) {
+      incOpsMetric('parse.layout_memory_hit', {
+        labels: { exact: learned.match.exact ? 'true' : 'false' },
+        detail: { documentId, fields: learned.appliedFields.length },
+      })
+      if (learned.match.exact) {
+        incOpsMetric('parse.layout_memory_exact', { detail: { documentId }, log: false })
+      }
+    }
     const mapping = sanitizeMapping(
       trimMappingForDocumentType(docType, learned.mapping),
       parsed.headers.length
     )
     if (!canAutoMap(docType, parsed.headers, mapping, parsed.rows.slice(0, 250))) {
+      await markDocumentParseReady(
+        documentId,
+        'Mapping confidence too low — map manually'
+      ).catch(() => undefined)
+      incOpsMetric('parse.auto_map_skipped', {
+        detail: { reason: 'low_confidence', documentId },
+      })
       return {
         status: 'skipped',
         reason: 'mapping confidence too low — map manually',
@@ -231,6 +277,13 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
     if (learned.match) {
       await touchLayoutMemoryUse(learned.match.id).catch(() => undefined)
     }
+    await markDocumentParseReady(
+      documentId,
+      `Auto-mapped ${result.count} transaction(s)`
+    ).catch(() => undefined)
+    incOpsMetric('parse.auto_map_mapped', {
+      detail: { documentId, transactionCount: result.count, parseMethod: parsed.parseMethod },
+    })
     return {
       status: 'mapped',
       transactionCount: result.count,
@@ -239,6 +292,9 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
       typeInference,
     }
   } catch (e) {
-    return { status: 'failed', error: (e as Error).message }
+    const error = (e as Error).message
+    await markDocumentParseFailed(documentId, error).catch(() => undefined)
+    incOpsMetric('parse.auto_map_failed', { detail: { documentId, error } })
+    return { status: 'failed', error }
   }
 }

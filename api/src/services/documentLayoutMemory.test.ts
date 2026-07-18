@@ -44,15 +44,24 @@ describe('documentLayoutMemory', () => {
     expect(applied.amt_paid).toBe(0)
   })
 
-  it('merges learned mapping over base suggestions', () => {
-    const { mapping, appliedFields } = mergeLearnedMapping(
+  it('soft-merge fills missing fields only; exact overwrites conflicts', () => {
+    const soft = mergeLearnedMapping(
       { date: 0, amt_received: 2 },
       { date: 1, details: 3 }
     )
-    expect(mapping.date).toBe(1)
-    expect(mapping.amt_received).toBe(2)
-    expect(mapping.details).toBe(3)
-    expect(appliedFields).toEqual(expect.arrayContaining(['date', 'details']))
+    expect(soft.mapping.date).toBe(0)
+    expect(soft.mapping.amt_received).toBe(2)
+    expect(soft.mapping.details).toBe(3)
+    expect(soft.appliedFields).toEqual(['details'])
+
+    const exact = mergeLearnedMapping(
+      { date: 0, amt_received: 2 },
+      { date: 1, details: 3 },
+      { overwriteConflicts: true }
+    )
+    expect(exact.mapping.date).toBe(1)
+    expect(exact.mapping.details).toBe(3)
+    expect(exact.appliedFields).toEqual(expect.arrayContaining(['date', 'details']))
   })
 
   it('picks exact fingerprint over soft match', () => {

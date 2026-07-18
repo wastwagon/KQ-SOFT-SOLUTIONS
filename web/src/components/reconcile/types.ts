@@ -24,6 +24,10 @@ export interface SuggestedMatch {
   ecobankPattern?: boolean
   /** True when organisation match memory raised this suggestion’s confidence. */
   orgMemoryBoosted?: boolean
+  /** Memory row id — used to forget a bad learned pattern. */
+  orgMemoryId?: string
+  /** How many times this pattern was confirmed before. */
+  orgMemoryConfirmations?: number
 }
 
 export interface SuggestedSplitMatch {
@@ -32,6 +36,8 @@ export interface SuggestedSplitMatch {
   confidence: number
   reason: string
   orgMemoryBoosted?: boolean
+  orgMemoryId?: string
+  orgMemoryConfirmations?: number
 }
 
 export interface AttachmentInfo {

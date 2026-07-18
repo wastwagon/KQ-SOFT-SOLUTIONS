@@ -52,6 +52,31 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       SUBSCRIPTION_PAYWALL: ${SUBSCRIPTION_PAYWALL:-true}
+      PARSE_JOB_IN_API: ${PARSE_JOB_IN_API:-1}
+      PARSE_JOB_CONCURRENCY: ${PARSE_JOB_CONCURRENCY:-1}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  # Optional dedicated OCR/parse worker (BullMQ + DB claim). Scale replicas as needed.
+  parse-worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    command: ["node", "dist/worker/parseWorker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/brs_db
+      REDIS_URL: redis://redis:6379
+      UPLOAD_DIR: /app/uploads
+      PARSE_JOB_CONCURRENCY: ${PARSE_JOB_CONCURRENCY:-1}
+      PARSE_JOB_USE_BULLMQ: ${PARSE_JOB_USE_BULLMQ:-1}
+      JWT_SECRET: ${JWT_SECRET:-unused}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

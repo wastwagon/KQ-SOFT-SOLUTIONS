@@ -15,14 +15,18 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed-plans": "npx tsx prisma/seed-plans.ts",
     "test": "prisma generate && vitest run",
+    "test:integration": "prisma generate && vitest run --config vitest.integration.config.ts",
     "test:licl-qtest": "vitest run --run src/routes/report.qtest-licl-golden.test.ts",
     "test:watch": "vitest",
+    "worker:parse": "tsx src/worker/parseWorker.ts",
+    "start:worker:parse": "node dist/worker/parseWorker.js",
     "benchmark:specimens": "tsx scripts/run-specimen-benchmark.ts",
     "benchmark:specimens:excel": "tsx scripts/run-specimen-benchmark.ts --excel-only"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.80.8",
     "cors": "^2.8.5",
     "csv-parse": "^6.2.1",
     "dotenv": "^16.4.5",
@@ -30,6 +34,7 @@
     "express-rate-limit": "^8.3.1",
     "express-validator": "^7.2.0",
     "helmet": "^8.1.0",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "pdf-parse-new": "^1.1.1",
@@ -45,6 +50,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^12.0.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -53,6 +59,7 @@
     "@types/node": "^22.9.0",
     "@types/pdfkit": "^0.17.5",
     "prisma": "^5.22.0",
+    "testcontainers": "^12.0.4",
     "typescript": "^5.6.3",
     "vitest": "^4.0.18"
   },

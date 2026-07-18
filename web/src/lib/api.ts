@@ -102,6 +102,7 @@ export interface DocumentPreviewResponse {
   parseQualityNotes?: string[]
   /** Present when org layout memory filled in suggested columns. */
   layoutMemoryApplied?: {
+    id?: string
     exact: boolean
     similarity: number
     fields: string[]
@@ -521,6 +522,16 @@ export const documents = {
   },
   map: (id: string, body: { mapping: Record<string, number>; sheetIndex?: number }) =>
     api(`/documents/${id}/map`, { method: 'POST', body: JSON.stringify(body) }) as Promise<MapDocumentResponse>,
+  parseStatus: (id: string) =>
+    api(`/documents/${id}/parse-status`) as Promise<{
+      documentId: string
+      parseStatus: 'pending' | 'processing' | 'ready' | 'failed' | string
+      parseStatusMessage?: string | null
+      parseStartedAt?: string | null
+      parseFinishedAt?: string | null
+      type: string
+      filename: string
+    }>,
   changeType: (id: string, family: 'cash_book' | 'bank_statement') =>
     api(`/documents/${id}/type`, {
       method: 'POST',
@@ -769,6 +780,10 @@ export const settings = {
     approvalThresholdAmount?: number | null
     ghanaBrsWorkbookNettingDefault?: boolean
   }) => api('/settings/branding', { method: 'PATCH', body: JSON.stringify(body) }),
+  forgetMatchMemory: (id: string) =>
+    api(`/settings/match-memory/${id}`, { method: 'DELETE' }) as Promise<{ deleted: boolean }>,
+  forgetLayoutMemory: (id: string) =>
+    api(`/settings/layout-memory/${id}`, { method: 'DELETE' }) as Promise<{ deleted: boolean }>,
   uploadLogo: (file: File) => {
     const form = new FormData()
     form.append('file', file)

@@ -40,11 +40,18 @@ import {
   amountToMinor,
   applyOrganisationMatchMemoryBoost,
   applyOrganisationSplitMatchMemoryBoost,
-  loadOrganisationMatchMemories,
+  loadOrganisationMatchMemoriesBatch,
+  pruneMatchMemoryIfOverCap,
   rememberOrganisationMatch,
   rememberOrganisationSplitMatch,
   sideKindFromCashBookDocType,
 } from '../services/organizationMatchMemory.js'
+import {
+  countReconcileLanes,
+  loadReconcileLane,
+  loadTransactionsByIds,
+} from '../services/reconcileTransactionLoad.js'
+import { incOpsMetric } from '../lib/opsMetrics.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveWorkbookNetting } from '../lib/brsQueryFlags.js'
 import { logAudit } from '../services/audit.js'
@@ -134,7 +141,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       organization: { select: { plan: true, branding: true } },
       bankAccounts: true,
       documents: {
-        include: { transactions: true, bankAccount: true },
+        select: { id: true, type: true, bankAccountId: true, filename: true },
       },
       matches: { include: { matchItems: true, attachments: true } },
     },
@@ -150,41 +157,52 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
   )
 
-  const toTx = (t: { id: string; date: Date | null; name: string | null; details: string | null; docRef: string | null; chqNo: string | null; amount: unknown }): Tx => ({
-    id: t.id,
-    date: t.date,
-    name: t.name,
-    details: t.details,
-    amount: Number(t.amount),
-    docRef: t.docRef,
-    chqNo: t.chqNo,
-  })
+  const receiptDocIds = receiptsDocs.map((d) => d.id)
+  const paymentDocIds = paymentsDocs.map((d) => d.id)
+  const creditDocIds = creditsDocs.map((d) => d.id)
+  const debitDocIds = debitsDocs.map((d) => d.id)
 
-  const receiptsFull = receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const paymentsFull = paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const creditsFull = creditsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const debitsFull = debitsDocs.flatMap((d) => (d.transactions || []).map(toTx))
-  const limit = resolveReconcileFetchLimit(requestedLimit, [
-    receiptsFull.length,
-    paymentsFull.length,
-    creditsFull.length,
-    debitsFull.length,
-  ])
-  const suggestionCap = resolveSuggestionCap(requestedSuggestionCap, [
-    receiptsFull.length,
-    paymentsFull.length,
-    creditsFull.length,
-    debitsFull.length,
-  ])
+  const categoryCounts = await countReconcileLanes({
+    receiptDocIds,
+    paymentDocIds,
+    creditDocIds,
+    debitDocIds,
+  })
+  const limit = resolveReconcileFetchLimit(requestedLimit, [...categoryCounts])
+  const suggestionCap = resolveSuggestionCap(requestedSuggestionCap, [...categoryCounts])
   const perCategory = Math.ceil(limit / 4)
-  const truncate = <T>(arr: T[]) => {
-    if (arr.length <= perCategory) return { arr, truncated: false, totalCount: arr.length }
-    return { arr: arr.slice(0, perCategory), truncated: true, totalCount: arr.length }
+
+  const [rRecLane, rCredLane, rPayLane, rDebLane] = await Promise.all([
+    loadReconcileLane({ documentIds: receiptDocIds, perCategory }),
+    loadReconcileLane({ documentIds: creditDocIds, perCategory }),
+    loadReconcileLane({ documentIds: paymentDocIds, perCategory }),
+    loadReconcileLane({ documentIds: debitDocIds, perCategory }),
+  ])
+
+  const receiptsFull = rRecLane.full
+  const paymentsFull = rPayLane.full
+  const creditsFull = rCredLane.full
+  const debitsFull = rDebLane.full
+  const rRec = {
+    arr: rRecLane.display,
+    truncated: rRecLane.truncated,
+    totalCount: rRecLane.totalCount,
   }
-  const rRec = truncate(receiptsFull)
-  const rCred = truncate(creditsFull)
-  const rPay = truncate(paymentsFull)
-  const rDeb = truncate(debitsFull)
+  const rCred = {
+    arr: rCredLane.display,
+    truncated: rCredLane.truncated,
+    totalCount: rCredLane.totalCount,
+  }
+  const rPay = {
+    arr: rPayLane.display,
+    truncated: rPayLane.truncated,
+    totalCount: rPayLane.totalCount,
+  }
+  const rDeb = {
+    arr: rDebLane.display,
+    truncated: rDebLane.truncated,
+    totalCount: rDebLane.totalCount,
+  }
   const receipts = rRec.arr
   const credits = rCred.arr
   const payments = rPay.arr
@@ -192,20 +210,39 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
 
   const matchedCbIds = new Set<string>()
   const matchedBankIds = new Set<string>()
-  const matchList: { matchId: string; cashBookTxId: string; bankTxId: string; cbTx: Tx; bankTx: Tx; attachments: any[] }[] = []
+  const matchList: {
+    matchId: string
+    cashBookTxId: string
+    bankTxId: string
+    cbTx: Tx
+    bankTx: Tx
+    attachments: any[]
+  }[] = []
   const allTxs = new Map<string, Tx>()
-  ;[...receipts, ...credits, ...payments, ...debits].forEach((t) => allTxs.set(t.id, t))
+  ;[...receiptsFull, ...creditsFull, ...paymentsFull, ...debitsFull].forEach((t) =>
+    allTxs.set(t.id, t)
+  )
+
+  const pairIds: string[] = []
+  for (const m of project.matches) {
+    for (const mi of m.matchItems) {
+      if (mi.side === 'cash_book') matchedCbIds.add(mi.transactionId)
+      else matchedBankIds.add(mi.transactionId)
+      if (!allTxs.has(mi.transactionId)) pairIds.push(mi.transactionId)
+    }
+  }
+  if (pairIds.length) {
+    for (const t of await loadTransactionsByIds(pairIds)) {
+      allTxs.set(t.id, t)
+    }
+  }
+
   for (const m of project.matches) {
     const cbIds: string[] = []
     const bankIds: string[] = []
     for (const mi of m.matchItems) {
-      if (mi.side === 'cash_book') {
-        matchedCbIds.add(mi.transactionId)
-        cbIds.push(mi.transactionId)
-      } else {
-        matchedBankIds.add(mi.transactionId)
-        bankIds.push(mi.transactionId)
-      }
+      if (mi.side === 'cash_book') cbIds.push(mi.transactionId)
+      else bankIds.push(mi.transactionId)
     }
     // Expand 1-to-many, many-to-1, 1-to-1, and many-to-many into pairs for display
     const pairs: [string, string][] = []
@@ -279,13 +316,23 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     : matchOptions.dateWindowDays
 
   const annotateSuggestions = (
-    list: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string; orgMemoryBoosted?: boolean }[],
+    list: {
+      cashBookTx: Tx
+      bankTx: Tx
+      confidence: number
+      reason: string
+      orgMemoryBoosted?: boolean
+      orgMemoryId?: string
+      orgMemoryConfirmations?: number
+    }[],
     matchKind: 'receipt' | 'payment'
   ) =>
     list.map((s) => ({
       ...s,
       matchKind,
       orgMemoryBoosted: s.orgMemoryBoosted || /org memory/i.test(s.reason) || undefined,
+      orgMemoryId: s.orgMemoryId,
+      orgMemoryConfirmations: s.orgMemoryConfirmations,
       ecobankPattern:
         matchKind === 'payment' &&
         (isEcobankPatternMatchReason(s.reason) || isScbPatternMatchReason(s.reason)),
@@ -506,29 +553,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   addRuleSuggestions(receiptsFull, receiptBank, receiptSuggestions)
   addRuleSuggestions(paymentsFull, paymentBank, paymentSuggestions)
 
-  // Organisation match memory: boost suggestions that resemble confirmed pairs
-  const currency = project.currency || 'GHS'
-  const receiptMemories = await loadOrganisationMatchMemories({
-    organizationId: orgId,
-    currency,
-    sideKind: 'receipt',
-    amountMinors: receiptSuggestions.map((s) => amountToMinor(s.cashBookTx.amount)),
-  })
-  const paymentMemories = await loadOrganisationMatchMemories({
-    organizationId: orgId,
-    currency,
-    sideKind: 'payment',
-    amountMinors: paymentSuggestions.map((s) => amountToMinor(s.cashBookTx.amount)),
-  })
-  applyOrganisationMatchMemoryBoost(receiptSuggestions, receiptMemories, matchOptions.amountTolerance)
-  applyOrganisationMatchMemoryBoost(paymentSuggestions, paymentMemories, matchOptions.amountTolerance)
-
-  receiptSuggestions.sort((a, b) => b.confidence - a.confidence)
-  paymentSuggestions.sort((a, b) => b.confidence - a.confidence)
-  const receiptSuggestionsOut = annotateSuggestions(receiptSuggestions, 'receipt')
-  const paymentSuggestionsOut = annotateSuggestions(paymentSuggestions, 'payment')
-
-  let splitSuggestions: { receipts: SuggestedSplitMatch[]; payments: SuggestedSplitMatch[] } = { receipts: [], payments: [] }
+  let splitSuggestions: { receipts: SuggestedSplitMatch[]; payments: SuggestedSplitMatch[] } = {
+    receipts: [],
+    payments: [],
+  }
   if (hasSplitMatchingPlan) {
     splitSuggestions.receipts = suggestSplitMatches(
       receiptsFull,
@@ -544,42 +572,83 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       matchedBankIds,
       { ...matchOptions }
     )
-    const receiptSplitAmounts = splitSuggestions.receipts.map((s) =>
-      amountToMinor(
-        s.cashBookTxs.length === 1
-          ? s.cashBookTxs[0]!.amount
-          : s.bankTxs[0]?.amount ?? s.cashBookTxs.reduce((n, t) => n + t.amount, 0)
+  }
+
+  // Organisation match memory (Standard+): one DB query for all suggestion amounts
+  const currency = project.currency || 'GHS'
+  if (hasAiSuggestions) {
+    const receiptAmounts = [
+      ...receiptSuggestions.map((s) => amountToMinor(s.cashBookTx.amount)),
+      ...splitSuggestions.receipts.map((s) =>
+        amountToMinor(
+          s.cashBookTxs.length === 1
+            ? s.cashBookTxs[0]!.amount
+            : s.bankTxs[0]?.amount ?? s.cashBookTxs.reduce((n, t) => n + t.amount, 0)
+        )
+      ),
+    ]
+    const paymentAmounts = [
+      ...paymentSuggestions.map((s) => amountToMinor(s.cashBookTx.amount)),
+      ...splitSuggestions.payments.map((s) =>
+        amountToMinor(
+          s.cashBookTxs.length === 1
+            ? s.cashBookTxs[0]!.amount
+            : s.bankTxs[0]?.amount ?? s.cashBookTxs.reduce((n, t) => n + t.amount, 0)
+        )
+      ),
+    ]
+    if (receiptAmounts.length || paymentAmounts.length) {
+      const memories = await loadOrganisationMatchMemoriesBatch({
+        organizationId: orgId,
+        currency,
+        bySide: {
+          receipt: receiptAmounts,
+          payment: paymentAmounts,
+        },
+      })
+      const boostReceipt = applyOrganisationMatchMemoryBoost(
+        receiptSuggestions,
+        memories.receipt,
+        matchOptions.amountTolerance
       )
-    )
-    const paymentSplitAmounts = splitSuggestions.payments.map((s) =>
-      amountToMinor(
-        s.cashBookTxs.length === 1
-          ? s.cashBookTxs[0]!.amount
-          : s.bankTxs[0]?.amount ?? s.cashBookTxs.reduce((n, t) => n + t.amount, 0)
+      const boostPayment = applyOrganisationMatchMemoryBoost(
+        paymentSuggestions,
+        memories.payment,
+        matchOptions.amountTolerance
       )
-    )
-    const receiptSplitMemories = await loadOrganisationMatchMemories({
-      organizationId: orgId,
-      currency,
-      sideKind: 'receipt',
-      amountMinors: receiptSplitAmounts,
-    })
-    const paymentSplitMemories = await loadOrganisationMatchMemories({
-      organizationId: orgId,
-      currency,
-      sideKind: 'payment',
-      amountMinors: paymentSplitAmounts,
-    })
-    applyOrganisationSplitMatchMemoryBoost(
-      splitSuggestions.receipts,
-      receiptSplitMemories,
-      matchOptions.amountTolerance
-    )
-    applyOrganisationSplitMatchMemoryBoost(
-      splitSuggestions.payments,
-      paymentSplitMemories,
-      matchOptions.amountTolerance
-    )
+      if (boostReceipt + boostPayment > 0) {
+        incOpsMetric('match.memory_boost_1to1', {
+          by: boostReceipt + boostPayment,
+          detail: { projectId, receipt: boostReceipt, payment: boostPayment },
+        })
+      }
+      if (hasSplitMatchingPlan) {
+        const boostSplitR = applyOrganisationSplitMatchMemoryBoost(
+          splitSuggestions.receipts,
+          memories.receipt,
+          matchOptions.amountTolerance
+        )
+        const boostSplitP = applyOrganisationSplitMatchMemoryBoost(
+          splitSuggestions.payments,
+          memories.payment,
+          matchOptions.amountTolerance
+        )
+        if (boostSplitR + boostSplitP > 0) {
+          incOpsMetric('match.memory_boost_split', {
+            by: boostSplitR + boostSplitP,
+            detail: { projectId, receipt: boostSplitR, payment: boostSplitP },
+          })
+        }
+      }
+    }
+  }
+
+  receiptSuggestions.sort((a, b) => b.confidence - a.confidence)
+  paymentSuggestions.sort((a, b) => b.confidence - a.confidence)
+  const receiptSuggestionsOut = annotateSuggestions(receiptSuggestions, 'receipt')
+  const paymentSuggestionsOut = annotateSuggestions(paymentSuggestions, 'payment')
+
+  if (hasSplitMatchingPlan) {
     splitSuggestions.receipts.sort((a, b) => b.confidence - a.confidence)
     splitSuggestions.payments.sort((a, b) => b.confidence - a.confidence)
   }
@@ -588,6 +657,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     project: { id: project.id, name: project.name, status: project.status, currency: project.currency || 'GHS' },
     bankAccounts: project.bankAccounts || [],
     bankAccountId: bankAccountId || null,
+    features: {
+      ai_suggestions: hasAiSuggestions,
+      bank_rules: hasBankRulesPlan,
+      one_to_many: hasSplitMatchingPlan,
+      many_to_many: hasPlanFeature(plan, 'many_to_many'),
+      bulk_match: hasPlanFeature(plan, 'bulk_match'),
+    },
     receipts: { transactions: receipts, documentId: receiptsDocs[0]?.id, truncated: rRec.truncated, totalCount: rRec.totalCount },
     credits: { transactions: credits, documentIds: creditsDocs.map((d) => d.id), truncated: rCred.truncated, totalCount: rCred.totalCount },
     payments: { transactions: payments, documentId: paymentsDocs[0]?.id, truncated: rPay.truncated, totalCount: rPay.totalCount },
@@ -723,49 +799,69 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
     }
 
-    const match = await prisma.match.create({
-      data: {
-        projectId,
-        type,
-        status: 'confirmed',
-        confidence: 1,
-        matchItems: {
-          create: matchItems.map((m) => ({ transactionId: m.transactionId, side: m.side })),
-        },
-      },
-    })
-    await prisma.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
+    const shouldRememberSplit =
+      (type === 'one_to_many' || type === 'many_to_one') &&
+      hasPlanFeature(org.plan, 'ai_suggestions')
+    const cbTxs = shouldRememberSplit
+      ? matchItems
+          .filter((m) => m.side === 'cash_book')
+          .map((m) => txs.find((t) => t.id === m.transactionId)!)
+          .filter(Boolean)
+      : []
+    const bankTxs = shouldRememberSplit
+      ? matchItems
+          .filter((m) => m.side === 'bank')
+          .map((m) => txs.find((t) => t.id === m.transactionId)!)
+          .filter(Boolean)
+      : []
 
-    if (type === 'one_to_many' || type === 'many_to_one') {
-      const cbTxs = matchItems
-        .filter((m) => m.side === 'cash_book')
-        .map((m) => txs.find((t) => t.id === m.transactionId)!)
-        .filter(Boolean)
-      const bankTxs = matchItems
-        .filter((m) => m.side === 'bank')
-        .map((m) => txs.find((t) => t.id === m.transactionId)!)
-        .filter(Boolean)
-      const sideKind = sideKindFromCashBookDocType(cbTxs[0]?.document.type || 'cash_book_receipts')
-      await rememberOrganisationSplitMatch({
-        organizationId: orgId,
-        currency: project.currency,
-        sideKind,
-        structure: type,
-        cashBookTxs: cbTxs.map((t) => ({
-          amount: Number(t.amount),
-          name: t.name,
-          details: t.details,
-          docRef: t.docRef,
-          chqNo: t.chqNo,
-        })),
-        bankTxs: bankTxs.map((t) => ({
-          amount: Number(t.amount),
-          name: t.name,
-          details: t.details,
-          docRef: t.docRef,
-          chqNo: t.chqNo,
-        })),
-      }).catch(() => undefined)
+    const { match, remembered } = await prisma.$transaction(async (tx) => {
+      const match = await tx.match.create({
+        data: {
+          projectId,
+          type,
+          status: 'confirmed',
+          confidence: 1,
+          matchItems: {
+            create: matchItems.map((m) => ({ transactionId: m.transactionId, side: m.side })),
+          },
+        },
+      })
+      await tx.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
+
+      let remembered = false
+      if (shouldRememberSplit) {
+        const sideKind = sideKindFromCashBookDocType(cbTxs[0]?.document.type || 'cash_book_receipts')
+        remembered = await rememberOrganisationSplitMatch({
+          organizationId: orgId,
+          currency: project.currency,
+          sideKind,
+          structure: type as 'one_to_many' | 'many_to_one',
+          cashBookTxs: cbTxs.map((t) => ({
+            amount: Number(t.amount),
+            name: t.name,
+            details: t.details,
+            docRef: t.docRef,
+            chqNo: t.chqNo,
+          })),
+          bankTxs: bankTxs.map((t) => ({
+            amount: Number(t.amount),
+            name: t.name,
+            details: t.details,
+            docRef: t.docRef,
+            chqNo: t.chqNo,
+          })),
+          db: tx,
+          prune: false,
+        })
+      }
+      return { match, remembered }
+    })
+    if (remembered) {
+      incOpsMetric('match.memory_remember_split', {
+        detail: { projectId, structure: type },
+      })
+      void pruneMatchMemoryIfOverCap(orgId).catch(() => undefined)
     }
 
     await logAudit({
@@ -821,40 +917,57 @@ router.post('/:projectId/match', async (req: AuthRequest, res) => {
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
     }
-    const match = await prisma.match.create({
-      data: {
-        projectId,
-        type: 'one_to_one',
-        status: 'confirmed',
-        confidence: 1,
-        matchItems: {
-          create: [
-            { transactionId: cbTx.id, side: 'cash_book' },
-            { transactionId: bankTx.id, side: 'bank' },
-          ],
-        },
-      },
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { plan: true },
     })
-    await prisma.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
-    await rememberOrganisationMatch({
-      organizationId: orgId,
-      currency: project.currency,
-      sideKind: sideKindFromCashBookDocType(cbTx.document.type),
-      cashBookTx: {
-        amount: Number(cbTx.amount),
-        name: cbTx.name,
-        details: cbTx.details,
-        docRef: cbTx.docRef,
-        chqNo: cbTx.chqNo,
-      },
-      bankTx: {
-        amount: Number(bankTx.amount),
-        name: bankTx.name,
-        details: bankTx.details,
-        docRef: bankTx.docRef,
-        chqNo: bankTx.chqNo,
-      },
-    }).catch(() => undefined)
+    const shouldRemember = !!(org && hasPlanFeature(org.plan, 'ai_suggestions'))
+    const { match, remembered } = await prisma.$transaction(async (tx) => {
+      const match = await tx.match.create({
+        data: {
+          projectId,
+          type: 'one_to_one',
+          status: 'confirmed',
+          confidence: 1,
+          matchItems: {
+            create: [
+              { transactionId: cbTx.id, side: 'cash_book' },
+              { transactionId: bankTx.id, side: 'bank' },
+            ],
+          },
+        },
+      })
+      await tx.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
+      let remembered = false
+      if (shouldRemember) {
+        remembered = await rememberOrganisationMatch({
+          organizationId: orgId,
+          currency: project.currency,
+          sideKind: sideKindFromCashBookDocType(cbTx.document.type),
+          cashBookTx: {
+            amount: Number(cbTx.amount),
+            name: cbTx.name,
+            details: cbTx.details,
+            docRef: cbTx.docRef,
+            chqNo: cbTx.chqNo,
+          },
+          bankTx: {
+            amount: Number(bankTx.amount),
+            name: bankTx.name,
+            details: bankTx.details,
+            docRef: bankTx.docRef,
+            chqNo: bankTx.chqNo,
+          },
+          db: tx,
+          prune: false,
+        })
+      }
+      return { match, remembered }
+    })
+    if (remembered) {
+      incOpsMetric('match.memory_remember_1to1', { detail: { projectId } })
+      void pruneMatchMemoryIfOverCap(orgId).catch(() => undefined)
+    }
     await logAudit({
       organizationId: orgId,
       userId: req.auth!.userId,
@@ -945,8 +1058,10 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
     }
+    const shouldRemember = hasPlanFeature(org.plan, 'ai_suggestions')
     const created = await prisma.$transaction(async (tx) => {
       const ids: { id: string }[] = []
+      let rememberedCount = 0
       for (const { cbTx, bankTx } of toCreate) {
         const match = await tx.match.create({
           data: {
@@ -963,44 +1078,56 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
           },
         })
         ids.push({ id: match.id })
+        if (shouldRemember) {
+          const ok = await rememberOrganisationMatch({
+            organizationId: orgId,
+            currency: project.currency,
+            sideKind: sideKindFromCashBookDocType(cbTx.document.type),
+            cashBookTx: {
+              amount: Number(cbTx.amount),
+              name: cbTx.name,
+              details: cbTx.details,
+              docRef: cbTx.docRef,
+              chqNo: cbTx.chqNo,
+            },
+            bankTx: {
+              amount: Number(bankTx.amount),
+              name: bankTx.name,
+              details: bankTx.details,
+              docRef: bankTx.docRef,
+              chqNo: bankTx.chqNo,
+            },
+            db: tx,
+            prune: false,
+          })
+          if (ok) rememberedCount++
+        }
       }
       if (ids.length > 0) {
         await tx.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
       }
-      return ids
+      return { ids, rememberedCount }
     })
-    if (created.length > 0) {
-      for (const { cbTx, bankTx } of toCreate) {
-        await rememberOrganisationMatch({
-          organizationId: orgId,
-          currency: project.currency,
-          sideKind: sideKindFromCashBookDocType(cbTx.document.type),
-          cashBookTx: {
-            amount: Number(cbTx.amount),
-            name: cbTx.name,
-            details: cbTx.details,
-            docRef: cbTx.docRef,
-            chqNo: cbTx.chqNo,
-          },
-          bankTx: {
-            amount: Number(bankTx.amount),
-            name: bankTx.name,
-            details: bankTx.details,
-            docRef: bankTx.docRef,
-            chqNo: bankTx.chqNo,
-          },
-        }).catch(() => undefined)
+    if (created.ids.length > 0) {
+      if (created.rememberedCount > 0) {
+        for (let i = 0; i < created.rememberedCount; i++) {
+          incOpsMetric('match.memory_remember_1to1', {
+            detail: { projectId, source: 'bulk' },
+            log: false,
+          })
+        }
+        void pruneMatchMemoryIfOverCap(orgId).catch(() => undefined)
       }
       await logAudit({
         organizationId: orgId,
         userId: req.auth!.userId,
         projectId,
         action: 'match_bulk',
-        details: { count: created.length },
+        details: { count: created.ids.length },
       })
     }
     res.status(201).json({
-      created: created.length,
+      created: created.ids.length,
     })
   } catch (e) {
     const conflict = getMatchConflictErrorBody(e)

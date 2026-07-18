@@ -48,6 +48,19 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       requestId,
     })
   }
+  if (code === 'OCR_BUSY' || code === 'OCR_TIMEOUT') {
+    const statusCode =
+      err && typeof err === 'object' && 'statusCode' in err
+        ? Number((err as { statusCode?: number }).statusCode)
+        : code === 'OCR_BUSY'
+          ? 503
+          : 504
+    return res.status(statusCode || 503).json({
+      error: err instanceof Error ? err.message : 'OCR unavailable',
+      code,
+      requestId,
+    })
+  }
 
   // Zod schema validation.
   if (err instanceof ZodError) {

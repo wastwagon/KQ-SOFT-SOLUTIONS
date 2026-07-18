@@ -14,6 +14,7 @@ import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscripti
 import { canAddBankAccount } from '../services/planLimits.js'
 import { autoMapAfterUpload } from '../lib/deferredAutoMap.js'
 import { resolveMaxUploadSizeBytes } from '../config/importLimits.js'
+import { uploadParseRouteLimiter } from '../middleware/heavyRouteLimiter.js'
 
 const router = Router()
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
@@ -93,6 +94,7 @@ const logoUpload = multer({
 
 router.use(authMiddleware)
 router.use(requireOrgSubscriptionForApp)
+router.use(uploadParseRouteLimiter)
 
 router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })

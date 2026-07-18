@@ -28,6 +28,8 @@ interface SuggestedMatchesPanelProps {
   onPhasedAutoMatch?: () => void
   isPhasedAutoMatching?: boolean
   isMatching: boolean
+  onForgetMemory?: (memoryId: string) => void
+  isForgettingMemory?: boolean
 }
 
 export default function SuggestedMatchesPanel({
@@ -45,6 +47,8 @@ export default function SuggestedMatchesPanel({
   onPhasedAutoMatch,
   isPhasedAutoMatching = false,
   isMatching,
+  onForgetMemory,
+  isForgettingMemory = false,
 }: SuggestedMatchesPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [listCount, setListCount] = useState(150)
@@ -248,12 +252,36 @@ export default function SuggestedMatchesPanel({
                       Withdrawal
                     </span>
                   )}
-                  {(s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
-                    <span
-                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-900"
-                      title="Boosted because your organisation confirmed a similar amount + reference/narration before"
-                    >
-                      Learned
+                  {features.ai_suggestions &&
+                    (s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
+                    <span className="ml-2 inline-flex items-center gap-1">
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-900"
+                        title={
+                          s.orgMemoryConfirmations
+                            ? `Boosted from ${s.orgMemoryConfirmations} prior confirmation(s) of a similar amount + reference/narration`
+                            : 'Boosted because your organisation confirmed a similar amount + reference/narration before'
+                        }
+                      >
+                        Learned
+                        {s.orgMemoryConfirmations != null && s.orgMemoryConfirmations > 0
+                          ? ` · ${s.orgMemoryConfirmations}×`
+                          : ''}
+                      </span>
+                      {onForgetMemory && s.orgMemoryId && (
+                        <button
+                          type="button"
+                          disabled={isForgettingMemory}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onForgetMemory(s.orgMemoryId!)
+                          }}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-emerald-800/80 hover:bg-emerald-200/80 disabled:opacity-50"
+                          title="Stop boosting suggestions from this learned pattern"
+                        >
+                          Forget
+                        </button>
+                      )}
                     </span>
                   )}
                   {s.duplicateWarning && (

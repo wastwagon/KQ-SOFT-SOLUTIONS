@@ -55,7 +55,7 @@ import {
   shouldPreferGeometryTable,
   type OcrWord,
 } from './genericStatementTable.js'
-import Tesseract from 'tesseract.js'
+import { recognizeWithOcrGate } from '../lib/ocrGate.js'
 
 const require = createRequire(import.meta.url)
 import { resolvePdfOcrMaxPages } from '../config/importLimits.js'
@@ -248,7 +248,7 @@ async function ocrPdfPages(
   const words: OcrWord[] = []
   for (let i = 0; i < pageCount; i++) {
     const pageBuffer = await doc.getPage(i + 1)
-    const result = await Tesseract.recognize(pageBuffer, lang, { logger: () => {} })
+    const result = await recognizeWithOcrGate(pageBuffer, lang)
     pages.push(result.data.text)
     words.push(...extractWordsFromTesseractPage(result.data, i))
   }
@@ -537,7 +537,7 @@ export async function parseImageFile(filepath: string): Promise<ParsedDocument> 
     throw new Error('Unsupported image format')
   }
   const lang = resolveOcrLanguages()
-  const result = await Tesseract.recognize(filepath, lang, { logger: () => {} })
+  const result = await recognizeWithOcrGate(filepath, lang)
   const words = extractWordsFromTesseractPage(result.data, 0)
   let doc = finalizeFromOcrText(result.data.text, 1, false, 1, words)
   if (doc.parseMethod === 'ocr') {
