@@ -82,6 +82,8 @@ model Organization {
   projects    Project[]
   payments    Payment[]
   bankRules   BankRule[]
+  layoutMemories DocumentLayoutMemory[]
+  matchMemories  OrganizationMatchMemory[]
   usageLogs   UsageLog[]
   auditLogs   AuditLog[]
   apiKeys     ApiKey[]
@@ -140,6 +142,52 @@ model BankRule {
 
   @@index([organizationId])
   @@map("bank_rules")
+}
+
+/// Remembers successful column mappings per organisation so similar uploads auto-map.
+model DocumentLayoutMemory {
+  id                String       @id @default(cuid())
+  organizationId    String       @map("organization_id")
+  documentType      DocumentType @map("document_type")
+  /// Ordered normalized headers joined by | (exact-layout key).
+  headerFingerprint String       @map("header_fingerprint")
+  /// Original headers at learn time (for display / soft matching).
+  headerSignature   Json         @map("header_signature")
+  /// Canonical field → original header name (not column index).
+  fieldMapping      Json         @map("field_mapping")
+  parseMethodHint   String?      @map("parse_method_hint")
+  useCount          Int          @default(1) @map("use_count")
+  lastUsedAt        DateTime     @default(now()) @map("last_used_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, documentType, headerFingerprint])
+  @@index([organizationId, documentType])
+  @@map("document_layout_memories")
+}
+
+/// Remembers confirmed cash-book ↔ bank pairs per organisation to boost future suggestions.
+model OrganizationMatchMemory {
+  id                   String   @id @default(cuid())
+  organizationId       String   @map("organization_id")
+  currency             String   @default("GHS")
+  /// receipt | payment
+  sideKind             String   @map("side_kind")
+  amountMinor          Int      @map("amount_minor")
+  cashBookFingerprint  String   @map("cash_book_fingerprint")
+  bankFingerprint      String   @map("bank_fingerprint")
+  confirmationCount    Int      @default(1) @map("confirmation_count")
+  lastConfirmedAt      DateTime @default(now()) @map("last_confirmed_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, currency, sideKind, amountMinor, cashBookFingerprint, bankFingerprint])
+  @@index([organizationId, currency, sideKind, amountMinor])
+  @@map("organization_match_memories")
 }
 
 model OrganizationMember {

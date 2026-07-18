@@ -81,19 +81,36 @@ export default function ProjectUploadStep({
       const total = files.length * types.length
       setProgress({ current: 0, total })
       let n = 0
+      const corrections: string[] = []
       for (const file of files) {
         for (const type of types) {
           n += 1
           setProgress({ current: n, total })
-          await uploadCashBook(projectSlug, file, type)
+          const result = await uploadCashBook(projectSlug, file, type)
+          const corrected = result?.autoMap?.typeCorrected as
+            | { from: string; to: string }
+            | undefined
+          if (corrected) {
+            corrections.push(
+              `${file.name}: treated as ${formatDocType(corrected.to)} (was uploaded as cash book)`
+            )
+          }
         }
       }
       setProgress(null)
+      return { corrections }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['project', projectSlug] })
       setCbFiles([])
-      toast.success('Cash book uploaded', 'Map columns next so we can read your data.')
+      if (data?.corrections?.length) {
+        toast.success(
+          'Cash book uploaded — type adjusted',
+          data.corrections.slice(0, 2).join(' · ')
+        )
+      } else {
+        toast.success('Cash book uploaded', 'Map columns next so we can read your data.')
+      }
     },
     onError: (err) => {
       setProgress(null)
@@ -122,6 +139,7 @@ export default function ProjectUploadStep({
       const total = files.length * types.length
       setProgress({ current: 0, total })
       let n = 0
+      const corrections: string[] = []
       const opts = {
         bankAccountId: accId || undefined,
         accountName: accountName || undefined,
@@ -131,18 +149,34 @@ export default function ProjectUploadStep({
         for (const type of types) {
           n += 1
           setProgress({ current: n, total })
-          await uploadBankStatement(projectSlug, file, type, opts)
+          const result = await uploadBankStatement(projectSlug, file, type, opts)
+          const corrected = result?.autoMap?.typeCorrected as
+            | { from: string; to: string }
+            | undefined
+          if (corrected) {
+            corrections.push(
+              `${file.name}: treated as ${formatDocType(corrected.to)} (was uploaded as bank statement)`
+            )
+          }
         }
       }
       setProgress(null)
+      return { corrections }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['project', projectSlug] })
       queryClient.invalidateQueries({ queryKey: ['bankAccounts', projectSlug] })
       setBsFiles([])
       setBankAccountNo('')
       setBankAccountName('')
-      toast.success('Bank statement uploaded', 'Map columns next so we can read your data.')
+      if (data?.corrections?.length) {
+        toast.success(
+          'Bank statement uploaded — type adjusted',
+          data.corrections.slice(0, 2).join(' · ')
+        )
+      } else {
+        toast.success('Bank statement uploaded', 'Map columns next so we can read your data.')
+      }
     },
     onError: (err) => {
       setProgress(null)
@@ -401,6 +435,21 @@ function groupByFilename(
     map.get(d.filename)!.add(d.type)
   }
   return Array.from(map)
+}
+
+function formatDocType(type: string): string {
+  switch (type) {
+    case 'cash_book_receipts':
+      return 'cash book receipts'
+    case 'cash_book_payments':
+      return 'cash book payments'
+    case 'bank_credits':
+      return 'bank credits'
+    case 'bank_debits':
+      return 'bank debits'
+    default:
+      return type.replace(/_/g, ' ')
+  }
 }
 
 function progressLabel(

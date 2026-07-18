@@ -1,4 +1,5 @@
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
 import {
   computeBrsMetrics,
@@ -9,9 +10,10 @@ import {
   refTokensEquivalent,
 } from './report.js'
 
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+
 describe('report helpers', () => {
   it('extracts declared closing balances from source workbooks', () => {
-    const repoRoot = path.resolve(process.cwd(), '..')
     const cashbook = path.join(repoRoot, 'new-test-data', 'Qtestcash book.xlsx')
     const bankStatement = path.join(repoRoot, 'new-test-data', 'Qtestbank statement.xlsx')
 

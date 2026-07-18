@@ -5,6 +5,14 @@
 
 export type MappingConfidence = 'high' | 'medium' | 'low'
 
+export interface SmartMappingOptions {
+  /**
+   * When true, prefer FC AMT RECEIVED / FC AMT PAID (foreign/euro amounts)
+   * over local-currency AMT RECEIVED / AMT PAID on TGL multi-currency cash books.
+   */
+  preferForeignCurrencyAmounts?: boolean
+}
+
 export function normHeader(h: string): string {
   return (h || '').toLowerCase().replace(/[\s_]+/g, ' ').trim()
 }
@@ -12,7 +20,8 @@ export function normHeader(h: string): string {
 export function buildSmartSuggestedMapping(
   headers: string[],
   isCashBook: boolean,
-  existingSuggested: Record<string, number> = {}
+  existingSuggested: Record<string, number> = {},
+  options: SmartMappingOptions = {}
 ): Record<string, number> {
   const out = { ...existingSuggested }
   const normalized = headers.map(normHeader)
@@ -48,12 +57,25 @@ export function buildSmartSuggestedMapping(
       if (i >= 0) out.accode = i
     }
     if (out.amt_received == null) {
-      const i = find([/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /credit/, /\bcr\b/, /deposit/])
-      if (i >= 0) out.amt_received = i
+      if (options.preferForeignCurrencyAmounts) {
+        const fc = find([/^fc\s*amt\s*received$/])
+        if (fc >= 0) out.amt_received = fc
+      }
+      if (out.amt_received == null) {
+        // Prefer local AMT RECEIVED over FC AMT RECEIVED (FC checked explicitly above).
+        const i = find([/^amt\s*received$/, /^amount\s*received$/, /receipts?$/, /^received$/, /^credit$/, /\bcr\b/, /deposit/])
+        if (i >= 0) out.amt_received = i
+      }
     }
     if (out.amt_paid == null) {
-      const i = find([/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /debit/, /\bdr\b/, /withdrawal/])
-      if (i >= 0) out.amt_paid = i
+      if (options.preferForeignCurrencyAmounts) {
+        const fc = find([/^fc\s*amt\s*paid$/])
+        if (fc >= 0) out.amt_paid = fc
+      }
+      if (out.amt_paid == null) {
+        const i = find([/^amt\s*paid$/, /^amount\s*paid$/, /payments?$/, /^paid$/, /^debit$/, /\bdr\b/, /withdrawal/])
+        if (i >= 0) out.amt_paid = i
+      }
     }
     if (out.amt_received == null && out.amt_paid == null) {
       const i = find([/^amount$/, /^amt$/, /total/])
@@ -66,26 +88,53 @@ export function buildSmartSuggestedMapping(
     if (out.transaction_date == null) {
       const i = find([
         /^date$/,
+        /trans(?:action)?\.?\s*date/,
         /transaction\s*date/,
-        /value\s*date/,
         /entry\s*date/,
         /post\s*date/,
         /txn\s*date/,
         /posting\s*date/,
         /transaction_date/,
+        /value\s*date/,
       ])
       if (i >= 0) out.transaction_date = i
     }
     if (out.description == null) {
-      const i = find([/^description$/, /particulars/, /narrative/, /details/, /memo/, /remarks/])
+      const i = find([
+        /^description$/,
+        /particulars/,
+        /narrative/,
+        /^details$/,
+        /memo/,
+        /remarks/,
+        // Prefer full "reference"/"references" text columns; avoid truncated "Referenc" ref-no headers.
+        /^references?$/,
+      ])
       if (i >= 0) out.description = i
     }
     if (out.credit == null) {
-      const i = find([/^credits?$/, /\bcr\b/, /^deposits?$/, /deposits?/, /in(?:ward)?/])
+      const i = find([
+        /^credits?$/,
+        /\bcr\b/,
+        /^deposits?$/,
+        /deposits?/,
+        /^money\s*in$/,
+        /^amount\s*in$/,
+        /in(?:ward)?/,
+      ])
       if (i >= 0) out.credit = i
     }
     if (out.debit == null) {
-      const i = find([/^debits?$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/, /out(?:ward)?/])
+      const i = find([
+        /^debits?$/,
+        /\bdr\b/,
+        /^payments?$/,
+        /payments?/,
+        /withdrawals?/,
+        /^money\s*out$/,
+        /^amount\s*out$/,
+        /out(?:ward)?/,
+      ])
       if (i >= 0) out.debit = i
     }
     if (out.credit == null && out.debit == null) {
@@ -109,13 +158,14 @@ export function getMappingConfidence(
     date: [/^date$/, /transaction\s*date/, /value\s*date/, /entry\s*date/, /post\s*date/, /posting\s*date/],
     transaction_date: [
       /^date$/,
+      /trans(?:action)?\.?\s*date/,
       /transaction\s*date/,
-      /value\s*date/,
       /entry\s*date/,
       /post\s*date/,
       /posting\s*date/,
+      /value\s*date/,
     ],
-    description: [/^description$/, /particulars/, /narrative/, /details/, /memo/, /remarks/],
+    description: [/^description$/, /particulars/, /narrative/, /details/, /^referenc/, /reference/, /memo/, /remarks/],
     name: [/^name$/, /payee/, /party/, /description/],
     details: [/^details$/, /particulars/, /narrative/, /memo/, /remarks/],
     doc_ref: [/^doc ref$/, /^doc_ref$/, /^ref$/, /reference/, /voucher/],
@@ -123,8 +173,8 @@ export function getMappingConfidence(
     accode: [/^accode$/, /account\s*code/, /ac\s*code/],
     amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credits?$/, /\bcr\b/],
     amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debits?$/, /\bdr\b/],
-    credit: [/^credits?$/, /\bcr\b/, /^deposits?$/, /deposits?/],
-    debit: [/^debits?$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/],
+    credit: [/^credits?$/, /\bcr\b/, /^deposits?$/, /deposits?/, /^money\s*in$/, /^amount\s*in$/],
+    debit: [/^debits?$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/, /^money\s*out$/, /^amount\s*out$/],
   }
   const SOFT: Record<string, RegExp[]> = {
     doc_ref: [/ref/, /receipt/, /number/],

@@ -73,6 +73,28 @@ describe('parseCsv', () => {
     const parsed = parseCsv(file)
     expect(parsed.headers[0]).toBe('Date')
   })
+
+  it('skips statement metadata before the transaction header', () => {
+    const file = writeTempCsv(
+      [
+        'Account Number,0012345678',
+        'Statement Period,January 2026',
+        '',
+        'Posting Date,Narration,Money Out,Money In,Balance',
+        '01/01/2026,Opening balance,,,1000',
+        '02/01/2026,Customer deposit,,250,1250',
+      ].join('\n')
+    )
+    const parsed = parseCsv(file)
+    expect(parsed.headers).toEqual([
+      'Posting Date',
+      'Narration',
+      'Money Out',
+      'Money In',
+      'Balance',
+    ])
+    expect(parsed.rows).toHaveLength(2)
+  })
 })
 
 describe('parseExcel', () => {
@@ -98,5 +120,47 @@ describe('parseExcel', () => {
     const r = parseExcel(file, 99)
     expect(r.activeSheet).toBe('January')
     expect(r.headers).toContain('Date')
+  })
+
+  it('merges multi-row Excel headers with empty merged cells', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'parser-multirow-'))
+    const file = path.join(dir, 'multirow.xlsx')
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Grace Academy Bank Statement'],
+      [],
+      [null, null, 'Amount', null, 'Balance'],
+      ['Date', 'Description', 'Debit', 'Credit', null],
+      ['01/09/2023', 'Customer deposit', null, '250.00', '1250.00'],
+      ['02/09/2023', 'Bank charge', '5.00', null, '1245.00'],
+    ])
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
+    XLSX.writeFile(wb, file)
+    tempFiles.push(file)
+
+    const parsed = parseExcel(file, 0)
+    expect(parsed.headers.some((h) => /date/i.test(h))).toBe(true)
+    expect(parsed.headers.some((h) => /debit/i.test(h))).toBe(true)
+    expect(parsed.headers.some((h) => /credit/i.test(h))).toBe(true)
+    expect(parsed.rows).toHaveLength(2)
+    expect(String(parsed.rows[0]?.[0])).toContain('01/09/2023')
+  })
+})
+
+describe('parseCsv multi-row headers', () => {
+  it('merges stacked CSV header rows before data', () => {
+    const file = writeTempCsv(
+      [
+        'Account Number,0012345678',
+        ',,Amount,,Balance',
+        'Date,Narration,Debit,Credit,',
+        '01/01/2026,Opening balance,,,1000',
+        '02/01/2026,Customer deposit,,250,1250',
+      ].join('\n')
+    )
+    const parsed = parseCsv(file)
+    expect(parsed.headers.some((h) => /date/i.test(h))).toBe(true)
+    expect(parsed.headers.some((h) => /debit/i.test(h))).toBe(true)
+    expect(parsed.rows).toHaveLength(2)
   })
 })

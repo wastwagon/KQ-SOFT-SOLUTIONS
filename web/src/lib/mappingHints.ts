@@ -33,12 +33,33 @@ export function getMappingIssues(
 
   if (isCashBook) {
     const amountField = isReceipts ? 'amt_received' : 'amt_paid'
+    const hasFcColumns = headers.some((h) =>
+      /^(fc\s*amt\s*(received|paid)|foreign\s*currency\s*amount)$/i.test(String(h).trim())
+    )
+    if (hasFcColumns) {
+      const mappedIdx = mapping[amountField]
+      const mappedHeader =
+        mappedIdx != null && mappedIdx >= 0 && mappedIdx < headers.length
+          ? String(headers[mappedIdx] || '')
+          : ''
+      const mappedIsFc = /^fc\s*amt\s*(received|paid)$/i.test(mappedHeader)
+      issues.push({
+        severity: mappedIsFc ? 'info' : 'warning',
+        field: amountField,
+        message: mappedIsFc
+          ? 'Foreign-currency (euro/USD) amount column is selected.'
+          : 'This cash book also has foreign-currency columns (FC AMT RECEIVED / FC AMT PAID).',
+        fix: mappedIsFc
+          ? 'Keep FC amounts when the bank statement is in EUR/USD. Use AMT RECEIVED / AMT PAID for GHS/cedi equivalents.'
+          : 'If the bank statement is in euros (or another foreign currency), map Amount received/paid to FC AMT RECEIVED / FC AMT PAID — not the cedi Amount columns.',
+      })
+    }
     if (mapping[amountField] == null) {
       issues.push({
         severity: 'error',
         field: amountField,
         message: `${isReceipts ? 'Amount received' : 'Amount paid'} must be mapped for this document type.`,
-        fix: `Select AMT RECEIVED / AMT PAID (or the single amount column if using signed-amount mode).`,
+        fix: `Select AMT RECEIVED / AMT PAID (or FC AMT RECEIVED / FC AMT PAID for euro/USD, or the single amount column if using signed-amount mode).`,
       })
     }
     if (mapping.amt_received != null && mapping.amt_paid != null && mapping.amt_received === mapping.amt_paid) {

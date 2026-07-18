@@ -7,6 +7,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canReconcile, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
 import { suggestMatches, suggestSplitMatches, type Tx, type SuggestedSplitMatch } from '../services/matching.js'
+import { resolveMatchSides } from '../services/sideInversion.js'
 import {
   detectDuplicateChequePayments,
   isEcobankPatternMatchReason,
@@ -35,6 +36,15 @@ import {
   suggestScbSweepMatches,
 } from '../services/scbSweepMatcher.js'
 import { getMatchingRule, type BankRule } from '../services/bankRules.js'
+import {
+  amountToMinor,
+  applyOrganisationMatchMemoryBoost,
+  applyOrganisationSplitMatchMemoryBoost,
+  loadOrganisationMatchMemories,
+  rememberOrganisationMatch,
+  rememberOrganisationSplitMatch,
+  sideKindFromCashBookDocType,
+} from '../services/organizationMatchMemory.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveWorkbookNetting } from '../lib/brsQueryFlags.js'
 import { logAudit } from '../services/audit.js'
@@ -269,12 +279,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     : matchOptions.dateWindowDays
 
   const annotateSuggestions = (
-    list: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string }[],
+    list: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string; orgMemoryBoosted?: boolean }[],
     matchKind: 'receipt' | 'payment'
   ) =>
     list.map((s) => ({
       ...s,
       matchKind,
+      orgMemoryBoosted: s.orgMemoryBoosted || /org memory/i.test(s.reason) || undefined,
       ecobankPattern:
         matchKind === 'payment' &&
         (isEcobankPatternMatchReason(s.reason) || isScbPatternMatchReason(s.reason)),
@@ -367,10 +378,16 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     : []
 
   // Matching suggestions for all plans (intelligent matching clues)
+  const { inversion: sideInversion, receiptBank, paymentBank } = resolveMatchSides({
+    receipts: receiptsFull,
+    payments: paymentsFull,
+    credits: creditsFull,
+    debits: debitsFull,
+  })
   const receiptSuggestions = mergeReceiptSuggestions(
     scbSweepSuggestions,
     scbReturnedChequeSuggestions,
-    suggestMatches(receiptsFull, creditsFull, matchedCbIds, matchedBankIds, {
+    suggestMatches(receiptsFull, receiptBank, matchedCbIds, matchedBankIds, {
       ...matchOptions,
       requireDateMatch: useDate,
       useDate,
@@ -380,7 +397,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   )
   const standardPaymentSuggestions = suggestMatches(
     paymentsFull,
-    debitsFull,
+    paymentBank,
     matchedCbIds,
     matchedBankIds,
     {
@@ -486,34 +503,25 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       }
     }
   }
-  addRuleSuggestions(receiptsFull, creditsFull, receiptSuggestions)
-  addRuleSuggestions(paymentsFull, debitsFull, standardPaymentSuggestions)
+  addRuleSuggestions(receiptsFull, receiptBank, receiptSuggestions)
+  addRuleSuggestions(paymentsFull, paymentBank, paymentSuggestions)
 
-  // AI-style boost: learn from confirmed matches — if suggestion resembles a past match, boost confidence
-  const learnedPatterns = matchList.map(({ cbTx, bankTx }) => ({
-    amount: cbTx.amount,
-    cbDesc: (cbTx.details || cbTx.name || '').toLowerCase().slice(0, 25).trim(),
-    bankDesc: (bankTx.details || bankTx.name || '').toLowerCase().slice(0, 25).trim(),
-  }))
-  const applyLearnedBoost = (list: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string }[]) => {
-    for (const s of list) {
-      const cbDesc = (s.cashBookTx.details || s.cashBookTx.name || '').toLowerCase().slice(0, 25).trim()
-      const bankDesc = (s.bankTx.details || s.bankTx.name || '').toLowerCase().slice(0, 25).trim()
-      const matchesPattern = (p: { amount: number; cbDesc: string; bankDesc: string }) => {
-        if (Math.abs(p.amount - s.cashBookTx.amount) > tol) return false
-        if (cbDesc && p.cbDesc && (cbDesc.includes(p.cbDesc) || p.cbDesc.includes(cbDesc))) return true
-        if (bankDesc && p.bankDesc && (bankDesc.includes(p.bankDesc) || p.bankDesc.includes(bankDesc))) return true
-        return false
-      }
-      const match = learnedPatterns.some(matchesPattern)
-      if (match) {
-        s.confidence = Math.min(1, s.confidence + 0.1)
-        if (!s.reason.includes('learned')) s.reason = s.reason + (s.reason ? ', learned' : 'Learned from past match')
-      }
-    }
-  }
-  applyLearnedBoost(receiptSuggestions)
-  applyLearnedBoost(paymentSuggestions)
+  // Organisation match memory: boost suggestions that resemble confirmed pairs
+  const currency = project.currency || 'GHS'
+  const receiptMemories = await loadOrganisationMatchMemories({
+    organizationId: orgId,
+    currency,
+    sideKind: 'receipt',
+    amountMinors: receiptSuggestions.map((s) => amountToMinor(s.cashBookTx.amount)),
+  })
+  const paymentMemories = await loadOrganisationMatchMemories({
+    organizationId: orgId,
+    currency,
+    sideKind: 'payment',
+    amountMinors: paymentSuggestions.map((s) => amountToMinor(s.cashBookTx.amount)),
+  })
+  applyOrganisationMatchMemoryBoost(receiptSuggestions, receiptMemories, matchOptions.amountTolerance)
+  applyOrganisationMatchMemoryBoost(paymentSuggestions, paymentMemories, matchOptions.amountTolerance)
 
   receiptSuggestions.sort((a, b) => b.confidence - a.confidence)
   paymentSuggestions.sort((a, b) => b.confidence - a.confidence)
@@ -524,18 +532,56 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   if (hasSplitMatchingPlan) {
     splitSuggestions.receipts = suggestSplitMatches(
       receiptsFull,
-      creditsFull,
+      receiptBank,
       matchedCbIds,
       matchedBankIds,
       { ...matchOptions }
     )
     splitSuggestions.payments = suggestSplitMatches(
       paymentsFull,
-      debitsFull,
+      paymentBank,
       matchedCbIds,
       matchedBankIds,
       { ...matchOptions }
     )
+    const receiptSplitAmounts = splitSuggestions.receipts.map((s) =>
+      amountToMinor(
+        s.cashBookTxs.length === 1
+          ? s.cashBookTxs[0]!.amount
+          : s.bankTxs[0]?.amount ?? s.cashBookTxs.reduce((n, t) => n + t.amount, 0)
+      )
+    )
+    const paymentSplitAmounts = splitSuggestions.payments.map((s) =>
+      amountToMinor(
+        s.cashBookTxs.length === 1
+          ? s.cashBookTxs[0]!.amount
+          : s.bankTxs[0]?.amount ?? s.cashBookTxs.reduce((n, t) => n + t.amount, 0)
+      )
+    )
+    const receiptSplitMemories = await loadOrganisationMatchMemories({
+      organizationId: orgId,
+      currency,
+      sideKind: 'receipt',
+      amountMinors: receiptSplitAmounts,
+    })
+    const paymentSplitMemories = await loadOrganisationMatchMemories({
+      organizationId: orgId,
+      currency,
+      sideKind: 'payment',
+      amountMinors: paymentSplitAmounts,
+    })
+    applyOrganisationSplitMatchMemoryBoost(
+      splitSuggestions.receipts,
+      receiptSplitMemories,
+      matchOptions.amountTolerance
+    )
+    applyOrganisationSplitMatchMemoryBoost(
+      splitSuggestions.payments,
+      paymentSplitMemories,
+      matchOptions.amountTolerance
+    )
+    splitSuggestions.receipts.sort((a, b) => b.confidence - a.confidence)
+    splitSuggestions.payments.sort((a, b) => b.confidence - a.confidence)
   }
 
   res.json({
@@ -555,6 +601,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       payments: paymentSuggestionsOut.slice(0, suggestionCap),
       clearingPayments: clearingPaymentSuggestions.slice(0, suggestionCap),
       split: splitSuggestions,
+    },
+    sideInversion: {
+      inverted: sideInversion.inverted,
+      standardOverlap: sideInversion.standardOverlap,
+      crossedOverlap: sideInversion.crossedOverlap,
+      reason: sideInversion.reason,
     },
     reconcileFetchLimit: limit,
     suggestionCap,
@@ -683,6 +735,39 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
       },
     })
     await prisma.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
+
+    if (type === 'one_to_many' || type === 'many_to_one') {
+      const cbTxs = matchItems
+        .filter((m) => m.side === 'cash_book')
+        .map((m) => txs.find((t) => t.id === m.transactionId)!)
+        .filter(Boolean)
+      const bankTxs = matchItems
+        .filter((m) => m.side === 'bank')
+        .map((m) => txs.find((t) => t.id === m.transactionId)!)
+        .filter(Boolean)
+      const sideKind = sideKindFromCashBookDocType(cbTxs[0]?.document.type || 'cash_book_receipts')
+      await rememberOrganisationSplitMatch({
+        organizationId: orgId,
+        currency: project.currency,
+        sideKind,
+        structure: type,
+        cashBookTxs: cbTxs.map((t) => ({
+          amount: Number(t.amount),
+          name: t.name,
+          details: t.details,
+          docRef: t.docRef,
+          chqNo: t.chqNo,
+        })),
+        bankTxs: bankTxs.map((t) => ({
+          amount: Number(t.amount),
+          name: t.name,
+          details: t.details,
+          docRef: t.docRef,
+          chqNo: t.chqNo,
+        })),
+      }).catch(() => undefined)
+    }
+
     await logAudit({
       organizationId: orgId,
       userId: req.auth!.userId,
@@ -751,6 +836,25 @@ router.post('/:projectId/match', async (req: AuthRequest, res) => {
       },
     })
     await prisma.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
+    await rememberOrganisationMatch({
+      organizationId: orgId,
+      currency: project.currency,
+      sideKind: sideKindFromCashBookDocType(cbTx.document.type),
+      cashBookTx: {
+        amount: Number(cbTx.amount),
+        name: cbTx.name,
+        details: cbTx.details,
+        docRef: cbTx.docRef,
+        chqNo: cbTx.chqNo,
+      },
+      bankTx: {
+        amount: Number(bankTx.amount),
+        name: bankTx.name,
+        details: bankTx.details,
+        docRef: bankTx.docRef,
+        chqNo: bankTx.chqNo,
+      },
+    }).catch(() => undefined)
     await logAudit({
       organizationId: orgId,
       userId: req.auth!.userId,
@@ -811,10 +915,21 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     }
     const txRows = await prisma.transaction.findMany({
       where: { id: { in: Array.from(requestedTxIds) } },
-      select: { id: true, document: { select: { projectId: true } } },
+      select: {
+        id: true,
+        amount: true,
+        name: true,
+        details: true,
+        docRef: true,
+        chqNo: true,
+        document: { select: { projectId: true, type: true } },
+      },
     })
     const txById = new Map(txRows.map((t) => [t.id, t]))
-    const toCreate: { cbTx: { id: string }; bankTx: { id: string } }[] = []
+    const toCreate: {
+      cbTx: (typeof txRows)[number]
+      bankTx: (typeof txRows)[number]
+    }[] = []
     for (const pair of body.matches) {
       const cbTx = txById.get(pair.cashBookTransactionId)
       const bankTx = txById.get(pair.bankTransactionId)
@@ -824,7 +939,7 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
       if (cbTx.document.projectId !== projectId || bankTx.document.projectId !== projectId) {
         return res.status(400).json({ error: 'Transaction not in project' })
       }
-      toCreate.push({ cbTx: { id: cbTx.id }, bankTx: { id: bankTx.id } })
+      toCreate.push({ cbTx, bankTx })
     }
     const alreadyMatched = await findAlreadyMatchedIds(projectId, Array.from(requestedTxIds))
     if (alreadyMatched.length > 0) {
@@ -855,6 +970,27 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
       return ids
     })
     if (created.length > 0) {
+      for (const { cbTx, bankTx } of toCreate) {
+        await rememberOrganisationMatch({
+          organizationId: orgId,
+          currency: project.currency,
+          sideKind: sideKindFromCashBookDocType(cbTx.document.type),
+          cashBookTx: {
+            amount: Number(cbTx.amount),
+            name: cbTx.name,
+            details: cbTx.details,
+            docRef: cbTx.docRef,
+            chqNo: cbTx.chqNo,
+          },
+          bankTx: {
+            amount: Number(bankTx.amount),
+            name: bankTx.name,
+            details: bankTx.details,
+            docRef: bankTx.docRef,
+            chqNo: bankTx.chqNo,
+          },
+        }).catch(() => undefined)
+      }
       await logAudit({
         organizationId: orgId,
         userId: req.auth!.userId,

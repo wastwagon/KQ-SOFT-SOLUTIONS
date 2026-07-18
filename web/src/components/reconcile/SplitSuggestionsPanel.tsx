@@ -54,10 +54,20 @@ export default function SplitSuggestionsPanel({
                   : 'border-primary-200/50 bg-white hover:bg-primary-50'
               }`}
             >
-              <div className="flex justify-between items-start mb-1">
+              <div className="flex justify-between items-start mb-1 gap-2">
                 <span className="text-[10px] font-bold text-primary-700 uppercase">{s.reason}</span>
-                <span className="text-[10px] font-bold text-gray-500">
-                  {Math.round(s.confidence * 100)}% Match
+                <span className="flex items-center gap-1 shrink-0">
+                  {(s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
+                    <span
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 normal-case tracking-normal"
+                      title="Boosted because your organisation confirmed a similar split group before"
+                    >
+                      Learned
+                    </span>
+                  )}
+                  <span className="text-[10px] font-bold text-gray-500">
+                    {Math.round(s.confidence * 100)}% Match
+                  </span>
                 </span>
               </div>
               <div className="text-xs text-gray-900">

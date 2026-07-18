@@ -15,8 +15,23 @@ import { pickBestExcelSheetIndex } from '../services/cashBookExcel.js'
 import { getMappingConfidence } from '../services/suggestedMapping.js'
 import { getMappingDiagnostics } from '../services/mappingDiagnostics.js'
 import { applyDocumentMapping, sanitizeMapping, validateMapping } from '../services/applyDocumentMapping.js'
-import { buildSuggestedMappingForDocument } from '../services/autoMapDocument.js'
+import {
+  buildSuggestedMappingForDocument,
+  trimMappingForDocumentType,
+} from '../services/autoMapDocument.js'
 import { MAP_PREVIEW_ROW_SAMPLE } from '../config/importLimits.js'
+import { inferAdaptiveMapping } from '../services/adaptiveColumnInference.js'
+import {
+  applyOrganisationLayoutMemory,
+  boostLearnedConfidence,
+  rememberDocumentLayout,
+} from '../services/documentLayoutMemory.js'
+import {
+  documentFamilyOf,
+  familyLabel,
+  inferDocumentFamily,
+} from '../services/documentTypeInference.js'
+import { changeDocumentType } from '../services/changeDocumentType.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -80,12 +95,86 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
             : undefined,
       }
     }
-    const suggestedMapping = buildSuggestedMappingForDocument(doc.type, result.headers, detectedBankFormat)
-    const mappingConfidence = getMappingConfidence(result.headers, suggestedMapping)
+    let suggestedMapping = buildSuggestedMappingForDocument(doc.type, result.headers, detectedBankFormat, {
+      projectCurrency: doc.project.currency || 'GHS',
+      sampleRows: result.rows.slice(0, 250),
+    })
+    const layout = await applyOrganisationLayoutMemory(
+      orgId,
+      doc.type,
+      result.headers,
+      suggestedMapping
+    )
+    suggestedMapping = trimMappingForDocumentType(doc.type, layout.mapping)
+    let mappingConfidence = getMappingConfidence(result.headers, suggestedMapping)
+    if (layout.appliedFields.length) {
+      mappingConfidence = boostLearnedConfidence(mappingConfidence, layout.appliedFields)
+    }
+    const adaptive = inferAdaptiveMapping(
+      doc.type,
+      result.headers,
+      result.rows.slice(0, 250)
+    )
+    for (const [field, index] of Object.entries(adaptive.mapping)) {
+      if (
+        suggestedMapping[field] === index &&
+        adaptive.confidence[field] &&
+        mappingConfidence[field] === 'low'
+      ) {
+        mappingConfidence[field] = adaptive.confidence[field]
+      }
+    }
     const mappingDiagnostics = getMappingDiagnostics(doc.type, result.headers, suggestedMapping)
+    const adaptiveFields = Object.keys(adaptive.reasons).filter(
+      (field) => suggestedMapping[field] === adaptive.mapping[field]
+    )
+    if (adaptiveFields.length) {
+      mappingDiagnostics.push({
+        severity: 'info',
+        message: `Adaptive parser inferred ${adaptiveFields.join(', ')} from sample values.`,
+        fix: adaptiveFields
+          .map((field) => `${field}: ${adaptive.reasons[field]}`)
+          .join('; '),
+      })
+    }
+    if (layout.match && layout.appliedFields.length) {
+      mappingDiagnostics.push({
+        severity: 'info',
+        message: layout.match.exact
+          ? `Using your organisation’s saved column map for this layout (${layout.appliedFields.join(', ')}).`
+          : `Using a similar saved column map from your organisation (${Math.round(layout.match.similarity * 100)}% header match; ${layout.appliedFields.join(', ')}).`,
+        fix: 'Adjust any field if this upload differs, then save — the layout memory will update.',
+      })
+    }
+    const typeInference = inferDocumentFamily(result.headers, {
+      sampleRows: result.rows.slice(0, 40),
+      parseMethod: result.parseMethod,
+      filename: doc.filename,
+    })
+    const uploadedFamily = documentFamilyOf(doc.type)
+    const typeMismatch =
+      typeInference.family !== 'unknown' &&
+      typeInference.family !== uploadedFamily &&
+      (typeInference.confidence === 'high' || typeInference.confidence === 'medium')
+    if (typeMismatch) {
+      mappingDiagnostics.push({
+        severity: typeInference.confidence === 'high' ? 'warning' : 'info',
+        message: `This file looks like a ${familyLabel(typeInference.family)} (${typeInference.confidence} confidence), but it was uploaded as a ${familyLabel(uploadedFamily)}.`,
+        fix:
+          typeInference.family === 'bank_statement'
+            ? 'Re-upload under Bank Statement (credits/debits), or delete and upload again on the correct card.'
+            : 'Re-upload under Cash Book (receipts/payments), or delete and upload again on the correct card.',
+      })
+    }
+    const hasForeignCurrencyColumns = result.headers.some((h) =>
+      /^(fc\s*amt\s*(received|paid)|foreign\s*currency\s*amount|currency\s*code|exch\s*rate)$/i.test(
+        String(h).trim()
+      )
+    )
     res.json({
       documentId: doc.id,
       filename: doc.filename,
+      documentType: doc.type,
       headers: result.headers,
       rows: sample,
       totalRows: result.rows.length,
@@ -96,11 +185,32 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       suggestedMapping,
       mappingConfidence,
       mappingDiagnostics,
+      typeInference: {
+        family: typeInference.family,
+        confidence: typeInference.confidence,
+        cashBookScore: typeInference.cashBookScore,
+        bankScore: typeInference.bankScore,
+        reasons: typeInference.reasons,
+        mismatch: typeMismatch || undefined,
+      },
+      layoutMemoryApplied: layout.match && layout.appliedFields.length
+        ? {
+            exact: layout.match.exact,
+            similarity: layout.match.similarity,
+            fields: layout.appliedFields,
+            useCount: layout.match.useCount,
+          }
+        : undefined,
+      projectCurrency: doc.project.currency || 'GHS',
+      hasForeignCurrencyColumns: hasForeignCurrencyColumns || undefined,
       parseMethod: result.parseMethod,
       parseSummary,
       pdfTruncated: result.pdfTruncated,
       pdfPagesProcessed: result.pdfPagesProcessed,
       pdfTotalPages: result.pdfTotalPages,
+      parseQualityScore: result.parseQualityScore,
+      ocrRetried: result.ocrRetried || undefined,
+      parseQualityNotes: result.parseQualityNotes,
     })
   } catch (e) {
     const msg = (e as Error).message || 'Parse failed'
@@ -175,6 +285,13 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
         parseMethod: result.parseMethod,
       },
     })
+    await rememberDocumentLayout({
+      organizationId: doc.project.organizationId,
+      documentType: doc.type,
+      headers: result.headers,
+      mapping,
+      parseMethodHint: result.parseMethod,
+    }).catch(() => undefined)
     res.json({
       count: applied.count,
       importStats: {
@@ -199,6 +316,48 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: msg })
     }
     res.status(500).json({ error: msg || 'Mapping failed. Check that column mapping is correct.' })
+  }
+})
+
+const changeTypeSchema = z.object({
+  family: z.enum(['cash_book', 'bank_statement']),
+})
+
+router.post('/:id/type', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canMapDocuments(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to change document type' })
+  }
+  const { id } = req.params
+  const orgId = req.auth!.orgId
+  const doc = await prisma.document.findFirst({
+    where: { id },
+    include: { project: true },
+  })
+  if (!doc || doc.project.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Document not found' })
+  }
+  if (!isProjectEditable((doc.project as { status?: string }).status)) {
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
+  }
+  try {
+    const body = changeTypeSchema.parse(req.body)
+    const result = await changeDocumentType({
+      documentId: id,
+      organizationId: orgId,
+      userId: req.auth!.userId,
+      family: body.family,
+    })
+    res.json(result)
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: e.errors[0]?.message ?? 'Invalid type' })
+    }
+    const err = e as Error & { status?: number }
+    if (err.status === 404) return res.status(404).json({ error: err.message })
+    if (err.status === 400) return res.status(400).json({ error: err.message })
+    if (err.status === 409) return res.status(409).json({ error: err.message })
+    res.status(500).json({ error: err.message || 'Failed to change document type' })
   }
 })
 

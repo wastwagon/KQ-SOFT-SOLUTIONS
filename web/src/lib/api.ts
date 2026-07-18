@@ -92,9 +92,30 @@ export interface DocumentPreviewResponse {
     message: string
     fix?: string
   }[]
+  projectCurrency?: string
+  hasForeignCurrencyColumns?: boolean
   pdfTruncated?: boolean
   pdfPagesProcessed?: number
   pdfTotalPages?: number
+  parseQualityScore?: number
+  ocrRetried?: boolean
+  parseQualityNotes?: string[]
+  /** Present when org layout memory filled in suggested columns. */
+  layoutMemoryApplied?: {
+    exact: boolean
+    similarity: number
+    fields: string[]
+    useCount: number
+  }
+  documentType?: string
+  typeInference?: {
+    family: 'cash_book' | 'bank_statement' | 'unknown'
+    confidence: 'high' | 'medium' | 'low'
+    cashBookScore: number
+    bankScore: number
+    reasons: string[]
+    mismatch?: boolean
+  }
 }
 
 export interface ReportMatchRow {
@@ -500,6 +521,16 @@ export const documents = {
   },
   map: (id: string, body: { mapping: Record<string, number>; sheetIndex?: number }) =>
     api(`/documents/${id}/map`, { method: 'POST', body: JSON.stringify(body) }) as Promise<MapDocumentResponse>,
+  changeType: (id: string, family: 'cash_book' | 'bank_statement') =>
+    api(`/documents/${id}/type`, {
+      method: 'POST',
+      body: JSON.stringify({ family }),
+    }) as Promise<{
+      from: string
+      to: string
+      clearedTransactions: number
+      clearedMatches: number
+    }>,
   getTransactions: (id: string) => api(`/documents/${id}/transactions`),
 }
 

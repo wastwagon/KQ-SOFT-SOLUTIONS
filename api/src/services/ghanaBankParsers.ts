@@ -24,6 +24,7 @@ export type GhanaBankFormat =
   | 'prudential'
   | 'nib'
   | 'adb'
+  | 'umb'
   | 'scb'
   | null
 
@@ -128,7 +129,7 @@ export function detectGhanaBankFormat(
     /\bdebits?\b/.test(normalizedHeaderStr) &&
     /\bcredits?\b/.test(normalizedHeaderStr)
   ) {
-    if (/united merchant bank|\bumb\b/i.test(allContent)) return 'nib'
+    if (/united merchant bank|\bumb\b/i.test(allContent)) return 'umb'
     return 'scb'
   }
 

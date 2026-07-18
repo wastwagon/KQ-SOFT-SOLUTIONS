@@ -99,6 +99,12 @@ interface ReconcileApiResponse {
     transactionIds: string[]
     totalAmount: number
   }[]
+  sideInversion?: {
+    inverted: boolean
+    standardOverlap: number
+    crossedOverlap: number
+    reason: string
+  }
   reconcileProfile?: {
     bankFormat: string
     ghanaBrs: boolean

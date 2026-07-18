@@ -1,6 +1,6 @@
 # Corrected bank statement specimens (BRS upload-ready)
 
-Exported: 2026-07-14T13:50:03.394Z
+Exported: 2026-07-17T19:29:57.236Z
 
 This folder packages every bank/cashbook specimen we fixed in the BRS platform. Each bank subfolder contains:
 
@@ -49,14 +49,14 @@ This folder packages every bank/cashbook specimen we fixed in the BRS platform. 
   - UMB cleaned Excel (manual layout): 10 rows, debits/payments 61,965,360.36, credits/receipts 61,965,360.36 (excel)
 
 ### Standard Chartered (SCB) (`08-scb/`)
-  - SCB statement raw: 1316 rows, debits/payments 23,000,852.632, credits/receipts 24,291,535.131 (excel)
+  - SCB statement raw: 841 rows, debits/payments 11,756,548.18, credits/receipts 12,296,754.21 (excel)
   - SCB statement cleaned: 841 rows, debits/payments 11,756,548.18, credits/receipts 12,296,754.21 (excel)
 
 ### TGL acct 4702 cash book (`09-tgl-acct4702/`)
   - TGL ERP cash book: 779 rows, debits/payments 12,296,754.21, credits/receipts 11,756,548.18 (excel)
 
 ### Prudential Bank (`10-prudential/`)
-  - September 2023 statement: 381 rows, debits/payments 420,716,564.89, credits/receipts 423,285,158.26 (prudential_pdf)
+  - September 2023 statement: 284 rows, debits/payments 419,133,070.68, credits/receipts 428,126,625.12 (prudential_pdf)
 
 ### Lordship Ecobank 9033 Q1 2026 (`11-lordship-9033-q1-2026/`)
   - Cash book Q1 2026: 76 rows, debits/payments 149,188.06, credits/receipts 508,115.54 (excel)
@@ -86,14 +86,14 @@ This folder packages every bank/cashbook specimen we fixed in the BRS platform. 
   - Platform export PDF: 139 rows, debits/payments 0, credits/receipts 0 (native_text)
 
 ### Account 4702 test data (`15-acct4702-test-data/`)
-  - Bank statement: 1316 rows, debits/payments 23,000,852.632, credits/receipts 24,291,535.131 (excel)
+  - Bank statement: 841 rows, debits/payments 11,756,548.18, credits/receipts 12,296,754.21 (excel)
   - Cash book (copy): 779 rows, debits/payments 12,296,754.21, credits/receipts 11,756,548.18 (excel)
   - Manual BRS: Reference manual BRS workbook
   - Platform export: BRS platform output for comparison
 
 ### Account 430 test data (`16-acct430-test-data/`)
   - Bank statement: 10 rows, debits/payments 6,803.71, credits/receipts 220 (excel)
-  - Cash book: 56 rows, debits/payments 55,170.67, credits/receipts 96,327.82 (excel)
+  - Cash book: 70 rows, debits/payments 55,170.67, credits/receipts 96,327.82 (excel) — includes euro/FC amount rows
   - Manual BRS: Reference manual BRS workbook
   - Platform export: BRS platform output for comparison
 

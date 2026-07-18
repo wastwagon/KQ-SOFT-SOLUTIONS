@@ -16,7 +16,9 @@
     "db:seed-plans": "npx tsx prisma/seed-plans.ts",
     "test": "prisma generate && vitest run",
     "test:licl-qtest": "vitest run --run src/routes/report.qtest-licl-golden.test.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "benchmark:specimens": "tsx scripts/run-specimen-benchmark.ts",
+    "benchmark:specimens:excel": "tsx scripts/run-specimen-benchmark.ts --excel-only"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -13,8 +13,21 @@ import {
 import { buildSmartSuggestedMapping, getMappingConfidence, type MappingConfidence } from './suggestedMapping.js'
 import { applyDocumentMapping, sanitizeMapping } from './applyDocumentMapping.js'
 import { pickBestExcelSheetIndex } from './cashBookExcel.js'
+import { inferAdaptiveMapping } from './adaptiveColumnInference.js'
+import {
+  applyOrganisationLayoutMemory,
+  touchLayoutMemoryUse,
+} from './documentLayoutMemory.js'
+import {
+  documentFamilyOf,
+  inferDocumentFamily,
+  remapDocumentTypeToFamily,
+  type DocumentTypeInference,
+} from './documentTypeInference.js'
 
 const AUTO_MAP = process.env.AUTO_MAP_ON_UPLOAD !== 'false'
+/** Auto-correct misfiled cash-book ↔ bank uploads when inference confidence is high. */
+const AUTO_CORRECT_DOC_TYPE = process.env.AUTO_CORRECT_DOC_TYPE !== 'false'
 
 function isHighOrMedium(c: MappingConfidence | undefined): boolean {
   return c === 'high' || c === 'medium'
@@ -23,7 +36,12 @@ function isHighOrMedium(c: MappingConfidence | undefined): boolean {
 export function buildSuggestedMappingForDocument(
   docType: DocumentType,
   headers: string[],
-  detectedBankFormat: GhanaBankFormat | null
+  detectedBankFormat: GhanaBankFormat | null,
+  options: {
+    preferForeignCurrencyAmounts?: boolean
+    projectCurrency?: string
+    sampleRows?: unknown[][]
+  } = {}
 ): Record<string, number> {
   const isCashBook = docType.startsWith('cash_book_')
   let base: Record<string, number> | undefined
@@ -31,13 +49,46 @@ export function buildSuggestedMappingForDocument(
     const side = docType === 'bank_credits' ? 'credits' : 'debits'
     base = getSuggestedBankMapping(detectedBankFormat, headers, side)
   }
-  const full = buildSmartSuggestedMapping(headers, isCashBook, base)
+  const currency = (options.projectCurrency || 'GHS').toUpperCase()
+  const preferForeign =
+    options.preferForeignCurrencyAmounts ??
+    (isCashBook &&
+      currency !== 'GHS' &&
+      headers.some((h) => /^fc\s*amt\s*(received|paid)$/i.test(String(h).trim())))
+  let full = buildSmartSuggestedMapping(headers, isCashBook, base, {
+    preferForeignCurrencyAmounts: preferForeign,
+  })
+  if (options.sampleRows?.length) {
+    full = inferAdaptiveMapping(docType, headers, options.sampleRows, full).mapping
+  }
+  return trimMappingForDocumentType(docType, full)
+}
+
+/** Drop opposite-side amount fields unless both map to one signed column. */
+export function trimMappingForDocumentType(
+  docType: DocumentType,
+  mapping: Record<string, number>
+): Record<string, number> {
+  const full = { ...mapping }
+  const isCashBook = docType.startsWith('cash_book_')
   if (isCashBook) {
-    if (docType === 'cash_book_receipts') delete full.amt_paid
-    if (docType === 'cash_book_payments') delete full.amt_received
+    // Preserve both fields when they intentionally point at one signed amount
+    // column. applyDocumentMapping uses that equality to split signs safely.
+    const signedOneColumn =
+      full.amt_received != null &&
+      full.amt_paid != null &&
+      full.amt_received === full.amt_paid
+    if (!signedOneColumn) {
+      if (docType === 'cash_book_receipts') delete full.amt_paid
+      if (docType === 'cash_book_payments') delete full.amt_received
+    }
   } else {
-    if (docType === 'bank_credits') delete full.debit
-    if (docType === 'bank_debits') delete full.credit
+    const signedOneColumn =
+      full.credit != null && full.debit != null && full.credit === full.debit
+    if (!signedOneColumn) {
+      if (docType === 'bank_credits') delete full.debit
+      if (docType === 'bank_debits') delete full.credit
+    }
   }
   return full
 }
@@ -45,7 +96,8 @@ export function buildSuggestedMappingForDocument(
 export function canAutoMap(
   docType: DocumentType,
   headers: string[],
-  suggested: Record<string, number>
+  suggested: Record<string, number>,
+  sampleRows: unknown[][] = []
 ): boolean {
   if (headers.length < 2) return false
   const isCashBook = docType.startsWith('cash_book_')
@@ -60,15 +112,35 @@ export function canAutoMap(
           : 'debit'
   if (suggested[dateField] == null || suggested[amountField] == null) return false
   const confidence = getMappingConfidence(headers, suggested)
-  if (!isHighOrMedium(confidence[dateField]) || !isHighOrMedium(confidence[amountField])) {
+  const adaptive = sampleRows.length
+    ? inferAdaptiveMapping(docType, headers, sampleRows)
+    : null
+  const adaptiveSupports = (field: string): boolean =>
+    adaptive?.mapping[field] === suggested[field] &&
+    isHighOrMedium(adaptive.confidence[field])
+  if (
+    (!isHighOrMedium(confidence[dateField]) && !adaptiveSupports(dateField)) ||
+    (!isHighOrMedium(confidence[amountField]) && !adaptiveSupports(amountField))
+  ) {
     return false
   }
   return true
 }
 
 export type AutoMapOutcome =
-  | { status: 'skipped'; reason: string }
-  | { status: 'mapped'; transactionCount: number; parseMethod?: string }
+  | {
+      status: 'skipped'
+      reason: string
+      typeCorrected?: { from: DocumentType; to: DocumentType }
+      typeInference?: DocumentTypeInference
+    }
+  | {
+      status: 'mapped'
+      transactionCount: number
+      parseMethod?: string
+      typeCorrected?: { from: DocumentType; to: DocumentType }
+      typeInference?: DocumentTypeInference
+    }
   | { status: 'failed'; error: string }
 
 /** Parse file, apply suggested mapping when safe. Does not throw — for use after upload. */
@@ -86,33 +158,85 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
   }
 
   try {
+    let docType = doc.type
+    let typeCorrected: { from: DocumentType; to: DocumentType } | undefined
+    let typeInference: DocumentTypeInference | undefined
+
     const ft = detectFileType(doc.filepath)
-    const sheetIndex =
-      ft === 'excel' ? pickBestExcelSheetIndex(doc.filepath, doc.type) : 0
-    const parsed = await parseDocumentFile(doc.filepath, doc.type, sheetIndex)
+    let sheetIndex = ft === 'excel' ? pickBestExcelSheetIndex(doc.filepath, docType) : 0
+    let parsed = await parseDocumentFile(doc.filepath, docType, sheetIndex)
+
+    typeInference = inferDocumentFamily(parsed.headers, {
+      sampleRows: parsed.rows.slice(0, 40),
+      parseMethod: parsed.parseMethod,
+      filename: doc.filename,
+    })
+    const currentFamily = documentFamilyOf(docType)
+    if (
+      AUTO_CORRECT_DOC_TYPE &&
+      typeInference.confidence === 'high' &&
+      typeInference.family !== 'unknown' &&
+      typeInference.family !== currentFamily
+    ) {
+      const nextType = remapDocumentTypeToFamily(docType, typeInference.family)
+      await prisma.document.update({
+        where: { id: documentId },
+        data: {
+          type: nextType,
+          ...(typeInference.family === 'cash_book' ? { bankAccountId: null } : {}),
+        },
+      })
+      typeCorrected = { from: docType, to: nextType }
+      docType = nextType
+      sheetIndex = ft === 'excel' ? pickBestExcelSheetIndex(doc.filepath, docType) : 0
+      parsed = await parseDocumentFile(doc.filepath, docType, sheetIndex)
+    }
+
     const sample = parsed.rows.slice(0, 20)
     let detectedBankFormat: GhanaBankFormat = null
-    if (!doc.type.startsWith('cash_book_')) {
+    if (!docType.startsWith('cash_book_')) {
       detectedBankFormat = resolveDetectedBankFormat(parsed.headers, sample, parsed.parseMethod)
     }
-    const suggested = buildSuggestedMappingForDocument(doc.type, parsed.headers, detectedBankFormat)
-    const mapping = sanitizeMapping(suggested, parsed.headers.length)
-    if (!canAutoMap(doc.type, parsed.headers, mapping)) {
-      return { status: 'skipped', reason: 'mapping confidence too low — map manually' }
+    const suggested = buildSuggestedMappingForDocument(docType, parsed.headers, detectedBankFormat, {
+      projectCurrency: doc.project.currency || 'GHS',
+      sampleRows: parsed.rows.slice(0, 250),
+    })
+    const learned = await applyOrganisationLayoutMemory(
+      doc.project.organizationId,
+      docType,
+      parsed.headers,
+      suggested
+    )
+    const mapping = sanitizeMapping(
+      trimMappingForDocumentType(docType, learned.mapping),
+      parsed.headers.length
+    )
+    if (!canAutoMap(docType, parsed.headers, mapping, parsed.rows.slice(0, 250))) {
+      return {
+        status: 'skipped',
+        reason: 'mapping confidence too low — map manually',
+        typeCorrected,
+        typeInference,
+      }
     }
     const result = await applyDocumentMapping(
       documentId,
-      doc.type,
+      docType,
       parsed,
       mapping,
       doc.project.organizationId,
       doc.projectId,
       doc.project.organization.plan
     )
+    if (learned.match) {
+      await touchLayoutMemoryUse(learned.match.id).catch(() => undefined)
+    }
     return {
       status: 'mapped',
       transactionCount: result.count,
       parseMethod: parsed.parseMethod,
+      typeCorrected,
+      typeInference,
     }
   } catch (e) {
     return { status: 'failed', error: (e as Error).message }

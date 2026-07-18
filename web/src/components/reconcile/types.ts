@@ -22,6 +22,8 @@ export interface SuggestedMatch {
   duplicateWarning?: boolean
   matchKind?: 'receipt' | 'payment'
   ecobankPattern?: boolean
+  /** True when organisation match memory raised this suggestion’s confidence. */
+  orgMemoryBoosted?: boolean
 }
 
 export interface SuggestedSplitMatch {
@@ -29,6 +31,7 @@ export interface SuggestedSplitMatch {
   bankTxs: Tx[]
   confidence: number
   reason: string
+  orgMemoryBoosted?: boolean
 }
 
 export interface AttachmentInfo {

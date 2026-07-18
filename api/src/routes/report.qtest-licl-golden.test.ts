@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
 import { parseExcel } from '../services/parser.js'
 import {
@@ -10,7 +11,7 @@ import {
   parseImportedAmount,
 } from './report.js'
 
-const repoRoot = path.resolve(process.cwd(), '..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
 function readGolden() {
   const p = path.join(repoRoot, 'new-test-data', 'qtest-licl-golden.json')

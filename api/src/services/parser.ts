@@ -21,6 +21,7 @@ import {
   findStanbicTransactionHeaderRow,
   normalizeStanbicExcelTable,
 } from './stanbicStatement.js'
+import { resolveMultiRowHeaders } from './excelHeaderResolve.js'
 
 export interface ParseResult {
   headers: string[]
@@ -82,11 +83,29 @@ export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
               : cashBookHeaderRow >= 0
                 ? cashBookHeaderRow
                 : findHeaderRow(nonEmpty)
-  const headerRowData = nonEmpty[headerRow] || []
-  const headers = headerRowData.map((c, i) =>
-    String(c ?? '').trim() || `Col_${i}`
-  )
-  const rows = nonEmpty.slice(headerRow + 1).filter((r) => r.some((c) => c != null && String(c).trim() !== ''))
+
+  const usedSpecializedHeader =
+    ecobankHeaderRow >= 0 ||
+    bogHeaderRow >= 0 ||
+    stanbicHeaderRow >= 0 ||
+    boaHeaderRow >= 0 ||
+    erpGlHeaderRow >= 0 ||
+    cashBookHeaderRow >= 0
+
+  let headers: string[]
+  let rows: unknown[][]
+  if (usedSpecializedHeader) {
+    const headerRowData = nonEmpty[headerRow] || []
+    headers = headerRowData.map((c, i) => String(c ?? '').trim() || `Col_${i}`)
+    rows = nonEmpty.slice(headerRow + 1).filter((r) => r.some((c) => c != null && String(c).trim() !== ''))
+  } else {
+    const resolved = resolveMultiRowHeaders(nonEmpty, headerRow)
+    headers = resolved.headers
+    rows = nonEmpty
+      .slice(resolved.dataStart)
+      .filter((r) => r.some((c) => c != null && String(c).trim() !== ''))
+  }
+
   let result: ParseResult = { headers, rows, sheetNames, activeSheet: sheetName }
   if (ecobankHeaderRow >= 0) {
     result = normalizeEcobankExcelTable(result)
@@ -111,8 +130,11 @@ export function parseCsv(filepath: string): ParseResult {
   const delimiter = sniffCsvDelimiter(buf)
   const data = parseCsvRows(buf, delimiter)
   const headerRow = findHeaderRow(data)
-  const headers = (data[headerRow] || []).map((c, i) => String(c).trim() || `Col_${i}`)
-  const rows = data.slice(headerRow + 1).filter((r) => r.some((c) => c != null && String(c).trim() !== ''))
+  const resolved = resolveMultiRowHeaders(data, headerRow)
+  const headers = resolved.headers
+  const rows = data
+    .slice(resolved.dataStart)
+    .filter((r) => r.some((c) => c != null && String(c).trim() !== ''))
   return { headers, rows }
 }
 
@@ -137,13 +159,61 @@ function sniffCsvDelimiter(text: string): ',' | ';' | '\t' {
   return ','
 }
 
-function findHeaderRow(data: unknown[][]): number {
-  for (let i = 0; i < Math.min(20, data.length); i++) {
+const HEADER_WORD =
+  /\b(date|time|description|details|narration|narrative|particulars|reference|ref|cheque|check|amount|debit|credit|withdrawal|deposit|payment|receipt|balance|currency|rate|value)\b/i
+
+function nonEmptyCells(row: unknown[]): unknown[] {
+  return row.filter((c) => c != null && String(c).trim() !== '')
+}
+
+/**
+ * Score candidate header rows instead of picking the first row with two cells.
+ * This handles exports with titles, account metadata, address blocks and blank
+ * spacer rows before the real transaction table.
+ */
+export function findHeaderRow(data: unknown[][]): number {
+  let bestIndex = 0
+  let bestScore = Number.NEGATIVE_INFINITY
+  const limit = Math.min(40, data.length)
+
+  for (let i = 0; i < limit; i++) {
     const row = data[i] || []
-    const nonEmpty = row.filter((c) => c != null && String(c).trim() !== '')
-    if (nonEmpty.length >= 2) return i
+    const cells = nonEmptyCells(row)
+    if (cells.length < 2) continue
+
+    const strings = cells.map((c) => String(c).trim())
+    const keywordHits = strings.filter((s) => HEADER_WORD.test(s)).length
+    const alphaCells = strings.filter((s) => /[A-Za-z]/.test(s)).length
+    const numericCells = strings.filter((s) => /^[-+()\d,.\s]+$/.test(s)).length
+    const averageLength =
+      strings.reduce((sum, s) => sum + s.length, 0) / Math.max(strings.length, 1)
+
+    // A real header is followed by similarly wide data rows.
+    let followingShape = 0
+    for (let j = i + 1; j < Math.min(i + 5, data.length); j++) {
+      const width = nonEmptyCells(data[j] || []).length
+      if (width >= Math.max(2, Math.floor(cells.length * 0.6))) followingShape++
+    }
+
+    let score =
+      keywordHits * 20 +
+      cells.length * 2 +
+      alphaCells * 1.5 +
+      followingShape * 5 -
+      numericCells * 2
+    // Metadata/title rows tend to have two long prose cells.
+    if (cells.length <= 2 && averageLength > 24) score -= 25
+    if (/statement\s+(for|of)|account\s*(name|number)|customer|branch|address/i.test(strings.join(' '))) {
+      score -= 12
+    }
+
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = i
+    }
   }
-  return 0
+
+  return bestScore === Number.NEGATIVE_INFINITY ? 0 : bestIndex
 }
 
 export function detectFileType(filepath: string): 'excel' | 'csv' | 'pdf' | 'image' {

@@ -248,6 +248,14 @@ export default function SuggestedMatchesPanel({
                       Withdrawal
                     </span>
                   )}
+                  {(s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
+                    <span
+                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-900"
+                      title="Boosted because your organisation confirmed a similar amount + reference/narration before"
+                    >
+                      Learned
+                    </span>
+                  )}
                   {s.duplicateWarning && (
                     <span
                       className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"

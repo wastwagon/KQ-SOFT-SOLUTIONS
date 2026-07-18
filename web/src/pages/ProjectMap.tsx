@@ -136,6 +136,27 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       ),
   })
 
+  const changeTypeMutation = useMutation({
+    mutationFn: (family: 'cash_book' | 'bank_statement') => {
+      if (!selectedDocId) throw new Error('No document selected')
+      return documents.changeType(selectedDocId, family)
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] })
+      queryClient.invalidateQueries({ queryKey: ['document-preview', selectedDocId] })
+      setMapping({})
+      setError('')
+      toast.success(
+        'Document type updated',
+        `Now ${data.to.replace(/_/g, ' ')}. Remap columns if this file was already mapped (${data.clearedTransactions} transactions cleared).`
+      )
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not change type', e instanceof Error ? e.message : undefined)
+      ),
+  })
+
   const [applyingAll, setApplyingAll] = useState(false)
   /** Document IDs included in bulk “apply suggested mapping”. New files default on; existing choices survive list refresh. */
   const [bulkDocIds, setBulkDocIds] = useState<Set<string>>(() => new Set())
@@ -654,6 +675,79 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               {(preview as { pdfTruncated?: boolean }).pdfTruncated && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
                   <strong>PDF truncation:</strong> This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (default limit {DEFAULT_PDF_OCR_MAX_PAGES}; set PDF_OCR_MAX_PAGES to raise). Some transactions may be missing. Split the PDF or increase the limit for full extraction.
+                </div>
+              )}
+              {typeof preview.parseQualityScore === 'number' &&
+                (preview.parseQualityScore < 70 || preview.ocrRetried) && (
+                <div
+                  className={`rounded-xl border px-4 py-2 text-sm ${
+                    preview.parseQualityScore < 55
+                      ? 'border-amber-200 bg-amber-50 text-amber-900'
+                      : 'border-slate-200 bg-slate-50 text-slate-800'
+                  }`}
+                >
+                  <strong>Parse quality:</strong> {preview.parseQualityScore}/100
+                  {preview.ocrRetried ? ' (OCR retry used)' : ''}.
+                  {preview.parseQualityNotes?.length
+                    ? ` ${preview.parseQualityNotes.slice(0, 2).join(' · ')}`
+                    : ''}
+                  {preview.parseQualityScore < 55
+                    ? ' Review the preview carefully — consider uploading the Excel export if available.'
+                    : ''}
+                </div>
+              )}
+              {preview.layoutMemoryApplied && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-950">
+                  <strong>Saved layout:</strong>{' '}
+                  {preview.layoutMemoryApplied.exact
+                    ? 'Using your organisation’s column map for this exact header layout'
+                    : `Using a similar saved column map (${Math.round(preview.layoutMemoryApplied.similarity * 100)}% match)`}
+                  {preview.layoutMemoryApplied.fields.length
+                    ? ` — ${preview.layoutMemoryApplied.fields.join(', ')}`
+                    : ''}
+                  . Adjust if needed; saving updates the memory for next time.
+                </div>
+              )}
+              {preview.typeInference?.mismatch && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  <p>
+                    <strong>Document type:</strong> this file looks like a{' '}
+                    {preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'} (
+                    {preview.typeInference.confidence} confidence), but it was uploaded under the other
+                    card.
+                    {preview.typeInference.reasons?.length
+                      ? ` Evidence: ${preview.typeInference.reasons.slice(0, 2).join('; ')}.`
+                      : ''}
+                  </p>
+                  {canMap && isProjectEditable(project?.status) && preview.typeInference.family !== 'unknown' && (
+                    <button
+                      type="button"
+                      disabled={changeTypeMutation.isPending}
+                      onClick={() =>
+                        changeTypeMutation.mutate(
+                          preview.typeInference!.family === 'cash_book' ? 'cash_book' : 'bank_statement'
+                        )
+                      }
+                      className="mt-2 inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      {changeTypeMutation.isPending
+                        ? 'Switching…'
+                        : `Switch to ${
+                            preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'
+                          }`}
+                    </button>
+                  )}
+                </div>
+              )}
+              {preview.hasForeignCurrencyColumns && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-950">
+                  <strong>Multi-currency cash book:</strong> columns include cedi equivalents (
+                  <code>AMT RECEIVED</code> / <code>AMT PAID</code>) and foreign amounts (
+                  <code>FC AMT RECEIVED</code> / <code>FC AMT PAID</code>, plus Currency Code / Exch Rate).
+                  For a euro bank account, map amounts to the <strong>FC</strong> columns — not the cedi ones.
+                  {preview.projectCurrency && preview.projectCurrency.toUpperCase() !== 'GHS' && (
+                    <> Project currency is <strong>{preview.projectCurrency}</strong>, so FC columns are suggested by default.</>
+                  )}
                 </div>
               )}
               <div className="overflow-x-auto">

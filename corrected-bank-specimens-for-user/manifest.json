@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-07-14T13:50:03.394Z",
+  "exportedAt": "2026-07-17T19:29:57.236Z",
   "banks": [
     {
       "id": "01-ecobank",
@@ -236,9 +236,9 @@
           "file": "scb statement.xlsx",
           "type": "excel",
           "status": "ok",
-          "rowCount": 1316,
-          "sumDebit": 23000852.631968394,
-          "sumCredit": 24291535.131031606,
+          "rowCount": 841,
+          "sumDebit": 11756548.180000002,
+          "sumCredit": 12296754.209999999,
           "parseMethod": "excel"
         },
         {
@@ -278,9 +278,9 @@
           "file": "Prudential bank(0091900180008)_sep 23[10235].pdf",
           "type": "pdf",
           "status": "ok",
-          "rowCount": 381,
-          "sumDebit": 420716564.8899997,
-          "sumCredit": 423285158.25999993,
+          "rowCount": 284,
+          "sumDebit": 419133070.67999965,
+          "sumCredit": 428126625.11999995,
           "parseMethod": "prudential_pdf"
         }
       ]
@@ -482,9 +482,9 @@
           "file": "acct 4702 bank statement.xlsx",
           "type": "excel",
           "status": "ok",
-          "rowCount": 1316,
-          "sumDebit": 23000852.631968394,
-          "sumCredit": 24291535.131031606,
+          "rowCount": 841,
+          "sumDebit": 11756548.180000002,
+          "sumCredit": 12296754.209999999,
           "parseMethod": "excel"
         },
         {
@@ -532,7 +532,7 @@
           "file": "acct430 cash book.xlsx",
           "type": "excel",
           "status": "ok",
-          "rowCount": 56,
+          "rowCount": 70,
           "sumDebit": 55170.67,
           "sumCredit": 96327.81999999999,
           "parseMethod": "excel"

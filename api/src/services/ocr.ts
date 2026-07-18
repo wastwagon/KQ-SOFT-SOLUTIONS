@@ -36,12 +36,6 @@ function textToTable(text: string): OcrResult {
   return textToTableFromOcrText(text)
 }
 
-async function ocrFromPath(imagePath: string): Promise<string> {
-  const lang = resolveOcrLanguages()
-  const result = await Tesseract.recognize(imagePath, lang, { logger: () => {} })
-  return result.data.text
-}
-
 async function ocrFromBuffer(buffer: Buffer): Promise<string> {
   const lang = resolveOcrLanguages()
   const result = await Tesseract.recognize(buffer, lang, { logger: () => {} })
@@ -49,12 +43,15 @@ async function ocrFromBuffer(buffer: Buffer): Promise<string> {
 }
 
 export async function parseImage(filepath: string): Promise<OcrResult> {
-  const ext = path.extname(filepath).toLowerCase()
-  if (!['.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp'].includes(ext)) {
-    throw new Error('Unsupported image format')
+  const { parseImageFile } = await import('./documentParse.js')
+  const doc = await parseImageFile(filepath)
+  return {
+    headers: doc.headers,
+    rows: doc.rows,
+    pdfTruncated: doc.pdfTruncated,
+    pdfPagesProcessed: doc.pdfPagesProcessed,
+    pdfTotalPages: doc.pdfTotalPages,
   }
-  const text = await ocrFromPath(filepath)
-  return textToTable(text)
 }
 
 import { resolvePdfOcrMaxPages } from '../config/importLimits.js'

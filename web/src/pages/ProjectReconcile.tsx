@@ -264,6 +264,14 @@ export default function ProjectReconcile({
         </div>
       )}
 
+      {data.sideInversion?.inverted && canReconcile && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950 max-w-2xl">
+          <strong>Cash-book side inversion detected</strong> — this ERP export appears to flip bank
+          sides (receipts line up with bank debits, payments with bank credits). Suggestions are
+          paired on the crossed sides automatically. {data.sideInversion.reason}
+        </div>
+      )}
+
       {(data.duplicateChequeWarnings?.length ?? 0) > 0 && canReconcile && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 max-w-2xl">
           <strong>Duplicate cheque numbers in cash book:</strong>{' '}

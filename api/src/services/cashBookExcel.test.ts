@@ -82,6 +82,67 @@ describe('cashBookExcel', () => {
     expect(result.rows[1]![6]).toBeNull()
   })
 
+  it('preserves euro/foreign-currency columns on TGL multi-currency cash books', () => {
+    const result = normalizeTglErpCashBookTable({
+      headers: [
+        'TGL Account Code',
+        'Transaction Date',
+        'Description',
+        'Amount',
+        'Currency Code',
+        'Exch Rate',
+        'Foreign Currency Amount',
+        'Cheque No',
+        'Transaction Reference',
+      ],
+      rows: [
+        [
+          '25010',
+          '11-Dec-2018',
+          'AFRICA MOVE - RELOCATION',
+          '-13640.85',
+          '23',
+          '5.5111',
+          '-2475.16',
+          null,
+          'GT BANK - EURO',
+        ],
+        [
+          '25010',
+          '17-Jan-2018',
+          'PYT-JN3747€2529.8/SOFITEL',
+          '-13319.4',
+          '23',
+          '5.265',
+          '-2529.8',
+          null,
+          'GTBANK - EURO',
+        ],
+      ],
+    })
+    expect(result.headers).toContain('Foreign Currency Amount')
+    expect(result.headers).toContain('FC AMT RECEIVED')
+    expect(result.headers).toContain('FC AMT PAID')
+    expect(result.headers).toContain('Currency Code')
+    expect(result.headers).toContain('Exch Rate')
+    // Local GHS still populated
+    expect(result.rows[0]![5]).toBeCloseTo(13640.85, 2)
+    expect(result.rows[0]![6]).toBeNull()
+    // Euro amounts available for EUR projects
+    expect(result.rows[0]![10]).toBeCloseTo(2475.16, 2)
+    expect(result.rows[1]![10]).toBeCloseTo(2529.8, 2)
+
+    const eurMap = buildSuggestedMappingForDocument('cash_book_receipts', result.headers, null, {
+      projectCurrency: 'EUR',
+    })
+    expect(result.headers[eurMap.amt_received!]).toBe('FC AMT RECEIVED')
+
+    const ghsMap = buildSuggestedMappingForDocument('cash_book_receipts', result.headers, null, {
+      projectCurrency: 'GHS',
+    })
+    expect(result.headers[ghsMap.amt_received!]).toBe('AMT RECEIVED')
+  })
+
   it('parses ERP GLPTLS1 ADB cashbook with auto-map', () => {
     if (!fs.existsSync(ADB_CASH)) return
 

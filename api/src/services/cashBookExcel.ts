@@ -115,6 +115,11 @@ export function isTglErpCashBookLayout(headers: string[]): boolean {
   )
 }
 
+/**
+ * Normalize TGL ERP cash books into receipt/payment columns.
+ * Preserves foreign-currency columns (euro/USD) so EUR projects can map
+ * FC AMT RECEIVED / FC AMT PAID instead of the GHS Amount equivalent.
+ */
 export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
   const normHeaders = result.headers.map(norm)
   const idx = (patterns: RegExp[]) =>
@@ -125,6 +130,9 @@ export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
   const refIdx = idx([/^transaction\s*reference$/, /^doc\s*ref/])
   const chqIdx = idx([/^cheque\s*no$/, /chq\s*no/])
   const accodeIdx = idx([/^tgl\s*account\s*code$/, /^account\s*code$/])
+  const currencyIdx = idx([/^currency\s*code$/, /^currency$/])
+  const exchIdx = idx([/^exch(?:ange)?\s*rate$/, /^exch\s*rate$/])
+  const fcAmtIdx = idx([/^foreign\s*currency\s*amount$/, /^fc\s*amount$/, /^foreign\s*amount$/])
 
   const outHeaders = [
     'Transaction Date',
@@ -134,6 +142,11 @@ export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
     'Accode',
     'AMT RECEIVED',
     'AMT PAID',
+    'Currency Code',
+    'Exch Rate',
+    'Foreign Currency Amount',
+    'FC AMT RECEIVED',
+    'FC AMT PAID',
   ]
   const outRows: unknown[][] = []
 
@@ -142,9 +155,13 @@ export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
     const desc = String(get(descIdx) ?? '').trim()
     if (/^total\s+(debit|credit)/i.test(desc)) continue
     const amt = amtIdx >= 0 ? parseImportedAmount(get(amtIdx)) : 0
-    if (amt === 0) continue
+    const fcAmt = fcAmtIdx >= 0 ? parseImportedAmount(get(fcAmtIdx)) : 0
+    if (amt === 0 && fcAmt === 0) continue
     const received = amt < 0 ? Math.abs(amt) : null
     const paid = amt > 0 ? amt : null
+    // Same sign convention as Amount: negative = receipt, positive = payment
+    const fcReceived = fcAmt < 0 ? Math.abs(fcAmt) : null
+    const fcPaid = fcAmt > 0 ? fcAmt : null
     outRows.push([
       get(dateIdx),
       desc,
@@ -153,6 +170,11 @@ export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
       accodeIdx >= 0 ? get(accodeIdx) : null,
       received,
       paid,
+      currencyIdx >= 0 ? get(currencyIdx) : null,
+      exchIdx >= 0 ? get(exchIdx) : null,
+      fcAmt !== 0 ? fcAmt : null,
+      fcReceived,
+      fcPaid,
     ])
   }
 
