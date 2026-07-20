@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-07-17T19:29:57.236Z",
+  "exportedAt": "2026-07-20T14:21:37.879Z",
   "banks": [
     {
       "id": "01-ecobank",
@@ -278,8 +278,8 @@
           "file": "Prudential bank(0091900180008)_sep 23[10235].pdf",
           "type": "pdf",
           "status": "ok",
-          "rowCount": 284,
-          "sumDebit": 419133070.67999965,
+          "rowCount": 400,
+          "sumDebit": 419133588.17999965,
           "sumCredit": 428126625.11999995,
           "parseMethod": "prudential_pdf"
         }

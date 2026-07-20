@@ -80,7 +80,7 @@ INWARD CLEARING
     expect(result.headers).toContain('Debit')
     expect(result.headers).toContain('Credit')
     expect(result.rows.length).toBeGreaterThan(50)
-    expect(result.rows.length).toBeLessThan(450)
+    expect(result.rows.length).toBeLessThan(500)
 
     const creditRows = result.rows.filter((r) => Number(r[5]) > 0)
     expect(creditRows.length).toBeGreaterThanOrEqual(45)
@@ -88,7 +88,8 @@ INWARD CLEARING
     expect(result.rows.some((r) => Math.abs(Number(r[5]) - 351_241.25) < 0.01)).toBe(true)
 
     const debits45 = result.rows.filter((r) => Number(r[4]) === 4.5).length
-    expect(debits45).toBeLessThan(20)
+    // Tiny commission lines (e.g. glued 4.50 fees) must be kept — they are real bank charges.
+    expect(debits45).toBeGreaterThanOrEqual(80)
 
     const cr = buildSuggestedMappingForDocument('bank_credits', result.headers, 'prudential')
     const dr = buildSuggestedMappingForDocument('bank_debits', result.headers, 'prudential')

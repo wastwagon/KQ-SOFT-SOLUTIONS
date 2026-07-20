@@ -237,26 +237,6 @@ export function parsePrudentialPdfText(text: string): ParseResult {
       previousBalance
     )
 
-    if (
-      parsed.amount <= 10 &&
-      Math.abs(parsed.balance) > 50_000 &&
-      /commission|\bcomm\b/i.test(`${pending.description} ${description}`)
-    ) {
-      pending = null
-      return
-    }
-
-    // Skip glued commission noise (e.g. 4.508,487,580.18DR) when balance delta does not match tiny amount
-    if (
-      parsed.amount > 0 &&
-      parsed.amount <= 10 &&
-      Math.abs(Math.abs(parsed.balance) - Math.abs(previousBalance)) > 1000 &&
-      Math.abs(parsed.amount - Math.abs(Math.abs(parsed.balance) - Math.abs(previousBalance))) > 1000
-    ) {
-      pending = null
-      return
-    }
-
     previousBalance = nextBalance
 
     if (debit === 0 && credit === 0) {
