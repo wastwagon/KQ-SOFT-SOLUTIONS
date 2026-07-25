@@ -9,8 +9,8 @@ export default function SubscriptionRenewalPanel() {
     <div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-center max-w-lg mx-auto shadow-sm">
       <p className="text-sm font-semibold text-amber-950 mb-1">Subscription inactive</p>
       <p className="text-sm text-amber-900 mb-4 leading-relaxed">
-        Core workspace features are paused until an admin renews. Use billing to pay with Paystack, or contact
-        support if you are on a custom plan.
+        Core workspace features are paused until an admin renews. Pay monthly, quarterly, or yearly with Paystack
+        under Billing — or contact support if you are on a custom plan.
       </p>
       <Link
         to="/settings/billing"

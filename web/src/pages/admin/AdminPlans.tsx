@@ -172,10 +172,10 @@ function PlanForm({
 }) {
   const [slug, setSlug] = useState(initial?.slug ?? '')
   const [name, setName] = useState(initial?.name ?? '')
-  const [projectsPerMonth, setProjectsPerMonth] = useState(String(initial?.projectsPerMonth ?? 5))
-  const [transactionsPerMonth, setTransactionsPerMonth] = useState(String(initial?.transactionsPerMonth ?? 500))
-  const [monthlyGhs, setMonthlyGhs] = useState(String(initial?.monthlyGhs ?? 0))
-  const [yearlyGhs, setYearlyGhs] = useState(String(initial?.yearlyGhs ?? 0))
+  const [projectsPerMonth, setProjectsPerMonth] = useState(String(initial?.projectsPerMonth ?? 10))
+  const [transactionsPerMonth, setTransactionsPerMonth] = useState(String(initial?.transactionsPerMonth ?? 1000))
+  const [monthlyGhs, setMonthlyGhs] = useState(String(initial?.monthlyGhs ?? 300))
+  const [yearlyGhs, setYearlyGhs] = useState(String(initial?.yearlyGhs ?? 3000))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

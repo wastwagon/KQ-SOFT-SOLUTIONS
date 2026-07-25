@@ -39,7 +39,7 @@ export default function AdminOrgDetail() {
       createdAt: string
       members: { user: { id: string; email: string; name: string | null }; role: string }[]
       _count: { projects: number; clients: number }
-      usage: { projectsUsed: number; projectsLimit: number; projectsUnlimited: boolean; transactionsUsed: number; transactionsLimit: number; transactionsUnlimited: boolean }
+      usage: { projectsUsed: number; projectsLimit: number; projectsUnlimited: boolean; transactionsUsed: number; transactionsLimit: number; transactionsUnlimited: boolean; bankAccountsUsed?: number; bankAccountsLimit?: number; bankAccountsUnlimited?: boolean }
       totalPaid: number
       payments: { id: string; amount: number; currency: string; plan: string; period: string; reference: string | null; status: string; createdAt: string }[]
       subscription?: {
@@ -48,7 +48,7 @@ export default function AdminOrgDetail() {
         currentPeriodStart: string | null
         currentPeriodEnd: string | null
         latestPaymentAt: string | null
-        latestPaymentPeriod: 'monthly' | 'yearly' | null
+        latestPaymentPeriod: 'monthly' | 'quarterly' | 'yearly' | null
         latestPaymentAmount: number | null
       }
       subscriptionMeta?: {
@@ -353,6 +353,11 @@ export default function AdminOrgDetail() {
             {org.usage.transactionsUnlimited
               ? `${org.usage.transactionsUsed} tx (unlimited)`
               : `${org.usage.transactionsUsed} / ${org.usage.transactionsLimit} tx`}
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {org.usage.bankAccountsUnlimited
+              ? `${org.usage.bankAccountsUsed ?? 0} banks (unlimited)`
+              : `${org.usage.bankAccountsUsed ?? 0} / ${org.usage.bankAccountsLimit ?? '—'} banks`}
           </p>
         </Card>
         <Card className="p-4 shadow-sm">

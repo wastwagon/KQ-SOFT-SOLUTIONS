@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Globe2, Loader2 } from 'lucide-react'
-import { formatGhs, type MarketingPlan } from '../../lib/plans'
+import { formatGhs, planAmountForPeriod, type BillingPeriod, type MarketingPlan } from '../../lib/plans'
 
 type FxCode = 'USD' | 'EUR' | 'GBP'
 
@@ -32,7 +32,7 @@ export default function SubscriptionFxReference({
   billingPeriod,
 }: {
   plans: MarketingPlan[]
-  billingPeriod: 'monthly' | 'yearly'
+  billingPeriod: BillingPeriod
 }) {
   const [code, setCode] = useState<FxCode>('USD')
   const [rates, setRates] = useState<Record<string, number> | null>(null)
@@ -79,7 +79,7 @@ export default function SubscriptionFxReference({
     return plans
       .filter((p) => p.monthlyGhs > 0)
       .map((p) => {
-        const ghs = billingPeriod === 'yearly' ? p.yearlyGhs : p.monthlyGhs
+        const ghs = planAmountForPeriod(p, billingPeriod)
         const foreign = ghs * unitPerGhs
         return { slug: p.slug, name: p.name, ghs, foreign }
       })

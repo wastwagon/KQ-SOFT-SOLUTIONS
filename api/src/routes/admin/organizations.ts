@@ -105,7 +105,7 @@ router.get('/', async (req, res) => {
       lastPayment
         ? {
             createdAt: lastPayment.createdAt,
-            period: lastPayment.period as 'monthly' | 'yearly',
+            period: lastPayment.period as 'monthly' | 'quarterly' | 'yearly',
             amount: lastPayment.amount,
           }
         : null,
@@ -193,7 +193,7 @@ router.get('/export/csv', async (req, res) => {
       last
         ? {
             createdAt: last.createdAt,
-            period: last.period as 'monthly' | 'yearly',
+            period: last.period as 'monthly' | 'quarterly' | 'yearly',
             amount: last.amount,
           }
         : null,
@@ -240,7 +240,7 @@ router.get('/:id', async (req, res) => {
     fetchSubscriptionOverrideMeta(org.id),
   ])
   const paymentForSnapshot = latestPayment
-    ? { createdAt: latestPayment.createdAt, period: latestPayment.period as 'monthly' | 'yearly', amount: latestPayment.amount }
+    ? { createdAt: latestPayment.createdAt, period: latestPayment.period as 'monthly' | 'quarterly' | 'yearly', amount: latestPayment.amount }
     : null
   const subscription = getSubscriptionSnapshot(
     { createdAt: org.createdAt, plan: org.plan },

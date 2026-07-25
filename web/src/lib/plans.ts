@@ -20,6 +20,8 @@
 
 export type PlanSlug = 'basic' | 'standard' | 'premium' | 'firm'
 
+export type BillingPeriod = 'monthly' | 'quarterly' | 'yearly'
+
 export interface MarketingPlan {
   slug: PlanSlug
   name: string
@@ -31,10 +33,13 @@ export interface MarketingPlan {
   highlight?: boolean
   monthlyGhs: number
   yearlyGhs: number
+  quarterlyGhs: number
   /** -1 = unlimited */
   projectsPerMonth: number
   /** -1 = unlimited */
   transactionsPerMonth: number
+  /** Org-wide bank account seats (-1 = unlimited). */
+  bankAccounts: number
   /** -1 = unlimited */
   users: number
   /** Concise bullets shown directly on the plan card. */
@@ -71,8 +76,9 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
   {
     title: 'Workspace limits',
     features: [
-      { id: 'projects', label: 'Projects per month' },
+      { id: 'bank_accounts', label: 'Bank accounts' },
       { id: 'transactions', label: 'Transactions per month' },
+      { id: 'projects', label: 'Projects per month' },
       { id: 'users', label: 'Team members' },
     ],
   },
@@ -84,7 +90,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       {
         id: 'bank_parsers',
         label:
-          'Pre-built bank statement layouts (e.g. Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB) + generic CSV/Excel/PDF',
+          'Pre-built bank statement layouts (e.g. Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB, Prudential) + generic CSV/Excel/PDF',
       },
     ],
   },
@@ -118,54 +124,50 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     ],
   },
   {
-    title: 'Integrations',
-    features: [
-      { id: 'api_access', label: 'Public REST API access' },
-    ],
-  },
-  {
-    title: 'Support',
+    title: 'Support & services',
     features: [
       { id: 'email_support', label: 'Email support' },
-      { id: 'priority_support', label: 'Priority support (4-hour SLA)' },
+      { id: 'priority_support', label: 'Priority support' },
+      { id: 'advisory', label: 'Bookkeeping consultancy / advisory' },
       { id: 'onboarding', label: 'Personalised onboarding' },
+      { id: 'api_access', label: 'Public REST API' },
     ],
   },
 ]
 
 /* -------------------------------------------------------------------------
- * Plan definitions (4 tiers)
- *
- * Pricing aligns with PLAN_PRICES in api/src/config/subscription.ts and the
- * tiers in PLANNING_DATA.json. Update both places when pricing changes.
+ * Jul 2026 catalogue — keep in sync with api/src/config/subscription.ts
  * ----------------------------------------------------------------------- */
 
 export const MARKETING_PLANS: MarketingPlan[] = [
   {
     slug: 'basic',
     name: 'Basic',
-    tagline: 'For solo accountants getting started.',
+    tagline: 'For solo accountants getting started — with advisory support.',
     audience: 'Solo practitioner',
-    monthlyGhs: 150,
-    yearlyGhs: 1500,
-    projectsPerMonth: 5,
-    transactionsPerMonth: 5000,
+    monthlyGhs: 300,
+    yearlyGhs: 3000,
+    quarterlyGhs: 855,
+    projectsPerMonth: 10,
+    transactionsPerMonth: 1_000,
+    bankAccounts: 5,
     users: 1,
     bullets: [
-      '5 projects · 5,000 transactions / month',
-      'Up to 2 bank accounts per project',
-      '1 team member',
-      '14-day trial, then subscription required',
+      '5 bank accounts · 1,000 transactions / month',
+      'Up to 10 projects / month · 1 team member',
+      '14-day free trial',
+      '50% off your first 2 months',
+      'Bookkeeping consultancy / advisory',
       'Excel, CSV & PDF imports + OCR',
       'Pre-built regional bank statement layouts',
       'One-to-one auto-matching',
       'BRS export (Excel + PDF)',
-      'Default report branding',
       'Email support',
     ],
     features: {
-      projects: '5 / month',
-      transactions: '5,000 / month',
+      bank_accounts: '5',
+      projects: '10 / month',
+      transactions: '1,000 / month',
       users: '1',
       imports: true,
       ocr: true,
@@ -187,6 +189,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       api_access: false,
       email_support: true,
       priority_support: false,
+      advisory: true,
       onboarding: false,
     },
     ctaLabel: 'Start 14-day trial',
@@ -199,26 +202,27 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     audience: 'Small finance team',
     badge: 'Most popular',
     highlight: true,
-    monthlyGhs: 50,
-    yearlyGhs: 550,
-    projectsPerMonth: 20,
-    transactionsPerMonth: 50_000,
+    monthlyGhs: 900,
+    yearlyGhs: 9000,
+    quarterlyGhs: 2565,
+    projectsPerMonth: 30,
+    transactionsPerMonth: 5_000,
+    bankAccounts: 10,
     users: 3,
     inheritsFromLabel: 'Everything in Basic, plus:',
     bullets: [
-      '20 projects · 50,000 transactions / month',
-      'Up to 3 team members',
+      '10 bank accounts · 5,000 transactions / month',
+      'Up to 30 projects / month · 3 team members',
       'Bulk match (up to 50 pairs)',
       'AI-powered match ranking',
       'Bank rules engine',
-      'Discrepancy report',
-      'Full audit trail',
+      'Discrepancy report & full audit trail',
       'Logo & full report branding on PDF exports',
-      'Email support',
     ],
     features: {
-      projects: '20 / month',
-      transactions: '50,000 / month',
+      bank_accounts: '10',
+      projects: '30 / month',
+      transactions: '5,000 / month',
       users: '3',
       imports: true,
       ocr: true,
@@ -240,6 +244,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       api_access: false,
       email_support: true,
       priority_support: false,
+      advisory: true,
       onboarding: false,
     },
     ctaLabel: 'Start free trial',
@@ -250,23 +255,26 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     name: 'Premium',
     tagline: 'For firms reconciling at scale.',
     audience: 'Established firm',
-    monthlyGhs: 100,
-    yearlyGhs: 1100,
+    monthlyGhs: 1500,
+    yearlyGhs: 15000,
+    quarterlyGhs: 4275,
     projectsPerMonth: 100,
-    transactionsPerMonth: 200_000,
+    transactionsPerMonth: 20_000,
+    bankAccounts: 30,
     users: 5,
     inheritsFromLabel: 'Everything in Standard, plus:',
     bullets: [
-      '100 projects · 200,000 transactions / month',
-      'Up to 5 team members',
+      '30 bank accounts · 20,000 transactions / month',
+      'Up to 100 projects / month · 5 team members',
       'One-to-many & many-to-many matches',
       'Roll forward across periods',
       'Threshold approval workflow',
       'Priority support',
     ],
     features: {
+      bank_accounts: '30',
       projects: '100 / month',
-      transactions: '200,000 / month',
+      transactions: '20,000 / month',
       users: '5',
       imports: true,
       ocr: true,
@@ -288,6 +296,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       api_access: false,
       email_support: true,
       priority_support: true,
+      advisory: true,
       onboarding: false,
     },
     ctaLabel: 'Start free trial',
@@ -295,18 +304,20 @@ export const MARKETING_PLANS: MarketingPlan[] = [
   },
   {
     slug: 'firm',
-    name: 'Firm',
-    tagline: 'For accounting firms and large practices.',
+    name: 'Custom',
+    tagline: 'Unlimited seats for firms and enterprises.',
     audience: 'Accounting firm / enterprise',
     badge: 'Best for firms',
     monthlyGhs: 0,
     yearlyGhs: 0,
+    quarterlyGhs: 0,
     projectsPerMonth: -1,
     transactionsPerMonth: -1,
+    bankAccounts: -1,
     users: -1,
     inheritsFromLabel: 'Everything in Premium, plus:',
     bullets: [
-      'Unlimited projects, transactions & members',
+      'Unlimited bank accounts, transactions & members',
       'Multi-client workspace',
       'Public REST API access',
       'Personalised onboarding',
@@ -314,6 +325,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       'Custom contract & billing',
     ],
     features: {
+      bank_accounts: 'Unlimited',
       projects: 'Unlimited',
       transactions: 'Unlimited',
       users: 'Unlimited',
@@ -337,10 +349,11 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       api_access: true,
       email_support: true,
       priority_support: true,
+      advisory: true,
       onboarding: true,
     },
     ctaLabel: 'Contact sales',
-    ctaHref: 'mailto:info@kqsoftwaresolutions.com?subject=KQ-SOFT%20Firm%20plan%20enquiry',
+    ctaHref: 'mailto:info@kqsoftwaresolutions.com?subject=KQ-SOFT%20Custom%20plan%20enquiry',
   },
 ]
 
@@ -358,8 +371,10 @@ export function mergeWithApiPlans(
     id: string
     monthlyGhs: number
     yearlyGhs: number
+    quarterlyGhs?: number
     projectsPerMonth: number
     transactionsPerMonth: number
+    bankAccounts?: number
   }> | undefined
 ): MarketingPlan[] {
   if (!apiPlans || apiPlans.length === 0) return MARKETING_PLANS
@@ -376,12 +391,15 @@ export function mergeWithApiPlans(
       ...p,
       monthlyGhs: pickNum(live.monthlyGhs, p.monthlyGhs),
       yearlyGhs: pickNum(live.yearlyGhs, p.yearlyGhs),
+      quarterlyGhs: pickNum(live.quarterlyGhs, p.quarterlyGhs),
       projectsPerMonth: pickNum(live.projectsPerMonth, p.projectsPerMonth),
       transactionsPerMonth: pickNum(live.transactionsPerMonth, p.transactionsPerMonth),
+      bankAccounts: pickNum(live.bankAccounts, p.bankAccounts),
     }
-    // Sync feature-matrix limits so the comparison table reflects live values.
     merged.features = {
       ...p.features,
+      bank_accounts:
+        merged.bankAccounts < 0 ? 'Unlimited' : String(merged.bankAccounts),
       projects:
         merged.projectsPerMonth < 0
           ? 'Unlimited'
@@ -410,7 +428,14 @@ export function formatGhs(amount: number): string {
   }
 }
 
-export function planMonthlyEquivalent(plan: MarketingPlan, period: 'monthly' | 'yearly'): number {
+export function planAmountForPeriod(plan: MarketingPlan, period: BillingPeriod): number {
+  if (period === 'yearly') return plan.yearlyGhs
+  if (period === 'quarterly') return plan.quarterlyGhs
+  return plan.monthlyGhs
+}
+
+export function planMonthlyEquivalent(plan: MarketingPlan, period: BillingPeriod): number {
   if (period === 'yearly') return plan.yearlyGhs / 12
+  if (period === 'quarterly') return plan.quarterlyGhs / 3
   return plan.monthlyGhs
 }

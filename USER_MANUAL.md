@@ -384,8 +384,8 @@ Click **Reset to platform default** to restore platform defaults.
 ### Billing (Admin only)
 
 - View **current plan** and usage (projects, transactions)
-- **Upgrade** — Click to pay via Paystack (GHS)
-- **Intro offer** — 50% off first payment when enabled by platform
+- **Upgrade** — Pay monthly, quarterly, or yearly via Paystack (GHS)
+- **Intro offer** — 50% off your first 2 months when enabled by platform
 - **Currency note:** Workspace billing is always in **GHS**. Each **project** still uses its own reporting currency (**GHS**, **USD**, or **EUR**) for the BRS — set when you create the project, not in Billing.
 
 ### Members (Admin only)
@@ -428,18 +428,26 @@ Create rules to auto-suggest matches:
 
 ## 12. Subscription Plans & Limits
 
-| Plan | Projects/mo | Transactions/mo | Bank accounts / project | Users |
-|------|-------------|-----------------|-------------------------|-------|
-| Basic | 5 | 200 | 2 | 1 |
-| Standard | 20 | 2,000 | Unlimited | 3 |
-| Premium | 100 | 10,000 | Unlimited | 5+ |
-| Firm | Unlimited | Unlimited | Unlimited | Unlimited |
+| Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Users |
+|------|-------------|-----------------|--------------------------|-------|
+| Basic | 10 | 1,000 | 5 | 1 |
+| Standard | 30 | 5,000 | 10 | 3 |
+| Premium | 100 | 20,000 | 30 | 5 |
+| Custom (firm) | Unlimited | Unlimited | Unlimited | Unlimited |
+
+| Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
+|------|---------------|-----------------|--------------|
+| Basic | 300 | 855 | 3,000 |
+| Standard | 900 | 2,565 | 9,000 |
+| Premium | 1,500 | 4,275 | 15,000 |
+| Custom | Contract | — | — |
 
 - **Trial:** 14 days on signup; subscribe via Paystack to continue when paywall is enabled.
-- **Basic** is a paid tier (not free after trial).
+- **Basic** is a paid tier (not free after trial) and includes bookkeeping consultancy / advisory.
 - **Excel export** includes mapped bank lines on sheets `BANK CREDITS (MAPPED)` and `BANK DEBITS (MAPPED)`.
-- **Intro offer:** 50% off first payment when enabled.
-- **Yearly billing:** ~17% discount vs monthly.
+- **Intro offer:** 50% off your first 2 months when enabled by the platform.
+- **Billing periods:** monthly, quarterly (~5% off), or yearly (~17% off vs monthly).
+- **Bank account seats** are counted across the whole organisation (not per project).
 
 ---
 

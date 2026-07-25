@@ -9,10 +9,11 @@
 ### Implemented
 | Feature | PLANNING_DATA | Implementation |
 |---------|---------------|----------------|
-| **Projects limit** | Basic: 5, Standard: 20, Premium: 100, Firm: unlimited | ✅ `canCreateProject` in usage.ts, enforced on project create |
-| **Transactions limit** | Basic: 500, Standard: 2000, Premium: 10000, Firm: unlimited | ✅ `canAddTransactions` in documents.ts map flow |
-| **Billing / Paystack** | All paid plans | ✅ Subscription flow, intro offer (50% first payment for basic) |
-| **Tier limits config** | TIER_LIMITS | ✅ `api/src/config/subscription.ts` |
+| **Projects limit** | Basic: 10, Standard: 30, Premium: 100, Custom: unlimited | ✅ `canCreateProject` in usage.ts, enforced on project create |
+| **Transactions limit** | Basic: 1000, Standard: 5000, Premium: 20000, Custom: unlimited | ✅ `canAddTransactions` in documents.ts map flow |
+| **Bank accounts** | Basic: 5, Standard: 10, Premium: 30, Custom: unlimited (org-wide) | ✅ `planLimits.ts` / `countOrgBankAccounts` |
+| **Billing / Paystack** | All paid plans | ✅ Subscription flow, quarterly + intro (50% first 2 months) |
+| **Tier limits config** | TIER_LIMITS / PLAN_PRICES | ✅ `api/src/config/subscription.ts` |
 
 ### Gaps – Plan-Based Features (Status as of Feb 2026)
 
@@ -86,9 +87,9 @@
 - **Missing cheques:** ✅ Ageing buckets.
 
 ### Intro Offer
-- **Eligibility:** Basic plan, first payment, no prior intro.
-- **Discount:** 50% off first payment.
-- **Status:** ✅ Implemented in subscription flow.
+- **Eligibility:** Self-serve tiers; fewer than 2 intro payments applied; `INTRO_OFFER_ENABLED=true`.
+- **Discount:** 50% off each of the first 2 billing periods (monthly / quarterly / yearly checkout).
+- **Status:** ✅ Implemented in subscription flow (`introOffer.ts`).
 
 ---
 

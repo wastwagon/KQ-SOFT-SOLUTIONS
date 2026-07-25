@@ -73,17 +73,18 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 
 ---
 
-## 4. Subscription Tiers — Final
+## 4. Subscription Tiers — Final (Jul 2026)
 
-| Plan | Monthly (GH₵) | Yearly (GH₵) | Discount | Projects/mo | Transactions/mo | Users |
-|------|---------------|--------------|----------|-------------|-----------------|-------|
-| **Basic** | 150 | 1,500 | 17% | 5 | 500 | 1 |
-| **Standard** | 400 | 4,000 | 17% | 20 | 2,000 | 3 |
-| **Premium** | 900 | 9,000 | 17% | 100 | 10,000 | 5+ |
-| **Firm** | Custom | Custom | — | Unlimited | Unlimited | Unlimited |
+| Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) | Discount | Bank accounts | Projects/mo | Transactions/mo | Users |
+|------|---------------|-----------------|--------------|----------|---------------|-------------|-----------------|-------|
+| **Basic** | 300 | 855 | 3,000 | ~17% yr / ~5% qtr | 5 | 10 | 1,000 | 1 |
+| **Standard** | 900 | 2,565 | 9,000 | ~17% yr / ~5% qtr | 10 | 30 | 5,000 | 3 |
+| **Premium** | 1,500 | 4,275 | 15,000 | ~17% yr / ~5% qtr | 30 | 100 | 20,000 | 5 |
+| **Custom** | Contract | — | — | — | Unlimited | Unlimited | Unlimited | Unlimited |
 
-**Intro offer:** 50% off first 2 months (new customers).  
-**Alternative annual:** 12mo 15% | 24mo 20% | 36mo 25%.
+**Intro offer:** 50% off first 2 months (new self-serve customers; `INTRO_OFFER_ENABLED=true`).  
+**Bank seats** are org-wide (not per project).  
+**Alternative annual (legacy note):** 12mo 15% | 24mo 20% | 36mo 25% — superseded by the fixed yearly catalogue above.
 
 ---
 
@@ -335,7 +336,7 @@ Advanced bank reconciliation web app for accounting firms in Ghana. Collects cas
 - [ ] Firm dashboard (multi-client)
 - [ ] Full audit trail UI
 - [ ] White-label branding (logo, colours, letterhead)
-- [ ] Intro offer (50% off 2 months)
+- [x] Intro offer (50% off 2 months)
 
 ### Phase 6 — Launch (Weeks 21–22)
 

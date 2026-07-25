@@ -1,6 +1,6 @@
 # Bank Reconciliation SaaS — Implementation Status
 
-**Last updated:** February 2026
+**Last updated:** July 2026
 
 ---
 
@@ -45,7 +45,8 @@
 - [x] Firm dashboard (multi-client)
 - [x] Full audit trail UI
 - [x] **Paystack integration (GHS)** — initialize, webhook, Settings/Billing UI; set PAYSTACK_SECRET_KEY
-- [x] **Intro offer** — 50% off first payment when INTRO_OFFER_ENABLED=true; eligible for orgs on basic who haven't used it
+- [x] **Intro offer** — 50% off first 2 months when `INTRO_OFFER_ENABLED=true`; applies to self-serve tiers for orgs that have not used the full intro allotment yet
+- [x] **Jul 2026 pricing** — Basic GHS 300 / Standard 900 / Premium 1,500 (monthly); quarterly (~5% off) + yearly (~17% off); org-wide bank seats (5 / 10 / 30); txn caps 1k / 5k / 20k
 
 ### Phase 5b — Multi-Bank (Phase 11)
 - [x] BankAccount model; Document.bankAccountId for bank_credits/bank_debits

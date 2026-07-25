@@ -6,7 +6,7 @@
     "version": "1.0",
     "status": "planning_complete",
     "principle": "build_once_no_return",
-    "last_updated": "2026-02-27"
+    "last_updated": "2026-07-25"
   },
 
   "scope": {
@@ -25,39 +25,46 @@
   "subscription_tiers": {
     "basic": {
       "name": "Basic",
-      "monthly_ghs": 150,
-      "yearly_ghs": 1500,
+      "monthly_ghs": 300,
+      "yearly_ghs": 3000,
+      "quarterly_ghs": 855,
       "yearly_discount_percent": 17,
-      "projects_per_month": 5,
-      "transactions_per_month": 500,
+      "bank_accounts": 5,
+      "projects_per_month": 10,
+      "transactions_per_month": 1000,
       "users": 1,
-      "features": ["document_upload", "basic_matching", "brs_report", "basic_branding"]
+      "features": ["document_upload", "basic_matching", "brs_report", "basic_branding", "bookkeeping_advisory"]
     },
     "standard": {
       "name": "Standard",
-      "monthly_ghs": 400,
-      "yearly_ghs": 4000,
+      "monthly_ghs": 900,
+      "yearly_ghs": 9000,
+      "quarterly_ghs": 2565,
       "yearly_discount_percent": 17,
-      "projects_per_month": 20,
-      "transactions_per_month": 2000,
+      "bank_accounts": 10,
+      "projects_per_month": 30,
+      "transactions_per_month": 5000,
       "users": 3,
       "features": ["all_basic", "bank_rules", "bulk_match", "ai_suggestions", "audit_trail", "discrepancy_report", "full_branding"]
     },
     "premium": {
       "name": "Premium",
-      "monthly_ghs": 900,
-      "yearly_ghs": 9000,
+      "monthly_ghs": 1500,
+      "yearly_ghs": 15000,
+      "quarterly_ghs": 4275,
       "yearly_discount_percent": 17,
+      "bank_accounts": 30,
       "projects_per_month": 100,
-      "transactions_per_month": 10000,
+      "transactions_per_month": 20000,
       "users": 5,
       "features": ["all_standard", "one_to_many", "many_to_many", "roll_forward", "threshold_approval", "firm_dashboard"]
     },
     "firm": {
-      "name": "Firm",
+      "name": "Custom",
       "monthly_ghs": null,
       "yearly_ghs": null,
       "custom": true,
+      "bank_accounts": -1,
       "projects_per_month": -1,
       "transactions_per_month": -1,
       "users": -1,
@@ -70,12 +77,11 @@
       "description": "50% off first 2 months",
       "discount_percent": 50,
       "duration_months": 2,
-      "eligible": "new_customers"
+      "eligible": "new_customers_self_serve"
     },
     "annual_tiered": {
-      "12_months": 15,
-      "24_months": 20,
-      "36_months": 25
+      "12_months": 17,
+      "quarterly": 5
     }
   },
 

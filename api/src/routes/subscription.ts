@@ -8,7 +8,7 @@ import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { getUsageWithLimits } from '../services/usage.js'
 import { getPlanBySlug } from '../services/plan.js'
-import { PLAN_PRICES } from '../config/subscription.js'
+import { PLAN_PRICES, planAmountForPeriod, INTRO_OFFER_DISCOUNT, INTRO_OFFER_MONTHS } from '../config/subscription.js'
 import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
 import { fetchSubscriptionOverrides } from '../services/subscriptionOverrides.js'
@@ -17,6 +17,12 @@ import {
   isSubscriptionPaywallEnabled,
 } from '../services/orgSubscriptionAccess.js'
 import { getPlanQuotaLimits } from '../services/planLimits.js'
+import {
+  isIntroOfferEnvEnabled,
+  isOrgIntroOfferEligible,
+  recordIntroOfferPayment,
+  getIntroOfferPaymentsApplied,
+} from '../services/introOffer.js'
 import { logger } from '../middleware/logging.js'
 import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
 import { isPlatformAdmin } from '../lib/platformAdmin.js'
@@ -31,7 +37,7 @@ const PLAN_SLUG_RANK: Record<string, number> = {
 }
 const initializeSchema = z.object({
   plan: z.enum(PAYABLE_PLANS),
-  period: z.enum(['monthly', 'yearly']),
+  period: z.enum(['monthly', 'quarterly', 'yearly']),
 })
 
 const PLAN_FEATURES: PlanFeature[] = [
@@ -42,8 +48,6 @@ const PLAN_FEATURES: PlanFeature[] = [
 ]
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || ''
-const INTRO_OFFER_ENABLED = process.env.INTRO_OFFER_ENABLED === 'true' || process.env.INTRO_OFFER_50_PCT === 'true'
-const INTRO_OFFER_DISCOUNT = 0.5 // 50% off first payment
 const router = Router()
 router.use(authMiddleware)
 
@@ -110,7 +114,8 @@ router.get('/usage', async (req: AuthRequest, res) => {
     ? {
         projectsPerMonth: planData.projectsPerMonth,
         transactionsPerMonth: planData.transactionsPerMonth,
-        bankAccountsPerProject: quotaLimits.bankAccountsPerProject,
+        bankAccounts: quotaLimits.bankAccounts,
+        bankAccountsPerProject: quotaLimits.bankAccounts,
       }
     : quotaLimits
   const features = Object.fromEntries(
@@ -133,10 +138,14 @@ router.get('/usage', async (req: AuthRequest, res) => {
       ...usage,
       projectsDisplay: usage.projectsUnlimited ? `${usage.projectsUsed} (unlimited)` : `${usage.projectsUsed} / ${usage.projectsLimit}`,
       transactionsDisplay: usage.transactionsUnlimited ? `${usage.transactionsUsed} (unlimited)` : `${usage.transactionsUsed} / ${usage.transactionsLimit}`,
+      bankAccountsDisplay: usage.bankAccountsUnlimited
+        ? `${usage.bankAccountsUsed} (unlimited)`
+        : `${usage.bankAccountsUsed} / ${usage.bankAccountsLimit}`,
     },
     limits: {
       projectsPerMonth: limits.projectsPerMonth,
       transactionsPerMonth: limits.transactionsPerMonth,
+      bankAccounts: limits.bankAccounts,
       bankAccountsPerProject: limits.bankAccountsPerProject,
     },
     subscription,
@@ -146,28 +155,32 @@ router.get('/usage', async (req: AuthRequest, res) => {
 router.get('/plans', async (req: AuthRequest, res) => {
   const orgId = req.auth?.orgId
   let introOfferEligible = false
-  if (orgId && INTRO_OFFER_ENABLED) {
-    const org = await prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { plan: true, introOfferUsedAt: true },
-    })
-    introOfferEligible = !!org && org.plan === 'basic' && !org.introOfferUsedAt
+  let introRemaining = 0
+  if (orgId && isIntroOfferEnvEnabled()) {
+    introOfferEligible = await isOrgIntroOfferEligible(orgId)
+    if (introOfferEligible) {
+      const applied = await getIntroOfferPaymentsApplied(orgId)
+      introRemaining = Math.max(0, INTRO_OFFER_MONTHS - applied)
+    }
   }
   const planEntries = Object.entries(PLAN_PRICES).filter(([k]) => k !== 'firm')
   const plans = await Promise.all(
     planEntries.map(async ([planId]) => {
       const p = await getPlanBySlug(planId)
+      const prices = PLAN_PRICES[planId]
+      const quota = await getPlanQuotaLimits(planId)
       if (p) {
         return {
           id: p.slug,
           name: p.name,
           monthlyGhs: p.monthlyGhs,
           yearlyGhs: p.yearlyGhs,
+          quarterlyGhs: prices?.quarterlyGhs ?? Math.round(p.monthlyGhs * 2.85),
           projectsPerMonth: p.projectsPerMonth,
           transactionsPerMonth: p.transactionsPerMonth,
+          bankAccounts: quota.bankAccounts,
         }
       }
-      const prices = PLAN_PRICES[planId]
       const { getLimits } = await import('../config/subscription.js')
       const limits = getLimits(planId)
       return {
@@ -175,14 +188,25 @@ router.get('/plans', async (req: AuthRequest, res) => {
         name: planId.charAt(0).toUpperCase() + planId.slice(1),
         monthlyGhs: prices?.monthlyGhs ?? 0,
         yearlyGhs: prices?.yearlyGhs ?? 0,
-        ...limits,
+        quarterlyGhs: prices?.quarterlyGhs ?? 0,
+        projectsPerMonth: limits.projectsPerMonth,
+        transactionsPerMonth: limits.transactionsPerMonth,
+        bankAccounts: limits.bankAccounts,
       }
     })
   )
   res.json({
     plans,
     paystackConfigured: !!PAYSTACK_SECRET,
-    introOffer: INTRO_OFFER_ENABLED ? { discountPercent: 50, eligible: introOfferEligible, description: '50% off first payment' } : undefined,
+    introOffer: isIntroOfferEnvEnabled()
+      ? {
+          discountPercent: 50,
+          months: INTRO_OFFER_MONTHS,
+          eligible: introOfferEligible,
+          remainingPeriods: introRemaining,
+          description: `50% off your first ${INTRO_OFFER_MONTHS} months`,
+        }
+      : undefined,
   })
 })
 
@@ -206,10 +230,18 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
   if (planData.monthlyGhs <= 0 && planData.yearlyGhs <= 0) {
     return res.status(400).json({
       error:
-        'This plan has no online checkout amount (e.g. free Basic or custom Firm). Choose a paid tier to upgrade, or contact support for firm billing.',
+        'This plan has no online checkout amount (custom / contract plans). Choose a paid tier to upgrade, or contact support for firm billing.',
     })
   }
-  let amountGhs = period === 'yearly' ? planData.yearlyGhs : planData.monthlyGhs
+  const priceFallback = PLAN_PRICES[plan]
+  let amountGhs = planAmountForPeriod(
+    {
+      monthlyGhs: planData.monthlyGhs,
+      yearlyGhs: planData.yearlyGhs,
+      quarterlyGhs: priceFallback?.quarterlyGhs,
+    },
+    period
+  )
   if (amountGhs <= 0) return res.status(400).json({ error: 'Invalid billing period for this plan.' })
 
   const org = await prisma.organization.findUnique({
@@ -239,7 +271,7 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
     return res.status(400).json({ error: 'No billing email found for organization. Add a member email before upgrading.' })
   }
 
-  const introOfferApplied = INTRO_OFFER_ENABLED && org.plan === 'basic' && !org.introOfferUsedAt
+  const introOfferApplied = await isOrgIntroOfferEligible(orgId)
   if (introOfferApplied) amountGhs = amountGhs * INTRO_OFFER_DISCOUNT
 
   const amountPesewas = Math.round(amountGhs * 100) // GHS to pesewas
@@ -303,10 +335,7 @@ export async function handlePaystackWebhook(req: express.Request, res: express.R
         await prisma.$transaction([
           prisma.organization.update({
             where: { id: orgId },
-            data: {
-              plan,
-              ...(introOffer && { introOfferUsedAt: new Date() }),
-            },
+            data: { plan },
           }),
           prisma.payment.create({
             data: {
@@ -321,6 +350,9 @@ export async function handlePaystackWebhook(req: express.Request, res: express.R
             },
           }),
         ])
+        if (introOffer) {
+          await recordIntroOfferPayment(orgId)
+        }
         invalidateOrgSubscriptionCache(orgId)
       } catch (e) {
         // Webhooks are retried; duplicate reference should be treated as idempotent success.

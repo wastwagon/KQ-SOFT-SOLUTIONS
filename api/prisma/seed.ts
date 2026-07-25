@@ -13,12 +13,12 @@ const TEST_PASSWORD = 'Test123!'
 async function main() {
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, SALT_ROUNDS)
 
-  // Plans (subscription tiers)
+  // Plans (subscription tiers) — Jul 2026 catalogue
   const plans = [
-    { slug: 'basic', name: 'Basic', projectsPerMonth: 5, transactionsPerMonth: 5000, monthlyGhs: 150, yearlyGhs: 1500 },
-    { slug: 'standard', name: 'Standard', projectsPerMonth: 20, transactionsPerMonth: 50000, monthlyGhs: 50, yearlyGhs: 550 },
-    { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 200000, monthlyGhs: 100, yearlyGhs: 1100 },
-    { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0 },
+    { slug: 'basic', name: 'Basic', projectsPerMonth: 10, transactionsPerMonth: 1000, monthlyGhs: 300, yearlyGhs: 3000 },
+    { slug: 'standard', name: 'Standard', projectsPerMonth: 30, transactionsPerMonth: 5000, monthlyGhs: 900, yearlyGhs: 9000 },
+    { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 20000, monthlyGhs: 1500, yearlyGhs: 15000 },
+    { slug: 'firm', name: 'Custom', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0 },
   ]
   for (const p of plans) {
     await prisma.plan.upsert({
@@ -130,7 +130,7 @@ async function main() {
           where: { slug: t.plan },
           select: { monthlyGhs: true, yearlyGhs: true },
         })
-        const period: 'monthly' | 'yearly' = t.plan === 'firm' ? 'yearly' : 'monthly'
+        const period: 'monthly' | 'quarterly' | 'yearly' = t.plan === 'firm' ? 'yearly' : 'monthly'
         const amount =
           period === 'monthly'
             ? (planRow?.monthlyGhs ?? 0)

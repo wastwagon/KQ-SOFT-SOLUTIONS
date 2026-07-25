@@ -28,11 +28,12 @@
 
 ## Quick Reference
 
-### Subscription Tiers
-- **Basic:** GH₵150/mo | 5 projects | 500 transactions
-- **Standard:** GH₵400/mo | 20 projects | 2,000 transactions  
-- **Premium:** GH₵900/mo | 100 projects | 10,000 transactions
-- **Firm:** Custom | Unlimited
+### Subscription Tiers (Jul 2026)
+- **Basic:** GH₵300/mo · GH₵855/qtr · GH₵3,000/yr | 5 bank accounts | 10 projects | 1,000 transactions
+- **Standard:** GH₵900/mo · GH₵2,565/qtr · GH₵9,000/yr | 10 bank accounts | 30 projects | 5,000 transactions
+- **Premium:** GH₵1,500/mo · GH₵4,275/qtr · GH₵15,000/yr | 30 bank accounts | 100 projects | 20,000 transactions
+- **Custom (firm):** Contract | Unlimited
+- **Promos:** 14-day trial · 50% off first 2 months · quarterly ~5% · annual ~17%
 
 ### Development Phases
 1. Foundation (Weeks 1–4)

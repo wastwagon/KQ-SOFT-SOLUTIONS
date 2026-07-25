@@ -1,33 +1,42 @@
 import { prisma } from '../lib/prisma.js'
 import { getPlanBySlug } from './plan.js'
-import { getLimits, isUnlimited } from '../config/subscription.js'
+import { getLimits, isUnlimited, TIER_LIMITS } from '../config/subscription.js'
 
 export interface PlanQuotaLimits {
   projectsPerMonth: number
   transactionsPerMonth: number
+  /** Org-wide bank account seats (-1 = unlimited). */
+  bankAccounts: number
+  /**
+   * @deprecated Alias of {@link bankAccounts} for older clients.
+   * Limits are org-wide, not per project.
+   */
   bankAccountsPerProject: number
-}
-
-const CONFIG_BANK_ACCOUNTS: Record<string, number> = {
-  basic: 2,
-  standard: -1,
-  premium: -1,
-  firm: -1,
 }
 
 export async function getPlanQuotaLimits(planSlug: string): Promise<PlanQuotaLimits> {
   const planData = await getPlanBySlug(planSlug)
+  const bankAccounts = TIER_LIMITS[planSlug]?.bankAccounts ?? TIER_LIMITS.basic.bankAccounts
   const limits = planData
     ? {
         projectsPerMonth: planData.projectsPerMonth,
         transactionsPerMonth: planData.transactionsPerMonth,
-        bankAccountsPerProject: CONFIG_BANK_ACCOUNTS[planSlug] ?? CONFIG_BANK_ACCOUNTS.basic,
+        bankAccounts,
+        bankAccountsPerProject: bankAccounts,
       }
     : {
         ...getLimits(planSlug),
-        bankAccountsPerProject: CONFIG_BANK_ACCOUNTS[planSlug] ?? CONFIG_BANK_ACCOUNTS.basic,
+        bankAccounts,
+        bankAccountsPerProject: bankAccounts,
       }
   return limits
+}
+
+/** Count bank accounts across all projects in the organisation. */
+export async function countOrgBankAccounts(organizationId: string): Promise<number> {
+  return prisma.bankAccount.count({
+    where: { project: { organizationId } },
+  })
 }
 
 export async function canAddBankAccount(
@@ -35,12 +44,19 @@ export async function canAddBankAccount(
   planSlug: string
 ): Promise<{ ok: boolean; message?: string }> {
   const limits = await getPlanQuotaLimits(planSlug)
-  if (isUnlimited(limits.bankAccountsPerProject)) return { ok: true }
-  const count = await prisma.bankAccount.count({ where: { projectId } })
-  if (count >= limits.bankAccountsPerProject) {
+  if (isUnlimited(limits.bankAccounts)) return { ok: true }
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { organizationId: true },
+  })
+  if (!project) return { ok: false, message: 'Project not found' }
+
+  const count = await countOrgBankAccounts(project.organizationId)
+  if (count >= limits.bankAccounts) {
     return {
       ok: false,
-      message: `Your plan allows up to ${limits.bankAccountsPerProject} bank account(s) per project. Upgrade for more.`,
+      message: `Your plan allows up to ${limits.bankAccounts} bank account(s) across the workspace. Upgrade for more.`,
     }
   }
   return { ok: true }

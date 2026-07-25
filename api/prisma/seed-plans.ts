@@ -11,6 +11,7 @@
  *   - Is the seed used by `start-api.sh` in production.
  *
  * Run: npx tsx prisma/seed-plans.ts
+ * Force reset prices/limits: FORCE_PLAN_RESET=1 npx tsx prisma/seed-plans.ts
  *
  * Pricing must stay in sync with:
  *   - api/src/config/subscription.ts → PLAN_PRICES, TIER_LIMITS
@@ -30,34 +31,35 @@ interface PlanSeed {
   yearlyGhs: number
 }
 
+/** Jul 2026 catalogue: bank seats + txn caps; annual ≈ 10× monthly. */
 const PLANS: PlanSeed[] = [
   {
     slug: 'basic',
     name: 'Basic',
-    projectsPerMonth: 5,
-    transactionsPerMonth: 5000,
-    monthlyGhs: 150,
-    yearlyGhs: 1500,
+    projectsPerMonth: 10,
+    transactionsPerMonth: 1_000,
+    monthlyGhs: 300,
+    yearlyGhs: 3000,
   },
   {
     slug: 'standard',
     name: 'Standard',
-    projectsPerMonth: 20,
-    transactionsPerMonth: 50_000,
-    monthlyGhs: 50,
-    yearlyGhs: 550,
+    projectsPerMonth: 30,
+    transactionsPerMonth: 5_000,
+    monthlyGhs: 900,
+    yearlyGhs: 9000,
   },
   {
     slug: 'premium',
     name: 'Premium',
     projectsPerMonth: 100,
-    transactionsPerMonth: 200_000,
-    monthlyGhs: 100,
-    yearlyGhs: 1100,
+    transactionsPerMonth: 20_000,
+    monthlyGhs: 1500,
+    yearlyGhs: 15000,
   },
   {
     slug: 'firm',
-    name: 'Firm',
+    name: 'Custom',
     projectsPerMonth: -1,
     transactionsPerMonth: -1,
     monthlyGhs: 0,
@@ -66,27 +68,38 @@ const PLANS: PlanSeed[] = [
 ]
 
 async function main() {
+  const force = process.env.FORCE_PLAN_RESET === '1'
+  /** Known pre–Jul 2026 monthly amounts — auto-sync without requiring FORCE_PLAN_RESET. */
+  const legacyMonthly: Record<string, number[]> = {
+    basic: [0, 150],
+    standard: [50, 400],
+    premium: [100, 900],
+  }
   for (const plan of PLANS) {
+    const existing = await prisma.plan.findUnique({ where: { slug: plan.slug } })
+    const isLegacy =
+      !!existing && (legacyMonthly[plan.slug] ?? []).includes(existing.monthlyGhs)
+    const shouldReset = force || isLegacy || !existing
     await prisma.plan.upsert({
       where: { slug: plan.slug },
-      // Update keeps existing edits made via the admin UI for `name`/limits/prices,
-      // BUT only if a row already exists. New deployments still get the canonical
-      // defaults. If you need to force-reset to defaults, run:
-      //   FORCE_PLAN_RESET=1 npx tsx prisma/seed-plans.ts
       create: plan,
-      update:
-        process.env.FORCE_PLAN_RESET === '1'
-          ? plan
-          : {
-              // No-op update keeps existing admin edits intact while still ensuring the row exists.
-              slug: plan.slug,
-            },
+      update: shouldReset
+        ? plan
+        : {
+            // Keep admin edits unless FORCE_PLAN_RESET=1 or legacy catalogue detected.
+            name: plan.name,
+            slug: plan.slug,
+          },
     })
+    if (isLegacy && !force) {
+      console.log('seed-plans: healed legacy prices for %s → %s/%s GHS', plan.slug, plan.monthlyGhs, plan.yearlyGhs)
+    }
   }
   console.log(
-    'seed-plans: ensured %d plans (%s)',
+    'seed-plans: ensured %d plans (%s)%s',
     PLANS.length,
-    PLANS.map((p) => p.slug).join(', ')
+    PLANS.map((p) => p.slug).join(', '),
+    force ? ' [FORCE_PLAN_RESET applied]' : ''
   )
 }
 

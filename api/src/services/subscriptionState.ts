@@ -8,7 +8,7 @@ export interface SubscriptionSnapshot {
   currentPeriodStart: string | null
   currentPeriodEnd: string | null
   latestPaymentAt: string | null
-  latestPaymentPeriod: 'monthly' | 'yearly' | null
+  latestPaymentPeriod: 'monthly' | 'quarterly' | 'yearly' | null
   latestPaymentAmount: number | null
 }
 
@@ -60,7 +60,8 @@ export function getSubscriptionSnapshot(
     }
   }
 
-  const periodDays = latestPayment.period === 'yearly' ? 365 : 30
+  const periodDays =
+    latestPayment.period === 'yearly' ? 365 : latestPayment.period === 'quarterly' ? 90 : 30
   const periodStart = latestPayment.createdAt
   const periodEnd = new Date(periodStart.getTime() + periodDays * 24 * 60 * 60 * 1000)
   const status = applyFirmCustomBilling(
@@ -73,7 +74,12 @@ export function getSubscriptionSnapshot(
     currentPeriodStart: periodStart.toISOString(),
     currentPeriodEnd: periodEnd.toISOString(),
     latestPaymentAt: latestPayment.createdAt.toISOString(),
-    latestPaymentPeriod: latestPayment.period === 'yearly' ? 'yearly' : 'monthly',
+    latestPaymentPeriod:
+      latestPayment.period === 'yearly'
+        ? 'yearly'
+        : latestPayment.period === 'quarterly'
+          ? 'quarterly'
+          : 'monthly',
     latestPaymentAmount: Number(latestPayment.amount),
   }
 }

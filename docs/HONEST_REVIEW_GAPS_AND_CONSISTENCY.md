@@ -125,7 +125,7 @@
 
 - Usage (projects/transactions, limits): **complete**.  
 - Plans and Paystack init: **complete**.  
-- Intro offer (50% first payment): **complete**.  
+- Intro offer (50% first 2 months): **complete**.  
 - Admin plan override: ✅ AdminOrgDetail allows plan override; AdminPlans full CRUD; AdminPayments lists all payments.
 
 ### 5.7 Audit and settings

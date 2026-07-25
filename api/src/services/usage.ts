@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js'
 import { getPlanBySlug } from './plan.js'
 import { getLimits, isUnlimited } from '../config/subscription.js'
+import { countOrgBankAccounts, getPlanQuotaLimits } from './planLimits.js'
 
 function currentPeriod(): string {
   const now = new Date()
@@ -24,9 +25,16 @@ export async function getUsageWithLimits(organizationId: string, planSlug: strin
   const period = currentPeriod()
   const log = await getOrCreateUsage(organizationId, period)
   const planData = await getPlanBySlug(planSlug)
+  const quota = await getPlanQuotaLimits(planSlug)
   const limits = planData
-    ? { projectsPerMonth: planData.projectsPerMonth, transactionsPerMonth: planData.transactionsPerMonth }
+    ? {
+        projectsPerMonth: planData.projectsPerMonth,
+        transactionsPerMonth: planData.transactionsPerMonth,
+      }
     : getLimits(planSlug)
+  const bankAccountsUsed = await countOrgBankAccounts(organizationId)
+  const bankAccountsLimit = quota.bankAccounts
+  const bankAccountsUnlimited = isUnlimited(bankAccountsLimit)
   return {
     period,
     projectsUsed: log.projectsCount,
@@ -35,6 +43,9 @@ export async function getUsageWithLimits(organizationId: string, planSlug: strin
     transactionsUsed: log.transactionsCount,
     transactionsLimit: limits.transactionsPerMonth,
     transactionsUnlimited: isUnlimited(limits.transactionsPerMonth),
+    bankAccountsUsed,
+    bankAccountsLimit,
+    bankAccountsUnlimited,
   }
 }
 

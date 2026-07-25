@@ -11,7 +11,7 @@
  * UI renders that as "Custom".
  */
 import { Router } from 'express'
-import { PLAN_PRICES, getLimits } from '../config/subscription.js'
+import { PLAN_PRICES, getLimits, INTRO_OFFER_MONTHS, resolvePlanPrices } from '../config/subscription.js'
 import { getPlanBySlug } from '../services/plan.js'
 import leadsPublicRouter from './leadsPublic.js'
 
@@ -24,8 +24,10 @@ export interface PublicPlanResponse {
   name: string
   monthlyGhs: number
   yearlyGhs: number
+  quarterlyGhs: number
   projectsPerMonth: number
   transactionsPerMonth: number
+  bankAccounts: number
 }
 
 /**
@@ -36,26 +38,31 @@ export interface PublicPlanResponse {
 export async function buildPublicPlans(): Promise<PublicPlanResponse[]> {
   return Promise.all(
     PLAN_DISPLAY_ORDER.map(async (planId): Promise<PublicPlanResponse> => {
+      const prices = PLAN_PRICES[planId]
+      const limits = getLimits(planId)
       const p = await getPlanBySlug(planId)
       if (p) {
+        const resolved = resolvePlanPrices(planId, p)
         return {
           id: p.slug,
           name: p.name,
-          monthlyGhs: p.monthlyGhs,
-          yearlyGhs: p.yearlyGhs,
+          monthlyGhs: resolved.monthlyGhs,
+          yearlyGhs: resolved.yearlyGhs,
+          quarterlyGhs: resolved.quarterlyGhs,
           projectsPerMonth: p.projectsPerMonth,
           transactionsPerMonth: p.transactionsPerMonth,
+          bankAccounts: limits.bankAccounts,
         }
       }
-      const prices = PLAN_PRICES[planId]
-      const limits = getLimits(planId)
       return {
         id: planId,
-        name: planId.charAt(0).toUpperCase() + planId.slice(1),
+        name: planId === 'firm' ? 'Custom' : planId.charAt(0).toUpperCase() + planId.slice(1),
         monthlyGhs: prices?.monthlyGhs ?? 0,
         yearlyGhs: prices?.yearlyGhs ?? 0,
+        quarterlyGhs: prices?.quarterlyGhs ?? 0,
         projectsPerMonth: limits.projectsPerMonth,
         transactionsPerMonth: limits.transactionsPerMonth,
+        bankAccounts: limits.bankAccounts,
       }
     })
   )
@@ -65,7 +72,14 @@ router.get('/plans', async (_req, res) => {
   const plans = await buildPublicPlans()
   // Light cache — plan data changes rarely, browsers/CDNs can cache for 5 min.
   res.set('Cache-Control', 'public, max-age=300, s-maxage=300')
-  res.json({ plans })
+  res.json({
+    plans,
+    introOffer: {
+      discountPercent: 50,
+      months: INTRO_OFFER_MONTHS,
+      description: `50% off your first ${INTRO_OFFER_MONTHS} months`,
+    },
+  })
 })
 
 router.use(leadsPublicRouter)

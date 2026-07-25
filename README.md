@@ -118,10 +118,10 @@ cd api && npx prisma db seed
 | Account | Org plan | Purpose |
 |--------|----------|--------|
 | admin@kqsoftwaresolutions.com | firm | Admin role, full access (new seeds; legacy: `admin@qsoft.com`) |
-| basic@test.com | basic | Test Basic limits (5 projects, 500 tx/month) |
-| standard@test.com | standard | Test Standard (20 projects, 2000 tx/month) |
-| premium@test.com | premium | Test Premium (100 projects, 10000 tx/month) |
-| firm@test.com | firm | Test Firm (unlimited) |
+| basic@test.com | basic | Test Basic limits (10 projects, 1,000 tx/month, 5 bank accounts) |
+| standard@test.com | standard | Test Standard (30 projects, 5,000 tx/month, 10 bank accounts) |
+| premium@test.com | premium | Test Premium (100 projects, 20,000 tx/month, 30 bank accounts) |
+| firm@test.com | firm | Test Custom / firm (unlimited) |
 
 Seed now also syncs realistic subscription samples:
 - `basic@test.com`: no payment (trial/free lifecycle testing)
@@ -168,7 +168,7 @@ To enable plan upgrades in Settings > Billing:
 
 Without `PAYSTACK_SECRET_KEY`, the Billing section shows "Billing is not configured".
 
-**Intro offer (50% off first payment):** Set `INTRO_OFFER_ENABLED=true` or `INTRO_OFFER_50_PCT=true` in `api/.env`. Eligible orgs (plan = basic, never used intro) see 50% off their first payment in Settings > Billing. After payment, the org is marked so the offer cannot be used again.
+**Intro offer (50% off first 2 months):** Set `INTRO_OFFER_ENABLED=true` or `INTRO_OFFER_50_PCT=true` in `api/.env`. Eligible orgs (self-serve tiers, fewer than 2 intro payments used) see 50% off in Settings > Billing. Each discounted payment counts toward the 2-month allotment.
 
 ---
 

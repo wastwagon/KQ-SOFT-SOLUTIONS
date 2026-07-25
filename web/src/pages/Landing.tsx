@@ -8,8 +8,6 @@ import {
   Database,
   FileSpreadsheet,
   FileText,
-  LayoutDashboard,
-  LineChart,
   Lock,
   Mail,
   MapPin,
@@ -35,6 +33,9 @@ import {
   FEATURE_GROUPS,
   formatGhs,
   mergeWithApiPlans,
+  planAmountForPeriod,
+  planMonthlyEquivalent,
+  type BillingPeriod,
   type MarketingPlan,
 } from '../lib/plans'
 import { maxYearlyDiscountPercent } from '../lib/planPricing'
@@ -45,16 +46,16 @@ import { maxYearlyDiscountPercent } from '../lib/planPricing'
  * Sections:
  *   0. Announcement bar (intro offer, dismissible)
  *   1. Sticky glass-morphism navigation
- *   2. Hero (headline + dual CTA + animated dashboard mockup)
+ *   2. Hero (full-bleed atmosphere + product screenshot)
  *   3. Trust strip (example bank / statement layouts)
  *   4. Stat band
  *   5. Features grid (6 cards)
- *   6. How it works (3 steps)
- *   7. Dashboard showcase
+ *   6. How it works (3 photographed steps)
+ *   7. Dashboard showcase (product imagery)
  *   8. Pricing (static catalogue, 4 tiers + comparison table)
  *   9. Testimonials
  *  10. FAQ accordion
- *  11. Final CTA banner
+ *  11. Final CTA banner (atmosphere photography)
  *  12. Footer (dark, multi-column, with newsletter + social)
  *
  * Visual treatment:
@@ -116,20 +117,34 @@ const STEPS = [
     title: 'Upload',
     description:
       'Bring the cash book and bank file — Excel, CSV, PDF, or scan. Column detection and layout hints get you to a clean grid in minutes.',
+    image: '/marketing/marketing-step-upload.jpg',
+    imageAlt: 'Cash book and bank statements ready to upload into KQ-SOFT',
   },
   {
     icon: Sparkles,
     title: 'Match',
     description:
       'Suggestions are scored and grouped so your team reviews the highest-impact lines first. Split lines, undo, or approve in bulk.',
+    image: '/marketing/marketing-step-match.jpg',
+    imageAlt: 'Transaction streams linking into confirmed bank reconciliation matches',
   },
   {
     icon: FileSpreadsheet,
     title: 'Report',
     description:
       'Publish a branded BRS, capture sign-off, lock the period, and roll unresolved items forward without rebuilding from scratch.',
+    image: '/marketing/marketing-step-report.jpg',
+    imageAlt: 'Branded bank reconciliation statement ready for export and sign-off',
   },
 ] as const
+
+const MARKETING = {
+  heroBg: '/marketing/marketing-hero-workspace.jpg',
+  productMatch: '/marketing/marketing-product-match.jpg',
+  productReport: '/marketing/marketing-product-report.jpg',
+  trustBand: '/marketing/marketing-trust-band.jpg',
+  ctaAtmosphere: '/marketing/marketing-cta-atmosphere.jpg',
+} as const
 
 const BANKS_SUPPORTED = [
   'Ecobank',
@@ -140,6 +155,7 @@ const BANKS_SUPPORTED = [
   'Zenith',
   'CalBank',
   'ADB',
+  'Prudential',
 ] as const
 
 const TESTIMONIALS = [
@@ -178,7 +194,11 @@ const FAQS = [
   },
   {
     q: 'How does pricing and currency work?',
-    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly or annual cycles. The public site shows approximate USD/EUR/GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use its own reporting currency (GHS, USD, or EUR) for BRS and balances.',
+    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. Every tier includes a 14-day free trial, and new workspaces get 50% off their first two months. The public site shows approximate USD/EUR/GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use its own reporting currency (GHS, USD, or EUR) for BRS and balances.',
+  },
+  {
+    q: 'What are the plan limits?',
+    a: 'Basic covers 5 bank accounts and 1,000 transactions per month (with bookkeeping advisory). Standard is 10 accounts / 5,000 transactions. Premium is 30 accounts / 20,000 transactions. Custom (firm) is unlimited under contract. Bank account seats are counted across your whole organisation.',
   },
   {
     q: 'Is my data secure?',
@@ -192,7 +212,7 @@ const FAQS = [
 
 export default function Landing() {
   const [navOpen, setNavOpen] = useState(false)
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly')
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
   const [showAnnouncement, setShowAnnouncement] = useState(true)
   const [showCompare, setShowCompare] = useState(false)
@@ -267,6 +287,16 @@ export default function Landing() {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
+        @keyframes heroDrift {
+          0% { transform: scale(1.02) translate3d(0, 0, 0); }
+          100% { transform: scale(1.08) translate3d(-1.5%, -1%, 0); }
+        }
+        .hero-drift { animation: heroDrift 32s ease-in-out infinite alternate; will-change: transform; }
+        @media (prefers-reduced-motion: reduce) {
+          .marquee-track,
+          .hero-drift { animation: none !important; }
+          [data-reveal] { opacity: 1; transform: none; transition: none; }
+        }
         [data-reveal] {
           opacity: 0;
           transform: translateY(18px);
@@ -296,6 +326,7 @@ export default function Landing() {
       <BankStrip />
       <StatBand />
       <Features />
+      <ProductSpotlight />
       <HowItWorks />
       <DashboardShowcase />
       <Pricing
@@ -513,225 +544,98 @@ function Hero() {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
-    <section className="relative isolate overflow-hidden">
+    <section className="relative isolate overflow-hidden min-h-[min(92vh,920px)]">
       <div aria-hidden className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary-50/60 via-white to-white" />
-        <div className="absolute inset-0 grid-overlay opacity-60" />
-        <div className="absolute -top-32 left-1/4 h-[420px] w-[420px] rounded-full bg-primary-300/30 blur-3xl animate-blob" />
-        <div className="absolute top-10 right-1/4 h-[360px] w-[360px] rounded-full bg-green-300/25 blur-3xl animate-blob-slow" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 h-[340px] w-[600px] rounded-full bg-primary-200/30 blur-3xl animate-blob" />
+        <img
+          src={MARKETING.heroBg}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-center hero-drift"
+          fetchPriority="high"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-900/55 to-slate-900/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-slate-900/30" />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-20 sm:pt-24 sm:pb-28 lg:pt-28 lg:pb-32">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/90 to-white px-4 py-2 shadow-sm ring-1 ring-black/[0.04]">
-            <span className="relative inline-flex shrink-0">
-              <span className="absolute inset-0 rounded-full bg-green-500 animate-pulse-dot" />
-              <span className="relative h-2 w-2 rounded-full bg-green-500" />
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary-600">
-              Modern bank rec for distributed teams
-            </span>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-16 sm:pt-20 sm:pb-20 lg:pt-24 lg:pb-28">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          <div className="lg:col-span-5 text-center lg:text-left">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-200">
+              KQ-SOFT · Bank reconciliation
+            </p>
+
+            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.35rem] font-bold tracking-tight text-white leading-[1.05]">
+              Bank reconciliation,
+              <br className="hidden sm:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-200 via-white to-green-300">
+                automated end to end.
+              </span>
+            </h1>
+
+            <p className="mt-6 text-lg sm:text-xl text-slate-200/90 leading-relaxed max-w-xl mx-auto lg:mx-0">
+              Pair the cash book with the bank file in one workspace. Intelligent matching
+              handles cheques, wires, and split lines — then ships a signed-off BRS you can
+              stand behind.
+            </p>
+
+            <div className="mt-9 flex flex-col sm:flex-row items-center lg:items-stretch justify-center lg:justify-start gap-3">
+              <Button
+                size="lg"
+                className="group gap-2 shadow-lg shadow-primary-900/40 bg-white text-primary-800 hover:bg-slate-100"
+                onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
+              >
+                {isAuthed ? 'Go to dashboard' : 'Start free trial'}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-white/35 bg-white/10 text-white hover:bg-white/15 hover:text-white backdrop-blur"
+                onClick={() =>
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })
+                }
+              >
+                See pricing
+              </Button>
+            </div>
+
+            <p className="mt-5 text-sm text-slate-300/90">
+              {isAuthed
+                ? 'Signed in — open your workspace to continue reconciliations.'
+                : '14-day free trial · From GHS 300/mo · No card required to start'}
+            </p>
           </div>
 
-          <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-[1.05] sm:mt-6">
-            Bank reconciliation,
-            <br className="hidden sm:block" />
-            <span className="gradient-text"> automated end to end.</span>
-          </h1>
-
-          <p className="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
-            Pair the cash book with the bank file in one workspace. Intelligent matching
-            handles cheques, wires, and split lines — then ships a signed-off BRS you can
-            stand behind, without the spreadsheet marathon.
-          </p>
-
-          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button
-              size="lg"
-              className="group gap-2 shadow-lg shadow-primary-600/20"
-              onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
-            >
-              {isAuthed ? 'Go to dashboard' : 'Start free trial'}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="gap-2 shadow-sm"
-              onClick={() =>
-                document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
-              }
-            >
-              See how it works
-            </Button>
+          <div data-reveal className="lg:col-span-7 relative">
+            <div
+              className="absolute -inset-3 sm:-inset-5 rounded-[1.75rem] bg-gradient-to-br from-primary-400/30 via-transparent to-green-400/25 blur-2xl"
+              aria-hidden
+            />
+            <div className="relative overflow-hidden rounded-xl border border-white/25 bg-white/95 shadow-2xl shadow-black/30 ring-1 ring-white/20">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-slate-50/95">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <div className="px-3 py-1 rounded-md bg-white border border-gray-200 text-[11px] font-medium text-gray-500">
+                    app.kqsoftwaresolutions.com / reconcile
+                  </div>
+                </div>
+                <div className="w-12" />
+              </div>
+              <img
+                src={MARKETING.productMatch}
+                alt="KQ-SOFT matching workspace with cash book and bank statement side by side"
+                className="w-full h-auto object-cover object-top max-h-[min(480px,58vh)]"
+                loading="eager"
+                decoding="async"
+              />
+            </div>
           </div>
-
-          <p className="mt-5 text-sm text-gray-500">
-            {isAuthed
-              ? 'Signed in — open your workspace to continue reconciliations.'
-              : 'No credit card required · Set up in under 5 minutes'}
-          </p>
-        </div>
-
-        <div data-reveal className="relative mt-14 sm:mt-20 mx-auto max-w-5xl">
-          <div className="absolute -inset-4 sm:-inset-6 rounded-[2rem] bg-gradient-to-br from-primary-200/40 via-white/0 to-green-200/40 blur-2xl" aria-hidden />
-          <DashboardMockup />
         </div>
       </div>
     </section>
-  )
-}
-
-/* Stylised dashboard preview — a product mockup built from real components. */
-
-function DashboardMockup() {
-  return (
-    <div className="relative rounded-xl border border-gray-200/80 bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
-          <span className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
-        </div>
-        <div className="flex-1 flex justify-center">
-          <div className="px-3 py-1 rounded-md bg-white border border-gray-200 text-[11px] font-medium text-gray-500">
-            app.kqsoft.com / dashboard
-          </div>
-        </div>
-        <div className="w-12" />
-      </div>
-
-      <div className="grid grid-cols-12 min-h-[420px]">
-        <div className="hidden sm:flex flex-col col-span-3 lg:col-span-2 border-r border-gray-100 bg-gray-50/50 p-4 gap-1">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-primary-600 grid place-items-center text-white text-xs font-bold">
-              KQ
-            </div>
-            <span className="text-xs font-bold text-gray-700">KQ-SOFT</span>
-          </div>
-          {[
-            { icon: LayoutDashboard, label: 'Dashboard', active: true },
-            { icon: FileText, label: 'Projects' },
-            { icon: Users, label: 'Clients' },
-            { icon: LineChart, label: 'Reports' },
-            { icon: Lock, label: 'Audit' },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <div
-                key={item.label}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium ${
-                  item.active
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-600'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="col-span-12 sm:col-span-9 lg:col-span-10 p-4 sm:p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-gray-900">Dashboard</h3>
-              <p className="text-xs text-gray-500">Live reconciliation overview</p>
-            </div>
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-50 text-primary-700 text-[11px] font-semibold border border-primary-100">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-              Live data
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {[
-              { label: 'Projects', value: '24', accent: 'bg-primary-500' },
-              { label: 'Pending', value: '3', accent: 'bg-amber-500' },
-              { label: 'Matched', value: '96%', accent: 'bg-green-500' },
-              { label: 'This month', value: '1.2k', accent: 'bg-primary-700' },
-            ].map((m) => (
-              <div
-                key={m.label}
-                className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className={`w-1 h-3 rounded-full ${m.accent}`} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    {m.label}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">
-                  {m.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
-              <span className="text-xs font-bold text-gray-700">
-                Suggested matches
-              </span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-                3 ready
-              </span>
-            </div>
-            <div className="divide-y divide-gray-100 text-[11px] sm:text-xs">
-              {[
-                {
-                  cb: 'Cheque 002145 · ZK Logistics',
-                  bank: 'CHQ 2145 ECOB CR',
-                  amount: 'GHS 12,400.00',
-                },
-                {
-                  cb: 'Mobile money · Pay Bola',
-                  bank: 'MOMO 0240XXX5891',
-                  amount: 'GHS 850.00',
-                },
-                {
-                  cb: 'Wire · Regional vendor payment',
-                  bank: 'EFT 81203 / TOS',
-                  amount: 'GHS 4,250.00',
-                },
-              ].map((row, i) => (
-                <div
-                  key={i}
-                  className="grid grid-cols-12 items-center gap-2 px-3 py-2.5"
-                >
-                  <span className="col-span-5 truncate text-gray-700">{row.cb}</span>
-                  <span className="col-span-1 text-center text-primary-500 font-bold">
-                    ↔
-                  </span>
-                  <span className="col-span-4 truncate text-gray-700">
-                    {row.bank}
-                  </span>
-                  <span className="col-span-2 text-right tabular-nums font-semibold text-gray-900">
-                    {row.amount}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden sm:flex absolute -right-4 top-28 lg:top-24 items-center gap-2 px-3 py-2 rounded-xl bg-white shadow-lg ring-1 ring-black/5 border border-gray-100">
-        <span className="w-7 h-7 rounded-full bg-green-100 grid place-items-center">
-          <Check className="w-4 h-4 text-green-600" />
-        </span>
-        <div className="text-left">
-          <p className="text-[11px] font-bold text-gray-900 leading-none">
-            Auto-matched
-          </p>
-          <p className="text-[10px] text-gray-500 leading-none mt-0.5">
-            42 transactions · 98%
-          </p>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -742,9 +646,18 @@ function DashboardMockup() {
 function BankStrip() {
   const items = [...BANKS_SUPPORTED, ...BANKS_SUPPORTED]
   return (
-    <section className="border-y border-gray-100 bg-gray-50/30 py-12 sm:py-14">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-7 text-center shadow-sm sm:px-8 sm:py-8">
+    <section className="relative overflow-hidden border-y border-gray-100 py-14 sm:py-16">
+      <img
+        src={MARKETING.trustBand}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover opacity-40"
+        loading="lazy"
+        decoding="async"
+        aria-hidden
+      />
+      <div className="absolute inset-0 bg-white/80" aria-hidden />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Bank formats
           </p>
@@ -762,7 +675,7 @@ function BankStrip() {
             {items.map((name, i) => (
               <div
                 key={`${name}-${i}`}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-gray-50/80 text-gray-600 font-semibold tracking-wide whitespace-nowrap"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200/90 bg-white/90 backdrop-blur-sm text-gray-700 font-semibold tracking-wide whitespace-nowrap shadow-sm"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
                 {name}
@@ -862,6 +775,68 @@ function Features() {
 }
 
 /* ---------------------------------------------------------------------------
+ * Section 5b: Product spotlight (report visual)
+ * ------------------------------------------------------------------------- */
+
+function ProductSpotlight() {
+  return (
+    <section className="py-20 sm:py-24 bg-slate-950 text-white overflow-hidden relative">
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-40"
+        style={{
+          backgroundImage:
+            'radial-gradient(ellipse at 20% 20%, rgba(4,115,234,0.35), transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(56,210,0,0.18), transparent 45%)',
+        }}
+      />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <div data-reveal>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary-300">
+              Audit-ready output
+            </p>
+            <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">
+              A BRS your reviewers will recognise.
+            </h2>
+            <p className="mt-3 text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl">
+              Formal statement lines, branded exports, and a clear trail from match to sign-off —
+              so the report looks like your firm&apos;s work, not a generic SaaS dump.
+            </p>
+            <ul className="mt-6 space-y-2.5 text-sm text-slate-200">
+              {[
+                'Excel + PDF with your logo and colours',
+                'Uncredited lodgments & unpresented cheques laid out cleanly',
+                'Preparer / reviewer sign-off states preserved',
+              ].map((line) => (
+                <li key={line} className="flex items-start gap-2.5">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div data-reveal className="relative">
+            <div
+              className="absolute -inset-4 rounded-3xl bg-primary-500/20 blur-2xl"
+              aria-hidden
+            />
+            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-white shadow-2xl shadow-black/40">
+              <img
+                src={MARKETING.productReport}
+                alt="KQ-SOFT bank reconciliation statement report preview"
+                className="w-full object-cover object-top aspect-[16/11]"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ---------------------------------------------------------------------------
  * Section 6: How it works
  * ------------------------------------------------------------------------- */
 
@@ -881,25 +856,35 @@ function HowItWorks() {
           </h2>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {STEPS.map((s, i) => {
             const Icon = s.icon
             return (
               <div
                 key={s.title}
                 data-reveal
-                className="relative rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+                className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-lg"
               >
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex w-9 h-9 rounded-full bg-primary-600 text-white text-sm font-bold items-center justify-center ring-4 ring-primary-100">
+                <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
+                  <img
+                    src={s.image}
+                    alt={s.imageAlt}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                  <span className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white ring-4 ring-white/80">
                     {i + 1}
                   </span>
-                  <Icon className="w-5 h-5 text-primary-600" />
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-gray-900">{s.title}</h3>
-                <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                  {s.description}
-                </p>
+                <div className="p-6">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-5 w-5 text-primary-600" />
+                    <h3 className="text-lg font-bold text-gray-900">{s.title}</h3>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600 leading-relaxed">{s.description}</p>
+                </div>
               </div>
             )
           })}
@@ -967,51 +952,18 @@ function DashboardShowcase() {
           </div>
 
           <div data-reveal className="relative">
-            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary-100 via-white to-green-100 blur-2xl opacity-60" aria-hidden />
-            <div className="relative rounded-xl border border-gray-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
-              <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50 to-white p-5">
-                <h4 className="text-sm font-bold text-gray-900">
-                  Bank Reconciliation Statement
-                </h4>
-                <p className="text-[11px] text-gray-500">
-                  Period ending 31 Mar — Acme Logistics Ltd
-                </p>
-                <div className="mt-4 flex justify-end rounded-md bg-gray-100 px-3 py-2 border border-gray-200/80">
-                  <span className="text-xs font-bold text-gray-900 tabular-nums min-w-[7.5rem] text-right">
-                    GHS
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  {[
-                    { label: 'Balance per bank statement', val: '482,150.00' },
-                    { label: 'Add: Uncredited lodgments', val: '18,400.00' },
-                    { label: 'Less: Unpresented cheques', val: '(12,250.00)' },
-                    { label: 'Bank-only reconciling items', val: '1,100.00' },
-                  ].map((r) => (
-                    <div
-                      key={r.label}
-                      className="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0"
-                    >
-                      <span className="text-gray-700">{r.label}</span>
-                      <span className="tabular-nums font-medium text-gray-900 text-right min-w-[7.5rem]">
-                        {r.val}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 rounded-lg bg-primary-50 border border-primary-100 px-3 py-2.5 flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase tracking-wider text-primary-700">
-                    Balance per cash book
-                  </span>
-                  <span className="tabular-nums font-bold text-primary-900 text-right min-w-[7.5rem]">
-                    489,400.00
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
-                  <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
-                  Signed off by reviewer · Audit trail captured
-                </div>
-              </div>
+            <div
+              className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary-100 via-white to-green-100 blur-2xl opacity-60"
+              aria-hidden
+            />
+            <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
+              <img
+                src={MARKETING.productReport}
+                alt="KQ-SOFT bank reconciliation statement with lodgments and cheques"
+                className="w-full rounded-lg object-cover object-top aspect-[16/11]"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           </div>
         </div>
@@ -1035,8 +987,8 @@ function Pricing({
   setShowCompare,
 }: {
   plans: MarketingPlan[]
-  billingPeriod: 'monthly' | 'yearly'
-  setBillingPeriod: (p: 'monthly' | 'yearly') => void
+  billingPeriod: BillingPeriod
+  setBillingPeriod: (p: BillingPeriod) => void
   showCompare: boolean
   setShowCompare: (b: boolean) => void
 }) {
@@ -1063,17 +1015,17 @@ function Pricing({
             Simple pricing — billed in GHS via Paystack.
           </h2>
           <p className="mt-2 text-base sm:text-lg text-gray-600">
-            Start free. Pay monthly or {yearlySavingsCopy} annually. Checkout is always in{' '}
+            14-day free trial on every tier. Pay monthly, quarterly (~5% off), or{' '}
+            {yearlySavingsCopy} annually. First 2 months at 50% off. Checkout is always in{' '}
             <abbr title="Ghana cedis">GHS</abbr> via Paystack; use the reference converter below for USD, EUR, or GBP.
-            Each project&apos;s BRS currency (GHS, USD, or EUR) is chosen in the app.
           </p>
 
           {/* Billing period toggle */}
-          <div className="mt-8 inline-flex items-center p-1 rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="mt-8 inline-flex flex-wrap items-center justify-center p-1 rounded-xl border border-gray-200 bg-white shadow-sm gap-0.5">
             <button
               type="button"
               onClick={() => setBillingPeriod('monthly')}
-              className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
                 billingPeriod === 'monthly'
                   ? 'bg-primary-600 text-white shadow'
                   : 'text-gray-600 hover:text-gray-900'
@@ -1083,8 +1035,28 @@ function Pricing({
             </button>
             <button
               type="button"
+              onClick={() => setBillingPeriod('quarterly')}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+                billingPeriod === 'quarterly'
+                  ? 'bg-primary-600 text-white shadow'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Quarterly
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  billingPeriod === 'quarterly'
+                    ? 'bg-white text-primary-700'
+                    : 'bg-green-100 text-green-700'
+                }`}
+              >
+                ~5% off
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setBillingPeriod('yearly')}
-              className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
                 billingPeriod === 'yearly'
                   ? 'bg-primary-600 text-white shadow'
                   : 'text-gray-600 hover:text-gray-900'
@@ -1167,14 +1139,15 @@ function PlanCard({
   period,
 }: {
   plan: MarketingPlan
-  period: 'monthly' | 'yearly'
+  period: BillingPeriod
 }) {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   const isHighlight = !!plan.highlight
   const isCustom = plan.slug === 'firm' && plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
-  const amount = period === 'yearly' ? plan.yearlyGhs : plan.monthlyGhs
-  const monthlyEq = period === 'yearly' ? plan.yearlyGhs / 12 : null
+  const amount = planAmountForPeriod(plan, period)
+  const monthlyEq = period === 'monthly' ? null : planMonthlyEquivalent(plan, period)
+  const periodLabel = period === 'yearly' ? 'year' : period === 'quarterly' ? 'quarter' : 'month'
   const ctaHref =
     isAuthed && plan.ctaHref === '/register' ? '/settings/billing' : plan.ctaHref
   const ctaLabel =
@@ -1217,13 +1190,11 @@ function PlanCard({
               <span className="text-4xl font-bold text-gray-900 tabular-nums">
                 {formatGhs(amount)}
               </span>
-              <span className="text-sm text-gray-500">
-                / {period === 'yearly' ? 'year' : 'month'}
-              </span>
+              <span className="text-sm text-gray-500">/ {periodLabel}</span>
             </div>
             {monthlyEq !== null && (
               <p className="mt-1 text-[11px] text-gray-500">
-                ≈ {formatGhs(Math.round(monthlyEq))} / month, billed annually
+                ≈ {formatGhs(Math.round(monthlyEq))} / month, billed {periodLabel === 'year' ? 'annually' : 'quarterly'}
               </p>
             )}
           </div>
@@ -1511,9 +1482,17 @@ function FinalCta() {
   return (
     <section className="py-24 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 p-10 sm:p-14 text-white shadow-2xl">
-          <div aria-hidden className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-green-400/30 blur-3xl" />
-          <div aria-hidden className="absolute -bottom-24 -left-10 w-80 h-80 rounded-full bg-primary-300/30 blur-3xl" />
+        <div className="relative overflow-hidden rounded-xl p-10 sm:p-14 text-white shadow-2xl">
+          <img
+            src={MARKETING.ctaAtmosphere}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            aria-hidden
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-900/92 via-primary-800/88 to-primary-950/90" />
+          <div aria-hidden className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-green-400/20 blur-3xl" />
           <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary-200/95">
@@ -1523,8 +1502,9 @@ function FinalCta() {
                 Close the next period before the inbox piles up.
               </h2>
               <p className="mt-3 text-base sm:text-lg text-white/85 leading-relaxed max-w-xl">
-                Create a free workspace, drop in a real cash book and bank extract, and
-                watch suggestions populate. Upgrade when volume or branding needs grow.
+                Start a 14-day free trial, drop in a real cash book and bank extract, and
+                watch suggestions populate. First two months at 50% off when you upgrade —
+                plans from GHS 300/mo.
               </p>
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">

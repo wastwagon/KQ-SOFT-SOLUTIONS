@@ -400,7 +400,7 @@ model Payment {
   amount         Decimal  @db.Decimal(18, 2)
   currency       String   @default("GHS")
   plan           String
-  period         String   // monthly | yearly
+  period         String   // monthly | quarterly | yearly
   reference      String?  @unique
   status         String   @default("success") // success | failed | refunded
   paystackData   Json?    @map("paystack_data")

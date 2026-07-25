@@ -16,6 +16,7 @@ import {
   Landmark,
   Shield,
   FileSpreadsheet,
+  Building2,
 } from 'lucide-react'
 import { projects, subscription, settings as settingsApi, isSubscriptionInactiveError } from '../lib/api'
 import { useAuth } from '../store/auth'
@@ -111,11 +112,14 @@ export default function Dashboard() {
   const { data: membersData, isError: membersQueryFailed } = membersQuery
   const memberCount = membersData?.currentCount ?? 1
   const projectsUsed = usage?.usage?.projectsUsed ?? projectsList.length
-  const projectsLimit = usage?.usage?.projectsLimit ?? 20
+  const projectsLimit = usage?.usage?.projectsLimit ?? 10
   const projectsUnlimited = usage?.usage?.projectsUnlimited ?? false
   const transactionsUsed = usage?.usage?.transactionsUsed ?? 0
-  const transactionsLimit = usage?.usage?.transactionsLimit ?? 2000
+  const transactionsLimit = usage?.usage?.transactionsLimit ?? 1000
   const transactionsUnlimited = usage?.usage?.transactionsUnlimited ?? false
+  const bankAccountsUsed = usage?.usage?.bankAccountsUsed ?? 0
+  const bankAccountsLimit = usage?.usage?.bankAccountsLimit ?? usage?.limits?.bankAccounts ?? 5
+  const bankAccountsUnlimited = usage?.usage?.bankAccountsUnlimited ?? false
   const inProgressCount = projectsList.filter((p: { status: string }) => p.status !== 'completed').length
   const completedCount = projectsList.filter((p: { status: string }) => p.status === 'completed').length
 
@@ -165,6 +169,9 @@ export default function Dashboard() {
   const transactionsBarPct = transactionsUnlimited
     ? 0
     : Math.min(100, (transactionsUsed / Math.max(1, transactionsLimit)) * 100)
+  const bankAccountsBarPct = bankAccountsUnlimited
+    ? 0
+    : Math.min(100, (bankAccountsUsed / Math.max(1, bankAccountsLimit)) * 100)
 
   return (
     <div className="space-y-10">
@@ -288,9 +295,10 @@ export default function Dashboard() {
         <h2 id="dashboard-metrics-heading" className="sr-only">
           Key metrics
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5 lg:gap-6">
         {usageLoading ? (
           <>
+            <MetricCardSkeleton />
             <MetricCardSkeleton />
             <MetricCardSkeleton />
             <MetricCardSkeleton />
@@ -344,6 +352,28 @@ export default function Dashboard() {
               }
               icon={<LayoutDashboard />}
               accent="green"
+            />
+            <MetricCard
+              label="Bank Accounts"
+              value={bankAccountsUsed}
+              sublabel={
+                <div className="mt-4">
+                  <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
+                    <span>Org seats</span>
+                    <span>
+                      {bankAccountsUsed} / {bankAccountsUnlimited ? '∞' : bankAccountsLimit}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${bankAccountsBarPct > 90 ? 'bg-red-500' : 'bg-primary-500'}`}
+                      style={{ width: `${bankAccountsBarPct}%` }}
+                    />
+                  </div>
+                </div>
+              }
+              icon={<Building2 />}
+              accent="brand"
             />
             <MetricCard
               label="Team Members"

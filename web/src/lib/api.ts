@@ -388,11 +388,16 @@ export interface SubscriptionUsageResponse {
     transactionsLimit: number
     transactionsUnlimited: boolean
     transactionsDisplay: string
+    bankAccountsUsed?: number
+    bankAccountsLimit?: number
+    bankAccountsUnlimited?: boolean
+    bankAccountsDisplay?: string
   }
   limits: {
     projectsPerMonth: number
     transactionsPerMonth: number
     bankAccountsPerProject: number
+    bankAccounts?: number
   }
   subscription?: {
     status: 'trial' | 'active' | 'expired' | 'free'
@@ -400,7 +405,7 @@ export interface SubscriptionUsageResponse {
     currentPeriodStart: string | null
     currentPeriodEnd: string | null
     latestPaymentAt: string | null
-    latestPaymentPeriod: 'monthly' | 'yearly' | null
+    latestPaymentPeriod: 'monthly' | 'quarterly' | 'yearly' | null
     latestPaymentAmount: number | null
   }
 }
@@ -715,7 +720,7 @@ export const platformAdminOps = {
 export const subscription = {
   getUsage: () => api('/subscription/usage') as Promise<SubscriptionUsageResponse>,
   getPlans: () => api('/subscription/plans'),
-  initializePayment: (body: { plan: string; period: 'monthly' | 'yearly' }) =>
+  initializePayment: (body: { plan: string; period: 'monthly' | 'quarterly' | 'yearly' }) =>
     api('/subscription/initialize', { method: 'POST', body: JSON.stringify(body) }),
 }
 

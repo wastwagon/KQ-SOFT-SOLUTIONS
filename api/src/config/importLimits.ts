@@ -32,9 +32,9 @@ export const MAP_PREVIEW_ROW_SAMPLE = 50
 
 /** Monthly imported transaction quotas per plan (-1 = unlimited). */
 export const TIER_TRANSACTION_LIMITS: Record<string, number> = {
-  basic: 5_000,
-  standard: 50_000,
-  premium: 200_000,
+  basic: 1_000,
+  standard: 5_000,
+  premium: 20_000,
   firm: -1,
 }
 

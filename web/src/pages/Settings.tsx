@@ -117,7 +117,7 @@ export default function Settings() {
     )
   }
 
-  const handleUpgrade = (plan: string, period: 'monthly' | 'yearly') => {
+  const handleUpgrade = (plan: string, period: 'monthly' | 'quarterly' | 'yearly') => {
     setInitializing(`${plan}-${period}`)
     initPaymentMutation.mutate({ plan, period })
   }
