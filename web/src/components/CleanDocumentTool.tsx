@@ -116,11 +116,11 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8 w-full">
       <PageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        subtitle={<p>{copy.blurb}</p>}
+        subtitle={<p className="max-w-3xl">{copy.blurb}</p>}
       />
 
       {paywall && <SubscriptionRenewalPanel />}
@@ -216,29 +216,54 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
           </div>
 
           {preview.sampleRows.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="min-w-full text-xs text-left">
+            <div className="w-full rounded-lg border border-border overflow-x-auto md:overflow-visible">
+              <table className="w-full table-fixed text-xs text-left">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    {preview.headers.map((h) => (
-                      <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
+                    {preview.headers.map((h) => {
+                      const isDesc = /desc|narration/i.test(h)
+                      const isAmount = /debit|credit|balance|amt|amount|payment|receipt/i.test(h)
+                      return (
+                        <th
+                          key={h}
+                          className={`px-3 py-2 font-semibold ${
+                            isDesc ? 'w-[36%]' : isAmount ? 'w-[11%] text-right' : 'w-[10%]'
+                          }`}
+                        >
+                          {h}
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>
                   {preview.sampleRows.map((row, i) => (
-                    <tr key={i} className="border-t border-gray-100">
-                      {preview.headers.map((_, j) => (
-                        <td key={j} className="px-3 py-1.5 text-gray-800 whitespace-nowrap max-w-[220px] truncate">
-                          {row[j] == null || row[j] === ''
+                    <tr key={i} className="border-t border-gray-100 align-top">
+                      {preview.headers.map((h, j) => {
+                        const isAmount = /debit|credit|balance|amt|amount|payment|receipt/i.test(h)
+                        const isDesc = /desc|narration/i.test(h)
+                        const empty = row[j] == null || row[j] === ''
+                        const content =
+                          empty
                             ? '—'
                             : typeof row[j] === 'number'
                               ? money(row[j] as number)
-                              : String(row[j])}
-                        </td>
-                      ))}
+                              : String(row[j])
+                        return (
+                          <td
+                            key={j}
+                            className={`px-3 py-2 text-gray-800 ${
+                              isAmount
+                                ? 'text-right whitespace-nowrap tabular-nums'
+                                : isDesc
+                                  ? 'break-words whitespace-normal'
+                                  : 'break-words'
+                            }`}
+                          >
+                            {content}
+                          </td>
+                        )
+                      })}
                     </tr>
                   ))}
                 </tbody>
