@@ -54,19 +54,39 @@ The **`api`** image runs **`start-api.sh`**, which detects this error and **boot
 - **Disable:** set `PRISMA_BOOTSTRAP_EMPTY_DB=0` on the `api` service.
 - **Real production data** already in Postgres: do **not** rely on bootstrap; restore from backup or run a proper baseline / hand-managed SQL instead of wiping `_prisma_migrations`.
 
-### API restarts / `P3009` / failed migration `20250228140000_add_project_slug`
+### API restarts / `P3009` / failed migration
 
-Older migration SQL used `"Project"` / `"User"` while the real tables are **`projects`** / **`users`**. That is **fixed in the repo**; the production **API** image runs **`api/start-api.sh`** (not nginx’s `/docker-entrypoint.sh` on the **web** container). On **`P3009`** mentioning `20250228140000_add_project_slug` it runs `prisma migrate resolve --rolled-back` and **retries** `migrate deploy` once. A normal redeploy after pull should recover without manual steps.
+Prisma **refuses all new migrations** while any row in `_prisma_migrations` is marked **failed**. Typical names:
+
+| Migration | Cause |
+|-----------|--------|
+| `20250228140000_add_project_slug` | Older SQL used `"Project"` / `"User"` (fixed in repo) |
+| `20260718110000_organization_match_memory` | Prior deploy aborted mid-migration; blocks `parse_status` and later schema |
+
+While stuck, Postgres logs also show `column documents.parse_status does not exist` — the **parse-worker** is running code that expects columns from a later migration that never applied.
+
+**Auto-recovery (current `start-api.sh`):** on `P3009` it resolves the failed name as **rolled-back** (from the log and a default list including both migrations above), retries `migrate deploy`, and if objects already exist marks the migration **applied**. Redeploy after pulling that script should recover without manual steps.
+
+**Immediate fix (Coolify → Terminal on `api`, or `docker compose exec api`):**
+
+```bash
+npx prisma migrate resolve --rolled-back 20260718110000_organization_match_memory --schema=./prisma/schema.prisma
+npx prisma migrate deploy --schema=./prisma/schema.prisma
+```
+
+If deploy errors with **already exists** / relation exists:
+
+```bash
+npx prisma migrate resolve --applied 20260718110000_organization_match_memory --schema=./prisma/schema.prisma
+npx prisma migrate deploy --schema=./prisma/schema.prisma
+```
+
+Then restart / redeploy the **api** service. Confirm api logs show `prisma migrate deploy OK` and `starting Node`.
 
 **Logs:** Prisma / `start-api:` lines appear under the **`api`** service. Lines like `/docker-entrypoint.sh` and `nginx/1.x` are the **`web`** (nginx) service only.
 
-- **Turn off** auto-recovery: set env `PRISMA_AUTO_RESOLVE_MIGRATIONS=` (empty) on the `api` service.
+- **Turn off** auto-recovery: set env `PRISMA_AUTO_RESOLVE_MIGRATIONS=` (empty) on the `api` service (log-detected names may still recover).
 - **Extra migration names** (comma-separated): `PRISMA_AUTO_RESOLVE_MIGRATIONS=name1,name2`
-- If deploy still fails after auto-resolve, fix the underlying error or use **Coolify Terminal**:
-
-```bash
-docker compose run --rm --no-deps api npx prisma migrate resolve --rolled-back <migration_name> --schema=./prisma/schema.prisma
-```
 
 **Dev-only / empty data:** remove the Postgres volume and redeploy (destructive).
 

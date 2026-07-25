@@ -4,14 +4,15 @@
 # Recovery loop (max 8 rounds):
 # 1) If log shows missing "projects" table (P3018 / 42P01): db push + mark all migrations applied.
 # 2) Else if P3009 for a configured migration: migrate resolve --rolled-back, retry deploy.
+#    Also auto-detects migration names from the P3009 log (e.g. organization_match_memory).
 #
 # Order matters: first failure is often P3009 only (no SQL yet), so no "projects" line — we resolve
 # first; the next deploy then hits P3018 and we bootstrap. Previously bootstrap ran only after the
 # first failure, so P3009-only logs never triggered it.
 #
 # Disable bootstrap: PRISMA_BOOTSTRAP_EMPTY_DB=0
+# Override P3009 auto-resolve list: PRISMA_AUTO_RESOLVE_MIGRATIONS=name1,name2
 # Disable P3009 auto-resolve: PRISMA_AUTO_RESOLVE_MIGRATIONS="" (empty)
-
 set -eu
 SCHEMA="./prisma/schema.prisma"
 MAX_ROUNDS=8
@@ -55,20 +56,82 @@ bootstrap_empty_schema() {
   done
 }
 
-try_p3009_rolled_back() {
-  MIGS="${PRISMA_AUTO_RESOLVE_MIGRATIONS-20250228140000_add_project_slug}"
-  [ -n "$MIGS" ] || return 1
+# Returns 0 if public table $1 exists (best-effort; used to choose --applied vs --rolled-back).
+pg_table_exists() {
+  table="$1"
+  node --input-type=module -e "
+import { PrismaClient } from '@prisma/client';
+const p = new PrismaClient();
+try {
+  const rows = await p.\$queryRawUnsafe(
+    \"SELECT to_regclass('public.$table') AS r\"
+  );
+  process.exit(rows[0]?.r ? 0 : 1);
+} catch {
+  process.exit(1);
+} finally {
+  await p.\$disconnect();
+}
+" 2>/dev/null
+}
+
+# Known failed-migration → table created by that migration (partial apply detection).
+migration_object_exists() {
+  case "$1" in
+    20260718110000_organization_match_memory)
+      pg_table_exists organization_match_memories
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+try_p3009_recover() {
+  # Clear failed migration rows so migrate deploy can retry (or skip if already applied).
+  # 1) Env list PRISMA_AUTO_RESOLVE_MIGRATIONS (comma-separated)
+  # 2) Plus any migration name mentioned in the P3009 log (`2026…_name`)
   grep -q "P3009" "$LOG" 2>/dev/null || return 1
+
+  DEFAULT_MIGS="20250228140000_add_project_slug,20260718110000_organization_match_memory"
+  MIGS="${PRISMA_AUTO_RESOLVE_MIGRATIONS-$DEFAULT_MIGS}"
+
+  names=""
+  if [ -n "$MIGS" ]; then
+    names="$MIGS"
+  fi
+  # Prisma: The `20260718110000_organization_match_memory` migration ... failed
+  from_log=$(grep -oE '`[0-9]{14}_[a-zA-Z0-9_]+`' "$LOG" 2>/dev/null | tr -d '`' | sort -u | tr '\n' ',' || true)
+  if [ -n "$from_log" ]; then
+    names="${names},${from_log}"
+  fi
+
   resolved_any=0
   OLDIFS=$IFS
   IFS=','
-  for m in $MIGS; do
+  for m in $names; do
     m=$(printf '%s' "$m" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [ -z "$m" ] && continue
-    if grep -q "$m" "$LOG" 2>/dev/null; then
-      echo "start-api: P3009 mentions $m — prisma migrate resolve --rolled-back" >&2
-      npx prisma migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2
-      resolved_any=1
+    # Only act when this migration is named in the failure log
+    if ! grep -q "$m" "$LOG" 2>/dev/null; then
+      continue
+    fi
+    # Partial apply: table already there → mark applied. Else roll back so deploy can re-run SQL.
+    if migration_object_exists "$m"; then
+      echo "start-api: P3009 — $m objects already exist; migrate resolve --applied" >&2
+      if npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
+        resolved_any=1
+      fi
+    else
+      echo "start-api: P3009 — resolving failed migration $m as rolled-back (will retry deploy)" >&2
+      if npx prisma migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2; then
+        resolved_any=1
+      else
+        echo "start-api: WARN — migrate resolve --rolled-back $m failed; trying --applied" >&2
+        if npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
+          resolved_any=1
+        fi
+      fi
     fi
   done
   IFS=$OLDIFS
@@ -112,6 +175,25 @@ seed_demo_users() {
   fi
 }
 
+# If migrate deploy fails because objects already exist (partial prior run), mark that migration applied.
+try_mark_applied_on_already_exists() {
+  grep -qiE 'already exists|duplicate key|42P07|42710' "$LOG" 2>/dev/null || return 1
+  from_log=$(grep -oE '`[0-9]{14}_[a-zA-Z0-9_]+`' "$LOG" 2>/dev/null | tr -d '`' | sort -u || true)
+  # Also try current pending from migrate status is hard in shell — use last failed name from P3009 style
+  if [ -z "$from_log" ]; then
+    from_log=$(grep -oE '[0-9]{14}_[a-zA-Z0-9_]+' "$LOG" 2>/dev/null | head -5 | sort -u || true)
+  fi
+  [ -n "$from_log" ] || return 1
+  resolved_any=0
+  for m in $from_log; do
+    echo "start-api: schema object already exists — migrate resolve --applied $m" >&2
+    if npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
+      resolved_any=1
+    fi
+  done
+  [ "$resolved_any" -eq 1 ]
+}
+
 round=0
 while [ "$round" -lt "$MAX_ROUNDS" ]; do
   if run_migrate >"$LOG" 2>&1; then
@@ -131,12 +213,17 @@ while [ "$round" -lt "$MAX_ROUNDS" ]; do
   if [ "${PRISMA_BOOTSTRAP_EMPTY_DB:-1}" != "0" ] && log_suggests_missing_projects_table; then
     bootstrap_empty_schema
     progressed=1
-  elif try_p3009_rolled_back; then
+  elif try_p3009_recover; then
+    progressed=1
+  elif try_mark_applied_on_already_exists; then
     progressed=1
   fi
 
   if [ "$progressed" -eq 0 ]; then
     echo "start-api: no automatic recovery applied; fix DB/migrations or env and redeploy." >&2
+    echo "start-api: For P3009 on match_memory, in Coolify Terminal (api) run:" >&2
+    echo "start-api:   npx prisma migrate resolve --rolled-back 20260718110000_organization_match_memory --schema=./prisma/schema.prisma" >&2
+    echo "start-api:   npx prisma migrate deploy --schema=./prisma/schema.prisma" >&2
     exit 1
   fi
 
