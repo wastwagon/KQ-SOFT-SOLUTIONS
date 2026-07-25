@@ -1,0 +1,30 @@
+{
+  "file": "Prudential bank(0091900180008)_sep 23[10235] (2).pdf",
+  "parseMethod": "prudential_pdf",
+  "headers": [
+    "Transaction Date",
+    "Description",
+    "Reference",
+    "Value Date",
+    "Debit",
+    "Credit",
+    "Balance"
+  ],
+  "rowCount": 400,
+  "debitRows": 347,
+  "creditRows": 53,
+  "both": 0,
+  "neither": 0,
+  "sumDebit": 419133588.17999965,
+  "sumCredit": 428126625.11999995,
+  "bankFormat": "prudential",
+  "canAutoMapCredits": true,
+  "canAutoMapDebits": true,
+  "firstBalance": 49999735,
+  "lastBalance": -265,
+  "dateRange": [
+    "01/09/2023",
+    "29/09/2023"
+  ],
+  "ms": 354
+}
