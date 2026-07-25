@@ -55,18 +55,25 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
   if (!doc || doc.project.organizationId !== orgId) {
     return res.status(404).json({ error: 'Document not found' })
   }
-  if (!fs.existsSync(doc.filepath)) {
+  const { resolveReadablePath } = await import('../lib/storage.js')
+  let localPath: string
+  try {
+    localPath = await resolveReadablePath(doc.filepath)
+  } catch {
+    return res.status(404).json({ error: 'File not found' })
+  }
+  if (!fs.existsSync(localPath)) {
     return res.status(404).json({ error: 'File not found' })
   }
   try {
-    const type = detectFileType(doc.filepath)
+    const type = detectFileType(localPath)
     let result: Awaited<ReturnType<typeof parseDocumentFile>>
     let excelPreviewSheetIndex: number | undefined
     if (type === 'excel') {
       const rawSheet = req.query.sheetIndex
       const hasSheetQuery =
         rawSheet !== undefined && rawSheet !== null && String(rawSheet).trim() !== ''
-      const requested = hasSheetQuery ? parseSheetIndexQuery(rawSheet) : pickBestExcelSheetIndex(doc.filepath, doc.type)
+      const requested = hasSheetQuery ? parseSheetIndexQuery(rawSheet) : pickBestExcelSheetIndex(localPath, doc.type)
       result = await parseDocumentFile(doc.filepath, doc.type, requested)
       const names = result.sheetNames ?? []
       const active = result.activeSheet
@@ -274,7 +281,13 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
   if (!isProjectEditable((doc.project as { status?: string }).status)) {
     return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
-  if (!fs.existsSync(doc.filepath)) {
+  const { resolveReadablePath } = await import('../lib/storage.js')
+  try {
+    const localPath = await resolveReadablePath(doc.filepath)
+    if (!fs.existsSync(localPath)) {
+      return res.status(404).json({ error: 'File not found' })
+    }
+  } catch {
     return res.status(404).json({ error: 'File not found' })
   }
   const org = await prisma.organization.findFirst({

@@ -8,7 +8,9 @@
     "export:corrected-specimens": "npx tsx scripts/export-corrected-specimens.mjs",
     "clean:specimens": "npx tsx scripts/clean-specimen-bank-statements.mjs",
     "demo:flow": "bash scripts/run-full-flow.sh",
-    "demo:flow:qtest": "bash scripts/run-qtest-licl-flow.sh"
+    "demo:flow:qtest": "bash scripts/run-qtest-licl-flow.sh",
+    "test:e2e": "npm run test:e2e --prefix web",
+    "test:e2e:smoke": "npm run test:e2e:smoke --prefix web"
   },
   "devDependencies": {
     "md-to-pdf": "^5.2.5"

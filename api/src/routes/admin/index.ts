@@ -10,6 +10,7 @@ import analyticsRouter from './analytics.js'
 import settingsRouter from './settings.js'
 import databaseRouter from './database.js'
 import opsMetricsRouter from './opsMetrics.js'
+import retentionRouter from './retention.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -23,6 +24,7 @@ router.get('/', (_req, res) => {
 router.use('/settings', settingsRouter)
 router.use('/database', databaseRouter)
 router.use('/ops-metrics', opsMetricsRouter)
+router.use('/retention', retentionRouter)
 router.use('/plans', plansRouter)
 router.use('/users', usersRouter)
 router.use('/organizations', organizationsRouter)

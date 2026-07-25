@@ -19,7 +19,7 @@ export interface PlatformDefaults {
   amountTolerance?: number
   /** Matching: date window in days for date match. Default 3 */
   dateWindowDays?: number
-  /** Data retention: years to keep audit/data (documentation only; deletion not implemented). Default 7 */
+  /** Data retention: years to keep completed projects before prune eligibility. Default 7 */
   dataRetentionYears?: number
   /** Default Ecobank Ghana BRS workbook netting when org has no override (Premium Ghana workflows). */
   ghanaBrsWorkbookNetting?: boolean

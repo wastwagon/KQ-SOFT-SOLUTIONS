@@ -512,22 +512,24 @@ export async function parseDocumentFile(
   docType: DocumentType,
   sheetIndex = 0
 ): Promise<ParsedDocument> {
-  if (!fs.existsSync(filepath)) {
+  const { resolveReadablePath } = await import('../lib/storage.js')
+  const localPath = await resolveReadablePath(filepath)
+  if (!fs.existsSync(localPath)) {
     throw new Error('File not found')
   }
-  const ft = detectFileType(filepath)
+  const ft = detectFileType(localPath)
   if (ft === 'excel') {
-    const r = parseExcel(filepath, sheetIndex)
+    const r = parseExcel(localPath, sheetIndex)
     return { ...r, parseMethod: r.headers.includes('Debit') ? 'ecobank_excel' : 'excel' }
   }
   if (ft === 'csv') {
-    const r = parseCsv(filepath)
+    const r = parseCsv(localPath)
     return { ...r, parseMethod: 'csv' }
   }
   if (ft === 'pdf') {
-    return docType.startsWith('cash_book_') ? parseCashBookPdf(filepath) : parseBankPdf(filepath)
+    return docType.startsWith('cash_book_') ? parseCashBookPdf(localPath) : parseBankPdf(localPath)
   }
-  return parseImageFile(filepath)
+  return parseImageFile(localPath)
 }
 
 /** Image uploads: OCR + geometry table reconstruction (same finalize path as PDF OCR). */

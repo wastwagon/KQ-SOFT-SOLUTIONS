@@ -175,8 +175,15 @@ export default function Register() {
         </Button>
 
         <p className="text-center text-xs leading-relaxed text-gray-500">
-          By continuing you agree to use KQ-SOFT in line with your organisation’s policies.
-          Need help?{' '}
+          By continuing you agree to our{' '}
+          <Link to="/terms" className="font-medium text-primary-600 hover:underline">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy" className="font-medium text-primary-600 hover:underline">
+            Privacy Policy
+          </Link>
+          . Need help?{' '}
           <a
             href="mailto:info@kqsoftwaresolutions.com"
             className="font-medium text-primary-600 hover:underline"

@@ -33,9 +33,15 @@ export type OpsMetricName =
   | 'parse.job_reclaimed_stale'
   | 'parse.job_completed'
   | 'parse.job_failed'
+  | 'parse.queue_pending_docs'
+  | 'parse.queue_oldest_lag_sec'
+  | 'parse.bullmq_waiting'
+  | 'parse.bullmq_active'
+  | 'parse.bullmq_failed'
 
 const startedAt = Date.now()
 const counters = new Map<string, number>()
+const gauges = new Map<string, number>()
 
 function keyOf(name: OpsMetricName, labels?: Record<string, string>): string {
   if (!labels || !Object.keys(labels).length) return name
@@ -44,6 +50,16 @@ function keyOf(name: OpsMetricName, labels?: Record<string, string>): string {
     .map((k) => `${k}=${labels[k]}`)
     .join(',')
   return `${name}{${parts}}`
+}
+
+/** Set a gauge (e.g. queue depth / lag). Overwrites previous value. */
+export function setOpsGauge(
+  name: OpsMetricName,
+  value: number,
+  labels?: Record<string, string>
+): void {
+  if (!Number.isFinite(value)) return
+  gauges.set(keyOf(name, labels), value)
 }
 
 /** Increment a counter (and optionally emit a structured log line). */
@@ -105,6 +121,7 @@ export type OpsMetricsSnapshot = {
   startedAt: string
   uptimeSec: number
   counters: Record<string, number>
+  gauges: Record<string, number>
   derived: {
     parseQualityAvg: number | null
     memoryBoostTotal: number
@@ -119,6 +136,8 @@ export type OpsMetricsSnapshot = {
 export function getOpsMetricsSnapshot(): OpsMetricsSnapshot {
   const out: Record<string, number> = {}
   for (const [k, v] of counters) out[k] = v
+  const gaugeOut: Record<string, number> = {}
+  for (const [k, v] of gauges) gaugeOut[k] = v
 
   const sum = out['parse.quality_score_sum'] || 0
   const count = out['parse.quality_score_count'] || 0
@@ -132,6 +151,7 @@ export function getOpsMetricsSnapshot(): OpsMetricsSnapshot {
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     counters: out,
+    gauges: gaugeOut,
     derived: {
       parseQualityAvg: count > 0 ? Math.round((sum / count) * 10) / 10 : null,
       memoryBoostTotal: boost1 + boostSplit,
@@ -224,6 +244,13 @@ export function formatOpsMetricsPrometheus(): string {
     lines.push(`${promName}${formatPrometheusLabels(labels)} ${value}`)
   }
 
+  for (const [key, value] of Object.entries(snap.gauges)) {
+    const { name, labels } = parseOpsMetricKey(key)
+    const promName = toPrometheusMetricName(name.replace(/\./g, '_'))
+    emitHelpType(promName, 'gauge', `Ops gauge ${name}`)
+    lines.push(`${promName}${formatPrometheusLabels(labels)} ${value}`)
+  }
+
   lines.push('')
   return lines.join('\n')
 }
@@ -231,4 +258,5 @@ export function formatOpsMetricsPrometheus(): string {
 /** Test helper — clear process counters. */
 export function resetOpsMetricsForTests(): void {
   counters.clear()
+  gauges.clear()
 }

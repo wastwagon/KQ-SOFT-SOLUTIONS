@@ -1262,6 +1262,90 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   res.json(reportPayload)
 })
 
+/** Suggested GL journal CSV from unmatched / bank-only schedules (project currency). */
+router.get('/:projectId/suggested-journals', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canExportReport(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to export reports' })
+  }
+  const orgId = req.auth!.orgId
+  const projectId = await resolveProjectId(req.params.projectId, orgId)
+  if (!projectId) return res.status(404).json({ error: 'Project not found' })
+  const bankAccountId = (req.query.bankAccountId as string) || undefined
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId },
+    include: {
+      documents: { include: { transactions: true } },
+      matches: { include: { matchItems: true } },
+    },
+  })
+  if (!project) return res.status(404).json({ error: 'Project not found' })
+
+  const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
+  const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
+  const creditsDocs = project.documents.filter(
+    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+  const debitsDocs = project.documents.filter(
+    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+  )
+  const receipts = dedupeTransactions(receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const payments = dedupeTransactions(paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const credits = dedupeTransactions(creditsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+  const debits = dedupeTransactions(debitsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
+
+  const matchedCbIds = new Set<string>()
+  const matchedBankIds = new Set<string>()
+  for (const m of project.matches) {
+    for (const mi of m.matchItems) {
+      if (mi.side === 'cash_book') matchedCbIds.add(mi.transactionId)
+      else matchedBankIds.add(mi.transactionId)
+    }
+  }
+
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return ''
+    if (typeof d === 'string') return d.slice(0, 10)
+    return d.toISOString().slice(0, 10)
+  }
+
+  const toRow = (t: ReturnType<typeof toTx>) => ({
+    date: fmtDate(t.date),
+    name: t.name,
+    details: t.details,
+    chqNo: t.chqNo,
+    docRef: t.docRef,
+    amount: t.amount,
+  })
+
+  const unmatchedReceipts = receipts.filter((t) => !matchedCbIds.has(t.id)).map(toRow)
+  const unmatchedPayments = payments.filter((t) => !matchedCbIds.has(t.id)).map(toRow)
+  const unmatchedCredits = credits.filter((t) => !matchedBankIds.has(t.id)).map(toRow)
+  const unmatchedDebits = debits.filter((t) => !matchedBankIds.has(t.id)).map(toRow)
+
+  const { buildSuggestedJournalsCsv } = await import('../services/suggestedJournals.js')
+  const csv = buildSuggestedJournalsCsv({
+    currency: project.currency || 'GHS',
+    uncreditedLodgments: unmatchedReceipts,
+    unpresentedCheques: unmatchedPayments,
+    bankOnlyDebits: unmatchedDebits,
+    bankOnlyCredits: unmatchedCredits,
+  })
+
+  const safeName = (project.name || 'brs').replace(/[^\w.-]+/g, '_').slice(0, 60)
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}-suggested-journals.csv"`)
+  await logAudit({
+    organizationId: orgId,
+    userId: req.auth!.userId,
+    projectId,
+    action: 'report_exported',
+    details: { format: 'suggested-journals-csv' },
+  })
+  res.send(csv)
+})
+
 router.get('/:projectId/export', async (req: AuthRequest, res) => {
   // Keep export table columns aligned with docs/REPORT_LAYOUT_SCHEMA.md (compact layout).
   const role = req.auth!.role

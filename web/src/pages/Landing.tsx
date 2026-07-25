@@ -1752,18 +1752,12 @@ function Footer() {
             © {new Date().getFullYear()} KQ-SOFT Solutions. All rights reserved.
           </p>
           <div className="flex items-center gap-5 text-xs text-gray-500">
-            <a
-              href="mailto:info@kqsoftwaresolutions.com?subject=Privacy%20policy"
-              className="hover:text-gray-300 transition-colors"
-            >
+            <Link to="/privacy" className="hover:text-gray-300 transition-colors">
               Privacy
-            </a>
-            <a
-              href="mailto:info@kqsoftwaresolutions.com?subject=Terms%20of%20service"
-              className="hover:text-gray-300 transition-colors"
-            >
+            </Link>
+            <Link to="/terms" className="hover:text-gray-300 transition-colors">
               Terms
-            </a>
+            </Link>
             <span className="inline-flex items-center gap-2">
               <span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-dot" />
               Service operational

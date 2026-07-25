@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
+import { deleteStoredFile, isS3StorageKey, resolveReadablePath } from '../lib/storage.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -39,16 +40,26 @@ router.get('/:id/download', async (req: AuthRequest, res) => {
   if (attachment.project.organizationId !== orgId) {
     return res.status(404).json({ error: 'Attachment not found' })
   }
-  const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
-  const fullPath = path.resolve(path.isAbsolute(attachment.filepath) ? attachment.filepath : path.join(process.cwd(), attachment.filepath))
-  const uploadDirResolved = path.resolve(uploadDir)
-  if (!fullPath.startsWith(uploadDirResolved) || !fs.existsSync(fullPath)) {
+  let fullPath: string
+  try {
+    fullPath = await resolveReadablePath(attachment.filepath)
+  } catch {
     return res.status(404).json({ error: 'File not found' })
+  }
+  if (!fs.existsSync(fullPath)) {
+    return res.status(404).json({ error: 'File not found' })
+  }
+  if (!isS3StorageKey(attachment.filepath)) {
+    const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
+    const uploadDirResolved = path.resolve(uploadDir)
+    if (!path.resolve(fullPath).startsWith(uploadDirResolved)) {
+      return res.status(404).json({ error: 'File not found' })
+    }
   }
   const safeFilename = sanitizeFilename(attachment.filename)
   res.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream')
   res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`)
-  res.sendFile(fullPath)
+  res.sendFile(path.resolve(fullPath))
 })
 
 router.delete('/:id', async (req: AuthRequest, res) => {
@@ -67,20 +78,15 @@ router.delete('/:id', async (req: AuthRequest, res) => {
   }
   const projectId = attachment.projectId
   await prisma.brsAttachment.delete({ where: { id: attachment.id } })
-  const fullPath = path.isAbsolute(attachment.filepath) ? attachment.filepath : path.join(process.cwd(), attachment.filepath)
-  try {
-    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
-  } catch {
-    // ignore file delete errors
-  }
+  await deleteStoredFile(attachment.filepath)
   await logAudit({
     organizationId: orgId,
     userId: req.auth!.userId,
     projectId,
     action: 'attachment_deleted',
-    details: { attachmentId: attachment.id, filename: attachment.filename },
+    details: { attachmentId: attachment.id },
   })
-  res.json({ deleted: true })
+  res.json({ ok: true })
 })
 
 export default router

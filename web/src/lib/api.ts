@@ -891,6 +891,29 @@ export const report = {
   },
   exportExcel: (projectId: string, opts?: ReportExportOptions) => reportExport(projectId, 'excel', opts),
   exportPdf: (projectId: string, opts?: ReportExportOptions) => reportExport(projectId, 'pdf', opts),
+  exportSuggestedJournals: async (projectId: string, opts?: { bankAccountId?: string }) => {
+    const token = getToken()
+    const q = new URLSearchParams()
+    if (opts?.bankAccountId) q.set('bankAccountId', opts.bankAccountId)
+    const qs = q.toString()
+    const res = await fetch(
+      `${API_URL}/api/v1/report/${projectId}/suggested-journals${qs ? `?${qs}` : ''}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    )
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throwFromFailedResponse(res, data)
+    }
+    const blob = await res.blob()
+    const disp = res.headers.get('Content-Disposition')
+    const match = disp?.match(/filename="([^"]+)"/)
+    const filename = match?.[1] || `suggested-journals_${projectId}.csv`
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(a.href)
+  },
 }
 
 export const reconcile = {

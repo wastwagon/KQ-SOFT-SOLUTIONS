@@ -20,11 +20,15 @@
     "test:watch": "vitest",
     "worker:parse": "tsx src/worker/parseWorker.ts",
     "start:worker:parse": "node dist/worker/parseWorker.js",
+    "retention:prune": "tsx src/scripts/runRetentionPrune.ts",
+    "retention:prune:execute": "tsx src/scripts/runRetentionPrune.ts --execute",
     "benchmark:specimens": "tsx scripts/run-specimen-benchmark.ts",
     "benchmark:specimens:excel": "tsx scripts/run-specimen-benchmark.ts --excel-only"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.848.0",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^9.40.0",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.80.8",
     "cors": "^2.8.5",

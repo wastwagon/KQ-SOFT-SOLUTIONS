@@ -15,13 +15,12 @@ import { canAddBankAccount } from '../services/planLimits.js'
 import { autoMapAfterUpload } from '../lib/deferredAutoMap.js'
 import { resolveMaxUploadSizeBytes } from '../config/importLimits.js'
 import { uploadParseRouteLimiter } from '../middleware/heavyRouteLimiter.js'
+import { ensureLocalUploadDirs, persistUploadedFile } from '../lib/storage.js'
 
 const router = Router()
+ensureLocalUploadDirs()
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true })
-}
 const brandingDir = path.join(uploadDir, 'branding')
 if (!fs.existsSync(brandingDir)) {
   fs.mkdirSync(brandingDir, { recursive: true })
@@ -137,12 +136,13 @@ router.post('/cash-book/:projectId', upload.single('file'), async (req: AuthRequ
       existingDocumentId: duplicate.id,
     })
   }
+  const storedPath = await persistUploadedFile(req.file.path, { contentType: req.file.mimetype })
   const doc = await prisma.document.create({
     data: {
       projectId,
       type,
       filename: safeFilename,
-      filepath: req.file.path,
+      filepath: storedPath,
       mimeType: req.file.mimetype,
       contentHash,
     },
@@ -237,13 +237,14 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
       existingDocumentId: duplicate.id,
     })
   }
+  const storedPath = await persistUploadedFile(req.file.path, { contentType: req.file.mimetype })
   const doc = await prisma.document.create({
     data: {
       projectId,
       bankAccountId: bankAccountId || undefined,
       type,
       filename: safeFilename,
-      filepath: req.file.path,
+      filepath: storedPath,
       mimeType: req.file.mimetype,
       contentHash,
     },
@@ -279,6 +280,10 @@ router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRe
   const validTypes = ['bank_statement', 'approval', 'match_evidence', 'other']
   const attachmentType = validTypes.includes(type) ? type : 'other'
   const safeFilename = sanitizeFilename(req.file.originalname)
+  const storedPath = await persistUploadedFile(req.file.path, {
+    keyPrefix: 'attachments',
+    contentType: req.file.mimetype,
+  })
 
   const attachment = await prisma.brsAttachment.create({
     data: {
@@ -286,7 +291,7 @@ router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRe
       matchId,
       type: attachmentType,
       filename: safeFilename,
-      filepath: req.file.path,
+      filepath: storedPath,
       mimeType: req.file.mimetype,
       uploadedBy: req.auth!.userId,
     },

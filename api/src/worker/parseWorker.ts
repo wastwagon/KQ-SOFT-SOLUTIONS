@@ -2,6 +2,8 @@ import 'dotenv/config'
 import { logger } from '../middleware/logging.js'
 import { startParseJobWorker } from '../lib/parseJobQueue.js'
 import { shouldUseBullmq } from '../lib/parseJobBullmq.js'
+import { initSentry, captureException } from '../lib/sentry.js'
+import { startParseQueueLagReporter } from '../lib/parseQueueLag.js'
 
 /**
  * Dedicated parse/OCR worker process.
@@ -12,6 +14,8 @@ import { shouldUseBullmq } from '../lib/parseJobBullmq.js'
  *
  * Requires DATABASE_URL; REDIS_URL recommended (BullMQ).
  */
+void initSentry('brs-parse-worker').then(() => startParseQueueLagReporter())
+
 logger.info(
   {
     bullmq: shouldUseBullmq(),
@@ -30,3 +34,11 @@ function shutdown(signal: string) {
 
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'uncaughtException in parse worker')
+  void captureException(err, { source: 'uncaughtException' })
+})
+process.on('unhandledRejection', (err) => {
+  logger.error({ err }, 'unhandledRejection in parse worker')
+  void captureException(err, { source: 'unhandledRejection' })
+})

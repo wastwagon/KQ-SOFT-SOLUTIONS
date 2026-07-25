@@ -57,6 +57,31 @@ export default function AdminGenerationSettings() {
     },
   })
 
+  type RetentionPreview = {
+    dryRun: boolean
+    retentionYears: number
+    cutoffIso: string
+    eligibleProjects: number
+    deletedProjects: number
+    filesRemoved: number
+  }
+
+  const retentionPreview = useMutation({
+    mutationFn: () =>
+      api(`/admin/retention?years=${form.dataRetentionYears}`) as Promise<RetentionPreview>,
+  })
+
+  const retentionExecute = useMutation({
+    mutationFn: () =>
+      api('/admin/retention', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true, retentionYears: form.dataRetentionYears }),
+      }) as Promise<RetentionPreview>,
+    onSuccess: () => {
+      retentionPreview.reset()
+    },
+  })
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     updateMutation.mutate(form)
@@ -292,8 +317,59 @@ export default function AdminGenerationSettings() {
               className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Policy for audit/data retention (documentation). Actual deletion not implemented.
+              Completed/approved projects older than this (by reconciliation date, else last update) are
+              eligible for permanent delete via prune. Preview with dry-run first.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={retentionPreview.isPending || retentionExecute.isPending}
+                onClick={() => retentionPreview.mutate()}
+              >
+                {retentionPreview.isPending ? 'Previewing…' : 'Preview prune (dry-run)'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                disabled={
+                  retentionExecute.isPending ||
+                  !retentionPreview.data ||
+                  retentionPreview.data.eligibleProjects === 0
+                }
+                onClick={() => {
+                  const n = retentionPreview.data?.eligibleProjects ?? 0
+                  if (
+                    !window.confirm(
+                      `Permanently delete ${n} completed/approved project(s) and their upload files? This cannot be undone.`
+                    )
+                  ) {
+                    return
+                  }
+                  retentionExecute.mutate()
+                }}
+              >
+                {retentionExecute.isPending ? 'Deleting…' : 'Run prune (confirm)'}
+              </Button>
+            </div>
+            {retentionPreview.data && (
+              <p className="mt-2 text-xs text-gray-600">
+                Dry-run: {retentionPreview.data.eligibleProjects} eligible · cutoff{' '}
+                {new Date(retentionPreview.data.cutoffIso).toLocaleDateString()} · retention{' '}
+                {retentionPreview.data.retentionYears}y
+              </p>
+            )}
+            {retentionExecute.data && !retentionExecute.data.dryRun && (
+              <p className="mt-1 text-xs text-green-700">
+                Deleted {retentionExecute.data.deletedProjects} project(s), removed{' '}
+                {retentionExecute.data.filesRemoved} file(s).
+              </p>
+            )}
+            {(retentionPreview.error || retentionExecute.error) && (
+              <p className="mt-1 text-xs text-red-600">
+                {((retentionPreview.error || retentionExecute.error) as Error).message}
+              </p>
+            )}
           </div>
 
           <div>

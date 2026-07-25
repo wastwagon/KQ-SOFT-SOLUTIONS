@@ -65,11 +65,19 @@
 
 ### Phase 6 — Launch
 - [x] Unit tests (Vitest — matching, Ghana bank parsers)
-- [ ] End-to-end (browser) testing
+- [x] Public Privacy + Terms pages (footer + register links)
+- [x] Data retention prune (dry-run + execute; admin + CLI)
+- [x] UsageLog unique constraint + upsert
+- [x] Playwright smoke E2E (public pages + optional auth via E2E_EMAIL/PASSWORD)
+- [x] Suggested journals CSV export
+- [x] Optional S3-compatible upload storage
+- [x] Optional Sentry + parse-queue lag metrics
+- [ ] Authenticated E2E (upload → map → reconcile → export)
 - [ ] Performance tuning
-- [ ] Documentation
-- [ ] Coolify deployment
-- [ ] Monitoring, alerts
+- [ ] Documentation refresh (STATUS / stale gap docs)
+- [x] Coolify deployment (production live)
+- [ ] Monitoring alerts wired to Pager/Slack (Sentry + Prometheus gauges ready)
+- [ ] MFA (deferred)
 
 ---
 

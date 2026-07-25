@@ -423,6 +423,7 @@ model UsageLog {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@unique([organizationId, period])
   @@map("usage_logs")
 }
 

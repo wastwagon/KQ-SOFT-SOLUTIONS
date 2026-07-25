@@ -40,6 +40,11 @@ import { httpLogger, logger, REQUEST_ID_HEADER } from './middleware/logging.js';
 import { livenessHandler, readinessHandler } from './middleware/readiness.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import metricsScrapeRoutes from './routes/metricsScrape.js';
+import { initSentry } from './lib/sentry.js';
+import { startParseQueueLagReporter } from './lib/parseQueueLag.js';
+import { resolveCorsOrigins } from './lib/corsOrigins.js';
+
+void initSentry('brs-api').then(() => startParseQueueLagReporter())
 
 const app = express();
 const PORT = process.env.PORT || 9001;
@@ -67,35 +72,41 @@ app.use((req, res, next) => {
   next()
 })
 
-const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) || [];
 const devOrigins = [
   'http://localhost:9000',
   'http://localhost:9100',
   'http://127.0.0.1:9000',
   'http://127.0.0.1:9100',
-];
-// In production we only allow explicitly configured origins. In development we
-// also allow the default Vite/Express ports for local work.
-const allowedOrigins = (isProd ? [...corsOrigins] : [...devOrigins, ...corsOrigins]).filter(Boolean) as string[];
-if (isProd && corsOrigins.length === 0) {
+]
+const { origins: allowedOrigins, source: corsSource } = resolveCorsOrigins({
+  isProd,
+  extraOrigins: isProd ? [] : devOrigins,
+})
+if (allowedOrigins.length === 0) {
   console.error(
-    'FATAL: CORS_ORIGIN must list the SPA origin(s) in production (comma-separated), e.g. https://kqsoftwaresolutions.com — browser requests from the web app will fail CORS without it.',
-  );
-  process.exit(1);
+    'FATAL: No CORS origins resolved. Set CORS_ORIGIN or APP_URL to your SPA URL(s), e.g. https://kqsoftwaresolutions.com',
+  )
+  process.exit(1)
 }
+if (isProd && corsSource === 'prod_fallback') {
+  console.warn(
+    'WARN: CORS_ORIGIN/APP_URL unset — using kqsoftwaresolutions.com defaults. Set CORS_ORIGIN explicitly in Coolify.',
+  )
+}
+logger.info({ corsSource, allowedOrigins }, 'CORS allow-list ready')
 
 app.use(cors({
   origin: (origin, cb) => {
     // Same-origin / non-browser callers (origin === undefined) are always allowed.
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, origin);
-    return cb(null, false);
+    if (!origin) return cb(null, true)
+    if (allowedOrigins.includes(origin)) return cb(null, origin)
+    return cb(null, false)
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', REQUEST_ID_HEADER],
   exposedHeaders: [REQUEST_ID_HEADER],
-}));
+}))
 // Paystack webhook — no auth; must be before subscription router
 app.post('/api/v1/subscription/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => {
   try {

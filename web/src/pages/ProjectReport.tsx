@@ -235,6 +235,25 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       await downloadAllSupportingDocuments()
       return
     }
+    if (value === 'journals') {
+      setExportError('')
+      setExporting(true)
+      try {
+        await report.exportSuggestedJournals(projectId, {
+          bankAccountId: bankAccountId || undefined,
+        })
+        toast.success('Suggested journals ready', 'CSV download should start automatically.')
+      } catch (err) {
+        unlessSubscriptionInactive(err, (e) => {
+          const msg = e instanceof Error ? e.message : 'Export failed'
+          setExportError(msg)
+          toast.error('Export failed', msg)
+        })
+      } finally {
+        setExporting(false)
+      }
+      return
+    }
     const parts = value.split(':')
     if (parts.length !== 2) return
     const fmt = parts[0] as 'excel' | 'pdf'
@@ -595,13 +614,19 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             value={displayCurrency}
             onChange={(e) => setDisplayCurrency(e.target.value as 'GHS' | 'USD' | 'EUR' | '')}
             className="min-h-[40px] rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium text-gray-900 outline-none transition-all focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500"
-            title="Display amounts in another currency (converted for display only)"
+            title="Preview amounts in another currency. Matching and Excel/PDF exports stay in the project currency."
           >
             <option value="">Display: {currency}</option>
             {currency !== 'GHS' && <option value="GHS">Display: GHS</option>}
             {currency !== 'USD' && <option value="USD">Display: USD</option>}
             {currency !== 'EUR' && <option value="EUR">Display: EUR</option>}
           </select>
+          {effectiveDisplayCurrency !== currency && (
+            <span className="text-xs text-gray-500 max-w-[14rem]">
+              Preview only · exports stay in {currency}
+              {ratesData?.attribution ? ` · ${ratesData.attribution}` : ''}
+            </span>
+          )}
           {ecobankBrsProfile && (
             <div className="inline-flex min-h-[40px] flex-col justify-center gap-0.5 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
               <label
@@ -676,6 +701,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <optgroup label="PDF">
                     <option value="pdf:full">Full report (BRS, notes, audit)</option>
                     <option value="pdf:brs_only">BRS statement & sign-off only</option>
+                  </optgroup>
+                  <optgroup label="Accounting">
+                    <option value="journals">Suggested journals (CSV)</option>
                   </optgroup>
                 </>
               )}

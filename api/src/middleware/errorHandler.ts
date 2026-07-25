@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { ZodError } from 'zod'
 import { REQUEST_ID_HEADER } from './logging.js'
 import { resolveMaxUploadSizeMb } from '../config/importLimits.js'
+import { captureException } from '../lib/sentry.js'
 
 /**
  * Central error handler.  Replaces the inline handler in `index.ts` and adds:
@@ -102,6 +103,10 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   let status = 500
   if (/file type|not allowed/i.test(message)) status = 400
   else if (code === 'LIMIT_FILE_SIZE' || /too large/i.test(message)) status = 413
+
+  if (status >= 500) {
+    void captureException(err, { requestId, path: req.path, method: req.method })
+  }
 
   res.status(status).json({
     error: status >= 500 && isProd ? 'Internal server error' : message,

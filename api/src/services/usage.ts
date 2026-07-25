@@ -9,16 +9,15 @@ function currentPeriod(): string {
   return `${year}-${month}`
 }
 
+/** Upsert monthly usage row — safe under concurrent create/increment. */
 export async function getOrCreateUsage(organizationId: string, period: string) {
-  let log = await prisma.usageLog.findFirst({
-    where: { organizationId, period },
+  return prisma.usageLog.upsert({
+    where: {
+      organizationId_period: { organizationId, period },
+    },
+    create: { organizationId, period, projectsCount: 0, transactionsCount: 0 },
+    update: {},
   })
-  if (!log) {
-    log = await prisma.usageLog.create({
-      data: { organizationId, period, projectsCount: 0, transactionsCount: 0 },
-    })
-  }
-  return log
 }
 
 export async function getUsageWithLimits(organizationId: string, planSlug: string) {
@@ -66,10 +65,10 @@ export async function canAddTransactions(
 
 export async function incrementProjects(organizationId: string): Promise<void> {
   const period = currentPeriod()
-  const log = await getOrCreateUsage(organizationId, period)
+  await getOrCreateUsage(organizationId, period)
   await prisma.usageLog.update({
-    where: { id: log.id },
-    data: { projectsCount: log.projectsCount + 1 },
+    where: { organizationId_period: { organizationId, period } },
+    data: { projectsCount: { increment: 1 } },
   })
 }
 
@@ -83,8 +82,15 @@ export async function adjustTransactions(organizationId: string, delta: number):
   if (delta === 0) return
   const period = currentPeriod()
   const log = await getOrCreateUsage(organizationId, period)
+  if (delta > 0) {
+    await prisma.usageLog.update({
+      where: { organizationId_period: { organizationId, period } },
+      data: { transactionsCount: { increment: delta } },
+    })
+    return
+  }
   await prisma.usageLog.update({
-    where: { id: log.id },
+    where: { organizationId_period: { organizationId, period } },
     data: { transactionsCount: Math.max(0, log.transactionsCount + delta) },
   })
 }

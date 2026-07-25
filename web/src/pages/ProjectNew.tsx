@@ -352,7 +352,8 @@ export default function ProjectNew() {
             maxLength={8}
           />
           <p className={hintClass}>
-            Reporting currency for this BRS (no FX conversion). Subscription is billed in <strong>GHS</strong> via
+            Reporting currency for matching and exports. On the Report step you can preview totals in
+            USD/EUR (display only). Subscription is billed in <strong>GHS</strong> via
             Paystack — see{' '}
             <Link to="/settings/billing" className="font-medium text-primary-600 hover:underline">
               Settings → Billing

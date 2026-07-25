@@ -125,8 +125,17 @@ Set these in Coolify for the **stack** (or per-service, depending on Coolify):
 | Variable | Purpose |
 |----------|---------|
 | `JWT_SECRET` | Strong secret (32+ characters). Required in production. |
-| `VITE_API_URL` | **Public** API base URL **without** trailing slash, e.g. `https://api.yourdomain.com`. Baked into the web build. |
-| `CORS_ORIGIN` | **Public** web app URL(s), comma-separated, e.g. `https://app.yourdomain.com`. |
+| `VITE_API_URL` | **Public** API base URL **without** trailing slash, e.g. `https://api.kqsoftwaresolutions.com`. Baked into the web build. |
+| `CORS_ORIGIN` | **Public** web app URL(s), comma-separated, e.g. `https://kqsoftwaresolutions.com,https://www.kqsoftwaresolutions.com`. Compose defaults to that if unset. |
+
+### Browser shows “CORS” but API returns 503 / `no available server`
+
+That message is from **Traefik/Coolify**, not Express. The API container is **not running or not healthy**, so the proxy never reaches CORS middleware. Chrome reports it as CORS because the 503 has no `Access-Control-Allow-Origin`.
+
+1. Coolify → **api** service → **Logs** (not web).
+2. Fix crash loops: missing/weak `JWT_SECRET`, failed migrations, OOM, etc.
+3. Confirm `CORS_ORIGIN` includes `https://kqsoftwaresolutions.com` (and `www` if used).
+4. Redeploy **api**; verify `curl -s https://api.kqsoftwaresolutions.com/healthz` returns JSON `ok`, not `no available server`.
 
 ## 4. Domains and ports
 

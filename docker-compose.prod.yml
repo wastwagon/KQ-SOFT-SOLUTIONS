@@ -43,10 +43,10 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/brs_db
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://kqsoftwaresolutions.com,https://www.kqsoftwaresolutions.com}
       UPLOAD_DIR: /app/uploads
       API_BASE_URL: ${API_BASE_URL:-}
-      APP_URL: ${APP_URL:-}
+      APP_URL: ${APP_URL:-https://kqsoftwaresolutions.com}
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_WEBHOOK_SECRET: ${PAYSTACK_WEBHOOK_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}

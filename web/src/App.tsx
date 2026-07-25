@@ -36,6 +36,8 @@ const Settings = lazy(() => import('./pages/Settings'))
 const UserManual = lazy(() => import('./pages/UserManual'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const Terms = lazy(() => import('./pages/Terms'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 const queryClient = new QueryClient({
@@ -74,6 +76,8 @@ function App() {
                   <Route path="/register" element={<Register />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
 
                   {/* Platform admin */}
                   <Route path="/platform-admin" element={<ProtectedRoute><PlatformAdminRoute><AdminLayout /></PlatformAdminRoute></ProtectedRoute>}>
