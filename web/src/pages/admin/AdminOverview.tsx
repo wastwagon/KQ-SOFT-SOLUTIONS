@@ -11,6 +11,8 @@ import {
   Archive,
   Settings,
   Inbox,
+  Landmark,
+  FileSpreadsheet,
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import PageHeader from '../../components/layout/PageHeader'
@@ -48,6 +50,18 @@ export default function AdminOverview() {
   ]
 
   const quickLinks = [
+    {
+      to: '/platform-admin/tools/clean-bank-statement',
+      label: 'Clean bank statement',
+      hint: 'Parse PDF/Excel → download cleaned files',
+      icon: Landmark,
+    },
+    {
+      to: '/platform-admin/tools/clean-cash-book',
+      label: 'Clean cash book',
+      hint: 'Normalise cash book → download cleaned files',
+      icon: FileSpreadsheet,
+    },
     {
       to: '/platform-admin/leads',
       label: 'Leads inbox',

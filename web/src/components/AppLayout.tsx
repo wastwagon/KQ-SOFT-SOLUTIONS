@@ -16,6 +16,7 @@ import {
   Landmark,
   Plus,
   Radio,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { settings, getLogoDisplayUrl, subscription } from '../lib/api'
@@ -88,6 +89,7 @@ export default function AppLayout() {
     path.startsWith('/clients/') ||
     path === '/reports' ||
     path.startsWith('/reports/')
+  const toolsActive = path === '/tools' || path.startsWith('/tools/')
   const settingsActive = path === '/settings' || path.startsWith('/settings/')
   const complianceActive =
     path === '/audit' || path.startsWith('/audit/') || path === '/manual' || path.startsWith('/manual/')
@@ -173,6 +175,17 @@ export default function AppLayout() {
           <NavLink to="/reports" onClick={closeSidebar} className={sidebarNavLinkClass}>
             <FileText className="w-5 h-5 flex-shrink-0 opacity-80" />
             Reports
+          </NavLink>
+        </SidebarNavSection>
+
+        <SidebarNavSection label="Tools" active={toolsActive}>
+          <NavLink to="/tools/clean-bank-statement" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Landmark className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Clean bank statement
+          </NavLink>
+          <NavLink to="/tools/clean-cash-book" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <FileSpreadsheet className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Clean cash book
           </NavLink>
         </SidebarNavSection>
 

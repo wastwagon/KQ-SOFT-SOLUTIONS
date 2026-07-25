@@ -1055,3 +1055,52 @@ export function uploadBankStatement(
     return data
   })
 }
+
+export type CleanToolKind = 'bank-statement' | 'cash-book'
+
+export type CleanPreviewResult = {
+  kind: string
+  source: string
+  parseMethod: string | null
+  headers: string[]
+  rowCount: number
+  sumDebit: number
+  sumCredit: number
+  sampleRows: unknown[][]
+}
+
+function cleanToolPath(kind: CleanToolKind): string {
+  return kind === 'cash-book' ? '/tools/clean-cash-book' : '/tools/clean-bank-statement'
+}
+
+export const cleanTools = {
+  preview: async (kind: CleanToolKind, file: File): Promise<CleanPreviewResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const token = getToken()
+    const res = await fetch(`${API_URL}/api/v1${cleanToolPath(kind)}?format=json`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throwFromFailedResponse(res, data)
+    return data as CleanPreviewResult
+  },
+  download: async (kind: CleanToolKind, file: File, format: 'xlsx' | 'pdf'): Promise<Blob> => {
+    const form = new FormData()
+    form.append('file', file)
+    const token = getToken()
+    const res = await fetch(`${API_URL}/api/v1${cleanToolPath(kind)}?format=${format}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throwFromFailedResponse(res, data)
+    }
+    return res.blob()
+  },
+}
+

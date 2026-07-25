@@ -14,6 +14,8 @@ import {
   Activity,
   Archive,
   Inbox,
+  Landmark,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import BrandLogo from './BrandLogo'
@@ -56,6 +58,7 @@ export default function AdminLayout() {
     path.startsWith('/platform-admin/ops-metrics') ||
     path.startsWith('/platform-admin/retention') ||
     path.startsWith('/platform-admin/leads')
+  const toolsActive = path.startsWith('/platform-admin/tools')
 
   const sidebar = (
     <>
@@ -143,6 +146,25 @@ export default function AdminLayout() {
           <NavLink to="/platform-admin/database" onClick={closeSidebar} className={sidebarNavLinkClass}>
             <Server className="w-5 h-5 flex-shrink-0 opacity-80" />
             Database
+          </NavLink>
+        </SidebarNavSection>
+
+        <SidebarNavSection label="Tools" active={toolsActive}>
+          <NavLink
+            to="/platform-admin/tools/clean-bank-statement"
+            onClick={closeSidebar}
+            className={sidebarNavLinkClass}
+          >
+            <Landmark className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Clean bank statement
+          </NavLink>
+          <NavLink
+            to="/platform-admin/tools/clean-cash-book"
+            onClick={closeSidebar}
+            className={sidebarNavLinkClass}
+          >
+            <FileSpreadsheet className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Clean cash book
           </NavLink>
         </SidebarNavSection>
       </nav>

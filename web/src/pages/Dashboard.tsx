@@ -15,6 +15,7 @@ import {
   Key,
   Landmark,
   Shield,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { projects, subscription, settings as settingsApi, isSubscriptionInactiveError } from '../lib/api'
 import { useAuth } from '../store/auth'
@@ -443,6 +444,39 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      <Card title="Clean & export tools" className="shadow-sm">
+        <p className="text-sm text-gray-600 mb-5">
+          Parse a bank statement or cash book and download a cleaned Excel or PDF — no reconciliation
+          project needed.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            to="/tools/clean-bank-statement"
+            className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+              <Landmark className="w-4 h-4" aria-hidden />
+            </span>
+            <span className="font-semibold tracking-tight text-gray-900">Clean bank statement</span>
+            <span className="text-xs text-gray-500 leading-snug">
+              Upload PDF/Excel → download cleaned PDF &amp; Excel
+            </span>
+          </Link>
+          <Link
+            to="/tools/clean-cash-book"
+            className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+              <FileSpreadsheet className="w-4 h-4" aria-hidden />
+            </span>
+            <span className="font-semibold tracking-tight text-gray-900">Clean cash book</span>
+            <span className="text-xs text-gray-500 leading-snug">
+              Upload cash book → download cleaned PDF &amp; Excel
+            </span>
+          </Link>
+        </div>
+      </Card>
 
       {isAdmin && (
         <Card title="Manage app & settings" className="shadow-sm">

@@ -15,6 +15,7 @@ export type AuditAction =
   | 'attachment_uploaded'
   | 'attachment_deleted'
   | 'reconciliation_undone'
+  | 'tools_clean_export'
 
 export async function logAudit(params: {
   organizationId: string

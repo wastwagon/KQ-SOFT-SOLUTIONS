@@ -33,6 +33,8 @@ const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
 const ProjectNew = lazy(() => import('./pages/ProjectNew'))
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
+const CleanBankStatement = lazy(() => import('./pages/CleanBankStatement'))
+const CleanCashBook = lazy(() => import('./pages/CleanCashBook'))
 const Audit = lazy(() => import('./pages/Audit'))
 const Clients = lazy(() => import('./pages/Clients'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -102,6 +104,8 @@ function App() {
                     <Route path="leads" element={<AdminLeads />} />
                     <Route path="retention" element={<AdminRetention />} />
                     <Route path="database" element={<AdminDatabase />} />
+                    <Route path="tools/clean-bank-statement" element={<CleanBankStatement />} />
+                    <Route path="tools/clean-cash-book" element={<CleanCashBook />} />
                   </Route>
 
                   {/* Authenticated app — /dashboard is the default after login. */}
@@ -110,6 +114,8 @@ function App() {
                     <Route path="/projects" element={<Projects />} />
                     <Route path="/projects/new" element={<ProjectNew />} />
                     <Route path="/projects/:slug" element={<ProjectDetail />} />
+                    <Route path="/tools/clean-bank-statement" element={<CleanBankStatement />} />
+                    <Route path="/tools/clean-cash-book" element={<CleanCashBook />} />
                     <Route path="/reports" element={<Projects initialStatus="completed" />} />
                     <Route path="/audit" element={<Audit />} />
                     <Route path="/clients" element={<Clients />} />
