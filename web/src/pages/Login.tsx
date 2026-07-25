@@ -4,13 +4,9 @@ import { Mail } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
-import AuthLayout, {
-  authAlertErrorClass,
-  authAlertWarnClass,
-  authFieldClass,
-  authLabelClass,
-  authPrimaryButtonClass,
-} from '../components/AuthLayout'
+import AuthLayout, { authAlertErrorClass, authAlertWarnClass } from '../components/AuthLayout'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
 import { useToast } from '../components/ui/Toast'
 
 export default function Login() {
@@ -95,24 +91,17 @@ export default function Login() {
           </div>
         )}
 
-        <div>
-          <label htmlFor="login-email" className={authLabelClass}>
-            Email
-          </label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className={`${authFieldClass} pl-11`}
-              placeholder="you@firm.com"
-            />
-          </div>
-        </div>
+        <Input
+          id="login-email"
+          type="email"
+          autoComplete="email"
+          label="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@firm.com"
+          leading={<Mail className="h-[18px] w-[18px]" aria-hidden />}
+        />
 
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -135,9 +124,9 @@ export default function Login() {
           />
         </div>
 
-        <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+        <Button type="submit" size="lg" className="w-full font-semibold shadow-lg shadow-primary-600/25" isLoading={loading} disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
-        </button>
+        </Button>
 
         <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
           Don&apos;t have an account?{' '}

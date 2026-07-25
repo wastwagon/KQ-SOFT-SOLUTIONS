@@ -2,11 +2,8 @@ import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
-import AuthLayout, {
-  authAlertErrorClass,
-  authLabelClass,
-  authPrimaryButtonClass,
-} from '../components/AuthLayout'
+import AuthLayout, { authAlertErrorClass } from '../components/AuthLayout'
+import Button from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
 
 export default function ResetPassword() {
@@ -82,35 +79,33 @@ export default function ResetPassword() {
                 {error}
               </div>
             )}
-            <div>
-              <label htmlFor="reset-password" className={authLabelClass}>
-                New password
-              </label>
-              <PasswordInput
-                id="reset-password"
-                value={password}
-                onChange={setPassword}
-                autoComplete="new-password"
-                placeholder="At least 6 characters"
-                minLength={6}
-              />
-            </div>
-            <div>
-              <label htmlFor="reset-confirm" className={authLabelClass}>
-                Confirm password
-              </label>
-              <PasswordInput
-                id="reset-confirm"
-                value={confirm}
-                onChange={setConfirm}
-                autoComplete="new-password"
-                placeholder="Repeat new password"
-                minLength={6}
-              />
-            </div>
-            <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+            <PasswordInput
+              id="reset-password"
+              label="New password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              placeholder="At least 6 characters"
+              minLength={6}
+            />
+            <PasswordInput
+              id="reset-confirm"
+              label="Confirm password"
+              value={confirm}
+              onChange={setConfirm}
+              autoComplete="new-password"
+              placeholder="Repeat new password"
+              minLength={6}
+            />
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full font-semibold shadow-lg shadow-primary-600/25"
+              isLoading={loading}
+              disabled={loading}
+            >
               {loading ? 'Updating…' : 'Update password'}
-            </button>
+            </Button>
           </>
         )}
 

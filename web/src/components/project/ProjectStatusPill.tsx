@@ -54,8 +54,8 @@ const STATUS_VISUALS: Record<string, StatusVisual> = {
   submitted_for_review: {
     label: 'Submitted for review',
     Icon: Eye,
-    className: 'bg-purple-50 text-purple-700 ring-purple-100',
-    dotColor: 'bg-purple-500',
+    className: 'bg-primary-50 text-primary-800 ring-primary-100',
+    dotColor: 'bg-primary-600',
   },
   approved: {
     label: 'Approved',

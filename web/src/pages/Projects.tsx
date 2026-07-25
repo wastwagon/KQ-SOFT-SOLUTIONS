@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { X, FolderKanban, ChevronRight } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { projects, clients, subscription, isSubscriptionInactiveError } from '../lib/api'
@@ -9,6 +9,9 @@ import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
@@ -31,6 +34,7 @@ type ProjectsProps = { initialStatus?: string }
 
 export default function Projects({ initialStatus }: ProjectsProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const role = useAuth((s) => s.role)
   const org = useAuth((s) => s.org)
   /** `/reports` renders this page with completed status pre-selected */
@@ -156,12 +160,9 @@ export default function Projects({ initialStatus }: ProjectsProps) {
         }
         actions={
           canCreateProject(role) ? (
-            <Link
-              to="/projects/new"
-              className="inline-flex items-center justify-center font-medium px-4 py-2.5 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-all"
-            >
+            <Button type="button" onClick={() => navigate('/projects/new')}>
               + New project
-            </Link>
+            </Button>
           ) : undefined
         }
       />
@@ -208,33 +209,37 @@ export default function Projects({ initialStatus }: ProjectsProps) {
 
       {/* Search & filter bar */}
       <div className="flex flex-wrap gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
-        <input
-          type="search"
-          placeholder="Search by project name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0 sm:min-w-[200px] px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50/50 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white transition-colors"
-        />
+        <div className="flex-1 min-w-0 sm:min-w-[200px]">
+          <Input
+            type="search"
+            placeholder="Search by project name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search projects"
+          />
+        </div>
         {features.multi_client ? (
-          <select
-            value={clientFilter}
-            onChange={(e) => {
-              const id = e.target.value
-              setClientFilter(id)
-              setSearchParams((prev) => {
-                const p = new URLSearchParams(prev)
-                if (id) p.set('clientId', id)
-                else p.delete('clientId')
-                return p
-              })
-            }}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50/50 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors min-h-[44px]"
-          >
-            <option value="">All clients</option>
-            {(clientsList as { id: string; name: string }[]).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <div className="w-full sm:w-56">
+            <Select
+              value={clientFilter}
+              onChange={(e) => {
+                const id = e.target.value
+                setClientFilter(id)
+                setSearchParams((prev) => {
+                  const p = new URLSearchParams(prev)
+                  if (id) p.set('clientId', id)
+                  else p.delete('clientId')
+                  return p
+                })
+              }}
+              aria-label="Filter by client"
+            >
+              <option value="">All clients</option>
+              {(clientsList as { id: string; name: string }[]).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </div>
         ) : (
           <span className="px-4 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-lg bg-gray-50" title="Filter by client requires Firm plan">
             Filter by client (Firm)
@@ -245,27 +250,23 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       {/* Projects table */}
       <Card noPadding className="overflow-hidden rounded-xl border-gray-200 shadow-sm">
         {isLoading ? (
-          <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-surface border-b border-border">
+          <Table>
+            <TableHead>
               <tr>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                {isReportsView && (
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">BRS tie-out</th>
-                )}
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                <TableTh>Project</TableTh>
+                <TableTh>Client</TableTh>
+                <TableTh>Status</TableTh>
+                {isReportsView && <TableTh>BRS tie-out</TableTh>}
+                <TableTh>Created</TableTh>
+                <TableTh className="text-right">Action</TableTh>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted bg-white">
+            </TableHead>
+            <TableBody>
               {[1, 2, 3, 4, 5].map((i) => (
                 <TableRowSkeleton key={i} cols={isReportsView ? 6 : 5} />
               ))}
-            </tbody>
-          </table>
-          </div>
+            </TableBody>
+          </Table>
         ) : filtered.length === 0 ? (
           projectsList.length === 0 ? (
             <div className="py-12">
@@ -309,39 +310,34 @@ export default function Projects({ initialStatus }: ProjectsProps) {
             </div>
           )
         ) : (
-          <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-surface border-b border-border">
+          <Table>
+            <TableHead>
               <tr>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                {isReportsView && (
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">BRS tie-out</th>
-                )}
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                <TableTh>Project</TableTh>
+                <TableTh>Client</TableTh>
+                <TableTh>Status</TableTh>
+                {isReportsView && <TableTh>BRS tie-out</TableTh>}
+                <TableTh>Created</TableTh>
+                <TableTh className="text-right">Action</TableTh>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted bg-white">
+            </TableHead>
+            <TableBody>
               {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50/90 transition-colors">
-                  <td className="px-6 py-4">
+                <TableRow key={p.id}>
+                  <TableTd>
                     <p className="font-medium text-gray-900">{p.name}</p>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{p.client?.name || '—'}</td>
-                  <td className="px-6 py-4">
+                  </TableTd>
+                  <TableTd className="text-gray-500">{p.client?.name || '—'}</TableTd>
+                  <TableTd>
                     <ProjectStatusPill status={p.status} size="sm" />
-                  </td>
+                  </TableTd>
                   {isReportsView && (
-                    <td className="px-6 py-4">
+                    <TableTd>
                       <BrsVarianceBadge projectId={p.id} />
-                    </td>
+                    </TableTd>
                   )}
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {formatDate(p.createdAt)}
-                  </td>
-                  <td className="px-6 py-4 text-right">
+                  <TableTd className="text-gray-500">{formatDate(p.createdAt)}</TableTd>
+                  <TableTd className="text-right">
                     <Link
                       to={`/projects/${p.slug ?? p.id}`}
                       onMouseEnter={preloadProjectDetailPage}
@@ -353,12 +349,11 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                         : 'Resume'}
                       <ChevronRight className="w-4 h-4 opacity-70 group-hover/link:translate-x-0.5 transition-transform" aria-hidden />
                     </Link>
-                  </td>
-                </tr>
+                  </TableTd>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-          </div>
+            </TableBody>
+          </Table>
         )}
       </Card>
 

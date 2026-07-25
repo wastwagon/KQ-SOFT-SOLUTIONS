@@ -2,12 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import { auth } from '../lib/api'
-import AuthLayout, {
-  authAlertErrorClass,
-  authFieldClass,
-  authLabelClass,
-  authPrimaryButtonClass,
-} from '../components/AuthLayout'
+import AuthLayout, { authAlertErrorClass } from '../components/AuthLayout'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
 import { useToast } from '../components/ui/Toast'
 
 export default function ForgotPassword() {
@@ -66,27 +63,26 @@ export default function ForgotPassword() {
             <p className="text-sm text-gray-600 leading-relaxed">
               Enter the email you use for KQ-SOFT. The link expires after a short time for security.
             </p>
-            <div>
-              <label htmlFor="forgot-email" className={authLabelClass}>
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-                <input
-                  id="forgot-email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className={`${authFieldClass} pl-11`}
-                  placeholder="you@firm.com"
-                />
-              </div>
-            </div>
-            <button type="submit" disabled={loading} className={authPrimaryButtonClass}>
+            <Input
+              id="forgot-email"
+              type="email"
+              autoComplete="email"
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="you@firm.com"
+              leading={<Mail className="h-[18px] w-[18px]" aria-hidden />}
+            />
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full font-semibold shadow-lg shadow-primary-600/25"
+              isLoading={loading}
+              disabled={loading}
+            >
               {loading ? 'Sending…' : 'Send reset link'}
-            </button>
+            </Button>
             <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
               <Link
                 to="/login"

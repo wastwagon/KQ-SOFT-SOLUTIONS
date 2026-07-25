@@ -1,4 +1,5 @@
 import { Link as LinkIcon } from 'lucide-react'
+import Button from '../ui/Button'
 
 /**
  * Floating bottom-of-viewport action bar shown while there's a valid
@@ -27,7 +28,7 @@ export default function MatchActionBar({
       aria-label="Confirm reconcile match"
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300"
     >
-      <div className="flex items-center gap-6 border border-gray-800 bg-gray-900 bg-opacity-90 p-2 pl-6 text-white shadow-2xl backdrop-blur-md rounded-xl">
+      <div className="flex items-center gap-6 border border-gray-800 bg-gray-900/90 p-2 pl-6 text-white shadow-2xl backdrop-blur-md rounded-xl">
         <div className="flex items-center gap-4 py-2">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -40,31 +41,28 @@ export default function MatchActionBar({
         </div>
         <div className="h-8 w-px bg-gray-800" aria-hidden="true" />
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClear}
-            className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white transition-colors"
+            className="text-gray-300 hover:text-white hover:bg-white/10"
           >
             Clear
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isPending}
-            className="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-primary-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all flex items-center gap-2"
-          >
+          </Button>
+          <Button type="button" size="sm" onClick={onConfirm} disabled={isPending}>
             {isPending ? (
               <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
                 Matching…
               </>
             ) : (
               <>
-                <LinkIcon className="w-4 h-4" />
+                <LinkIcon className="w-4 h-4 mr-2" aria-hidden />
                 Confirm Match
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

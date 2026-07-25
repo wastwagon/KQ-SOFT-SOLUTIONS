@@ -13,6 +13,7 @@ import { RECONCILE_CLIENT_LIMIT } from '../lib/importLimits'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
+import Button from '../components/ui/Button'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 
 /**
@@ -266,7 +267,7 @@ export default function ProjectReconcile({
       )}
 
       {data.sideInversion?.inverted && canReconcile && (
-        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950 max-w-2xl">
+        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-950 max-w-2xl">
           <strong>Cash-book side inversion detected</strong> — this ERP export appears to flip bank
           sides (receipts line up with bank debits, payments with bank credits). Suggestions are
           paired on the crossed sides automatically. {data.sideInversion.reason}
@@ -383,14 +384,10 @@ export default function ProjectReconcile({
               BRS report.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onProceedToReview}
-            className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold shadow-lg hover:bg-gray-800 hover:shadow-xl active:scale-[0.98] transition-all flex items-center gap-2"
-          >
+          <Button type="button" onClick={onProceedToReview} className="bg-gray-900 hover:bg-gray-800 focus:ring-gray-700">
             Proceed to Review
-            <ArrowRight className="w-4 h-4" />
-          </button>
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
         </div>
       )}
     </div>

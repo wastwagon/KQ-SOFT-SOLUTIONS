@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   FileCheck,
   FolderKanban,
@@ -24,6 +24,8 @@ import MetricCard from '../components/ui/MetricCard'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
@@ -39,6 +41,7 @@ const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
 
 export default function Dashboard() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const role = useAuth((s) => s.role)
   const org = useAuth((s) => s.org)
   const isAdmin = useAuth((s) => s.isAdmin())
@@ -171,25 +174,22 @@ export default function Dashboard() {
         }
         actions={
           <>
-            <Link
-              to="/manual"
-              className="inline-flex items-center justify-center font-medium px-4 py-2 text-sm rounded-xl border border-primary-200 bg-white text-primary-700 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 shadow-sm transition-colors"
-            >
+            <Button variant="outline" type="button" onClick={() => navigate('/manual')}>
               Help / User Manual
-            </Link>
-            <span
-              className={`px-3 py-1.5 text-xs font-semibold rounded-full tracking-wide ${
+            </Button>
+            <Badge
+              tone={
                 isAdmin
-                  ? 'bg-primary-100 text-primary-800'
+                  ? 'brand'
                   : role === 'reviewer'
-                    ? 'bg-green-100 text-green-800'
+                    ? 'success'
                     : role === 'preparer'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-gray-100 text-gray-800'
-              }`}
+                      ? 'brand'
+                      : 'neutral'
+              }
             >
               {roleLabel}
-            </span>
+            </Badge>
           </>
         }
       />
@@ -345,7 +345,7 @@ export default function Dashboard() {
               value={memberCount}
               sublabel="Active firm accounts"
               icon={<Users />}
-              accent="indigo"
+              accent="brand"
             />
           </>
         )}
@@ -585,19 +585,13 @@ export default function Dashboard() {
         className="shadow-sm"
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link
-              to="/projects"
-              className="inline-flex items-center justify-center font-medium px-3 py-2 text-sm rounded-xl border border-border bg-white text-gray-700 hover:bg-surface shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-colors"
-            >
+            <Button variant="outline" size="sm" type="button" onClick={() => navigate('/projects')}>
               View all
-            </Link>
+            </Button>
             {canCreateProject(role) && (
-              <Link
-                to="/projects/new"
-                className="inline-flex items-center justify-center font-medium px-3 py-2 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500 transition-colors"
-              >
+              <Button size="sm" type="button" onClick={() => navigate('/projects/new')}>
                 + New project
-              </Link>
+              </Button>
             )}
           </div>
         }

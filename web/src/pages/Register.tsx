@@ -4,12 +4,9 @@ import { Building2, Mail, User } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
-import AuthLayout, {
-  authAlertErrorClass,
-  authFieldClass,
-  authLabelClass,
-  authPrimaryButtonClass,
-} from '../components/AuthLayout'
+import AuthLayout, { authAlertErrorClass } from '../components/AuthLayout'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
 import { useToast } from '../components/ui/Toast'
 
 export default function Register() {
@@ -106,85 +103,65 @@ export default function Register() {
         )}
 
         {!joiningOrg && (
-          <div>
-            <label htmlFor="register-org" className={authLabelClass}>
-              Organisation name
-            </label>
-            <div className="relative">
-              <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-              <input
-                id="register-org"
-                type="text"
-                autoComplete="organization"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                required
-                className={`${authFieldClass} pl-11`}
-                placeholder="Your firm or company name"
-              />
-            </div>
-          </div>
+          <Input
+            id="register-org"
+            type="text"
+            autoComplete="organization"
+            label="Organisation name"
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            required
+            placeholder="Your firm or company name"
+            leading={<Building2 className="h-[18px] w-[18px]" aria-hidden />}
+          />
         )}
 
-        <div>
-          <label htmlFor="register-name" className={authLabelClass}>
-            Your name <span className="font-normal text-gray-500">(optional)</span>
-          </label>
-          <div className="relative">
-            <User className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              id="register-name"
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={`${authFieldClass} pl-11`}
-              placeholder="How we’ll greet you in the app"
-            />
-          </div>
-        </div>
+        <Input
+          id="register-name"
+          type="text"
+          autoComplete="name"
+          label={
+            <>
+              Your name <span className="font-normal text-gray-500">(optional)</span>
+            </>
+          }
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="How we’ll greet you in the app"
+          leading={<User className="h-[18px] w-[18px]" aria-hidden />}
+        />
 
-        <div>
-          <label htmlFor="register-email" className={authLabelClass}>
-            Work email
-          </label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              id="register-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              readOnly={joiningOrg}
-              className={`${authFieldClass} pl-11 ${joiningOrg ? 'bg-gray-50' : ''}`}
-              placeholder="you@firm.com"
-            />
-          </div>
-        </div>
+        <Input
+          id="register-email"
+          type="email"
+          autoComplete="email"
+          label="Work email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          readOnly={joiningOrg}
+          className={joiningOrg ? 'bg-gray-50' : ''}
+          placeholder="you@firm.com"
+          leading={<Mail className="h-[18px] w-[18px]" aria-hidden />}
+        />
 
-        <div>
-          <label htmlFor="register-password" className={authLabelClass}>
-            Password
-          </label>
-          <PasswordInput
-            id="register-password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="new-password"
-            placeholder="At least 6 characters"
-            minLength={6}
-          />
-          <p className="mt-1.5 text-xs text-gray-500">
-            Use at least 6 characters. You can change this anytime from your profile.
-          </p>
-        </div>
+        <PasswordInput
+          id="register-password"
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          placeholder="At least 6 characters"
+          minLength={6}
+          hint="Use at least 6 characters. You can change this anytime from your profile."
+        />
 
-        <button
+        <Button
           type="submit"
+          size="lg"
+          className="w-full font-semibold shadow-lg shadow-primary-600/25"
+          isLoading={loading}
           disabled={loading || inviteLoading || (joiningOrg && !inviteOrgName)}
-          className={authPrimaryButtonClass}
         >
           {loading
             ? joiningOrg
@@ -195,7 +172,7 @@ export default function Register() {
               : joiningOrg
                 ? 'Join organisation'
                 : 'Create workspace'}
-        </button>
+        </Button>
 
         <p className="text-center text-xs leading-relaxed text-gray-500">
           By continuing you agree to use KQ-SOFT in line with your organisation’s policies.

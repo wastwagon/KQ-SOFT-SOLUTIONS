@@ -39,8 +39,10 @@ const administrationNavItems = [
 ]
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-    isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+  `flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+    isActive
+      ? 'bg-primary-50 text-primary-700'
+      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
   }`
 
 export default function AppLayout() {
@@ -115,7 +117,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Top header bar: logo + nav + user */}
-      <header className="sticky top-0 z-40 flex items-center h-14 px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur-md border-b border-border shadow-sm supports-[backdrop-filter]:bg-white/90">
+      <header className="sticky top-0 z-40 flex items-center h-16 px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur-md border-b border-border supports-[backdrop-filter]:bg-white/90">
         {/* Logo */}
         <NavLink
           to="/"
@@ -145,8 +147,8 @@ export default function AppLayout() {
           <div className="relative">
             <button
               type="button"
-              className={`flex items-center gap-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                workActive || workMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                workActive || workMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
               onClick={() => {
                 setWorkMenuOpen((v) => !v)
@@ -184,8 +186,8 @@ export default function AppLayout() {
           <div className="relative">
             <button
               type="button"
-              className={`flex items-center gap-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                administrationActive || adminMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                administrationActive || adminMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
               onClick={() => {
                 setAdminMenuOpen((v) => !v)
@@ -224,7 +226,7 @@ export default function AppLayout() {
             <div className="relative">
               <button
                 type="button"
-                className={`flex items-center gap-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                   platformActive || platformMenuOpen ? 'bg-amber-50 text-amber-800' : 'text-amber-800 hover:bg-amber-50'
                 }`}
                 onClick={() => {

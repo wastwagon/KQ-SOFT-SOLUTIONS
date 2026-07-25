@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
@@ -29,6 +29,7 @@ import {
   Zap,
 } from 'lucide-react'
 import BrandLogo from '../components/BrandLogo'
+import Button from '../components/ui/Button'
 import SubscriptionFxReference from '../components/marketing/SubscriptionFxReference'
 import { publicApi } from '../lib/api'
 import { useAuth } from '../store/auth'
@@ -359,6 +360,7 @@ function AnnouncementBar({
  * ------------------------------------------------------------------------- */
 
 function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolean) => void }) {
+  const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   const links: { label: string; href: string }[] = [
     { label: 'Features', href: '#features' },
@@ -392,28 +394,27 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
 
         <div className="hidden md:flex items-center gap-2">
           {isAuthed ? (
-            <Link
-              to="/dashboard"
-              className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
+            <Button
+              size="sm"
+              className="group gap-1.5 font-bold shadow-md shadow-primary-600/25 hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 nav-shimmer"
+              onClick={() => navigate('/dashboard')}
             >
               Dashboard
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            </Button>
           ) : (
             <>
-              <Link
-                to="/login"
-                className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-primary-700 rounded-lg hover:bg-primary-50/60 transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>
                 Sign in
-              </Link>
-              <Link
-                to="/register"
-                className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-md shadow-primary-600/25 transition-all hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 nav-shimmer"
+              </Button>
+              <Button
+                size="sm"
+                className="group gap-1.5 font-bold shadow-md shadow-primary-600/25 hover:shadow-lg hover:shadow-primary-600/30 hover:-translate-y-0.5 nav-shimmer"
+                onClick={() => navigate('/register')}
               >
                 Start free
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </Link>
+              </Button>
             </>
           )}
         </div>
@@ -442,29 +443,35 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
             ))}
             <div className={`pt-3 border-t border-gray-100 grid gap-2 ${isAuthed ? 'grid-cols-1' : 'grid-cols-2'}`}>
               {isAuthed ? (
-                <Link
-                  to="/dashboard"
-                  className="text-center px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
-                  onClick={() => setNavOpen(false)}
+                <Button
+                  className="w-full font-bold"
+                  onClick={() => {
+                    setNavOpen(false)
+                    navigate('/dashboard')
+                  }}
                 >
                   Dashboard
-                </Link>
+                </Button>
               ) : (
                 <>
-                  <Link
-                    to="/login"
-                    className="text-center px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
-                    onClick={() => setNavOpen(false)}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setNavOpen(false)
+                      navigate('/login')
+                    }}
                   >
                     Sign in
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="text-center px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
-                    onClick={() => setNavOpen(false)}
+                  </Button>
+                  <Button
+                    className="font-semibold"
+                    onClick={() => {
+                      setNavOpen(false)
+                      navigate('/register')
+                    }}
                   >
                     Start free
-                  </Link>
+                  </Button>
                 </>
               )}
             </div>
@@ -480,6 +487,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
  * ------------------------------------------------------------------------- */
 
 function Hero() {
+  const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
     <section className="relative isolate overflow-hidden">
@@ -516,19 +524,24 @@ function Hero() {
           </p>
 
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              to={isAuthed ? '/dashboard' : '/register'}
-              className="group inline-flex items-center gap-2 px-6 py-3 text-base font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-600/20 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            <Button
+              size="lg"
+              className="group gap-2 shadow-lg shadow-primary-600/20"
+              onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
             >
               {isAuthed ? 'Go to dashboard' : 'Start free trial'}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center gap-2 px-6 py-3 text-base font-semibold text-gray-700 bg-white hover:bg-gray-50 rounded-xl border border-gray-200 shadow-sm transition-colors"
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2 shadow-sm"
+              onClick={() =>
+                document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+              }
             >
               See how it works
-            </a>
+            </Button>
           </div>
 
           <p className="mt-5 text-sm text-gray-500">
@@ -615,7 +628,7 @@ function DashboardMockup() {
               { label: 'Projects', value: '24', accent: 'bg-primary-500' },
               { label: 'Pending', value: '3', accent: 'bg-amber-500' },
               { label: 'Matched', value: '96%', accent: 'bg-green-500' },
-              { label: 'This month', value: '1.2k', accent: 'bg-indigo-500' },
+              { label: 'This month', value: '1.2k', accent: 'bg-primary-700' },
             ].map((m) => (
               <div
                 key={m.label}
@@ -878,6 +891,7 @@ function HowItWorks() {
  * ------------------------------------------------------------------------- */
 
 function DashboardShowcase() {
+  const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
     <section className="py-24 sm:py-32 bg-gradient-to-b from-white via-gray-50/60 to-white">
@@ -911,19 +925,21 @@ function DashboardShowcase() {
               ))}
             </ul>
             <div className="mt-8 flex gap-3">
-              <Link
-                to={isAuthed ? '/dashboard' : '/register'}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm"
+              <Button
+                className="gap-2 shadow-sm"
+                onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
               >
                 {isAuthed ? 'Open dashboard' : 'Try it free'}
                 <ArrowRight className="w-4 h-4" />
-              </Link>
-              <a
-                href="#pricing"
-                className="inline-flex items-center px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg"
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })
+                }
               >
                 See pricing
-              </a>
+              </Button>
             </div>
           </div>
 
@@ -1093,17 +1109,17 @@ function Pricing({
 
         {/* Comparison table toggle */}
         <div className="mt-10 text-center">
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50"
             onClick={() => setShowCompare(!showCompare)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-700 bg-white border border-primary-200 hover:bg-primary-50 rounded-lg transition-colors"
             aria-expanded={showCompare}
           >
             {showCompare ? 'Hide full comparison' : 'Compare all features'}
             <ChevronDown
               className={`w-4 h-4 transition-transform ${showCompare ? 'rotate-180' : ''}`}
             />
-          </button>
+          </Button>
         </div>
 
         {showCompare && <ComparisonTable plans={plans} />}
@@ -1130,6 +1146,7 @@ function PlanCard({
   plan: MarketingPlan
   period: 'monthly' | 'yearly'
 }) {
+  const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   const isHighlight = !!plan.highlight
   const isCustom = plan.slug === 'firm' && plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
@@ -1210,29 +1227,33 @@ function PlanCard({
       </ul>
 
       {isInternalCta ? (
-        <Link
-          to={ctaHref}
-          className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
+        <Button
+          className={`mt-7 w-full gap-1.5 font-bold ${
             isHighlight
-              ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20 hover:shadow-lg'
-              : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
+              ? 'shadow-md shadow-primary-600/20 hover:shadow-lg'
+              : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
           }`}
+          variant={isHighlight ? 'primary' : 'outline'}
+          onClick={() => navigate(ctaHref)}
         >
           {ctaLabel}
           <ArrowRight className="w-4 h-4" />
-        </Link>
+        </Button>
       ) : (
-        <a
-          href={ctaHref}
-          className={`mt-7 inline-flex justify-center items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
+        <Button
+          className={`mt-7 w-full gap-1.5 font-bold ${
             isHighlight
-              ? 'text-white bg-primary-600 hover:bg-primary-700 shadow-md shadow-primary-600/20'
-              : 'text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200'
+              ? 'shadow-md shadow-primary-600/20'
+              : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
           }`}
+          variant={isHighlight ? 'primary' : 'outline'}
+          onClick={() => {
+            window.location.href = ctaHref
+          }}
         >
           {ctaLabel}
           <ArrowRight className="w-4 h-4" />
-        </a>
+        </Button>
       )}
     </div>
   )
@@ -1462,6 +1483,7 @@ function Faq({
  * ------------------------------------------------------------------------- */
 
 function FinalCta() {
+  const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
     <section className="py-24 sm:py-28">
@@ -1484,28 +1506,31 @@ function FinalCta() {
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">
               {isAuthed ? (
-                <Link
-                  to="/dashboard"
-                  className="inline-flex justify-center items-center gap-2 px-6 py-3 text-base font-bold text-primary-700 bg-white hover:bg-gray-100 rounded-xl shadow-lg transition-colors"
+                <Button
+                  size="lg"
+                  className="gap-2 bg-white text-primary-700 hover:bg-gray-100 shadow-lg focus:ring-white"
+                  onClick={() => navigate('/dashboard')}
                 >
                   Go to dashboard
                   <ArrowRight className="w-4 h-4" />
-                </Link>
+                </Button>
               ) : (
                 <>
-                  <Link
-                    to="/register"
-                    className="inline-flex justify-center items-center gap-2 px-6 py-3 text-base font-bold text-primary-700 bg-white hover:bg-gray-100 rounded-xl shadow-lg transition-colors"
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-white text-primary-700 hover:bg-gray-100 shadow-lg focus:ring-white"
+                    onClick={() => navigate('/register')}
                   >
                     Start free trial
                     <ArrowRight className="w-4 h-4" />
-                  </Link>
-                  <Link
-                    to="/login"
-                    className="inline-flex justify-center items-center px-6 py-3 text-base font-semibold text-white bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl border border-white/20 transition-colors"
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="bg-white/10 text-white hover:bg-white/20 border border-white/20 backdrop-blur focus:ring-white"
+                    onClick={() => navigate('/login')}
                   >
                     Sign in
-                  </Link>
+                  </Button>
                 </>
               )}
             </div>

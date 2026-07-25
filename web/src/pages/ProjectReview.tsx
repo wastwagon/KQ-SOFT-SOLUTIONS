@@ -9,6 +9,7 @@ import BrsHelp from '../components/BrsHelp'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
+import Button from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
 
 interface Tx {
@@ -219,20 +220,14 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
             </p>
             <div className="flex flex-wrap gap-2">
               {onGoToReconcile && (
-                <button
-                  onClick={onGoToReconcile}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
-                >
+                <Button type="button" onClick={onGoToReconcile}>
                   Go to Reconcile
-                </button>
+                </Button>
               )}
               {onGoToReport && (
-                <button
-                  onClick={onGoToReport}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50"
-                >
+                <Button type="button" variant="outline" onClick={onGoToReport}>
                   Proceed to Report (with exceptions)
-                </button>
+                </Button>
               )}
             </div>
           </>
@@ -244,37 +239,35 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
             </p>
             <div className="flex flex-wrap gap-2">
               {canSubmitForReview(role) && (projectStatus === 'reconciling' || projectStatus === 'mapping' || projectStatus === 'draft') && (
-                <button
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => submitMutation.mutate()}
                   disabled={submitMutation.isPending}
-                  className="px-4 py-2 border border-blue-300 text-blue-800 rounded-xl hover:bg-blue-50 disabled:opacity-50"
                   title="Submit for review (locks editing)"
                 >
                   {submitMutation.isPending ? 'Submitting...' : 'Submit for review'}
-                </button>
+                </Button>
               )}
               {canApprove(role) && projectStatus === 'submitted_for_review' && (
                 <>
-                  <button
+                  <Button
+                    type="button"
                     onClick={() => approveMutation.mutate()}
                     disabled={approveMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50"
                     title="Approve BRS"
                   >
                     {approveMutation.isPending ? 'Approving...' : 'Approve'}
-                  </button>
+                  </Button>
                   {approveMutation.error && !isSubscriptionInactiveError(approveMutation.error) && (
                     <p className="text-sm text-red-600">{approveMutation.error.message}</p>
                   )}
                 </>
               )}
               {onGoToReport && (
-                <button
-                  onClick={onGoToReport}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700"
-                >
+                <Button type="button" onClick={onGoToReport}>
                   Generate report
-                </button>
+                </Button>
               )}
             </div>
           </>

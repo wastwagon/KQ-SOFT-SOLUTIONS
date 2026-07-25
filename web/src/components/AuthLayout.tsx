@@ -101,7 +101,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
             Back to home
           </Link>
 
-          <div className="rounded-xl border border-gray-200/90 border-l-4 border-l-primary-500 bg-gradient-to-br from-white via-slate-50/80 to-white px-5 py-6 shadow-sm sm:px-8 sm:py-8">
+          <div className="rounded-xl border border-gray-200 bg-white px-5 py-6 sm:px-8 sm:py-8">
             {eyebrow && (
               <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">{eyebrow}</p>
             )}
@@ -113,7 +113,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
             {subtitle && (
               <p className="mt-2 text-sm text-gray-600 leading-relaxed">{subtitle}</p>
             )}
-            <div className="mt-5 border-t border-gray-100/90 pt-5 sm:mt-6 sm:pt-6">{children}</div>
+            <div className="mt-5 border-t border-gray-100 pt-5 sm:mt-6 sm:pt-6">{children}</div>
           </div>
 
           <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 rounded-xl border border-gray-200/80 bg-white/60 px-4 py-3 text-xs text-gray-500 shadow-sm lg:justify-start">
@@ -131,15 +131,6 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
     </div>
   )
 }
-
-/** Shared field styles for auth forms */
-export const authFieldClass =
-  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 shadow-sm placeholder:text-gray-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20'
-
-export const authLabelClass = 'mb-1.5 block text-sm font-medium text-gray-700'
-
-export const authPrimaryButtonClass =
-  'w-full min-h-[48px] rounded-xl bg-primary-600 py-3 px-4 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 transition-all hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50'
 
 export const authAlertErrorClass =
   'rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm'

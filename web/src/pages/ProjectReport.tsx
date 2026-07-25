@@ -18,6 +18,7 @@ import { formatDate, formatBrsAsAtLine, formatBrsFormalDate, formatPrintDateAccr
 import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
+import Button from '../components/ui/Button'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
@@ -687,43 +688,43 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </select>
           </div>
           {canSubmitForReview(role) && data?.project?.status === 'reconciling' && (
-            <button
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => submitMutation.mutate()}
               disabled={submitMutation.isPending}
-              className="rounded-xl border border-blue-300 px-4 py-2 text-blue-800 hover:bg-blue-50 disabled:opacity-50"
               title="Submit for review (locks editing)"
             >
               {submitMutation.isPending ? 'Submitting...' : 'Submit for review'}
-            </button>
+            </Button>
           )}
           {canApprove(role) && data?.project?.status === 'submitted_for_review' && (
-            <button
+            <Button
+              type="button"
               onClick={() => approveMutation.mutate()}
               disabled={approveMutation.isPending}
-              className="rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               title="Approve BRS"
             >
               {approveMutation.isPending ? 'Approving...' : 'Approve'}
-            </button>
+            </Button>
           )}
           {onGoToReview && (
-            <button
-              onClick={onGoToReview}
-              className="rounded-xl px-4 py-2 text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-            >
+            <Button type="button" variant="ghost" onClick={onGoToReview}>
               ← Back to Review
-            </button>
+            </Button>
           )}
           {onRollForward && canReopen && (
             <div className="flex flex-col gap-1">
-              <button
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => rollForwardMutation.mutate()}
                 disabled={rollForwardMutation.isPending}
-                className="w-fit rounded-xl border border-blue-300 px-4 py-2 text-blue-800 hover:bg-blue-50 disabled:opacity-50"
                 title="Uses this report as the previous period BRS; new project will carry forward unpresented cheques"
+                className="w-fit"
               >
                 {rollForwardMutation.isPending ? 'Creating...' : 'Create next period (roll forward)'}
-              </button>
+              </Button>
               <p className="text-xs text-gray-500 max-w-sm">Uses this report as the <strong>previous period BRS</strong>; unpresented cheques are carried forward to the new project.</p>
             </div>
           )}

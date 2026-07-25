@@ -7,13 +7,13 @@ interface MetricCardProps {
   /** Optional icon or trend (e.g. Lucide icon) */
   icon?: ReactNode
   /** Left accent bar colour. Default: primary */
-  accent?: 'primary' | 'muted' | 'amber' | 'green' | 'indigo' | 'none'
+  accent?: 'primary' | 'muted' | 'amber' | 'green' | 'brand' | 'none'
   className?: string
 }
 
 export default function MetricCard({ label, value, sublabel, icon, accent = 'primary', className = '' }: MetricCardProps) {
   const accentBorder =
-    accent === 'primary'
+    accent === 'primary' || accent === 'brand'
       ? 'border-l-4 border-l-primary-500'
       : accent === 'muted'
         ? 'border-l-4 border-l-gray-300'
@@ -21,12 +21,10 @@ export default function MetricCard({ label, value, sublabel, icon, accent = 'pri
           ? 'border-l-4 border-l-amber-500'
           : accent === 'green'
             ? 'border-l-4 border-l-green-500'
-            : accent === 'indigo'
-              ? 'border-l-4 border-l-indigo-500'
-              : ''
+            : ''
 
   const iconWrap =
-    accent === 'primary'
+    accent === 'primary' || accent === 'brand'
       ? 'bg-primary-50 text-primary-600'
       : accent === 'muted'
         ? 'bg-gray-100 text-gray-500'
@@ -34,13 +32,11 @@ export default function MetricCard({ label, value, sublabel, icon, accent = 'pri
           ? 'bg-amber-50 text-amber-600'
           : accent === 'green'
             ? 'bg-green-50 text-green-600'
-            : accent === 'indigo'
-              ? 'bg-indigo-50 text-indigo-600'
-              : 'bg-gray-50 text-gray-400'
+            : 'bg-gray-50 text-gray-400'
 
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 sm:p-6 ${accentBorder} ${className}`}
+      className={`bg-white rounded-xl border border-border shadow-card hover:shadow-card-hover transition-shadow duration-200 p-5 sm:p-6 ${accentBorder} ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

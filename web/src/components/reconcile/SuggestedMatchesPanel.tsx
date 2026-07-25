@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Settings } from 'lucide-react'
 import { formatAmount } from '../../lib/format'
+import Button from '../ui/Button'
+import Badge from '../ui/Badge'
 import MatchSettingsPanel from './MatchSettingsPanel'
 import type { MatchParams, SuggestedMatch } from './types'
 
@@ -95,21 +97,23 @@ export default function SuggestedMatchesPanel({
       {canBulk && (
         <div className="flex flex-wrap gap-2 mb-4">
           {onPhasedAutoMatch && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={onPhasedAutoMatch}
               disabled={isMatching || isPhasedAutoMatching}
-              className="px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-slate-900 disabled:opacity-50 transition-all"
               title="Runs safe 90%+ matches, then Ecobank/receipt 85%+ — same as integration test scripts"
             >
               {isPhasedAutoMatching
                 ? 'Auto-matching…'
                 : 'Auto-match all (safe → Ecobank)'}
-            </button>
+            </Button>
           )}
           {highConfidence.length > 0 && (
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={() =>
                 onBulkMatch(
                   highConfidence.map((s) => ({
@@ -119,16 +123,17 @@ export default function SuggestedMatchesPanel({
                 )
               }
               disabled={isMatching}
-              className="px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-green-700 hover:shadow disabled:opacity-50 transition-all"
+              className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
               title="Apply only suggestions with 95%+ confidence"
             >
               {isMatching
                 ? 'Matching…'
                 : `Match all high-confidence (95%+) — ${highConfidence.length}`}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={() =>
               onBulkMatch(
                 safeSuggestions.map((s) => ({
@@ -138,16 +143,17 @@ export default function SuggestedMatchesPanel({
               )
             }
             disabled={isMatching || safeSuggestions.length === 0}
-            className="px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 transition-all"
             title="Skips ambiguous duplicates; requires 90%+ confidence"
           >
             {isMatching
               ? 'Matching…'
               : `Match safe suggestions (90%+, no duplicates) — ${safeSuggestions.length}`}
-          </button>
+          </Button>
           {phaseBSuggestions.length > 0 && (
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() =>
                 onBulkMatch(
                   phaseBSuggestions.map((s) => ({
@@ -157,17 +163,17 @@ export default function SuggestedMatchesPanel({
                 )
               }
               disabled={isMatching || phaseBSuggestions.length === 0}
-              className="px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-violet-700 hover:shadow disabled:opacity-50 transition-all"
               title="Phase B: receipts at 85%+ and Ecobank clearing/transfer/withdrawal patterns only — skips generic payment↔debit guesses"
             >
               {isMatching
                 ? 'Matching…'
                 : `Match receipts + Ecobank patterns (85%+) — ${phaseBSuggestions.length}`}
-            </button>
+            </Button>
           )}
           {bulkSelected.size > 0 && (
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={() => {
                 const pairs = Array.from(bulkSelected).map((i) => ({
                   cashBookTransactionId: suggestions[i].cashBookTx.id,
@@ -176,10 +182,9 @@ export default function SuggestedMatchesPanel({
                 onBulkMatch(pairs)
               }}
               disabled={isMatching}
-              className="px-4 py-2.5 bg-primary-500 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-primary-600 disabled:opacity-50 transition-all"
             >
               Match {bulkSelected.size} selected
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -229,28 +234,19 @@ export default function SuggestedMatchesPanel({
                     {Math.round(s.confidence * 100)}%
                   </span>
                   {s.reason.toLowerCase().includes('ecobank clearing') && (
-                    <span
-                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-800"
-                      title="Ecobank inward clearing / HSE deposit — payment matched to bank credit"
-                    >
+                    <Badge size="sm" tone="brand" className="ml-2" title="Ecobank inward clearing / HSE deposit — payment matched to bank credit">
                       Clearing
-                    </span>
+                    </Badge>
                   )}
                   {s.reason.toLowerCase().includes('ecobank transfer') && (
-                    <span
-                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-800"
-                      title="Ecobank outward transfer — payment matched to bank debit"
-                    >
+                    <Badge size="sm" tone="warning" className="ml-2" title="Ecobank outward transfer — payment matched to bank debit">
                       Transfer
-                    </span>
+                    </Badge>
                   )}
                   {s.reason.toLowerCase().includes('ecobank withdrawal') && (
-                    <span
-                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
-                      title="Ecobank named withdrawal — payment matched to bank debit by payee"
-                    >
+                    <Badge size="sm" tone="neutral" className="ml-2" title="Ecobank named withdrawal — payment matched to bank debit by payee">
                       Withdrawal
-                    </span>
+                    </Badge>
                   )}
                   {features.ai_suggestions &&
                     (s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (

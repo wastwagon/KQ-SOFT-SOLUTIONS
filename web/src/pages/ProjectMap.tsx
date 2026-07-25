@@ -21,11 +21,21 @@ import { canExportReport, isProjectEditable } from '../lib/permissions'
 import ProjectLockedBanner from '../components/project/ProjectLockedBanner'
 import { useToast } from '../components/ui/Toast'
 import { useConfirm } from '../components/ui/ConfirmDialog'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import Select from '../components/ui/Select'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import { getMappingIssues, fieldLabel } from '../lib/mappingHints'
 import { DEFAULT_PDF_OCR_MAX_PAGES, SIGN_WARNINGS_PREVIEW_MAX } from '../lib/importLimits'
+
+function confidenceTone(level: MappingConfidence): 'success' | 'warning' | 'neutral' {
+  if (level === 'high') return 'success'
+  if (level === 'medium') return 'warning'
+  return 'neutral'
+}
 
 const CASH_BOOK_FIELDS = ['date', 'name', 'details', 'doc_ref', 'chq_no', 'accode', 'amt_received', 'amt_paid']
 const BANK_FIELDS = ['transaction_date', 'description', 'credit', 'debit']
@@ -396,13 +406,15 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         <p className="mt-1">
           {projectError instanceof Error ? projectError.message : 'Something went wrong.'}
         </p>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3 border-red-300 text-red-900 hover:bg-red-100"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['project', id] })}
-          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-xl bg-white border border-red-300 text-red-900 hover:bg-red-100"
         >
           Retry
-        </button>
+        </Button>
       </div>
     )
   }
@@ -419,21 +431,19 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     <div className="space-y-6">
       <WorkflowStepIntro
         eyebrow="Map"
-        title="Column mapping"
+        title="Map columns"
         subtitle={
           <>
-            <strong>One-time setup.</strong> Uploads can be spreadsheets, PDFs, images, or other supported types—we turn
-            each file into a table of rows, read the detected column headers (Date, Amount, Credit, Debit, etc.), and
-            suggest how they map. After this, <strong>Reconcile runs automatically</strong>—matching and suggestions are
-            done for you. Tick which files to include, then apply suggested mappings in one run, or map each document
-            individually if you need to adjust.
+            Match spreadsheet headers to cash-book and bank fields. Suggested mappings are pre-filled from header names —
+            confirm date and amount columns before continuing. After this, <strong>Reconcile runs automatically</strong>.
+            Tick which files to include, apply suggested mappings in one run, or map each document individually.
           </>
         }
       />
-      <p className="text-xs text-slate-600 max-w-2xl rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+      <p className="text-xs text-gray-600 max-w-2xl rounded-xl bg-gray-50 border border-gray-200 px-3 py-2">
         <strong>Required:</strong> Map the <strong>date</strong> column for each document so transactions can be matched correctly.
       </p>
-      <p className="text-xs text-blue-700 max-w-2xl rounded-xl bg-blue-50 border border-blue-200 px-3 py-2">
+      <p className="text-xs text-primary-800 max-w-2xl rounded-xl bg-primary-50 border border-primary-200 px-3 py-2">
         <strong>Signed amount mode:</strong> if one amount column contains mixed entries, positive amounts are treated as receipts/credits and negative amounts as payments/debits.
       </p>
       {projectLocked && (
@@ -443,7 +453,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         <p className="text-sm text-amber-600">You have view-only access. Contact an admin, reviewer, or preparer to map documents.</p>
       )}
       {parseJobsInflight > 0 && (
-        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-950">
           <strong>Background parse:</strong> {parseJobsInflight} file
           {parseJobsInflight === 1 ? ' is' : 's are'} still parsing or auto-mapping. This page refreshes
           automatically — map manually if a file stays unmapped after it finishes.
@@ -453,8 +463,8 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700 shadow-sm">{error}</div>
       )}
       {mapResult && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-          <p className="text-sm text-slate-700">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+          <p className="text-sm text-gray-700">
             {mapResult.documentsMapped != null && mapResult.documentsMapped > 1 ? (
               <>
                 Mapped <strong>{mapResult.documentsMapped}</strong> document(s);{' '}
@@ -472,7 +482,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             )}
           </p>
           {mapResult.importStats && (
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-gray-700">
               Source rows: <strong>{mapResult.importStats.sourceRowCount}</strong> → imported{' '}
               <strong>{mapResult.importStats.importedCount}</strong>
               {(mapResult.importStats.skippedZeroAmountRows > 0 ||
@@ -491,17 +501,17 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             </p>
           )}
           {!mapResult.importStats && (mapResult.skippedDuplicateRows || 0) > 0 && (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-gray-600">
               Skipped <strong>{mapResult.skippedDuplicateRows}</strong> duplicate row(s) in the source (same date,
               amount, and narrative as an earlier row).
             </p>
           )}
           {mapResult.signFilterSummary && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <div className="rounded border border-green-200 bg-green-50 px-2 py-1">Primary: {mapResult.signFilterSummary.primary ?? 0}</div>
-              <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1">Cross-ref: {mapResult.signFilterSummary.cross_reference ?? 0}</div>
-              <div className="rounded border border-primary-200 bg-primary-50 px-2 py-1 text-primary-900">Zero: {mapResult.signFilterSummary.zero ?? 0}</div>
-              <div className="rounded border border-slate-200 bg-white px-2 py-1">Empty: {mapResult.signFilterSummary.empty ?? 0}</div>
+              <div className="rounded-lg border border-green-200 bg-green-50 px-2 py-1">Primary: {mapResult.signFilterSummary.primary ?? 0}</div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">Cross-ref: {mapResult.signFilterSummary.cross_reference ?? 0}</div>
+              <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1 text-primary-900">Zero: {mapResult.signFilterSummary.zero ?? 0}</div>
+              <div className="rounded-lg border border-gray-200 bg-white px-2 py-1">Empty: {mapResult.signFilterSummary.empty ?? 0}</div>
             </div>
           )}
           {(mapResult.signWarningsPreview || []).length > 0 && (
@@ -516,9 +526,10 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
           )}
           {hasBankDocuments && canExportReport(role) && (
             <div className="pt-2">
-              <button
+              <Button
                 type="button"
-                className="px-4 py-2 text-sm font-medium rounded-xl border border-primary-200 bg-primary-50 text-primary-800 hover:bg-primary-100"
+                variant="outline"
+                className="border-primary-200 bg-primary-50 text-primary-800 hover:bg-primary-100"
                 onClick={() => {
                   void (async () => {
                     try {
@@ -533,8 +544,8 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 }}
               >
                 Download mapped bank Excel
-              </button>
-              <p className="mt-1 text-xs text-slate-600">
+              </Button>
+              <p className="mt-1 text-xs text-gray-600">
                 Credits and debits you have mapped, as Excel — also available under Report → Export.
               </p>
             </div>
@@ -551,17 +562,19 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               automatically; untick any file you want to skip or map by hand below.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3 text-xs font-medium">
-            <button
+          <div className="flex flex-wrap gap-2 text-xs font-medium">
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              className="text-primary-700 hover:text-primary-800"
               onClick={() => setBulkDocIds(new Set((docs as { id: string }[]).map((d) => d.id)))}
-              className="text-primary-700 hover:underline"
             >
               Select all
-            </button>
-            <button type="button" onClick={() => setBulkDocIds(new Set())} className="text-gray-600 hover:underline">
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setBulkDocIds(new Set())}>
               Clear selection
-            </button>
+            </Button>
           </div>
           <ul className="space-y-2 max-h-52 overflow-y-auto border border-gray-100 rounded-xl p-2 bg-gray-50/50">
             {(
@@ -592,36 +605,38 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   <span className="text-gray-900 break-words">{d.filename}</span>
                   <span className="text-gray-500 text-xs"> ({d.type})</span>
                   {d.parseStatus === 'pending' && (
-                    <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                    <Badge tone="brand" size="sm" className="ml-2 uppercase tracking-wide">
                       Queued
-                    </span>
+                    </Badge>
                   )}
                   {d.parseStatus === 'processing' && (
-                    <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                    <Badge tone="brand" size="sm" className="ml-2 uppercase tracking-wide">
                       Parsing…
-                    </span>
+                    </Badge>
                   )}
                   {d.parseStatus === 'failed' && (
-                    <span
-                      className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-red-700"
+                    <Badge
+                      tone="danger"
+                      size="sm"
+                      className="ml-2 uppercase tracking-wide"
                       title={d.parseStatusMessage || 'Parse failed'}
                     >
                       Failed
-                    </span>
+                    </Badge>
                   )}
                 </span>
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <button
+            <Button
               type="button"
               onClick={applySuggestedToAll}
               disabled={applyingAll || bulkDocIds.size === 0}
-              className="px-4 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              isLoading={applyingAll}
             >
               {applyingAll ? 'Applying…' : 'Apply suggested mapping to selected'}
-            </button>
+            </Button>
             <span className="text-xs text-gray-500 max-w-md">
               We detect columns from the extracted table and apply mapping per file. For Excel workbooks
               with several sheets, we automatically use the <strong>best transaction sheet</strong>{' '}
@@ -632,11 +647,9 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Or select a document to map or adjust
-        </label>
-        <select
+      <div className="max-w-md">
+        <Select
+          label="Or select a document to map or adjust"
           value={selectedDocId || ''}
           onChange={(e) => {
             worksheetPickSessionRef.current += 1
@@ -646,7 +659,6 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             setSheetIndexExplicit(false)
             setMapping({})
           }}
-          className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900"
         >
           <option value="">Select a document</option>
           {docs.map((d: { id: string; filename: string; type: string; parseStatus?: string }) => (
@@ -659,7 +671,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   : ''}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       {selectedDocId && (
         <>
@@ -671,28 +683,28 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               <p className="mt-1">
                 {previewError instanceof Error ? previewError.message : 'Something went wrong.'}
               </p>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-red-300 text-red-900 hover:bg-red-100"
                 onClick={() =>
                   queryClient.invalidateQueries({
                     queryKey: ['document-preview', selectedDocId, previewSheetIndex],
                   })
                 }
-                className="mt-3 px-3 py-1.5 text-sm font-medium rounded-xl bg-white border border-red-300 text-red-900 hover:bg-red-100"
               >
                 Retry
-              </button>
+              </Button>
             </div>
           ) : preview ? (
-            <div className="bg-white shadow rounded-xl p-4 sm:p-6 space-y-4 border border-gray-200">
+            <div className="bg-white shadow-sm rounded-xl p-4 sm:p-6 space-y-4 border border-gray-200">
               <h3 className="font-medium text-gray-900">{preview.filename}</h3>
               {preview.sheetNames && preview.sheetNames.length > 1 && (
-                <label className="block max-w-md">
-                  <span className="block text-sm font-medium text-gray-700 mb-1">Worksheet (Excel)</span>
-                  <p className="text-xs text-gray-500 mb-1.5">
-                    We pick the best transaction sheet automatically. You can change the tab here anytime.
-                  </p>
-                  <select
+                <div className="max-w-md">
+                  <Select
+                    label="Worksheet (Excel)"
+                    hint="We pick the best transaction sheet automatically. You can change the tab here anytime."
                     value={previewSheetIndex}
                     onChange={(e) => {
                       const n = parseInt(e.target.value, 10)
@@ -702,27 +714,28 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                         setMapping({})
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm"
                   >
                     {preview.sheetNames.map((name, i) => (
                       <option key={i} value={i}>
                         {name?.trim() ? name : `Sheet ${i + 1}`}
                       </option>
                     ))}
-                  </select>
-                </label>
+                  </Select>
+                </div>
               )}
-              <p className="text-sm text-gray-500">
-                {preview.totalRows} rows
+              <p className="text-sm text-gray-500 flex flex-wrap items-center gap-2">
+                <span>{preview.totalRows} rows</span>
                 {preview.parseMethod && (
-                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                  <Badge tone="brand" size="sm">
                     {preview.parseMethod.replace(/_/g, ' ')}
-                  </span>
+                  </Badge>
                 )}
                 {preview.detectedBankFormat && (
-                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded">
-                    {String(preview.detectedBankFormat).charAt(0).toUpperCase() + String(preview.detectedBankFormat).slice(1)} format detected
-                  </span>
+                  <Badge tone="success" size="sm">
+                    {String(preview.detectedBankFormat).charAt(0).toUpperCase() +
+                      String(preview.detectedBankFormat).slice(1)}{' '}
+                    format detected
+                  </Badge>
                 )}
               </p>
               {preview.parseSummary &&
@@ -749,7 +762,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   className={`rounded-xl border px-4 py-2 text-sm ${
                     preview.parseQualityScore < 55
                       ? 'border-amber-200 bg-amber-50 text-amber-900'
-                      : 'border-slate-200 bg-slate-50 text-slate-800'
+                      : 'border-gray-200 bg-gray-50 text-gray-800'
                   }`}
                 >
                   <strong>Parse quality:</strong> {preview.parseQualityScore}/100
@@ -780,9 +793,13 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   {canMap &&
                     isProjectEditable(project?.status) &&
                     preview.layoutMemoryApplied.id && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
                         disabled={forgetLayoutMutation.isPending}
+                        isLoading={forgetLayoutMutation.isPending}
                         onClick={async () => {
                           const ok = await confirm({
                             title: 'Forget this saved layout?',
@@ -793,10 +810,9 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                           })
                           if (ok) forgetLayoutMutation.mutate(preview.layoutMemoryApplied!.id!)
                         }}
-                        className="shrink-0 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
                       >
                         {forgetLayoutMutation.isPending ? 'Forgetting…' : 'Forget layout'}
-                      </button>
+                      </Button>
                     )}
                 </div>
               )}
@@ -812,9 +828,13 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                       : ''}
                   </p>
                   {canMap && isProjectEditable(project?.status) && preview.typeInference.family !== 'unknown' && (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 border-amber-300 text-amber-950 hover:bg-amber-100"
                       disabled={changeTypeMutation.isPending}
+                      isLoading={changeTypeMutation.isPending}
                       onClick={async () => {
                         const family =
                           preview.typeInference!.family === 'cash_book' ? 'cash_book' : 'bank_statement'
@@ -829,19 +849,18 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                         })
                         if (ok) changeTypeMutation.mutate(family)
                       }}
-                      className="mt-2 inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100 disabled:opacity-50"
                     >
                       {changeTypeMutation.isPending
                         ? 'Switching…'
                         : `Switch to ${
                             preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'
                           }`}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
               {preview.hasForeignCurrencyColumns && (
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-950">
+                <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-2 text-sm text-primary-950">
                   <strong>Multi-currency cash book:</strong> columns include cedi equivalents (
                   <code>AMT RECEIVED</code> / <code>AMT PAID</code>) and foreign amounts (
                   <code>FC AMT RECEIVED</code> / <code>FC AMT PAID</code>, plus Currency Code / Exch Rate).
@@ -851,32 +870,32 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   )}
                 </div>
               )}
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50">
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <Table>
+                  <TableHead>
+                    <TableRow>
                       {preview.headers.map((h: string, i: number) => (
-                        <th key={i} className="px-2 py-1 text-left border border-gray-200 text-gray-900">
+                        <TableTh key={i} className="px-3 py-2.5 whitespace-nowrap">
                           [{i}] {h || `Col ${i}`}
-                        </th>
+                        </TableTh>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
                     {(preview.rows || []).slice(0, 5).map((row: unknown[], ri: number) => (
-                      <tr key={ri} className="border-b border-gray-200">
+                      <TableRow key={ri}>
                         {(row as unknown[]).map((cell, ci) => (
-                          <td key={ci} className="px-2 py-1 border border-gray-200 text-gray-900">
+                          <TableTd key={ci} className="px-3 py-2.5 whitespace-nowrap text-gray-900">
                             {cell != null ? String(cell) : 'No value provided'}
-                          </td>
+                          </TableTd>
                         ))}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               {mappingIssues.length > 0 && (
-                <ul className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                <ul className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
                   {mappingIssues.map((issue, i) => (
                     <li
                       key={i}
@@ -885,7 +904,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                           ? 'text-red-900'
                           : issue.severity === 'warning'
                             ? 'text-amber-900'
-                            : 'text-slate-700'
+                            : 'text-gray-700'
                       }
                     >
                       <span className="font-medium">
@@ -899,57 +918,65 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 </ul>
               )}
               <div className="grid gap-4">
-                <h4 className="font-medium">Map to canonical fields</h4>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-medium text-gray-900">Map to canonical fields</h4>
+                  {Object.keys(mapping).length > 0 && (
+                    <Badge tone="brand" size="sm">
+                      {Object.keys(mapping).length} field
+                      {Object.keys(mapping).length === 1 ? '' : 's'} mapped
+                    </Badge>
+                  )}
+                </div>
                 {canonicalFields.map((field: string) => (
-                  <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                    <label className="sm:w-40 text-sm font-medium text-gray-700">
-                      {fieldLabel(field)}
+                  <div
+                    key={field}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-xl bg-gray-50/80 border border-gray-100 px-3 py-2.5"
+                  >
+                    <div className="sm:w-44 flex items-center gap-2 flex-wrap">
+                      <label htmlFor={`map-field-${field}`} className="text-sm font-medium text-gray-700">
+                        {fieldLabel(field)}
+                      </label>
                       {liveConfidence[field] && (
-                        <span
-                          className={`ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase ${
-                            liveConfidence[field] === 'high'
-                              ? 'bg-green-100 text-green-800'
-                              : liveConfidence[field] === 'medium'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
+                        <Badge tone={confidenceTone(liveConfidence[field]!)} size="sm" className="uppercase">
                           {liveConfidence[field]}
-                        </span>
+                        </Badge>
                       )}
-                    </label>
-                    <select
-                      value={mapping[field] ?? ''}
-                      disabled={mappingDisabled}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        setMapping((m) => {
-                          const next = { ...m }
-                          if (v === '') delete next[field]
-                          else next[field] = parseInt(v, 10)
-                          return next
-                        })
-                      }}
-                      className="w-full sm:flex-1 sm:max-w-xs px-3 py-2.5 min-h-[44px] border border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
-                    >
-                      <option value="">Do not map this field</option>
-                      {(preview.headers || []).map((h: string, i: number) => (
-                        <option key={i} value={i}>
-                          [{i}] {h || `Col ${i}`}
-                        </option>
-                      ))}
-                    </select>
+                    </div>
+                    <div className="w-full sm:flex-1 sm:max-w-xs">
+                      <Select
+                        id={`map-field-${field}`}
+                        value={mapping[field] ?? ''}
+                        disabled={mappingDisabled}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setMapping((m) => {
+                            const next = { ...m }
+                            if (v === '') delete next[field]
+                            else next[field] = parseInt(v, 10)
+                            return next
+                          })
+                        }}
+                      >
+                        <option value="">Do not map this field</option>
+                        {(preview.headers || []).map((h: string, i: number) => (
+                          <option key={i} value={i}>
+                            [{i}] {h || `Col ${i}`}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                   </div>
                 ))}
               </div>
               {!mappingDisabled && (
-              <button
-                onClick={() => mapMutation.mutate(selectedDocId)}
-                disabled={mapMutation.isPending}
-                className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 font-medium"
-              >
-                {mapMutation.isPending ? 'Applying...' : 'Apply mapping'}
-              </button>
+                <Button
+                  onClick={() => mapMutation.mutate(selectedDocId)}
+                  disabled={mapMutation.isPending}
+                  isLoading={mapMutation.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  {mapMutation.isPending ? 'Applying…' : 'Apply mapping'}
+                </Button>
               )}
             </div>
           ) : null}
@@ -971,13 +998,9 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       {onProceedToReconcile && (
         <div className="pt-6 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-600">Mapping done? Go to Reconcile to match transactions.</p>
-          <button
-            type="button"
-            onClick={onProceedToReconcile}
-            className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 hover:shadow transition-all"
-          >
+          <Button type="button" onClick={onProceedToReconcile} className="shadow-sm">
             Proceed to Reconcile →
-          </button>
+          </Button>
         </div>
       )}
     </div>
