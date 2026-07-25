@@ -42,6 +42,31 @@ describe('getSubscriptionSnapshot', () => {
     expect(snapshot.status).toBe('free')
   })
 
+  it('keeps firm plan active after trial with no payment (custom billing)', () => {
+    const snapshot = getSubscriptionSnapshot(
+      { createdAt: new Date('2026-03-01T00:00:00.000Z'), plan: 'firm' },
+      null
+    )
+    expect(snapshot.status).toBe('active')
+  })
+
+  it('keeps firm plan active when last paid period has expired', () => {
+    const snapshot = getSubscriptionSnapshot(
+      { createdAt: new Date('2024-01-01T00:00:00.000Z'), plan: 'firm' },
+      { createdAt: new Date('2025-01-01T00:00:00.000Z'), period: 'yearly', amount: new Prisma.Decimal(1000) }
+    )
+    expect(snapshot.status).toBe('active')
+  })
+
+  it('respects explicit status override on firm plan', () => {
+    const snapshot = getSubscriptionSnapshot(
+      { createdAt: new Date('2026-03-01T00:00:00.000Z'), plan: 'firm' },
+      null,
+      { status: 'expired' }
+    )
+    expect(snapshot.status).toBe('expired')
+  })
+
   it('returns active for current monthly payment period', () => {
     const snapshot = getSubscriptionSnapshot(
       { createdAt: new Date('2026-01-01T00:00:00.000Z') },

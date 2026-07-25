@@ -26,7 +26,7 @@ export async function getOrgSubscriptionStatus(orgId: string): Promise<Subscript
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { createdAt: true },
+    select: { createdAt: true, plan: true },
   })
   if (!org) return 'free'
   const [latestPayment, overrides] = await Promise.all([

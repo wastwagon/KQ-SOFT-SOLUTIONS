@@ -101,7 +101,7 @@ router.get('/', async (req, res) => {
   const organizations = orgs.map((o) => {
     const lastPayment = o.payments[0]
     const subscription = getSubscriptionSnapshot(
-      { createdAt: o.createdAt },
+      { createdAt: o.createdAt, plan: o.plan },
       lastPayment
         ? {
             createdAt: lastPayment.createdAt,
@@ -189,7 +189,7 @@ router.get('/export/csv', async (req, res) => {
     const last = o.payments[0]
     const total = totalByOrg.get(o.id) ?? 0
     const subscriptionStatus = getSubscriptionSnapshot(
-      { createdAt: o.createdAt },
+      { createdAt: o.createdAt, plan: o.plan },
       last
         ? {
             createdAt: last.createdAt,
@@ -242,9 +242,13 @@ router.get('/:id', async (req, res) => {
   const paymentForSnapshot = latestPayment
     ? { createdAt: latestPayment.createdAt, period: latestPayment.period as 'monthly' | 'yearly', amount: latestPayment.amount }
     : null
-  const subscription = getSubscriptionSnapshot({ createdAt: org.createdAt }, paymentForSnapshot, overrides)
+  const subscription = getSubscriptionSnapshot(
+    { createdAt: org.createdAt, plan: org.plan },
+    paymentForSnapshot,
+    overrides
+  )
   const computedSubscription = getSubscriptionSnapshot(
-    { createdAt: org.createdAt },
+    { createdAt: org.createdAt, plan: org.plan },
     paymentForSnapshot,
     { trialEndsAt: overrides.trialEndsAt, status: null }
   )

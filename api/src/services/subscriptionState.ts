@@ -18,7 +18,7 @@ export interface SubscriptionOverrides {
 }
 
 export function getSubscriptionSnapshot(
-  org: Pick<Organization, 'createdAt'>,
+  org: Pick<Organization, 'createdAt'> & { plan?: string },
   latestPayment: Pick<Payment, 'createdAt' | 'period' | 'amount'> | null,
   overrides?: SubscriptionOverrides
 ): SubscriptionSnapshot {
@@ -28,8 +28,27 @@ export function getSubscriptionSnapshot(
   const trialEnds = overrides?.trialEndsAt ?? defaultTrialEnds
   const forcedStatus = overrides?.status ?? null
 
+  /**
+   * Firm / enterprise uses custom billing (no Paystack). After trial those orgs
+   * would otherwise become `free`/`expired` and hit the paywall even though they
+   * cannot self-serve renew. Keep them `active` unless an explicit status override
+   * was set by platform admin.
+   */
+  const applyFirmCustomBilling = (status: SubscriptionStatus): SubscriptionStatus => {
+    if (
+      org.plan === 'firm' &&
+      forcedStatus == null &&
+      (status === 'free' || status === 'expired')
+    ) {
+      return 'active'
+    }
+    return status
+  }
+
   if (!latestPayment) {
-    const status: SubscriptionStatus = forcedStatus || (now <= trialEnds ? 'trial' : 'free')
+    const status = applyFirmCustomBilling(
+      forcedStatus || (now <= trialEnds ? 'trial' : 'free')
+    )
     return {
       status,
       trialEndsAt: trialEnds.toISOString(),
@@ -44,7 +63,9 @@ export function getSubscriptionSnapshot(
   const periodDays = latestPayment.period === 'yearly' ? 365 : 30
   const periodStart = latestPayment.createdAt
   const periodEnd = new Date(periodStart.getTime() + periodDays * 24 * 60 * 60 * 1000)
-  const status: SubscriptionStatus = forcedStatus || (now <= periodEnd ? 'active' : 'expired')
+  const status = applyFirmCustomBilling(
+    forcedStatus || (now <= periodEnd ? 'active' : 'expired')
+  )
 
   return {
     status,

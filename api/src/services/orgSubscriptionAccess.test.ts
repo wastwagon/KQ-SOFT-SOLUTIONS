@@ -27,6 +27,7 @@ describe('orgSubscriptionAccess cache', () => {
     vi.clearAllMocks()
     vi.mocked(prisma.organization.findUnique).mockResolvedValue({
       createdAt: new Date('2026-01-01'),
+      plan: 'premium',
     } as never)
     vi.mocked(prisma.payment.findFirst).mockResolvedValue(null)
   })
