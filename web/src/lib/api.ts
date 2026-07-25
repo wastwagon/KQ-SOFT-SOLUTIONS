@@ -373,6 +373,11 @@ export interface SubscriptionUsageResponse {
   organization: { id: string; name: string; plan: string }
   /** True when API has SUBSCRIPTION_PAYWALL=true (core routes blocked for inactive subs). */
   paywallEnabled?: boolean
+  /**
+   * True for platform admins — org subscription status does not block core APIs.
+   * UI must not show renewal paywall chrome when this is set.
+   */
+  subscriptionBypass?: boolean
   features: Record<string, boolean>
   usage: {
     projectsUsed: number
@@ -664,6 +669,49 @@ export const platformAdminDatabase = {
   seed: () => api('/admin/database/seed', { method: 'POST' }) as Promise<PlatformDatabaseOpResult>,
 }
 
+export type OpsMetricsSnapshot = {
+  startedAt: string
+  uptimeSec: number
+  counters: Record<string, number>
+  gauges: Record<string, number>
+  derived: Record<string, number | null>
+  alerts?: { webhookConfigured?: boolean }
+}
+
+export type RetentionPruneResult = {
+  dryRun: boolean
+  retentionYears: number
+  cutoffIso: string
+  eligibleProjects: number
+  deletedProjects: number
+  filesRemoved: number
+  projects: Array<{
+    id: string
+    name: string
+    organizationId: string
+    status: string
+    anchorDate: string
+    documentCount: number
+  }>
+}
+
+/** Platform admin: process-local ops metrics + data retention tools */
+export const platformAdminOps = {
+  getMetrics: () => api('/admin/ops-metrics') as Promise<OpsMetricsSnapshot>,
+  getRetentionPreview: (params?: { years?: number; organizationId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.years) q.set('years', String(params.years))
+    if (params?.organizationId) q.set('organizationId', params.organizationId)
+    const qs = q.toString()
+    return api(`/admin/retention${qs ? `?${qs}` : ''}`) as Promise<RetentionPruneResult>
+  },
+  runRetention: (body: { confirm?: boolean; retentionYears?: number; organizationId?: string }) =>
+    api('/admin/retention', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }) as Promise<RetentionPruneResult>,
+}
+
 export const subscription = {
   getUsage: () => api('/subscription/usage') as Promise<SubscriptionUsageResponse>,
   getPlans: () => api('/subscription/plans'),
@@ -701,6 +749,29 @@ export const publicApi = {
     } catch {
       return { plans: [] }
     }
+  },
+  createLead: async (body: {
+    email: string
+    name?: string
+    company?: string
+    source: 'newsletter' | 'bank_feeds' | 'sales' | 'contact'
+    message?: string
+  }): Promise<{ ok: boolean; id: string; duplicate?: boolean }> => {
+    const res = await fetch(`${API_URL}/api/v1/public/leads`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      id?: string
+      duplicate?: boolean
+      error?: string
+    }
+    if (!res.ok) {
+      throw new Error(data.error || 'Could not submit')
+    }
+    return { ok: true, id: data.id || '', duplicate: data.duplicate }
   },
 }
 

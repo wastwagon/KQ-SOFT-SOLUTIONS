@@ -25,6 +25,9 @@ const AdminOrgDetail = lazy(() => import('./pages/admin/AdminOrgDetail'))
 const AdminRevenue = lazy(() => import('./pages/admin/AdminRevenue'))
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'))
 const AdminDatabase = lazy(() => import('./pages/admin/AdminDatabase'))
+const AdminOpsMetrics = lazy(() => import('./pages/admin/AdminOpsMetrics'))
+const AdminRetention = lazy(() => import('./pages/admin/AdminRetention'))
+const AdminLeads = lazy(() => import('./pages/admin/AdminLeads'))
 const Projects = lazy(() => import('./pages/Projects'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
@@ -45,6 +48,10 @@ const queryClient = new QueryClient({
     queries: {
       /** Avoid hammering the API when `SUBSCRIPTION_INACTIVE` is returned. */
       retry: subscriptionPaywallRetry,
+      /** Soft-launch default: reuse fresh data across layout + page queries. */
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
     },
   },
 })
@@ -91,6 +98,9 @@ function App() {
                     <Route path="payments" element={<AdminPayments />} />
                     <Route path="revenue" element={<AdminRevenue />} />
                     <Route path="generation-settings" element={<AdminGenerationSettings />} />
+                    <Route path="ops-metrics" element={<AdminOpsMetrics />} />
+                    <Route path="leads" element={<AdminLeads />} />
+                    <Route path="retention" element={<AdminRetention />} />
                     <Route path="database" element={<AdminDatabase />} />
                   </Route>
 

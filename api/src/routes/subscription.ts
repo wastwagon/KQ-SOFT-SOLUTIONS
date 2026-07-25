@@ -19,6 +19,7 @@ import {
 import { getPlanQuotaLimits } from '../services/planLimits.js'
 import { logger } from '../middleware/logging.js'
 import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
+import { isPlatformAdmin } from '../lib/platformAdmin.js'
 
 const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
 /** Rank for upgrade/downgrade checks; `firm` is highest (custom billing, not self-service). */
@@ -90,6 +91,7 @@ export function isUniqueConstraintError(e: unknown): boolean {
 
 router.get('/usage', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
+  const userId = req.auth!.userId
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
   })
@@ -114,9 +116,18 @@ router.get('/usage', async (req: AuthRequest, res) => {
   const features = Object.fromEntries(
     PLAN_FEATURES.map((f) => [f, hasPlanFeature(org.plan, f)])
   ) as Record<string, boolean>
+
+  let subscriptionBypass = false
+  if (!String(userId).startsWith('apikey:')) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
+    subscriptionBypass = !!(user?.email && isPlatformAdmin(user.email))
+  }
+
   res.json({
     organization: { id: org.id, name: org.name, plan: org.plan },
     paywallEnabled: isSubscriptionPaywallEnabled(),
+    /** Platform admins bypass org subscription gates for core product APIs. */
+    subscriptionBypass,
     features,
     usage: {
       ...usage,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -6,11 +6,9 @@ import {
   Check,
   ChevronDown,
   Database,
-  Facebook,
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
-  Linkedin,
   LineChart,
   Lock,
   Mail,
@@ -21,7 +19,6 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  Twitter,
   Upload,
   Users,
   Workflow,
@@ -32,6 +29,7 @@ import BrandLogo from '../components/BrandLogo'
 import Button from '../components/ui/Button'
 import SubscriptionFxReference from '../components/marketing/SubscriptionFxReference'
 import { publicApi } from '../lib/api'
+import { useFocusTrap } from '../lib/focusTrap'
 import { useAuth } from '../store/auth'
 import {
   FEATURE_GROUPS,
@@ -362,12 +360,26 @@ function AnnouncementBar({
 function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolean) => void }) {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const links: { label: string; href: string }[] = [
     { label: 'Features', href: '#features' },
     { label: 'How it works', href: '#how-it-works' },
     { label: 'Pricing', href: '#pricing' },
     { label: 'FAQ', href: '#faq' },
   ]
+
+  useFocusTrap(navOpen, panelRef, { restoreFocusRef: menuButtonRef })
+
+  useEffect(() => {
+    if (!navOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navOpen, setNavOpen])
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200/60 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16 sm:h-18">
@@ -420,16 +432,27 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
         </div>
 
         <button
+          ref={menuButtonRef}
           type="button"
           onClick={() => setNavOpen(!navOpen)}
           className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-gray-700 hover:bg-gray-100"
           aria-label={navOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={navOpen}
+          aria-controls="landing-mobile-nav"
         >
           {navOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
       {navOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white">
+        <div
+          ref={panelRef}
+          id="landing-mobile-nav"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile navigation"
+          tabIndex={-1}
+          className="md:hidden border-t border-gray-100 bg-white outline-none"
+        >
           <div className="px-4 py-4 space-y-1">
             {links.map((l) => (
               <a
@@ -1581,12 +1604,26 @@ function Footer() {
           </div>
           <form
             className="flex flex-col sm:flex-row gap-2"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
               const form = e.currentTarget
-              const email = (form.elements.namedItem('email') as HTMLInputElement | null)?.value
-              if (email) {
-                window.location.href = `mailto:info@kqsoftwaresolutions.com?subject=Subscribe%20to%20updates&body=Please%20add%20${encodeURIComponent(email)}%20to%20the%20product-updates%20mailing%20list.`
+              const emailInput = form.elements.namedItem('email') as HTMLInputElement | null
+              const email = emailInput?.value?.trim()
+              if (!email) return
+              const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
+              if (btn) btn.disabled = true
+              try {
+                const res = await publicApi.createLead({ email, source: 'newsletter' })
+                if (emailInput) emailInput.value = ''
+                window.alert(
+                  res.duplicate
+                    ? 'You are already subscribed with this email.'
+                    : 'Thanks — you are on the product updates list.'
+                )
+              } catch (err) {
+                window.alert(err instanceof Error ? err.message : 'Could not subscribe. Try again.')
+              } finally {
+                if (btn) btn.disabled = false
               }
             }}
             aria-label="Subscribe to updates"
@@ -1624,36 +1661,12 @@ function Footer() {
               Cloud bank reconciliation for accounting firms and in-house finance teams.
               Match with confidence, publish polished BRS packs, and preserve the audit trail.
             </p>
-            <div className="mt-7 flex items-center gap-2">
-              {[
-                {
-                  href: 'https://www.linkedin.com/',
-                  label: 'LinkedIn',
-                  Icon: Linkedin,
-                },
-                {
-                  href: 'https://twitter.com/',
-                  label: 'X / Twitter',
-                  Icon: Twitter,
-                },
-                {
-                  href: 'https://www.facebook.com/',
-                  label: 'Facebook',
-                  Icon: Facebook,
-                },
-              ].map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  aria-label={s.label}
-                  className="inline-flex w-9 h-9 rounded-lg bg-white/5 border border-white/10 hover:bg-primary-600 hover:border-primary-500 items-center justify-center transition-colors"
-                >
-                  <s.Icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
+            <a
+              href="mailto:info@kqsoftwaresolutions.com"
+              className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+            >
+              info@kqsoftwaresolutions.com
+            </a>
           </div>
 
           {/* Column 2: Contact only */}

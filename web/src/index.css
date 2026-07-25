@@ -3,7 +3,7 @@
 /* Design system tokens — premium light theme */
 @theme {
   /* Typography */
-  --font-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   /* Brand: blue #0473ea (primary) + green #38d200 (success / second accent) */
   --color-primary-50: #e8f4ff;
   --color-primary-100: #cce6ff;

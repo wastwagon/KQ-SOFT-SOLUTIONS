@@ -15,10 +15,12 @@ CREATE TABLE "organization_match_memories" (
     CONSTRAINT "organization_match_memories_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "organization_match_memories_organization_id_currency_side_kind_amount_minor_cash_book_fingerprint_bank_fingerprint_key"
+-- Short names: Postgres truncates identifiers to 63 chars; the default Prisma
+-- names for these two indexes collide after truncation.
+CREATE UNIQUE INDEX "omm_org_cur_side_amt_cash_bank_key"
   ON "organization_match_memories"("organization_id", "currency", "side_kind", "amount_minor", "cash_book_fingerprint", "bank_fingerprint");
 
-CREATE INDEX "organization_match_memories_organization_id_currency_side_kind_amount_minor_idx"
+CREATE INDEX "omm_org_cur_side_amt_idx"
   ON "organization_match_memories"("organization_id", "currency", "side_kind", "amount_minor");
 
 ALTER TABLE "organization_match_memories"

@@ -72,20 +72,25 @@
 - [x] Suggested journals CSV export
 - [x] Optional S3-compatible upload storage
 - [x] Optional Sentry + parse-queue lag metrics
-- [ ] Authenticated E2E (upload → map → reconcile → export)
-- [ ] Performance tuning
-- [ ] Documentation refresh (STATUS / stale gap docs)
+- [x] Slack/Pager alert webhook (parse lag + leads; ops test-alert)
+- [x] Lead capture (newsletter + bank-feed waitlist + admin inbox)
+- [x] Bank connections settings (import path + feeds waitlist)
+- [x] Web Sentry (optional `VITE_SENTRY_DSN`)
+- [x] Authenticated E2E nav smoke (dashboard → projects/clients/settings)
+- [ ] Full upload → map → reconcile → export E2E (specimen fixtures)
+- [x] Documentation refresh (STATUS)
 - [x] Coolify deployment (production live)
-- [ ] Monitoring alerts wired to Pager/Slack (Sentry + Prometheus gauges ready)
-- [ ] MFA (deferred)
+- [ ] MFA (deferred — ignored for go-live)
 
 ---
 
 ## Remaining — Recommended Order
 
-1. ~~**Paystack integration**~~ — Done. Set PAYSTACK_SECRET_KEY, PAYSTACK_WEBHOOK_SECRET; configure webhook URL in Paystack dashboard.
-2. ~~**Bank rules engine**~~ — Done. Settings > Bank rules.
-3. ~~**1-to-many matching UI**~~ — Done. Multi-select in Reconcile for batch deposits/payments.
-4. ~~**Reference extraction**~~ — Done. chqNo and extracted refs from descriptions boost confidence.
-5. ~~**Ghana bank parsers**~~ — Done. Format detection (Ecobank, GCB, Access, Stanbic, Fidelity, UBA, Absa), auto-mapping, chqNo extraction.
-6. **Phase 6** — Unit tests done (api: `npm test`). Next: E2E, docs, Coolify deploy, monitoring.
+1. ~~**Paystack integration**~~ — Done.
+2. ~~**Bank rules engine**~~ — Done.
+3. ~~**1-to-many matching UI**~~ — Done.
+4. ~~**Reference extraction**~~ — Done.
+5. ~~**Ghana bank parsers**~~ — Done.
+6. **Phase 6** — Soft-launch complete except full workflow E2E + MFA (deferred).
+7. **Live bank feeds** — Waitlist live; aggregator/bank partnerships when available in Ghana.
+8. Set production env: `ALERT_WEBHOOK_URL`, `SENTRY_DSN`, `VITE_SENTRY_DSN`, run leads migration.

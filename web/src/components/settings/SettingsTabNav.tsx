@@ -25,6 +25,9 @@ export default function SettingsTabNav({
       <NavLink to="/settings/members" className={tabClass}>
         Members
       </NavLink>
+      <NavLink to="/settings/connections" className={tabClass}>
+        Connections
+      </NavLink>
       {showApiKeys && (
         <NavLink to="/settings/api-keys" className={tabClass}>
           API keys

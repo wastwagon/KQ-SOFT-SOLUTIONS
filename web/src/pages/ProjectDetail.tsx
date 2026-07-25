@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clients, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
@@ -17,12 +17,14 @@ import ProjectHeader, { type ProjectHeaderProject } from '../components/project/
 import ProjectStepNav, { type ProjectStep } from '../components/project/ProjectStepNav'
 import ProjectStageCard from '../components/project/ProjectStageCard'
 import ProjectUploadStep from '../components/project/ProjectUploadStep'
+import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Skeleton from '../components/ui/Skeleton'
-import ProjectMap from './ProjectMap'
-import ProjectReconcile from './ProjectReconcile'
-import ProjectReview from './ProjectReview'
-import ProjectReport from './ProjectReport'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+
+const ProjectMap = lazy(() => import('./ProjectMap'))
+const ProjectReconcile = lazy(() => import('./ProjectReconcile'))
+const ProjectReview = lazy(() => import('./ProjectReview'))
+const ProjectReport = lazy(() => import('./ProjectReport'))
 
 const STEPS: readonly ProjectStep[] = [
   { id: 'upload', label: 'Upload' },
@@ -214,43 +216,51 @@ export default function ProjectDetail() {
       )}
       {step === 1 && (
         <ProjectStageCard ariaLabel="Map columns">
-          <ProjectMap
-            projectId={slug}
-            canMap={canMapDocuments(role)}
-            onProceedToReconcile={() => setStep(2)}
-          />
+          <Suspense fallback={<WorkflowStepSkeleton />}>
+            <ProjectMap
+              projectId={slug}
+              canMap={canMapDocuments(role)}
+              onProceedToReconcile={() => setStep(2)}
+            />
+          </Suspense>
         </ProjectStageCard>
       )}
       {step === 2 && (
         <ProjectStageCard ariaLabel="Reconcile transactions">
-          <ProjectReconcile
-            projectId={slug}
-            canReconcile={canReconcile(role)}
-            onProceedToReview={() => setStep(3)}
-          />
+          <Suspense fallback={<WorkflowStepSkeleton />}>
+            <ProjectReconcile
+              projectId={slug}
+              canReconcile={canReconcile(role)}
+              onProceedToReview={() => setStep(3)}
+            />
+          </Suspense>
         </ProjectStageCard>
       )}
       {step === 3 && (
         <ProjectStageCard ariaLabel="Review and approve">
-          <ProjectReview
-            projectId={slug}
-            onGoToReconcile={() => setStep(2)}
-            onGoToReport={() => setStep(4)}
-          />
+          <Suspense fallback={<WorkflowStepSkeleton />}>
+            <ProjectReview
+              projectId={slug}
+              onGoToReconcile={() => setStep(2)}
+              onGoToReport={() => setStep(4)}
+            />
+          </Suspense>
         </ProjectStageCard>
       )}
       {step === 4 && (
         <ProjectStageCard ariaLabel="Report">
-          <ProjectReport
-            projectId={slug}
-            onGoToReview={() => setStep(3)}
-            onReopen={() => setStep(2)}
-            onRollForward={(newProjectId) => {
-              navigate(`/projects/${newProjectId}`)
-            }}
-            canExport={canExportReport(role)}
-            canReopen={canReopenProject(role)}
-          />
+          <Suspense fallback={<WorkflowStepSkeleton />}>
+            <ProjectReport
+              projectId={slug}
+              onGoToReview={() => setStep(3)}
+              onReopen={() => setStep(2)}
+              onRollForward={(newProjectId) => {
+                navigate(`/projects/${newProjectId}`)
+              }}
+              canExport={canExportReport(role)}
+              canReopen={canReopenProject(role)}
+            />
+          </Suspense>
         </ProjectStageCard>
       )}
     </div>

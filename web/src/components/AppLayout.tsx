@@ -8,55 +8,43 @@ import {
   FileCheck,
   Settings,
   ShieldCheck,
-  Menu,
   LogOut,
-  X,
-  Bell,
   FileText,
   BookOpen,
-  ChevronDown,
-  UserCircle2,
+  CreditCard,
+  Key,
+  Landmark,
+  Plus,
+  Radio,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { settings, getLogoDisplayUrl, subscription } from '../lib/api'
+import { canCreateProject, canEditBankRules, canManageBilling, canManageMembers } from '../lib/permissions'
 import BrandLogo from './BrandLogo'
 import OrgSwitcher from './OrgSwitcher'
+import NotificationsBell from './NotificationsBell'
+import SidebarShell, { SidebarHeader, SidebarNavSection } from './layout/SidebarShell'
+import { sidebarNavLinkClass } from './layout/sidebarStyles'
 
 const preloadProjectsPage = () => import('../pages/Projects')
 const preloadSettingsPage = () => import('../pages/Settings')
-
-const workNavItems = [
-  { to: '/projects', label: 'Projects', icon: FolderKanban, preload: preloadProjectsPage },
-  { to: '/clients', label: 'Clients', icon: Users },
-  { to: '/reports', label: 'Reports', icon: FileText },
-]
-
-const administrationNavItems = [
-  { to: '/settings/members', label: 'Team Members', icon: Users },
-  { to: '/audit', label: 'Audit Log', icon: FileCheck },
-  { to: '/manual', label: 'User Manual', icon: BookOpen },
-  { to: '/settings/branding', label: 'Firm Branding', icon: Settings, preload: preloadSettingsPage },
-]
-
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-    isActive
-      ? 'bg-primary-50 text-primary-700'
-      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-  }`
 
 export default function AppLayout() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, org, role, logout, isPlatformAdmin } = useAuth()
-  const roleLabel = role === 'admin' ? 'Admin' : role === 'reviewer' ? 'Reviewer' : role === 'preparer' ? 'Preparer' : role === 'viewer' ? 'Viewer' : null
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [notificationOpen, setNotificationOpen] = useState(false)
-  const [workMenuOpen, setWorkMenuOpen] = useState(false)
-  const [adminMenuOpen, setAdminMenuOpen] = useState(false)
-  const [platformMenuOpen, setPlatformMenuOpen] = useState(false)
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const { user, role, logout, isPlatformAdmin } = useAuth()
+  const roleLabel =
+    role === 'admin'
+      ? 'Admin'
+      : role === 'reviewer'
+        ? 'Reviewer'
+        : role === 'preparer'
+          ? 'Preparer'
+          : role === 'viewer'
+            ? 'Viewer'
+            : null
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null)
   const [subscriptionBannerDismissed, setSubscriptionBannerDismissed] = useState(() => {
     try {
@@ -65,6 +53,7 @@ export default function AppLayout() {
       return false
     }
   })
+
   const { data: branding, isError: layoutBrandingQueryFailed } = useQuery({
     queryKey: ['settings', 'branding'],
     queryFn: settings.getBranding,
@@ -76,19 +65,34 @@ export default function AppLayout() {
     staleTime: 60_000,
     refetchOnWindowFocus: true,
   })
+
   const logoUrl = (branding as { logoUrl?: string } | undefined)?.logoUrl
   const showOrgLogo = !!logoUrl?.trim() && failedLogoUrl !== logoUrl
   const path = location.pathname
+  const features = (usageForBanner?.features || {}) as Record<string, boolean>
+  const subscriptionBypass = isPlatformAdmin || !!usageForBanner?.subscriptionBypass
   const sub = usageForBanner?.subscription?.status
   const showSubscriptionStrip =
+    !subscriptionBypass &&
     !subscriptionBannerDismissed &&
     !path.startsWith('/settings') &&
     !!usageForBanner?.paywallEnabled &&
     (sub === 'free' || sub === 'expired')
-  /** Settings shows its own combined usage/plans banner. */
   const hideLayoutUsageFailureBanner = path.startsWith('/settings')
-  /** Settings branding tab loads branding and shows a full-page error when it fails. */
   const hideLayoutBrandingFailureBanner = path.startsWith('/settings')
+
+  const workActive =
+    path === '/projects' ||
+    path.startsWith('/projects/') ||
+    path === '/clients' ||
+    path.startsWith('/clients/') ||
+    path === '/reports' ||
+    path.startsWith('/reports/')
+  const settingsActive = path === '/settings' || path.startsWith('/settings/')
+  const complianceActive =
+    path === '/audit' || path.startsWith('/audit/') || path === '/manual' || path.startsWith('/manual/')
+  const platformActive = path === '/platform-admin' || path.startsWith('/platform-admin/')
+
   const dismissSubscriptionStrip = () => {
     try {
       sessionStorage.setItem('brs_subscription_banner_dismissed', '1')
@@ -97,384 +101,196 @@ export default function AppLayout() {
     }
     setSubscriptionBannerDismissed(true)
   }
-  const workActive = path === '/projects' || path.startsWith('/projects/') || path === '/clients' || path.startsWith('/clients/') || path === '/reports' || path.startsWith('/reports/')
-  const administrationActive = path === '/audit' || path.startsWith('/audit/') || path === '/manual' || path.startsWith('/manual/') || path === '/settings' || path.startsWith('/settings/')
-  const platformActive = path === '/platform-admin' || path.startsWith('/platform-admin/')
 
-  function closeDesktopMenus() {
-    setWorkMenuOpen(false)
-    setAdminMenuOpen(false)
-    setPlatformMenuOpen(false)
-    setProfileMenuOpen(false)
-  }
+  const closeSidebar = () => setSidebarOpen(false)
 
   function handleLogout() {
-    closeDesktopMenus()
+    closeSidebar()
     logout()
     navigate('/login')
   }
 
-  return (
-    <div className="min-h-screen bg-surface">
-      {/* Top header bar: logo + nav + user */}
-      <header className="sticky top-0 z-40 flex items-center h-16 px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur-md border-b border-border supports-[backdrop-filter]:bg-white/90">
-        {/* Logo */}
+  const showMembers = canManageMembers(role)
+  const showBilling = canManageBilling(role)
+  const showBankRules = !!features.bank_rules && canEditBankRules(role)
+  const showApiKeys = !!features.api_access
+  const showNewProject = canCreateProject(role)
+
+  const sidebar = (
+    <>
+      <SidebarHeader onClose={closeSidebar}>
         <NavLink
-          to="/"
-          className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded"
+          to="/dashboard"
+          onClick={closeSidebar}
+          className="flex items-center gap-2.5 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-lg"
         >
-          <BrandLogo className="h-9 w-auto min-w-[140px] max-w-[min(100%,240px)] object-left object-contain" />
-          {showOrgLogo && (
-            <>
-              <span className="hidden sm:block w-px h-7 bg-gray-200 shrink-0" aria-hidden />
+          <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-gray-900 truncate">Workspace</p>
+            {showOrgLogo ? (
               <img
                 src={getLogoDisplayUrl(logoUrl!)}
                 alt="Organisation logo"
-                className="max-h-7 sm:max-h-8 w-auto max-w-[120px] object-contain object-left"
+                className="mt-0.5 max-h-5 w-auto max-w-[140px] object-contain object-left"
                 onError={() => setFailedLogoUrl(logoUrl ?? '')}
               />
-            </>
-          )}
+            ) : (
+              <BrandLogo className="mt-0.5 h-5 w-auto max-w-[140px] object-left object-contain" />
+            )}
+          </div>
         </NavLink>
+      </SidebarHeader>
 
-        {/* Main nav (desktop) */}
-        <nav className="hidden md:flex items-center gap-1 ml-6" aria-label="Main navigation">
-          <NavLink to="/dashboard" end className={navLinkClass}>
-            <LayoutDashboard className="w-4 h-4 opacity-80" />
+      <nav className="flex-1 overflow-y-auto py-2 px-3" aria-label="Workspace">
+        <SidebarNavSection label="General" active={path === '/dashboard' || path.startsWith('/dashboard/')}>
+          <NavLink to="/dashboard" end onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <LayoutDashboard className="w-5 h-5 flex-shrink-0 opacity-80" />
             Dashboard
           </NavLink>
+        </SidebarNavSection>
 
-          <div className="relative">
-            <button
-              type="button"
-              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                workActive || workMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-              onClick={() => {
-                setWorkMenuOpen((v) => !v)
-                setAdminMenuOpen(false)
-                setPlatformMenuOpen(false)
-                setProfileMenuOpen(false)
-              }}
-              aria-expanded={workMenuOpen}
-            >
-              Work
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            {workMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" aria-hidden onClick={() => setWorkMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1.5 z-40 w-52 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
-                  {workNavItems.map(({ to, label, icon: Icon, preload }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      className={navLinkClass}
-                      onMouseEnter={preload}
-                      onFocus={preload}
-                      onClick={() => setWorkMenuOpen(false)}
-                    >
-                      <Icon className="w-4 h-4 opacity-80" />
-                      {label}
-                    </NavLink>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="relative">
-            <button
-              type="button"
-              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                administrationActive || adminMenuOpen ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-              onClick={() => {
-                setAdminMenuOpen((v) => !v)
-                setWorkMenuOpen(false)
-                setPlatformMenuOpen(false)
-                setProfileMenuOpen(false)
-              }}
-              aria-expanded={adminMenuOpen}
-            >
-              Administration
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            {adminMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" aria-hidden onClick={() => setAdminMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1.5 z-40 w-52 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
-                  {administrationNavItems.map(({ to, label, icon: Icon, preload }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      className={navLinkClass}
-                      onMouseEnter={preload}
-                      onFocus={preload}
-                      onClick={() => setAdminMenuOpen(false)}
-                    >
-                      <Icon className="w-4 h-4 opacity-80" />
-                      {label}
-                    </NavLink>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {isPlatformAdmin && (
-            <div className="relative">
-              <button
-                type="button"
-                className={`flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  platformActive || platformMenuOpen ? 'bg-amber-50 text-amber-800' : 'text-amber-800 hover:bg-amber-50'
-                }`}
-                onClick={() => {
-                  setPlatformMenuOpen((v) => !v)
-                  setWorkMenuOpen(false)
-                  setAdminMenuOpen(false)
-                  setProfileMenuOpen(false)
-                }}
-                aria-expanded={platformMenuOpen}
-              >
-                <ShieldCheck className="w-4 h-4" />
-                Platform
-                <ChevronDown className="w-4 h-4" />
-              </button>
-              {platformMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" aria-hidden onClick={() => setPlatformMenuOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1.5 z-40 w-60 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
-                    <NavLink to="/platform-admin" end className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Overview
-                    </NavLink>
-                    <NavLink to="/platform-admin/organizations" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Organizations
-                    </NavLink>
-                    <NavLink to="/platform-admin/users" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Users
-                    </NavLink>
-                    <NavLink to="/platform-admin/plans" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Plans
-                    </NavLink>
-                    <NavLink to="/platform-admin/payments" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Payments
-                    </NavLink>
-                    <NavLink to="/platform-admin/revenue" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Revenue
-                    </NavLink>
-                    <NavLink to="/platform-admin/generation-settings" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Generation settings
-                    </NavLink>
-                    <NavLink to="/platform-admin/database" className={navLinkClass} onClick={() => setPlatformMenuOpen(false)}>
-                      Database
-                    </NavLink>
-                  </div>
-                </>
-              )}
-            </div>
+        <SidebarNavSection label="Work" active={workActive}>
+          <NavLink
+            to="/projects"
+            onClick={closeSidebar}
+            onMouseEnter={preloadProjectsPage}
+            onFocus={preloadProjectsPage}
+            className={sidebarNavLinkClass}
+          >
+            <FolderKanban className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Projects
+          </NavLink>
+          {showNewProject && (
+            <NavLink to="/projects/new" onClick={closeSidebar} className={sidebarNavLinkClass}>
+              <Plus className="w-5 h-5 flex-shrink-0 opacity-80" />
+              New project
+            </NavLink>
           )}
-        </nav>
+          <NavLink to="/clients" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Users className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Clients
+          </NavLink>
+          <NavLink to="/reports" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <FileText className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Reports
+          </NavLink>
+        </SidebarNavSection>
 
-        {/* Spacer */}
-        <div className="flex-1 min-w-4" />
+        <SidebarNavSection label="Settings" active={settingsActive}>
+          <NavLink
+            to="/settings/branding"
+            onClick={closeSidebar}
+            onMouseEnter={preloadSettingsPage}
+            onFocus={preloadSettingsPage}
+            className={sidebarNavLinkClass}
+          >
+            <Settings className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Firm branding
+          </NavLink>
+          {showBilling && (
+            <NavLink to="/settings/billing" onClick={closeSidebar} className={sidebarNavLinkClass}>
+              <CreditCard className="w-5 h-5 flex-shrink-0 opacity-80" />
+              Billing &amp; plans
+            </NavLink>
+          )}
+          {showMembers && (
+            <NavLink to="/settings/members" onClick={closeSidebar} className={sidebarNavLinkClass}>
+              <Users className="w-5 h-5 flex-shrink-0 opacity-80" />
+              Team members
+            </NavLink>
+          )}
+          {showApiKeys && (
+            <NavLink to="/settings/api-keys" onClick={closeSidebar} className={sidebarNavLinkClass}>
+              <Key className="w-5 h-5 flex-shrink-0 opacity-80" />
+              API keys
+            </NavLink>
+          )}
+          {showBankRules && (
+            <NavLink to="/settings/bank-rules" onClick={closeSidebar} className={sidebarNavLinkClass}>
+              <Landmark className="w-5 h-5 flex-shrink-0 opacity-80" />
+              Bank rules
+            </NavLink>
+          )}
+          <NavLink to="/settings/connections" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Radio className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Connections
+          </NavLink>
+        </SidebarNavSection>
 
-        {/* Top bar items: org, role, notifications, user, logout */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <OrgSwitcher />
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg">
+        <SidebarNavSection label="Compliance" active={complianceActive}>
+          <NavLink to="/audit" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <FileCheck className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Audit log
+          </NavLink>
+          <NavLink to="/manual" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <BookOpen className="w-5 h-5 flex-shrink-0 opacity-80" />
+            User manual
+          </NavLink>
+        </SidebarNavSection>
+
+        {isPlatformAdmin && (
+          <SidebarNavSection label="Platform" active={platformActive}>
+            <NavLink
+              to="/platform-admin"
+              onClick={closeSidebar}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive || platformActive
+                    ? 'bg-amber-50 text-amber-900'
+                    : 'text-amber-800 hover:bg-amber-50'
+                }`
+              }
+            >
+              <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+              Platform admin
+            </NavLink>
+          </SidebarNavSection>
+        )}
+      </nav>
+
+      <div className="shrink-0 border-t border-border-muted p-3 space-y-2">
+        <OrgSwitcher variant="sidebar" />
+        <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg">
+          <div
+            className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm shrink-0"
+            title={user?.email ?? ''}
+          >
+            {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'User'}</p>
+            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+          </div>
+          {roleLabel && (
             <span
-              className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider ${
-                role === 'admin' ? 'bg-primary-600 text-white' : 
-                role === 'reviewer' ? 'bg-green-600 text-white' :
-                role === 'preparer' ? 'bg-blue-600 text-white' :
-                'bg-gray-400 text-white'
+              className={`px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider shrink-0 ${
+                role === 'admin'
+                  ? 'bg-primary-600 text-white'
+                  : role === 'reviewer'
+                    ? 'bg-green-600 text-white'
+                    : role === 'preparer'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-400 text-white'
               }`}
             >
               {roleLabel}
             </span>
-          </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setNotificationOpen((o) => !o)}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-              title="Notifications"
-              aria-label="Notifications"
-              aria-expanded={notificationOpen}
-            >
-              <Bell className="w-5 h-5" />
-            </button>
-            {notificationOpen && (
-              <>
-                <div className="fixed inset-0 z-40" aria-hidden onClick={() => setNotificationOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 w-72 rounded-xl border border-gray-200 bg-white py-2 shadow-lg">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-semibold text-gray-900">Notifications</p>
-                  </div>
-                  <div className="px-4 py-6 text-center text-sm text-gray-500">No new notifications</div>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="relative hidden md:block">
-            <button
-              type="button"
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              onClick={() => {
-                setProfileMenuOpen((v) => !v)
-                setWorkMenuOpen(false)
-                setAdminMenuOpen(false)
-                setPlatformMenuOpen(false)
-              }}
-              aria-expanded={profileMenuOpen}
-            >
-              <div
-                className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm shrink-0"
-                title={user?.email ?? ''}
-              >
-                {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            {profileMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" aria-hidden onClick={() => setProfileMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-40 w-60 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-                  <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'User'}</p>
-                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    onClick={() => {
-                      setProfileMenuOpen(false)
-                      handleLogout()
-                    }}
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign out
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Mobile menu trigger */}
-          <div className="md:hidden relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100"
-              aria-label="Menu"
-              aria-expanded={menuOpen}
-            >
-              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" aria-hidden onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
-                  <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Main</p>
-                  </div>
-                  <NavLink
-                    to="/dashboard"
-                    end
-                    onClick={() => {
-                      setMenuOpen(false)
-                      closeDesktopMenus()
-                    }}
-                    className={({ isActive }) =>
-                      `flex items-center gap-2 px-4 py-2.5 text-sm font-medium ${isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'}`
-                    }
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
-                  </NavLink>
-
-                  <div className="px-3 py-2 mt-2 border-t border-gray-100">
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Work</p>
-                  </div>
-                  {workNavItems.map(({ to, label, icon: Icon, preload }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      onClick={() => {
-                        setMenuOpen(false)
-                        closeDesktopMenus()
-                      }}
-                      onMouseEnter={preload}
-                      onFocus={preload}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2 px-4 py-2.5 text-sm font-medium ${isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'}`
-                      }
-                    >
-                      <Icon className="w-4 h-4" />
-                      {label}
-                    </NavLink>
-                  ))}
-                  <div className="px-3 py-2 mt-2 border-t border-gray-100">
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
-                  </div>
-                  {administrationNavItems.map(({ to, label, icon: Icon, preload }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      onClick={() => {
-                        setMenuOpen(false)
-                        closeDesktopMenus()
-                      }}
-                      onMouseEnter={preload}
-                      onFocus={preload}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2 px-4 py-2.5 text-sm font-medium ${isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-50'}`
-                      }
-                    >
-                      <Icon className="w-4 h-4" />
-                      {label}
-                    </NavLink>
-                  ))}
-                  {isPlatformAdmin && (
-                    <>
-                      <div className="px-3 py-2 mt-2 border-t border-gray-100">
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Platform</p>
-                      </div>
-                      <NavLink to="/platform-admin" end onClick={() => setMenuOpen(false)} className={navLinkClass}>Overview</NavLink>
-                      <NavLink to="/platform-admin/organizations" onClick={() => setMenuOpen(false)} className={navLinkClass}>Organizations</NavLink>
-                      <NavLink to="/platform-admin/users" onClick={() => setMenuOpen(false)} className={navLinkClass}>Users</NavLink>
-                      <NavLink to="/platform-admin/plans" onClick={() => setMenuOpen(false)} className={navLinkClass}>Plans</NavLink>
-                      <NavLink to="/platform-admin/payments" onClick={() => setMenuOpen(false)} className={navLinkClass}>Payments</NavLink>
-                      <NavLink to="/platform-admin/revenue" onClick={() => setMenuOpen(false)} className={navLinkClass}>Revenue</NavLink>
-                      <NavLink to="/platform-admin/generation-settings" onClick={() => setMenuOpen(false)} className={navLinkClass}>Generation settings</NavLink>
-                      <NavLink to="/platform-admin/database" onClick={() => setMenuOpen(false)} className={navLinkClass}>Database</NavLink>
-                    </>
-                  )}
-                  {org?.name && (
-                    <div className="px-4 py-2 mt-2 border-t border-gray-100">
-                      <p className="text-xs text-gray-500">Org: {org.name}</p>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 border-t border-gray-100 mt-2"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      handleLogout()
-                    }}
-                  >
-                    <UserCircle2 className="w-4 h-4" />
-                    Account
-                    <span className="ml-auto text-xs text-gray-400">Sign out</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          )}
         </div>
-      </header>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
+      </div>
+    </>
+  )
 
+  const banners = (
+    <>
       {showSubscriptionStrip && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2.5 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-sm">
           <p className="min-w-0">
@@ -496,10 +312,21 @@ export default function AppLayout() {
         </div>
       )}
 
+      {subscriptionBypass &&
+        !!usageForBanner?.paywallEnabled &&
+        (sub === 'free' || sub === 'expired') &&
+        !path.startsWith('/settings') && (
+          <div className="bg-slate-50 border-b border-slate-200 text-slate-700 px-4 py-2 sm:px-6 text-sm">
+            <span className="font-medium">Platform admin bypass.</span> This workspace’s subscription is{' '}
+            {sub}; core APIs remain available for your account. Tenant users still need an active plan.
+          </div>
+        )}
+
       {layoutUsageQueryFailed && !showSubscriptionStrip && !hideLayoutUsageFailureBanner && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-sm">
           <p className="min-w-0">
-            Plan limits could not be loaded. Project filters and usage metrics may be incomplete until this succeeds.
+            Plan limits could not be loaded. Project filters and usage metrics may be incomplete until this
+            succeeds.
           </p>
           <button
             type="button"
@@ -523,10 +350,33 @@ export default function AppLayout() {
           </button>
         </div>
       )}
+    </>
+  )
 
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
-        <Outlet />
-      </main>
-    </div>
+  const topBarEnd = (
+    <>
+      <NotificationsBell />
+      <div
+        className="hidden sm:flex w-8 h-8 rounded-full bg-primary-100 items-center justify-center text-primary-700 font-semibold text-sm shrink-0"
+        title={user?.email ?? ''}
+        aria-hidden
+      >
+        {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
+      </div>
+    </>
+  )
+
+  return (
+    <SidebarShell
+      open={sidebarOpen}
+      onOpen={() => setSidebarOpen(true)}
+      onClose={closeSidebar}
+      sidebar={sidebar}
+      banners={banners}
+      topBarEnd={topBarEnd}
+      sidebarLabel="Workspace navigation"
+    >
+      <Outlet />
+    </SidebarShell>
   )
 }

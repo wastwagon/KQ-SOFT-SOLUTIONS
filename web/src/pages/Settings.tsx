@@ -13,6 +13,7 @@ import BankRulesSection from '../components/settings/BankRulesSection'
 import MembersSection from '../components/settings/MembersSection'
 import SettingsBillingTab from '../components/settings/SettingsBillingTab'
 import SettingsBrandingTab from '../components/settings/SettingsBrandingTab'
+import SettingsConnectionsTab from '../components/settings/SettingsConnectionsTab'
 import SettingsTabNav from '../components/settings/SettingsTabNav'
 import { useBrandingSettings } from '../components/settings/useBrandingSettings'
 import Card from '../components/ui/Card'
@@ -67,6 +68,7 @@ export default function Settings() {
     'branding',
     'billing',
     'members',
+    'connections',
     ...(features.api_access ? ['api-keys'] : []),
     ...(features.bank_rules ? ['bank-rules'] : []),
   ]
@@ -129,7 +131,8 @@ export default function Settings() {
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
             <p className="text-gray-500">
-              Branding, billing, team, API keys, and bank rules — everything that applies across projects.
+              Branding, billing, team, connections, API keys, and bank rules — everything that applies
+              across projects.
             </p>
           </>
         }
@@ -179,6 +182,8 @@ export default function Settings() {
             <MembersSection canManage={canManageMembers(role)} />
           </Card>
         )}
+
+        {activeTab === 'connections' && <SettingsConnectionsTab />}
 
         {activeTab === 'api-keys' && (
           <Card className="rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">

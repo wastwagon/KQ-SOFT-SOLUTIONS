@@ -185,8 +185,8 @@ model OrganizationMatchMemory {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, currency, sideKind, amountMinor, cashBookFingerprint, bankFingerprint])
-  @@index([organizationId, currency, sideKind, amountMinor])
+  @@unique([organizationId, currency, sideKind, amountMinor, cashBookFingerprint, bankFingerprint], map: "omm_org_cur_side_amt_cash_bank_key")
+  @@index([organizationId, currency, sideKind, amountMinor], map: "omm_org_cur_side_amt_idx")
   @@map("organization_match_memories")
 }
 
@@ -435,4 +435,21 @@ model PlatformSettings {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
+}
+
+/// Marketing / waitlist leads (newsletter, bank feeds interest, sales).
+model Lead {
+  id        String    @id @default(cuid())
+  email     String
+  name      String?
+  company   String?
+  source    String // newsletter | bank_feeds | sales | contact
+  message   String?
+  meta      Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+  contactedAt DateTime? @map("contacted_at")
+
+  @@index([email, source])
+  @@index([createdAt])
+  @@map("leads")
 }

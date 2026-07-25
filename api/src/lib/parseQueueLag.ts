@@ -6,6 +6,7 @@ import { prisma } from './prisma.js'
 import { setOpsGauge } from './opsMetrics.js'
 import { getParseQueue, shouldUseBullmq } from './parseJobBullmq.js'
 import { logger } from '../middleware/logging.js'
+import { sendAlertWebhook } from './alertWebhook.js'
 
 export async function refreshParseQueueLagMetrics(): Promise<void> {
   try {
@@ -30,6 +31,14 @@ export async function refreshParseQueueLagMetrics(): Promise<void> {
           { evt: 'parse_queue_lag', lagSec, pending, warnSec },
           'parse queue lag exceeded warning threshold'
         )
+        void sendAlertWebhook({
+          key: 'parse_queue_lag',
+          title: 'Parse queue lag warning',
+          text: `Oldest pending/processing document is ${lagSec}s behind (threshold ${warnSec}s).`,
+          severity: lagSec >= warnSec * 2 ? 'critical' : 'warning',
+          fields: { lagSec, pending, warnSec },
+          cooldownMs: 15 * 60_000,
+        })
       }
     } else {
       setOpsGauge('parse.queue_oldest_lag_sec', 0)

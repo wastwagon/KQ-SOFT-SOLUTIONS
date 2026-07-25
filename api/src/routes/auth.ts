@@ -348,7 +348,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!membership) {
       return res.status(401).json({ error: 'Membership not found' })
     }
-    if (membership.organization.suspendedAt) {
+    if (membership.organization.suspendedAt && !isPlatformAdmin(user.email)) {
       return res.status(401).json({ error: 'Organization suspended' })
     }
     res.json({
@@ -393,7 +393,10 @@ router.post('/login', async (req, res) => {
         where: { id: orgId },
         select: { id: true, name: true, suspendedAt: true },
       })
-      if (!org || org.suspendedAt) {
+      if (!org) {
+        return res.status(401).json({ error: 'Organization not found' })
+      }
+      if (org.suspendedAt && !isPlatformAdmin(email)) {
         return res.status(401).json({ error: 'Organization suspended' })
       }
       orgName = org.name
@@ -405,7 +408,7 @@ router.post('/login', async (req, res) => {
       if (!membership) {
         return res.status(400).json({ error: 'No organization found' })
       }
-      if (membership.organization.suspendedAt) {
+      if (membership.organization.suspendedAt && !isPlatformAdmin(email)) {
         return res.status(401).json({ error: 'Organization suspended' })
       }
       orgId = membership.organizationId

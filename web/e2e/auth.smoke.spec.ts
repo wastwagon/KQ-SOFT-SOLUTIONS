@@ -24,4 +24,21 @@ test.describe('authenticated smoke', () => {
       timeout: 15_000,
     })
   })
+
+  test('workspace nav: projects, clients, settings', async ({ page }) => {
+    await page.goto('/login')
+    await page.getByLabel(/email/i).fill(email)
+    await page.locator('#login-password').fill(password)
+    await page.getByRole('button', { name: /sign in/i }).click()
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 })
+
+    await page.getByRole('link', { name: /^Projects$/i }).first().click()
+    await expect(page).toHaveURL(/\/projects/, { timeout: 15_000 })
+
+    await page.getByRole('link', { name: /^Clients$/i }).first().click()
+    await expect(page).toHaveURL(/\/clients/, { timeout: 15_000 })
+
+    await page.getByRole('link', { name: /Firm branding|Connections|Billing/i }).first().click()
+    await expect(page).toHaveURL(/\/settings/, { timeout: 15_000 })
+  })
 })

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { AlertTriangle, HelpCircle, Info, ShieldAlert } from 'lucide-react'
+import { useFocusTrap } from '../../lib/focusTrap'
 
 /**
  * Branded confirm/alert dialog system.
@@ -159,9 +160,11 @@ function ConfirmDialogView({
   const tone = options.tone ?? 'default'
   const style = TONE_STYLES[tone]
   const Icon = style.Icon
+  const panelRef = useRef<HTMLDivElement>(null)
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
 
-  // Esc closes; focus the confirm button on open for keyboard users.
+  useFocusTrap(true, panelRef, { initialFocusRef: confirmBtnRef })
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -170,8 +173,6 @@ function ConfirmDialogView({
       }
     }
     window.addEventListener('keydown', onKey)
-    confirmBtnRef.current?.focus()
-    // Lock background scroll while dialog is open.
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
@@ -182,9 +183,6 @@ function ConfirmDialogView({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kq-confirm-title"
       className="fixed inset-0 z-[110] flex items-center justify-center px-4"
     >
       <div
@@ -194,7 +192,12 @@ function ConfirmDialogView({
         aria-hidden="true"
       />
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="kq-confirm-title"
+        tabIndex={-1}
+        className="relative w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5 outline-none"
         style={{ animation: 'kq-dialog-in 200ms ease-out both' }}
       >
         <div className="p-6 sm:p-7">

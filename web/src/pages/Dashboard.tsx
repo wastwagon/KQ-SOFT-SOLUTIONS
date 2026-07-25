@@ -118,9 +118,13 @@ export default function Dashboard() {
   const inProgressCount = projectsList.filter((p: { status: string }) => p.status !== 'completed').length
   const completedCount = projectsList.filter((p: { status: string }) => p.status === 'completed').length
 
+  const isPlatformAdmin = useAuth((s) => s.isPlatformAdmin)
   const subStatus = usage?.subscription?.status
+  const subscriptionBypass = isPlatformAdmin || !!usage?.subscriptionBypass
   const showSubscriptionPaywallBanner =
-    !!usage?.paywallEnabled && (subStatus === 'free' || subStatus === 'expired')
+    !subscriptionBypass &&
+    !!usage?.paywallEnabled &&
+    (subStatus === 'free' || subStatus === 'expired')
 
   if (projectsLoadFailed) {
     return (

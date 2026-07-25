@@ -13,6 +13,7 @@
 import { Router } from 'express'
 import { PLAN_PRICES, getLimits } from '../config/subscription.js'
 import { getPlanBySlug } from '../services/plan.js'
+import leadsPublicRouter from './leadsPublic.js'
 
 const router = Router()
 
@@ -66,5 +67,7 @@ router.get('/plans', async (_req, res) => {
   res.set('Cache-Control', 'public, max-age=300, s-maxage=300')
   res.json({ plans })
 })
+
+router.use(leadsPublicRouter)
 
 export default router

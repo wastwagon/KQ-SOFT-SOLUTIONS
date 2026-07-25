@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Users,
@@ -10,127 +10,187 @@ import {
   Settings,
   Server,
   ArrowLeft,
-  Menu,
-  X,
+  LogOut,
+  Activity,
+  Archive,
+  Inbox,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import BrandLogo from './BrandLogo'
-
-const adminNavItems = [
-  { to: '/platform-admin', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/platform-admin/organizations', label: 'Organizations', icon: Building2, end: false },
-  { to: '/platform-admin/users', label: 'Users', icon: Users, end: false },
-  { to: '/platform-admin/plans', label: 'Plans', icon: CreditCard, end: false },
-  { to: '/platform-admin/payments', label: 'Payments', icon: Receipt, end: false },
-  { to: '/platform-admin/revenue', label: 'Revenue', icon: DollarSign, end: false },
-  { to: '/platform-admin/generation-settings', label: 'Generation settings', icon: Settings, end: false },
-  { to: '/platform-admin/database', label: 'Database', icon: Server, end: false },
-]
+import SidebarShell, { SidebarHeader, SidebarNavSection } from './layout/SidebarShell'
+import { sidebarNavLinkClass } from './layout/sidebarStyles'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout, isPlatformAdmin } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const path = location.pathname
+
+  useEffect(() => {
+    if (!isPlatformAdmin) navigate('/')
+  }, [isPlatformAdmin, navigate])
 
   if (!isPlatformAdmin) {
-    navigate('/')
     return null
   }
 
+  const closeSidebar = () => setSidebarOpen(false)
+
   function handleLogout() {
+    closeSidebar()
     logout()
     navigate('/login')
   }
 
-  return (
-    <div className="min-h-screen bg-surface flex">
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-      <aside
-        className={`
-          fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-border flex flex-col
-          transform transition-transform duration-200 ease-out lg:transform-none
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}
-        aria-label="Admin navigation"
-      >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-border-muted lg:px-5">
-          <div className="flex items-center gap-2 min-w-0">
-            <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
-            <span className="text-lg font-semibold text-primary-600 truncate">Platform Admin</span>
+  const overviewActive = path === '/platform-admin'
+  const tenantsActive =
+    path.startsWith('/platform-admin/organizations') || path.startsWith('/platform-admin/users')
+  const commerceActive =
+    path.startsWith('/platform-admin/plans') ||
+    path.startsWith('/platform-admin/payments') ||
+    path.startsWith('/platform-admin/revenue')
+  const opsActive =
+    path.startsWith('/platform-admin/generation-settings') ||
+    path.startsWith('/platform-admin/database') ||
+    path.startsWith('/platform-admin/ops-metrics') ||
+    path.startsWith('/platform-admin/retention') ||
+    path.startsWith('/platform-admin/leads')
+
+  const sidebar = (
+    <>
+      <SidebarHeader onClose={closeSidebar}>
+        <NavLink
+          to="/platform-admin"
+          onClick={closeSidebar}
+          className="flex items-center gap-2.5 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-lg"
+        >
+          <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">Platform Admin</p>
+            <p className="text-[11px] text-gray-500 truncate">KQ Soft Solutions</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 lg:hidden"
-            aria-label="Close menu"
+        </NavLink>
+      </SidebarHeader>
+
+      <nav className="flex-1 overflow-y-auto py-2 px-3" aria-label="Platform admin">
+        <SidebarNavSection label="Overview" active={overviewActive}>
+          <NavLink to="/platform-admin" end onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <LayoutDashboard className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Dashboard
+          </NavLink>
+        </SidebarNavSection>
+
+        <SidebarNavSection label="Tenants" active={tenantsActive}>
+          <NavLink
+            to="/platform-admin/organizations"
+            onClick={closeSidebar}
+            className={sidebarNavLinkClass}
           >
-            <X className="w-5 h-5" />
-          </button>
+            <Building2 className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Organizations
+          </NavLink>
+          <NavLink to="/platform-admin/users" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Users className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Users
+          </NavLink>
+        </SidebarNavSection>
+
+        <SidebarNavSection label="Commerce" active={commerceActive}>
+          <NavLink to="/platform-admin/plans" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <CreditCard className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Plans
+          </NavLink>
+          <NavLink to="/platform-admin/payments" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Receipt className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Payments
+          </NavLink>
+          <NavLink to="/platform-admin/revenue" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <DollarSign className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Revenue
+          </NavLink>
+        </SidebarNavSection>
+
+        <SidebarNavSection label="Ops" active={opsActive}>
+          <NavLink
+            to="/platform-admin/ops-metrics"
+            onClick={closeSidebar}
+            className={sidebarNavLinkClass}
+          >
+            <Activity className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Ops metrics
+          </NavLink>
+          <NavLink to="/platform-admin/leads" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Inbox className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Leads
+          </NavLink>
+          <NavLink
+            to="/platform-admin/retention"
+            onClick={closeSidebar}
+            className={sidebarNavLinkClass}
+          >
+            <Archive className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Data retention
+          </NavLink>
+          <NavLink
+            to="/platform-admin/generation-settings"
+            onClick={closeSidebar}
+            className={sidebarNavLinkClass}
+          >
+            <Settings className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Generation settings
+          </NavLink>
+          <NavLink to="/platform-admin/database" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Server className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Database
+          </NavLink>
+        </SidebarNavSection>
+      </nav>
+
+      <div className="shrink-0 border-t border-border-muted p-3 space-y-2">
+        <Link
+          to="/dashboard"
+          onClick={closeSidebar}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to workspace
+        </Link>
+        <div className="flex items-center gap-2.5 px-2 py-1.5">
+          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 font-semibold text-sm shrink-0">
+            {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'A'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'Admin'}</p>
+            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+          </div>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {adminNavItems.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`
-              }
-            >
-              <Icon className="w-5 h-5 flex-shrink-0" />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-4 lg:px-6 border-b border-border bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 lg:hidden"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex-1 min-w-0" />
-          <div className="flex items-center gap-4">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to app
-            </Link>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{user?.email}</span>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
-        <main className="flex-1 overflow-auto px-4 py-6 lg:px-8 lg:py-8">
-          <div className="max-w-[1600px] mx-auto w-full">
-            <Outlet />
-          </div>
-        </main>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
       </div>
-    </div>
+    </>
+  )
+
+  return (
+    <SidebarShell
+      open={sidebarOpen}
+      onOpen={() => setSidebarOpen(true)}
+      onClose={closeSidebar}
+      sidebar={sidebar}
+      sidebarLabel="Admin navigation"
+      topBarEnd={
+        <span className="hidden sm:inline text-sm text-gray-500 truncate max-w-[220px]">
+          {user?.email}
+        </span>
+      }
+    >
+      <Outlet />
+    </SidebarShell>
   )
 }
