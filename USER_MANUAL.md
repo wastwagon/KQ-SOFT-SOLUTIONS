@@ -1,7 +1,10 @@
 # Bank Reconciliation System — User Manual
 
+> **Canonical in-app manual:** edit and deploy [`web/public/user-manual.md`](web/public/user-manual.md) — that file is what `/manual` loads. Keep this root copy aligned or treat it as a planning mirror only.
+
 **KQ SOFT SOLUTIONS** | Global product · HQ Ghana  
-**Version 1.0** | March 2026
+**Version 1.4** | July 2026  
+**Updated:** July 26, 2026
 
 ---
 

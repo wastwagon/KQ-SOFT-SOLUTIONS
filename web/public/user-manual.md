@@ -3,15 +3,16 @@
 **Product:** KQ Bank Reconciliation System (BRS)  
 **Company:** KQ SOFT SOLUTIONS  
 **Audience:** End users and operations teams  
-**Updated:** June 22, 2026
+**Updated:** July 26, 2026
 
-> Welcome to KQ BRS. This manual is your official guide for onboarding, day-to-day reconciliation, approvals, reporting, and support escalation.  
-> For best results, share this page with all new users during kickoff and role assignment.
+> Welcome to KQ BRS. This manual is your official guide for onboarding, day-to-day reconciliation, approvals, reporting, billing, and support.  
+> Share this page with all new users during kickoff and role assignment.
 
 ## Changelog
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-07-26 | 1.4 | Jul 2026 pricing (Basic/Standard/Premium/Custom), quarterly billing, org-wide bank seats, intro offer (first 2 months), clean document tools, Connections, Prudential and expanded bank list, dashboard usage meters. |
 | 2026-06-22 | 1.3 | Added dedicated [Mapping & Matching guide](/mapping-and-matching-manual.md) with field reference, matching settings, troubleshooting, and training checklist. |
 | 2026-05-11 | 1.2 | FAQ on subscription (GHS) vs project reporting currency; Settings → Billing; New project currency hint; manual cross-references. |
 | 2026-05-07 | 1.1 | Added dedicated in-app online manual page (`/manual`), dashboard help shortcut, and live update process. |
@@ -29,7 +30,8 @@ Use this checklist when onboarding a new customer team:
 - [ ] First reconciliation period confirmed
 - [ ] Sample cash book and bank statement files validated
 - [ ] Branding configured (logo/colors/report title) if required
-- [ ] Billing/plan features confirmed
+- [ ] Billing/plan confirmed (trial or paid; see [Subscription Plans](#12-subscription-plans--limits))
+- [ ] Bank account seats understood (counted **org-wide**, not per project)
 
 ---
 
@@ -43,33 +45,36 @@ Core capabilities:
 - Reconcile receipts vs credits and payments vs debits
 - Review exceptions and complete sign-off
 - Export final reports in PDF and Excel
+- Optional **Clean bank statement** / **Clean cash book** tools (parse and download without a full project)
 
 ---
 
 ## 2) Navigation
 
-- **Dashboard**: summary and quick actions
+- **Dashboard**: projects, usage meters (projects / transactions / **bank account seats**), quick actions
 - **Projects**: create and manage reconciliation jobs
+- **Clean bank statement** / **Clean cash book**: standalone parse → Excel/PDF export (no project required)
 - **Reports**: completed jobs and exports
 - **Clients**: client directory
-- **Audit log**: activity records (plan-based)
-- **Settings**: branding, billing, members, API keys, bank rules (plan-based)
+- **Audit log**: activity records (Standard+)
+- **Settings**: branding, billing, members, connections, API keys, bank rules (plan-based)
 - **User manual**: this documentation page
 
 ---
 
 ## Platform Walkthrough (Screenshots)
 
-Add your screenshots to make training easier for end users.
+Add your screenshots under `web/public/manual-images/` to make training easier.
 
 Recommended screenshots:
-1. Dashboard home
+1. Dashboard home (including bank seats meter)
 2. New project form
-3. Upload step
+3. Upload step (multi-bank selector)
 4. Mapping step
 5. Reconcile screen (both views)
 6. Review exceptions
 7. Final report/export page
+8. Settings → Billing (monthly / quarterly / yearly)
 
 Template:
 - `![Dashboard](./manual-images/dashboard.png)`
@@ -95,11 +100,12 @@ Each project follows:
 1. Open `Settings -> Members` and invite team
 2. Assign roles for maker-checker flow
 3. Configure branding and billing
-4. Review plan-gated features with your team
+4. Review plan limits (projects, transactions, **org-wide bank accounts**) with your team
+5. Optionally configure **Connections** (import path / bank-feed waitlist)
 
 ### Preparer (daily operations)
 1. Create project
-2. Upload files
+2. Upload files (assign bank account when multi-bank)
 3. Map columns
 4. Reconcile and resolve major exceptions
 5. Submit for review
@@ -114,14 +120,14 @@ Each project follows:
 
 ## 4) Create a Project
 
-Go to **Projects -> New project**, then set:
+Go to **Projects → New project**, then set:
 - project name
 - client (optional)
 - reconciliation date
 - currency (`GHS`, `USD`, `EUR`) — this is the **project reporting currency** for the BRS and workbook amounts
-- optional roll-forward source (if enabled)
+- optional roll-forward source (Premium+)
 
-**Billing vs project currency:** Organisation subscriptions are charged in **GHS** via Paystack. Project currency is independent and can be **GHS**, **USD**, or **EUR** per reconciliation job. The same note appears on the **New project** form next to the currency field.
+**Billing vs project currency:** Organisation subscriptions are charged in **GHS** via Paystack. Project currency is independent and can be **GHS**, **USD**, or **EUR** per reconciliation job.
 
 ---
 
@@ -132,10 +138,17 @@ Go to **Projects -> New project**, then set:
 
 ### Bank Statement
 - Upload as `Credits`, `Debits`, or `Both`
-- For multiple accounts, assign/select bank account name
+- For multiple accounts, add or select a **bank account** name (counts toward your org-wide seat limit)
 
 Supported formats:
 - `.xlsx`, `.xls`, `.csv`, `.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`
+
+### Clean document tools (no project)
+From the dashboard or sidebar:
+- **Clean bank statement** — upload a statement, parse with the same engine, download Excel or PDF
+- **Clean cash book** — same for cash book files  
+
+Useful for one-off cleanup or validating a file before starting a full reconciliation.
 
 ---
 
@@ -163,8 +176,8 @@ Work in:
 - **Cash book (all)** for overview (switch to Receipts or Payments to match)
 
 Matching modes:
-- 1:1 (base)
-- 1:many / many:1 / many:many (plan-based)
+- 1:1 (all plans)
+- 1:many / many:1 / many:many (Premium+)
 
 Matching settings presets:
 - **Strict** — amount + date + reference + cheque
@@ -173,8 +186,8 @@ Matching settings presets:
 
 Available actions:
 - manual matching (select rows → **Confirm Match**)
-- suggested matching
-- bulk matching and auto-match (plan-based)
+- suggested matching (Standard+)
+- bulk matching and auto-match (Standard+)
 - split suggestions for bulk deposits (Premium+)
 - unmatch
 - bank account filtering
@@ -210,31 +223,127 @@ Actions:
 - print
 - submit for review
 - approve/reopen (role-based)
-- roll-forward (plan-based)
+- roll-forward (Premium+)
 
 ---
 
-## 10) Roles
+## 10) Settings
 
-- **Admin**: full control
-- **Reviewer**: review and approval flows
-- **Preparer**: upload/map/reconcile/report preparation
+### Branding (Admin)
+Logo, primary/secondary colours, letterhead, report title, footer. Full branding on PDF/Excel is Standard+.
+
+### Billing (Admin)
+- Current plan and subscription status (trial / active / expired)
+- Usage: projects and transactions this month
+- **Upgrade / renew** via Paystack: **monthly**, **quarterly** (~5% off), or **yearly** (~17% off)
+- **Intro offer** (when enabled by platform): 50% off your first **2 billing periods**
+- Workspace billing is always **GHS**; project reporting currency is separate
+
+### Members (Admin)
+Invite by email; assign Admin / Reviewer / Preparer / Viewer. Seat limits follow the plan.
+
+### Connections
+Configure how statements arrive (manual upload path today; bank-feed waitlist where offered).
+
+### Bank Rules (Admin/Reviewer, Standard+)
+Conditions on description/amount/date → suggest match or flag for review.
+
+### API Keys (Custom / firm, Admin)
+Create and revoke keys for programmatic access.
+
+---
+
+## 11) Roles
+
+- **Admin**: full control (billing, members, branding, delete project)
+- **Reviewer**: review and approval flows; bank rules
+- **Preparer**: upload / map / reconcile / report preparation
 - **Viewer**: read-only access
 
+| Action | Admin | Reviewer | Preparer | Viewer |
+|--------|-------|----------|----------|--------|
+| Delete project | ✓ | | | |
+| Reopen project | ✓ | ✓ | | |
+| Edit bank rules | ✓ | ✓ | | |
+| Edit branding / billing / members | ✓ | | | |
+| Export report | ✓ | ✓ | ✓ | |
+| Create project / upload / map / reconcile | ✓ | ✓ | ✓ | |
+| Submit for review | ✓ | ✓ | ✓ | |
+| Approve | ✓ | ✓ | | |
+
 ---
 
-## 11) Troubleshooting
+## 12) Subscription Plans & Limits
 
-- **Upload issues:** retry with CSV/XLSX and verify date/amount columns
-- **No matches:** review mapping and matching parameters
-- **Export delay:** large reports may require additional processing time
-- **Billing unavailable:** payment integration may not be configured in the environment
+| Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Users |
+|------|-------------|-----------------|--------------------------|-------|
+| Basic | 10 | 1,000 | 5 | 1 |
+| Standard | 30 | 5,000 | 10 | 3 |
+| Premium | 100 | 20,000 | 30 | 5 |
+| Custom (firm) | Unlimited | Unlimited | Unlimited | Unlimited |
+
+| Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
+|------|---------------|-----------------|--------------|
+| Basic | 300 | 855 | 3,000 |
+| Standard | 900 | 2,565 | 9,000 |
+| Premium | 1,500 | 4,275 | 15,000 |
+| Custom | Contract | — | — |
+
+- **Trial:** 14 days on signup; renew via Paystack when the paywall is enabled.
+- **Basic** includes bookkeeping consultancy / advisory messaging.
+- **Bank account seats** are counted across the **whole organisation** (all projects), not per project.
+- **Intro offer:** 50% off the first 2 billing periods when enabled (`INTRO_OFFER_ENABLED` on the server).
+- **Billing periods:** monthly, quarterly (~5% off), yearly (~17% off vs paying monthly).
+
+### Feature gating (summary)
+
+| Capability | From |
+|------------|------|
+| 1:1 match, BRS export, OCR, clean tools | Basic+ |
+| Bulk match, AI suggestions, bank rules, audit, discrepancy | Standard+ |
+| 1:many / many:many, roll-forward, threshold approval, priority support | Premium+ |
+| Multi-client workspace, public API, custom contract | Custom |
+
+---
+
+## 13) Supported Banks
+
+Pre-built / auto-detected layouts (examples; generic Excel, CSV, and PDF always work):
+
+| Bank | Notes |
+|------|--------|
+| Ecobank | Headers + description content |
+| GCB | Value Date, Particulars, Credit/Debit |
+| Access | Header contains "access" |
+| Stanbic | Header or content |
+| Fidelity | Header or content |
+| Zenith | Regional layouts |
+| CalBank | Regional layouts |
+| ADB | Regional layouts |
+| Prudential | PDF statement layouts |
+| UBA | Header or content |
+| Absa | "absa" / "barclays" |
+
+If your bank is not auto-detected, use the **Map** step to map columns manually. Standard+ includes parser tuning support via your account team.
+
+---
+
+## 14) Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Cannot log in | Check email/password; use Forgot password if email delivery is configured |
+| Upload fails | Prefer Excel/CSV; confirm file is not corrupted; check size limits |
+| Parse / map errors | Fix date and amount columns; use Map step; see [Mapping guide](/mapping-and-matching-manual.md) |
+| No suggested matches | Standard plan or above; check mapping and matching presets |
+| Bank account limit reached | Org-wide seat limit — upgrade or archive unused accounts |
+| Export delay | Large reports (200+ lines) may take 30–60 seconds |
+| Billing unavailable | Ask an admin; Paystack may not be configured in that environment |
+| Subscription inactive | Admin: **Settings → Billing** → pay monthly, quarterly, or yearly |
 
 ---
 
 ## Data Preparation Rules (Recommended)
-
-To improve reconciliation accuracy:
 
 - Keep one reporting period per project
 - Avoid mixed date formats inside one file
@@ -253,26 +362,28 @@ No. If your file structure stays consistent, mapping is usually quick and reusab
 Yes. Upload it as `Both` during the Upload step.
 
 ### 3) Why do I still have unmatched items after reconciliation?
-Common reasons:
-- date/amount/reference differences
-- missing transactions in one source
-- wrong mapping on one side
-- post-period timing differences
+Common reasons: date/amount/reference differences, missing transactions, wrong mapping, or post-period timing differences.
 
 ### 4) Can we finalize a report with exceptions?
 Yes. You can proceed to report with exceptions noted, then approve based on your internal policy.
 
 ### 5) Who can approve or reopen a project?
-Approval and reopen access are role-based (typically reviewer/admin roles).
+Approval and reopen are role-based (typically reviewer/admin).
 
 ### 6) How do we keep users aligned after UI updates?
-Update this manual changelog every release and announce changes to all active teams.
+Update this manual changelog every release and announce changes to active teams.
 
 ### 7) Why is our subscription billed in GHS if we reconcile in USD or EUR?
-**Workspace billing** (your organisation's plan) is processed in **Ghana cedis (GHS)** through **Paystack**. That is separate from each **project's reporting currency** (`GHS`, `USD`, or `EUR`), which you set when creating the project and which controls how amounts appear on the BRS and in exports.
+**Workspace billing** is processed in **GHS** through **Paystack**. Each **project's reporting currency** (`GHS`, `USD`, or `EUR`) is set when creating the project and controls BRS amounts only.
 
 ### 8) Where do we upgrade, renew, or see subscription status?
-Admins: open **Settings → Billing**. You will see the current plan, subscription status, and Paystack payment buttons when billing is enabled for your deployment. Other roles should ask an organisation admin for plan changes.
+Admins: **Settings → Billing**. You will see plan, status, usage, and Paystack buttons for monthly / quarterly / yearly when billing is enabled.
+
+### 9) Are bank account limits per project or for the whole firm?
+**Org-wide.** Creating accounts across projects all count toward the same seat pool (5 / 10 / 30 / unlimited by plan).
+
+### 10) What is the intro offer?
+When enabled by the platform, eligible workspaces get **50% off** for their first **two** paid billing periods (each monthly, quarterly, or yearly checkout that applies the discount counts as one period).
 
 ---
 
@@ -281,6 +392,7 @@ Admins: open **Settings → Billing**. You will see the current plan, subscripti
 ### Week 1
 - Complete onboarding checklist
 - Run one pilot reconciliation end-to-end
+- Confirm bank seat usage on the Dashboard
 
 ### Week 2
 - Move live periods to platform
@@ -294,16 +406,11 @@ Admins: open **Settings → Billing**. You will see the current plan, subscripti
 
 ## Support and Escalation
 
-Set your customer-facing support details here:
-
-- **Support email:** `support@yourdomain.com`
-- **Support phone/WhatsApp:** `+233-XX-XXX-XXXX`
-- **Business hours:** `Mon-Fri, 8:00-17:00 GMT`
-- **Critical incident SLA target:** `2 hours initial response`
+- **Support email:** `info@kqsoftwaresolutions.com`
+- **Website:** [kqsoftwaresolutions.com](https://kqsoftwaresolutions.com)
+- **Business hours:** Mon–Fri, 8:00–17:00 GMT (or as contracted)
 
 ### Quick Support Message Template
-
-Use this template when raising incidents:
 
 ```text
 Organization:
@@ -318,33 +425,24 @@ Browser:
 Screenshot attached: Yes/No
 ```
 
-When contacting support, include:
-- organization name
-- project name
-- error message screenshot
-- file type used (CSV/XLSX/PDF)
-- browser and time of issue
-
 ---
 
 ## Commercial Use and Governance
 
-For customer-facing deployments, define and communicate:
-
-- **Data ownership:** customer retains ownership of all uploaded files and generated reports
-- **Access control:** customer admins are responsible for role assignment and periodic access review
-- **Approval policy:** define who can submit, approve, and reopen reconciliations
-- **Record retention:** specify how long reports and attachments are retained
+- **Data ownership:** customer retains ownership of uploaded files and generated reports
+- **Access control:** customer admins own role assignment and periodic access review
+- **Approval policy:** define who can submit, approve, and reopen
+- **Record retention:** agree retention for reports and attachments with your admin
 - **Change communication:** announce user-facing workflow changes before release
 
 Recommended:
-- perform a monthly role/access audit
+- monthly role/access audit
 - standardize upload templates per client/bank
 - document exception handling thresholds in team SOPs
 
 ---
 
-## 12) Keeping This Manual Updated
+## Keeping This Manual Updated
 
 This online page loads content from:
 
@@ -352,11 +450,10 @@ This online page loads content from:
 
 To update user documentation:
 1. Edit `web/public/user-manual.md`
-2. Deploy your platform update
-3. Users instantly see the new manual version on `/manual`
+2. Deploy the web app
+3. Users see the new version on `/manual` (sign-in required)
 
 Recommended update policy:
 - update changelog every release
-- update this manual for any user-facing workflow change
+- update this manual for any user-facing workflow or pricing change
 - keep screenshots refreshed after major UI updates
-
