@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Trash2, Building2, Ban, BadgeCheck } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Building2, Ban, BadgeCheck, LogIn } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import PageHeader from '../../components/layout/PageHeader'
+import { useAuth } from '../../store/auth'
+import { useToast } from '../../components/ui/Toast'
+import { useNavigate } from 'react-router-dom'
 
 const ROLES = ['admin', 'reviewer', 'preparer', 'viewer'] as const
 const COMPLIMENTARY_ACCESS_REASON = 'Complimentary platform admin access'
@@ -16,6 +19,9 @@ export default function AdminOrgDetail() {
   const { slug } = useParams<{ slug: string }>()
   const queryClient = useQueryClient()
   const confirm = useConfirm()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const setAuth = useAuth((s) => s.setAuth)
   const [overridePlan, setOverridePlan] = useState('')
   const [newPlan, setNewPlan] = useState('')
   const [editingName, setEditingName] = useState(false)
@@ -244,6 +250,30 @@ export default function AdminOrgDetail() {
   const hasComplimentaryAccess =
     org.plan === 'premium' && org.subscription?.status === 'active'
 
+  const impersonateMutation = useMutation({
+    mutationFn: () =>
+      api(`/admin/organizations/${slug}/impersonate`, {
+        method: 'POST',
+        body: '{}',
+      }) as Promise<{
+        user: { id: string; email: string; name?: string }
+        org: { id: string; name: string }
+        role: string
+        token: string
+        isPlatformAdmin: boolean
+        impersonating: boolean
+      }>,
+    onSuccess: (data) => {
+      setAuth(data.user, data.org, data.token, data.role, data.isPlatformAdmin, true)
+      queryClient.clear()
+      toast.success('Entered workspace', `Now viewing ${data.org.name}`)
+      navigate('/dashboard')
+    },
+    onError: (e) => {
+      toast.error('Could not enter workspace', e instanceof Error ? e.message : 'Request failed')
+    },
+  })
+
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
       {suspended && (
@@ -252,6 +282,23 @@ export default function AdminOrgDetail() {
       <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 capitalize">
         {org.plan}
       </span>
+      <Button
+        variant="primary"
+        size="sm"
+        disabled={impersonateMutation.isPending}
+        onClick={async () => {
+          const ok = await confirm({
+            title: `Enter workspace “${org.name}”?`,
+            description:
+              'You will open this subscriber’s projects and Reconcile as a platform admin (support mode). An audit log entry is recorded. Sessions expire after 2 hours.',
+            confirmLabel: 'Enter workspace',
+          })
+          if (ok) impersonateMutation.mutate()
+        }}
+      >
+        <LogIn className="w-4 h-4 mr-1" />
+        {impersonateMutation.isPending ? 'Entering…' : 'Enter workspace'}
+      </Button>
       {suspended ? (
         <Button
           variant="outline"

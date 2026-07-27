@@ -14,7 +14,15 @@ export default function AuthHydrator() {
     if (!token) return
     auth
       .me()
-      .then((data) => refreshSession({ user: data.user, org: data.org, role: data.role, isPlatformAdmin: data.isPlatformAdmin }))
+      .then((data) =>
+        refreshSession({
+          user: data.user,
+          org: data.org,
+          role: data.role,
+          isPlatformAdmin: data.isPlatformAdmin,
+          impersonating: !!data.impersonating,
+        })
+      )
       .catch(() => {})
   }, [token, refreshSession])
 

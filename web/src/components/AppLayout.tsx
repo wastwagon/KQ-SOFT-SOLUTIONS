@@ -24,6 +24,7 @@ import { canCreateProject, canEditBankRules, canManageBilling, canManageMembers 
 import BrandLogo from './BrandLogo'
 import OrgSwitcher from './OrgSwitcher'
 import NotificationsBell from './NotificationsBell'
+import ImpersonationBanner from './ImpersonationBanner'
 import SidebarShell, { SidebarHeader, SidebarNavSection } from './layout/SidebarShell'
 import { sidebarNavLinkClass } from './layout/sidebarStyles'
 
@@ -304,6 +305,7 @@ export default function AppLayout() {
 
   const banners = (
     <>
+      <ImpersonationBanner />
       {showSubscriptionStrip && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-950 px-4 py-2.5 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-sm">
           <p className="min-w-0">

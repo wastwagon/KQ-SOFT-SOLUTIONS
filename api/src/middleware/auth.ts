@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma.js'
 import { membershipAccessBlocked } from '../lib/membershipAccess.js'
+import { isPlatformAdmin } from '../lib/platformAdmin.js'
 import type { OrgRole } from '../lib/permissions.js'
 
 export function requireJwtSecret(): string {
@@ -17,10 +18,21 @@ export interface AuthPayload {
   userId: string
   orgId: string
   role?: OrgRole
+  /** True when a platform admin is viewing another organisation's workspace. */
+  impersonating?: boolean
+  /** Admin's home org id (to exit impersonation). */
+  homeOrgId?: string
 }
 
 export interface AuthRequest extends Request {
   auth?: AuthPayload
+}
+
+export type JwtAuthClaims = {
+  userId: string
+  orgId: string
+  impersonating?: boolean
+  homeOrgId?: string
 }
 
 function looksLikeJwt(token: string): boolean {
@@ -40,7 +52,34 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     return apiKeyAuthMiddleware(req, res, next)
   }
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as unknown as { userId: string; orgId: string }
+    const payload = jwt.verify(token, JWT_SECRET) as unknown as JwtAuthClaims
+
+    // Platform-admin support session: enter a subscriber org without membership.
+    if (payload.impersonating) {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { id: true, email: true, suspendedAt: true },
+      })
+      if (!user || user.suspendedAt != null || !isPlatformAdmin(user.email)) {
+        return res.status(401).json({ error: 'Invalid impersonation session' })
+      }
+      const org = await prisma.organization.findUnique({
+        where: { id: payload.orgId },
+        select: { id: true },
+      })
+      if (!org) {
+        return res.status(401).json({ error: 'Organisation not found' })
+      }
+      req.auth = {
+        userId: user.id,
+        orgId: org.id,
+        role: 'admin',
+        impersonating: true,
+        homeOrgId: payload.homeOrgId,
+      }
+      return next()
+    }
+
     const membership = await prisma.organizationMember.findFirst({
       where: { userId: payload.userId, organizationId: payload.orgId },
       select: {

@@ -18,8 +18,23 @@ interface AuthState {
   role: string | null
   token: string | null
   isPlatformAdmin: boolean
-  setAuth: (user: User, org: Org, token: string, role?: string, isPlatformAdmin?: boolean) => void
-  refreshSession: (data: { user: User; org: Org; role?: string | null; isPlatformAdmin: boolean }) => void
+  /** Platform admin is inside another organisation's workspace. */
+  impersonating: boolean
+  setAuth: (
+    user: User,
+    org: Org,
+    token: string,
+    role?: string,
+    isPlatformAdmin?: boolean,
+    impersonating?: boolean
+  ) => void
+  refreshSession: (data: {
+    user: User
+    org: Org
+    role?: string | null
+    isPlatformAdmin: boolean
+    impersonating?: boolean
+  }) => void
   logout: () => void
   isAuthenticated: () => boolean
   isAdmin: () => boolean
@@ -52,8 +67,16 @@ export const useAuth = create<AuthState>()(
       role: null,
       token: null,
       isPlatformAdmin: false,
-      setAuth: (user, org, token, role, isPlatformAdmin) => {
-        set({ user, org, token, role: role ?? null, isPlatformAdmin: !!isPlatformAdmin })
+      impersonating: false,
+      setAuth: (user, org, token, role, isPlatformAdmin, impersonating) => {
+        set({
+          user,
+          org,
+          token,
+          role: role ?? null,
+          isPlatformAdmin: !!isPlatformAdmin,
+          impersonating: !!impersonating,
+        })
       },
       refreshSession: (data) => {
         set({
@@ -61,10 +84,18 @@ export const useAuth = create<AuthState>()(
           org: data.org,
           role: data.role ?? null,
           isPlatformAdmin: !!data.isPlatformAdmin,
+          impersonating: !!data.impersonating,
         })
       },
       logout: () => {
-        set({ user: null, org: null, role: null, token: null, isPlatformAdmin: false })
+        set({
+          user: null,
+          org: null,
+          role: null,
+          token: null,
+          isPlatformAdmin: false,
+          impersonating: false,
+        })
       },
       isAuthenticated: () => !!get().token,
       isAdmin: () => get().role === 'admin',

@@ -10,6 +10,28 @@ import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 
+type ClientRow = { id: string; name: string; _count?: { projects: number } }
+
+function normalizeClientsPayload(data: unknown): {
+  list: ClientRow[]
+  unassignedProjectCount: number
+  totalProjectCount: number
+} {
+  if (Array.isArray(data)) {
+    return { list: data as ClientRow[], unassignedProjectCount: 0, totalProjectCount: 0 }
+  }
+  const obj = data as {
+    clients?: ClientRow[]
+    unassignedProjectCount?: number
+    totalProjectCount?: number
+  }
+  return {
+    list: obj.clients ?? [],
+    unassignedProjectCount: obj.unassignedProjectCount ?? 0,
+    totalProjectCount: obj.totalProjectCount ?? 0,
+  }
+}
+
 export default function Clients() {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -27,7 +49,8 @@ export default function Clients() {
     queryKey: ['clients'],
     queryFn: clients.list,
   })
-  const { data: clientsList = [], isLoading, isError, error: clientsListError } = clientsQuery
+  const { data: clientsRaw, isLoading, isError, error: clientsListError } = clientsQuery
+  const { list, unassignedProjectCount, totalProjectCount } = normalizeClientsPayload(clientsRaw)
   const paywallBlocked = isSubscriptionInactiveError(clientsQuery.error)
 
   const createMutation = useMutation({
@@ -52,8 +75,6 @@ export default function Clients() {
     setError('')
     createMutation.mutate({ name: name.trim() })
   }
-
-  const list = clientsList as { id: string; name: string; _count?: { projects: number } }[]
 
   if (paywallBlocked) {
     return (
@@ -94,17 +115,20 @@ export default function Clients() {
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
             <p>
-              <strong className="text-gray-800">Clients</strong> are the entities you reconcile for. Team
-              employees are managed under{' '}
+              <strong className="text-gray-800">Clients</strong> are labels inside this firm workspace for
+              the entities you reconcile for. This is not the same as Platform admin → Organizations
+              (subscriber accounts). Team employees are under{' '}
               <Link to="/settings/members" className="font-medium text-primary-600 hover:underline">
-                Administration → Members
+                Settings → Team members
               </Link>
               .
             </p>
             <p className="text-xs text-gray-500">
-              Assign clients when creating a project.{' '}
+              Project counts only include projects assigned to that client. Assign a client when creating
+              or editing a project.
               {!features.multi_client && (
                 <span className="text-amber-700 font-medium">
+                  {' '}
                   Filtering the project list by client requires the Firm plan.
                 </span>
               )}
@@ -112,6 +136,23 @@ export default function Clients() {
           </>
         }
       />
+
+      {unassignedProjectCount > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 max-w-2xl">
+          <p className="font-medium">
+            {unassignedProjectCount} project{unassignedProjectCount === 1 ? '' : 's'} in this workspace{' '}
+            {unassignedProjectCount === 1 ? 'is' : 'are'} not assigned to a client
+            {totalProjectCount > 0 ? ` (${totalProjectCount} total)` : ''}.
+          </p>
+          <p className="mt-1 text-amber-900/90">
+            Those projects still appear under{' '}
+            <Link to="/projects" className="font-semibold underline hover:text-amber-950">
+              Projects
+            </Link>
+            . Edit a project (or create new ones with a client selected) to link them here.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-xl">
         <input
@@ -153,7 +194,7 @@ export default function Clients() {
                     Client
                   </th>
                   <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Projects
+                    Assigned projects
                   </th>
                 </tr>
               </thead>
@@ -167,7 +208,10 @@ export default function Clients() {
                         className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg group/row"
                       >
                         {c._count?.projects ?? 0} project{(c._count?.projects ?? 0) === 1 ? '' : 's'}
-                        <ChevronRight className="w-4 h-4 opacity-70 group-hover/row:translate-x-0.5 transition-transform" aria-hidden />
+                        <ChevronRight
+                          className="w-4 h-4 opacity-70 group-hover/row:translate-x-0.5 transition-transform"
+                          aria-hidden
+                        />
                       </Link>
                     </td>
                   </tr>

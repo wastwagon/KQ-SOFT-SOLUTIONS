@@ -486,7 +486,15 @@ export async function api(path: string, options: RequestInit = {}) {
 }
 
 export const auth = {
-  me: () => api('/auth/me') as Promise<{ user: { id: string; email: string; name?: string }; org: { id: string; name: string }; role: string; isPlatformAdmin: boolean }>,
+  me: () =>
+    api('/auth/me') as Promise<{
+      user: { id: string; email: string; name?: string }
+      org: { id: string; name: string }
+      role: string
+      isPlatformAdmin: boolean
+      impersonating?: boolean
+      homeOrgId?: string | null
+    }>,
   getInvite: (token: string) =>
     api(`/auth/invite/${encodeURIComponent(token)}`) as Promise<{
       email: string
@@ -516,6 +524,15 @@ export const auth = {
       role: string
       token: string
       isPlatformAdmin: boolean
+    }>,
+  exitImpersonation: () =>
+    api('/auth/exit-impersonation', { method: 'POST', body: '{}' }) as Promise<{
+      user: { id: string; email: string; name?: string }
+      org: { id: string; name: string }
+      role: string
+      token: string
+      isPlatformAdmin: boolean
+      impersonating: boolean
     }>,
   forgotPassword: (email: string) =>
     api('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
@@ -556,7 +573,15 @@ export const documents = {
 }
 
 export const clients = {
-  list: () => api('/clients'),
+  list: () =>
+    api('/clients') as Promise<
+      | { id: string; name: string; _count?: { projects: number } }[]
+      | {
+          clients: { id: string; name: string; _count?: { projects: number } }[]
+          unassignedProjectCount: number
+          totalProjectCount: number
+        }
+    >,
   create: (body: { name: string }) => api('/clients', { method: 'POST', body: JSON.stringify(body) }),
 }
 

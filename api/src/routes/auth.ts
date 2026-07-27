@@ -333,7 +333,8 @@ router.post('/register', async (req, res) => {
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const { userId, orgId } = (req as AuthRequest).auth!
+    const auth = (req as AuthRequest).auth!
+    const { userId, orgId } = auth
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, name: true, suspendedAt: true },
@@ -341,6 +342,25 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!user || user.suspendedAt != null) {
       return res.status(401).json({ error: 'User not found or suspended' })
     }
+
+    if (auth.impersonating) {
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { id: true, name: true },
+      })
+      if (!org) {
+        return res.status(401).json({ error: 'Organisation not found' })
+      }
+      return res.json({
+        user: { id: user.id, email: user.email, name: user.name },
+        org: { id: org.id, name: org.name },
+        role: 'admin',
+        isPlatformAdmin: isPlatformAdmin(user.email),
+        impersonating: true,
+        homeOrgId: auth.homeOrgId ?? null,
+      })
+    }
+
     const membership = await prisma.organizationMember.findFirst({
       where: { userId, organizationId: orgId },
       include: { organization: { select: { id: true, name: true, suspendedAt: true } } },
@@ -356,10 +376,73 @@ router.get('/me', authMiddleware, async (req, res) => {
       org: { id: membership.organization.id, name: membership.organization.name },
       role: membership.role,
       isPlatformAdmin: isPlatformAdmin(user.email),
+      impersonating: false,
     })
   } catch (e) {
     logger.error({ err: e }, 'auth/me failed')
     res.status(500).json({ error: 'Failed to fetch session' })
+  }
+})
+
+router.post('/exit-impersonation', authMiddleware, async (req, res) => {
+  try {
+    const auth = (req as AuthRequest).auth!
+    if (!auth.impersonating) {
+      return res.status(400).json({ error: 'Not in an impersonation session' })
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true, email: true, name: true, suspendedAt: true },
+    })
+    if (!user || user.suspendedAt != null || !isPlatformAdmin(user.email)) {
+      return res.status(401).json({ error: 'Invalid impersonation session' })
+    }
+
+    let homeOrgId = auth.homeOrgId
+    let membership = homeOrgId
+      ? await prisma.organizationMember.findUnique({
+          where: { userId_organizationId: { userId: user.id, organizationId: homeOrgId } },
+          include: { organization: { select: { id: true, name: true } } },
+        })
+      : null
+    if (!membership) {
+      membership = await prisma.organizationMember.findFirst({
+        where: { userId: user.id },
+        include: { organization: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'asc' },
+      })
+    }
+    if (!membership) {
+      return res.status(400).json({ error: 'No home organisation membership to return to' })
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, orgId: membership.organizationId },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+    await prisma.auditLog.create({
+      data: {
+        organizationId: auth.orgId,
+        userId: user.id,
+        action: 'admin_impersonation_ended',
+        details: {
+          targetOrgId: auth.orgId,
+          homeOrgId: membership.organizationId,
+        },
+      },
+    })
+    res.json({
+      user: { id: user.id, email: user.email, name: user.name },
+      org: { id: membership.organization.id, name: membership.organization.name },
+      role: membership.role,
+      token,
+      isPlatformAdmin: true,
+      impersonating: false,
+    })
+  } catch (e) {
+    logger.error({ err: e }, 'auth/exit-impersonation failed')
+    res.status(500).json({ error: 'Failed to exit impersonation' })
   }
 })
 

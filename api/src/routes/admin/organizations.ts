@@ -11,6 +11,8 @@ import {
 import { invalidateOrgSubscriptionCache } from '../../services/orgSubscriptionAccess.js'
 import { normalizeOrgMemberRole } from '../../lib/orgMemberRole.js'
 import type { AuthRequest } from '../../middleware/auth.js'
+import { requireJwtSecret } from '../../middleware/auth.js'
+import jwt from 'jsonwebtoken'
 
 const router = Router()
 
@@ -477,6 +479,66 @@ router.patch('/:id', async (req, res) => {
     select: { id: true, name: true, slug: true, plan: true },
   })
   res.json(org)
+})
+
+/**
+ * Enter a subscriber organisation as the platform admin (support impersonation).
+ * Issues a short-lived JWT scoped to the target org without adding a membership row.
+ */
+router.post('/:id/impersonate', async (req: AuthRequest, res) => {
+  const orgId = await resolveOrgId(req.params.id)
+  if (!orgId) return res.status(404).json({ error: 'Organization not found' })
+
+  const auth = req.auth!
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    select: { id: true, email: true, name: true, suspendedAt: true },
+  })
+  if (!user || user.suspendedAt != null) {
+    return res.status(401).json({ error: 'User not found or suspended' })
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true, name: true, suspendedAt: true },
+  })
+  if (!org) return res.status(404).json({ error: 'Organization not found' })
+
+  const homeOrgId = auth.impersonating ? auth.homeOrgId : auth.orgId
+  const token = jwt.sign(
+    {
+      userId: user.id,
+      orgId: org.id,
+      impersonating: true,
+      homeOrgId: homeOrgId || auth.orgId,
+    },
+    requireJwtSecret(),
+    { expiresIn: '2h' }
+  )
+
+  await prisma.auditLog.create({
+    data: {
+      organizationId: org.id,
+      userId: user.id,
+      action: 'admin_impersonation_started',
+      details: {
+        targetOrgId: org.id,
+        targetOrgName: org.name,
+        homeOrgId: homeOrgId || auth.orgId,
+        suspended: !!org.suspendedAt,
+      },
+    },
+  })
+
+  res.json({
+    user: { id: user.id, email: user.email, name: user.name },
+    org: { id: org.id, name: org.name },
+    role: 'admin',
+    token,
+    isPlatformAdmin: true,
+    impersonating: true,
+    homeOrgId: homeOrgId || auth.orgId,
+  })
 })
 
 export default router
