@@ -2,14 +2,26 @@
  * Organisation match memory: learn from confirmed 1:1 matches and boost
  * future suggestions that share amount + ref/cheque/narration fingerprints.
  */
-import type { Prisma } from '@prisma/client'
+import { Prisma, type Prisma as PrismaTypes } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { tokenizeNarration, type Tx } from './matching.js'
 
 /** Default Prisma client or a transaction client for atomic confirm+remember. */
-export type MatchMemoryDb = Prisma.TransactionClient | typeof prisma
+export type MatchMemoryDb = PrismaTypes.TransactionClient | typeof prisma
 
 export type MatchSideKind = 'receipt' | 'payment'
+
+/** True when match-memory table was never created (false --applied migrate / drift). */
+export function isMissingMatchMemoryTable(e: unknown): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2021') return false
+  const table = String((e.meta as { table?: string } | undefined)?.table ?? '')
+  const model = String((e.meta as { modelName?: string } | undefined)?.modelName ?? '')
+  return (
+    table.includes('organization_match_memories') ||
+    model === 'OrganizationMatchMemory' ||
+    /organization_match_memories/i.test(e.message)
+  )
+}
 
 const MEMORY_BOOST = 0.1
 const MEMORY_CONFIDENCE_CAP = 0.95
@@ -256,32 +268,37 @@ export async function rememberOrganisationMatch(opts: {
   const amountMinor = amountToMinor(opts.cashBookTx.amount)
   const db = opts.db ?? prisma
 
-  await db.organizationMatchMemory.upsert({
-    where: {
-      organizationId_currency_sideKind_amountMinor_cashBookFingerprint_bankFingerprint: {
+  try {
+    await db.organizationMatchMemory.upsert({
+      where: {
+        organizationId_currency_sideKind_amountMinor_cashBookFingerprint_bankFingerprint: {
+          organizationId: opts.organizationId,
+          currency,
+          sideKind: opts.sideKind,
+          amountMinor,
+          cashBookFingerprint: cb.fingerprint,
+          bankFingerprint: bk.fingerprint,
+        },
+      },
+      create: {
         organizationId: opts.organizationId,
         currency,
         sideKind: opts.sideKind,
         amountMinor,
         cashBookFingerprint: cb.fingerprint,
         bankFingerprint: bk.fingerprint,
+        confirmationCount: 1,
+        lastConfirmedAt: new Date(),
       },
-    },
-    create: {
-      organizationId: opts.organizationId,
-      currency,
-      sideKind: opts.sideKind,
-      amountMinor,
-      cashBookFingerprint: cb.fingerprint,
-      bankFingerprint: bk.fingerprint,
-      confirmationCount: 1,
-      lastConfirmedAt: new Date(),
-    },
-    update: {
-      confirmationCount: { increment: 1 },
-      lastConfirmedAt: new Date(),
-    },
-  })
+      update: {
+        confirmationCount: { increment: 1 },
+        lastConfirmedAt: new Date(),
+      },
+    })
+  } catch (e) {
+    if (isMissingMatchMemoryTable(e)) return false
+    throw e
+  }
   if (opts.prune !== false && !opts.db) {
     await pruneMatchMemoryIfOverCap(opts.organizationId)
   }
@@ -295,23 +312,28 @@ export function matchMemoryCapPerOrg(): number {
 }
 
 export async function pruneMatchMemoryIfOverCap(organizationId: string): Promise<number> {
-  const cap = matchMemoryCapPerOrg()
-  const count = await prisma.organizationMatchMemory.count({
-    where: { organizationId },
-  })
-  if (count <= cap) return 0
-  const excess = count - cap
-  const stale = await prisma.organizationMatchMemory.findMany({
-    where: { organizationId },
-    orderBy: [{ lastConfirmedAt: 'asc' }, { confirmationCount: 'asc' }, { createdAt: 'asc' }],
-    take: excess,
-    select: { id: true },
-  })
-  if (!stale.length) return 0
-  const result = await prisma.organizationMatchMemory.deleteMany({
-    where: { id: { in: stale.map((r) => r.id) } },
-  })
-  return result.count
+  try {
+    const cap = matchMemoryCapPerOrg()
+    const count = await prisma.organizationMatchMemory.count({
+      where: { organizationId },
+    })
+    if (count <= cap) return 0
+    const excess = count - cap
+    const stale = await prisma.organizationMatchMemory.findMany({
+      where: { organizationId },
+      orderBy: [{ lastConfirmedAt: 'asc' }, { confirmationCount: 'asc' }, { createdAt: 'asc' }],
+      take: excess,
+      select: { id: true },
+    })
+    if (!stale.length) return 0
+    const result = await prisma.organizationMatchMemory.deleteMany({
+      where: { id: { in: stale.map((r) => r.id) } },
+    })
+    return result.count
+  } catch (e) {
+    if (isMissingMatchMemoryTable(e)) return 0
+    throw e
+  }
 }
 
 /** Remember a confirmed 1:N or N:1 split — never invents pairwise Cartesian memories. */
@@ -344,32 +366,37 @@ export async function rememberOrganisationSplitMatch(opts: {
 
   const currency = (opts.currency || 'GHS').toUpperCase()
   const db = opts.db ?? prisma
-  await db.organizationMatchMemory.upsert({
-    where: {
-      organizationId_currency_sideKind_amountMinor_cashBookFingerprint_bankFingerprint: {
+  try {
+    await db.organizationMatchMemory.upsert({
+      where: {
+        organizationId_currency_sideKind_amountMinor_cashBookFingerprint_bankFingerprint: {
+          organizationId: opts.organizationId,
+          currency,
+          sideKind: opts.sideKind,
+          amountMinor,
+          cashBookFingerprint: cbFp.fingerprint,
+          bankFingerprint: bkFp.fingerprint,
+        },
+      },
+      create: {
         organizationId: opts.organizationId,
         currency,
         sideKind: opts.sideKind,
         amountMinor,
         cashBookFingerprint: cbFp.fingerprint,
         bankFingerprint: bkFp.fingerprint,
+        confirmationCount: 1,
+        lastConfirmedAt: new Date(),
       },
-    },
-    create: {
-      organizationId: opts.organizationId,
-      currency,
-      sideKind: opts.sideKind,
-      amountMinor,
-      cashBookFingerprint: cbFp.fingerprint,
-      bankFingerprint: bkFp.fingerprint,
-      confirmationCount: 1,
-      lastConfirmedAt: new Date(),
-    },
-    update: {
-      confirmationCount: { increment: 1 },
-      lastConfirmedAt: new Date(),
-    },
-  })
+      update: {
+        confirmationCount: { increment: 1 },
+        lastConfirmedAt: new Date(),
+      },
+    })
+  } catch (e) {
+    if (isMissingMatchMemoryTable(e)) return false
+    throw e
+  }
   if (opts.prune !== false && !opts.db) {
     await pruneMatchMemoryIfOverCap(opts.organizationId)
   }
@@ -455,10 +482,15 @@ export async function forgetOrganisationMatchMemory(
   organizationId: string,
   memoryId: string
 ): Promise<boolean> {
-  const result = await prisma.organizationMatchMemory.deleteMany({
-    where: { id: memoryId, organizationId },
-  })
-  return result.count > 0
+  try {
+    const result = await prisma.organizationMatchMemory.deleteMany({
+      where: { id: memoryId, organizationId },
+    })
+    return result.count > 0
+  } catch (e) {
+    if (isMissingMatchMemoryTable(e)) return false
+    throw e
+  }
 }
 
 export async function loadOrganisationMatchMemories(opts: {
@@ -501,24 +533,37 @@ export async function loadOrganisationMatchMemoriesBatch(opts: {
   }
   if (!expanded.size) return empty
 
-  const rows = await prisma.organizationMatchMemory.findMany({
-    where: {
-      organizationId: opts.organizationId,
-      currency,
-      sideKind: { in: [...sideKinds] },
-      amountMinor: { in: [...expanded] },
-    },
-    orderBy: [{ confirmationCount: 'desc' }, { lastConfirmedAt: 'desc' }],
-    take: 800,
-    select: {
-      id: true,
-      sideKind: true,
-      amountMinor: true,
-      cashBookFingerprint: true,
-      bankFingerprint: true,
-      confirmationCount: true,
-    },
-  })
+  let rows: {
+    id: string
+    sideKind: string
+    amountMinor: number
+    cashBookFingerprint: string
+    bankFingerprint: string
+    confirmationCount: number
+  }[]
+  try {
+    rows = await prisma.organizationMatchMemory.findMany({
+      where: {
+        organizationId: opts.organizationId,
+        currency,
+        sideKind: { in: [...sideKinds] },
+        amountMinor: { in: [...expanded] },
+      },
+      orderBy: [{ confirmationCount: 'desc' }, { lastConfirmedAt: 'desc' }],
+      take: 800,
+      select: {
+        id: true,
+        sideKind: true,
+        amountMinor: true,
+        cashBookFingerprint: true,
+        bankFingerprint: true,
+        confirmationCount: true,
+      },
+    })
+  } catch (e) {
+    if (isMissingMatchMemoryTable(e)) return empty
+    throw e
+  }
 
   const out: Record<MatchSideKind, MatchMemoryRecord[]> = { receipt: [], payment: [] }
   for (const r of rows) {

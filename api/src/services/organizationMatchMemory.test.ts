@@ -6,11 +6,13 @@ import {
   buildMultiSideFingerprint,
   buildSideFingerprint,
   fingerprintsMatch,
+  isMissingMatchMemoryTable,
   memoryEligibleForBoost,
   multiFingerprintsMatch,
   type MatchMemoryRecord,
 } from './organizationMatchMemory.js'
 import type { Tx } from './matching.js'
+import { Prisma } from '@prisma/client'
 
 function tx(partial: Partial<Tx> & { id: string; amount: number }): Tx {
   return {
@@ -24,6 +26,23 @@ function tx(partial: Partial<Tx> & { id: string; amount: number }): Tx {
 }
 
 describe('organizationMatchMemory', () => {
+  it('detects missing organization_match_memories table (P2021)', () => {
+    const err = new Prisma.PrismaClientKnownRequestError('table missing', {
+      code: 'P2021',
+      clientVersion: '5.22.0',
+      meta: { modelName: 'OrganizationMatchMemory', table: 'public.organization_match_memories' },
+    })
+    expect(isMissingMatchMemoryTable(err)).toBe(true)
+    expect(
+      isMissingMatchMemoryTable(
+        new Prisma.PrismaClientKnownRequestError('unique', {
+          code: 'P2002',
+          clientVersion: '5.22.0',
+        })
+      )
+    ).toBe(false)
+  })
+
   it('prefers cheque fingerprints over narration', () => {
     const fp = buildSideFingerprint({
       amount: 100,

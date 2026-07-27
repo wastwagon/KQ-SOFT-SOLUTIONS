@@ -78,7 +78,7 @@ try {
 # Known failed-migration → table created by that migration (partial apply detection).
 migration_object_exists() {
   case "$1" in
-    20260718110000_organization_match_memory)
+    20260718110000_organization_match_memory|20260727090000_ensure_organization_match_memories)
       pg_table_exists organization_match_memories
       ;;
     *)
@@ -93,7 +93,7 @@ try_p3009_recover() {
   # 2) Plus any migration name mentioned in the P3009 log (`2026…_name`)
   grep -q "P3009" "$LOG" 2>/dev/null || return 1
 
-  DEFAULT_MIGS="20250228140000_add_project_slug,20260718110000_organization_match_memory"
+  DEFAULT_MIGS="20250228140000_add_project_slug,20260718110000_organization_match_memory,20260727090000_ensure_organization_match_memories"
   MIGS="${PRISMA_AUTO_RESOLVE_MIGRATIONS-$DEFAULT_MIGS}"
 
   names=""
@@ -127,10 +127,9 @@ try_p3009_recover() {
       if npx prisma migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2; then
         resolved_any=1
       else
-        echo "start-api: WARN — migrate resolve --rolled-back $m failed; trying --applied" >&2
-        if npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
-          resolved_any=1
-        fi
+        # Never mark --applied when the migration object is missing — that leaves
+        # migrate deploy "OK" while runtime queries crash (P2021).
+        echo "start-api: WARN — migrate resolve --rolled-back $m failed; not marking applied (table missing)" >&2
       fi
     fi
   done
@@ -175,6 +174,36 @@ seed_demo_users() {
   fi
 }
 
+# If migrate history says applied but the table was never created (false --applied),
+# create it now so Reconcile does not crash with P2021.
+ensure_organization_match_memories() {
+  if pg_table_exists organization_match_memories; then
+    return 0
+  fi
+  # Prefer the idempotent ensure migration; fall back to original create migration.
+  SQL_FILE="prisma/migrations/20260727090000_ensure_organization_match_memories/migration.sql"
+  if [ ! -f "$SQL_FILE" ]; then
+    SQL_FILE="prisma/migrations/20260718110000_organization_match_memory/migration.sql"
+  fi
+  if [ ! -f "$SQL_FILE" ]; then
+    echo "start-api: WARN — match-memory SQL missing; cannot heal organization_match_memories" >&2
+    return 1
+  fi
+  echo "start-api: organization_match_memories missing after migrate OK — applying $SQL_FILE" >&2
+  if npx prisma db execute --file "$SQL_FILE" --schema="$SCHEMA" >&2; then
+    if pg_table_exists organization_match_memories; then
+      echo "start-api: organization_match_memories created" >&2
+      npx prisma migrate resolve --applied 20260727090000_ensure_organization_match_memories --schema="$SCHEMA" >&2 || true
+      npx prisma migrate resolve --applied 20260718110000_organization_match_memory --schema="$SCHEMA" >&2 || true
+      return 0
+    fi
+    echo "start-api: WARN — SQL ran but organization_match_memories still missing" >&2
+    return 1
+  fi
+  echo "start-api: WARN — failed to create organization_match_memories; Reconcile soft-fails without org memory" >&2
+  return 1
+}
+
 # If migrate deploy fails because objects already exist (partial prior run), mark that migration applied.
 try_mark_applied_on_already_exists() {
   grep -qiE 'already exists|duplicate key|42P07|42710' "$LOG" 2>/dev/null || return 1
@@ -200,6 +229,7 @@ while [ "$round" -lt "$MAX_ROUNDS" ]; do
     rm -f "$LOG"
     trap - EXIT
     echo "start-api: prisma migrate deploy OK" >&2
+    ensure_organization_match_memories
     seed_plans
     seed_demo_users
     echo "start-api: starting Node on port ${PORT:-9001}" >&2
