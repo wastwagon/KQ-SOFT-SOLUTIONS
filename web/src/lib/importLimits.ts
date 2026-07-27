@@ -5,8 +5,10 @@
 
 export const DEFAULT_MAX_UPLOAD_SIZE_MB = 50
 export const DEFAULT_PDF_OCR_MAX_PAGES = 200
-/** Default reconcile fetch limit (matches API RECONCILE_MAX_LIMIT). */
-export const RECONCILE_CLIENT_LIMIT = 40_000
+/** Default reconcile fetch limit (matches API RECONCILE_DEFAULT_LIMIT). */
+export const RECONCILE_CLIENT_LIMIT = 16_000
+/** Hard cap when user clicks “load more” (matches API RECONCILE_MAX_LIMIT). */
+export const RECONCILE_CLIENT_MAX_LIMIT = 40_000
 export const SIGN_WARNINGS_PREVIEW_MAX = 100
 
 const mb = parseInt(import.meta.env.VITE_MAX_UPLOAD_SIZE_MB ?? String(DEFAULT_MAX_UPLOAD_SIZE_MB), 10)

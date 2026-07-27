@@ -57,6 +57,7 @@ import { resolveWorkbookNetting } from '../lib/brsQueryFlags.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { heavyOrgRouteLimiter } from '../middleware/heavyRouteLimiter.js'
+import { logger } from '../middleware/logging.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -127,6 +128,7 @@ export function getMatchConflictErrorBody(e: unknown) {
 
 router.get('/:projectId', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
+  try {
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const bankAccountId = (req.query.bankAccountId as string) || undefined
@@ -710,6 +712,17 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     matchedBankIds: Array.from(matchedBankIds),
     matches: matchList,
   })
+  } catch (e) {
+    logger.error(
+      { err: e, orgId, projectId: req.params.projectId },
+      'reconcile GET failed'
+    )
+    return res.status(500).json({
+      error:
+        'Could not load reconciliation data. If files were just mapped, wait a moment and retry. For very large statements, try again or contact support.',
+      code: 'RECONCILE_LOAD_FAILED',
+    })
+  }
 })
 
 const matchSchema = z.object({

@@ -9,7 +9,7 @@ import {
   unlessSubscriptionInactive,
 } from '../../lib/api'
 import { runPhasedAutoMatchRounds } from '../../lib/phasedAutoMatch'
-import { RECONCILE_CLIENT_LIMIT } from '../../lib/importLimits'
+import { RECONCILE_CLIENT_LIMIT, RECONCILE_CLIENT_MAX_LIMIT } from '../../lib/importLimits'
 import { useToast } from '../ui/Toast'
 import type {
   MatchParams,
@@ -123,6 +123,8 @@ export interface ReconcileSession {
   subscriptionPaywallBlocked: boolean
   /** True when reconcile fetch failed for a reason other than subscription paywall. */
   reconcileLoadFailed: boolean
+  /** Underlying reconcile query error (when {@link reconcileLoadFailed}). */
+  reconcileError: unknown
   // View / scope
   view: ReconcileView
   setView: (view: ReconcileView) => void
@@ -226,11 +228,24 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     enabled: !!projectId,
     staleTime: 60_000,
   })
-  const { data, isLoading, isError: reconcileQueryFailed } = reconcileQuery
+  const { data, isLoading, isError: reconcileQueryFailed, error: reconcileError } = reconcileQuery
   const subscriptionPaywallBlocked = isSubscriptionInactiveError(reconcileQuery.error)
   const reconcileLoadFailed = !subscriptionPaywallBlocked && reconcileQueryFailed
 
   const bankAccounts = useMemo(() => data?.bankAccounts ?? [], [data?.bankAccounts])
+
+  // Drop a stale localStorage bank-account filter so we do not keep querying an
+  // account that no longer exists on this project.
+  useEffect(() => {
+    if (!projectId || bankAccounts.length === 0 || !bankAccountId) return
+    if (bankAccounts.some((a) => a.id === bankAccountId)) return
+    setBankAccountIdState('')
+    try {
+      localStorage.removeItem(STORAGE_KEY_BANK(projectId))
+    } catch {
+      /* ignore */
+    }
+  }, [projectId, bankAccounts, bankAccountId])
 
   // Effective bank account: only show the saved value once we've confirmed
   // the account still exists on the project.  Until accounts have loaded
@@ -441,13 +456,14 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     isLoading,
     subscriptionPaywallBlocked,
     reconcileLoadFailed,
+    reconcileError,
     view,
     setView,
     bankAccountId: effectiveBankAccountId,
     setBankAccountId: setBankAccountIdState,
     bankAccounts,
     reconcileLimit,
-    loadMore: () => setReconcileLimit(RECONCILE_CLIENT_LIMIT),
+    loadMore: () => setReconcileLimit(RECONCILE_CLIENT_MAX_LIMIT),
     matchParams,
     setMatchParams: setMatchParamsState,
     resetMatchParams: () => setMatchParamsState(DEFAULT_MATCH_PARAMS),

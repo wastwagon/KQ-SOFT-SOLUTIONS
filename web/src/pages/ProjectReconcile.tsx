@@ -100,10 +100,19 @@ export default function ProjectReconcile({
   }
 
   if (reconcileLoadFailed) {
+    const err = session.reconcileError
+    const detail =
+      err instanceof Error && err.message.trim()
+        ? err.message
+        : 'Check your connection and try again.'
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
         <p className="font-medium text-red-900">Could not load reconciliation data</p>
-        <p className="mt-1">Check your connection and try again.</p>
+        <p className="mt-1">{detail}</p>
+        <p className="mt-2 text-xs text-red-700/90">
+          If you just finished mapping, wait a few seconds for imports to settle, then retry. Large PDF/Excel
+          files can take longer on first open of Reconcile.
+        </p>
         <button
           type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
