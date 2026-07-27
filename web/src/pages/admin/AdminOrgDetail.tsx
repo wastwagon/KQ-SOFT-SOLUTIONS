@@ -211,6 +211,30 @@ export default function AdminOrgDetail() {
     },
   })
 
+  const impersonateMutation = useMutation({
+    mutationFn: () =>
+      api(`/admin/organizations/${slug}/impersonate`, {
+        method: 'POST',
+        body: '{}',
+      }) as Promise<{
+        user: { id: string; email: string; name?: string }
+        org: { id: string; name: string }
+        role: string
+        token: string
+        isPlatformAdmin: boolean
+        impersonating: boolean
+      }>,
+    onSuccess: (data) => {
+      setAuth(data.user, data.org, data.token, data.role, data.isPlatformAdmin, true)
+      queryClient.clear()
+      toast.success('Entered workspace', `Now viewing ${data.org.name}`)
+      navigate('/dashboard')
+    },
+    onError: (e) => {
+      toast.error('Could not enter workspace', e instanceof Error ? e.message : 'Request failed')
+    },
+  })
+
   if (!slug) {
     return (
       <div className="space-y-6">
@@ -249,30 +273,6 @@ export default function AdminOrgDetail() {
   const suspended = org.suspendedAt != null
   const hasComplimentaryAccess =
     org.plan === 'premium' && org.subscription?.status === 'active'
-
-  const impersonateMutation = useMutation({
-    mutationFn: () =>
-      api(`/admin/organizations/${slug}/impersonate`, {
-        method: 'POST',
-        body: '{}',
-      }) as Promise<{
-        user: { id: string; email: string; name?: string }
-        org: { id: string; name: string }
-        role: string
-        token: string
-        isPlatformAdmin: boolean
-        impersonating: boolean
-      }>,
-    onSuccess: (data) => {
-      setAuth(data.user, data.org, data.token, data.role, data.isPlatformAdmin, true)
-      queryClient.clear()
-      toast.success('Entered workspace', `Now viewing ${data.org.name}`)
-      navigate('/dashboard')
-    },
-    onError: (e) => {
-      toast.error('Could not enter workspace', e instanceof Error ? e.message : 'Request failed')
-    },
-  })
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
