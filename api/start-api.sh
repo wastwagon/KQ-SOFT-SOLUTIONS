@@ -59,20 +59,25 @@ bootstrap_empty_schema() {
 # Returns 0 if public table $1 exists (best-effort; used to choose --applied vs --rolled-back).
 pg_table_exists() {
   table="$1"
+  # Use information_schema (stable under Prisma) and exit after disconnect so
+  # process.exit-in-try + await-in-finally cannot scramble the status code.
   node --input-type=module -e "
 import { PrismaClient } from '@prisma/client';
 const p = new PrismaClient();
+let ok = false;
 try {
   const rows = await p.\$queryRawUnsafe(
-    \"SELECT to_regclass('public.$table') AS r\"
+    \"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '\" + process.argv[1] + \"') AS e\"
   );
-  process.exit(rows[0]?.r ? 0 : 1);
-} catch {
-  process.exit(1);
+  ok = !!(rows?.[0]?.e === true || rows?.[0]?.e === 't' || rows?.[0]?.e === 1);
+} catch (err) {
+  console.error('start-api: pg_table_exists error:', err?.message || err);
+  ok = false;
 } finally {
-  await p.\$disconnect();
+  await p.\$disconnect().catch(() => {});
 }
-" 2>/dev/null
+process.exit(ok ? 0 : 1);
+" "$table"
 }
 
 # Known failed-migration → table created by that migration (partial apply detection).
@@ -176,32 +181,50 @@ seed_demo_users() {
 
 # If migrate history says applied but the table was never created (false --applied),
 # create it now so Reconcile does not crash with P2021.
+# IMPORTANT: under `set -e`, this function must not abort boot — always return 0.
 ensure_organization_match_memories() {
   if pg_table_exists organization_match_memories; then
+    echo "start-api: organization_match_memories present" >&2
     return 0
   fi
-  # Prefer the idempotent ensure migration; fall back to original create migration.
-  SQL_FILE="prisma/migrations/20260727090000_ensure_organization_match_memories/migration.sql"
+
+  SQL_FILE="prisma/heal/ensure_organization_match_memories.sql"
   if [ ! -f "$SQL_FILE" ]; then
-    SQL_FILE="prisma/migrations/20260718110000_organization_match_memory/migration.sql"
+    SQL_FILE="prisma/migrations/20260727090000_ensure_organization_match_memories/migration.sql"
   fi
   if [ ! -f "$SQL_FILE" ]; then
-    echo "start-api: WARN — match-memory SQL missing; cannot heal organization_match_memories" >&2
-    return 1
+    echo "start-api: WARN — match-memory SQL missing; continuing without org memory table" >&2
+    return 0
   fi
+
   echo "start-api: organization_match_memories missing after migrate OK — applying $SQL_FILE" >&2
-  if npx prisma db execute --file "$SQL_FILE" --schema="$SCHEMA" >&2; then
-    if pg_table_exists organization_match_memories; then
-      echo "start-api: organization_match_memories created" >&2
-      npx prisma migrate resolve --applied 20260727090000_ensure_organization_match_memories --schema="$SCHEMA" >&2 || true
-      npx prisma migrate resolve --applied 20260718110000_organization_match_memory --schema="$SCHEMA" >&2 || true
-      return 0
-    fi
-    echo "start-api: WARN — SQL ran but organization_match_memories still missing" >&2
-    return 1
+  if ! npx prisma db execute --file "$SQL_FILE" --schema="$SCHEMA" >&2; then
+    echo "start-api: WARN — db execute failed for organization_match_memories; continuing (soft-fail in API)" >&2
+    return 0
   fi
-  echo "start-api: WARN — failed to create organization_match_memories; Reconcile soft-fails without org memory" >&2
-  return 1
+
+  # Optional FK (separate statement so a constraint error cannot roll back CREATE TABLE).
+  printf '%s\n' \
+    'DO $$ BEGIN' \
+    '  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '\''organization_match_memories_organization_id_fkey'\'')' \
+    '     AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_name = '\''organizations'\'')' \
+    '     AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_name = '\''organization_match_memories'\'') THEN' \
+    '    ALTER TABLE "organization_match_memories"' \
+    '      ADD CONSTRAINT "organization_match_memories_organization_id_fkey"' \
+    '      FOREIGN KEY ("organization_id") REFERENCES "organizations"("id")' \
+    '      ON DELETE CASCADE ON UPDATE CASCADE;' \
+    '  END IF;' \
+    'END $$;' | npx prisma db execute --stdin --schema="$SCHEMA" >&2 || true
+
+  if pg_table_exists organization_match_memories; then
+    echo "start-api: organization_match_memories created" >&2
+    npx prisma migrate resolve --applied 20260727090000_ensure_organization_match_memories --schema="$SCHEMA" >&2 || true
+    npx prisma migrate resolve --applied 20260718110000_organization_match_memory --schema="$SCHEMA" >&2 || true
+    return 0
+  fi
+
+  echo "start-api: WARN — organization_match_memories still missing after heal; continuing (API soft-fails without org memory)" >&2
+  return 0
 }
 
 # If migrate deploy fails because objects already exist (partial prior run), mark that migration applied.
