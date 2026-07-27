@@ -10,6 +10,7 @@ import {
   isSubscriptionInactiveError,
   unlessSubscriptionInactive,
 } from '../lib/api'
+import { normalizeClientsList } from '../lib/clientsPayload'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
@@ -56,7 +57,8 @@ export default function ProjectNew() {
     queryKey: ['clients'],
     queryFn: clients.list,
   })
-  const { data: clientsList = [], isError: clientsQueryFailed } = clientsQuery
+  const { data: clientsRaw, isError: clientsQueryFailed } = clientsQuery
+  const clientsList = useMemo(() => normalizeClientsList(clientsRaw), [clientsRaw])
   const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
@@ -232,7 +234,7 @@ export default function ProjectNew() {
               className={selectClass}
             >
               <option value="">— None —</option>
-              {(clientsList as { id: string; name: string }[]).map((c) => (
+              {clientsList.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

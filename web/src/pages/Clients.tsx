@@ -3,40 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Building2, ChevronRight } from 'lucide-react'
 import { clients, subscription, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
+import { normalizeClientsPayload } from '../lib/clientsPayload'
 import { useAuth } from '../store/auth'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
-
-type ClientRow = { id: string; name: string; _count?: { projects: number } }
-
-function normalizeClientsPayload(data: unknown): {
-  list: ClientRow[]
-  unassignedProjectCount: number
-  totalProjectCount: number
-} {
-  if (data == null) {
-    return { list: [], unassignedProjectCount: 0, totalProjectCount: 0 }
-  }
-  if (Array.isArray(data)) {
-    return { list: data as ClientRow[], unassignedProjectCount: 0, totalProjectCount: 0 }
-  }
-  if (typeof data !== 'object') {
-    return { list: [], unassignedProjectCount: 0, totalProjectCount: 0 }
-  }
-  const obj = data as {
-    clients?: ClientRow[]
-    unassignedProjectCount?: number
-    totalProjectCount?: number
-  }
-  return {
-    list: Array.isArray(obj.clients) ? obj.clients : [],
-    unassignedProjectCount: obj.unassignedProjectCount ?? 0,
-    totalProjectCount: obj.totalProjectCount ?? 0,
-  }
-}
 
 export default function Clients() {
   const queryClient = useQueryClient()
@@ -56,7 +29,7 @@ export default function Clients() {
     queryFn: clients.list,
   })
   const { data: clientsRaw, isLoading, isError, error: clientsListError } = clientsQuery
-  const { list, unassignedProjectCount, totalProjectCount } = normalizeClientsPayload(clientsRaw)
+  const { clients: list, unassignedProjectCount, totalProjectCount } = normalizeClientsPayload(clientsRaw)
   const paywallBlocked = isSubscriptionInactiveError(clientsQuery.error)
 
   const createMutation = useMutation({

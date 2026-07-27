@@ -1,7 +1,8 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clients, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
+import { normalizeClientsList } from '../lib/clientsPayload'
 import {
   canDeleteProject,
   canEditProject,
@@ -111,7 +112,8 @@ export default function ProjectDetail() {
     queryKey: ['clients'],
     queryFn: clients.list,
   })
-  const { data: clientsList = [], isError: clientsQueryFailed } = clientsQuery
+  const { data: clientsRaw, isError: clientsQueryFailed } = clientsQuery
+  const clientsList = useMemo(() => normalizeClientsList(clientsRaw), [clientsRaw])
   const paywallBlocked =
     isSubscriptionInactiveError(projectQuery.error) || isSubscriptionInactiveError(clientsQuery.error)
   const loadFailed = !paywallBlocked && (projectQueryFailed || clientsQueryFailed)
@@ -195,7 +197,7 @@ export default function ProjectDetail() {
     <div className="space-y-6">
       <ProjectHeader
         project={project}
-        clients={clientsList as { id: string; name: string }[]}
+        clients={clientsList}
         canEdit={canEditProject(role)}
         canDelete={canDeleteProject(role)}
         isUpdating={updateMutation.isPending}

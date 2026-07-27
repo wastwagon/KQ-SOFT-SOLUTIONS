@@ -4,6 +4,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { X, FolderKanban, ChevronRight } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { projects, clients, subscription, isSubscriptionInactiveError } from '../lib/api'
+import { normalizeClientsList } from '../lib/clientsPayload'
 import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
@@ -70,13 +71,14 @@ export default function Projects({ initialStatus }: ProjectsProps) {
     queryKey: ['clients'],
     queryFn: clients.list,
   })
-  const { data: clientsList = [], isError: clientsQueryFailed } = clientsQuery
+  const { data: clientsRaw, isError: clientsQueryFailed } = clientsQuery
+  const clientsList = useMemo(() => normalizeClientsList(clientsRaw), [clientsRaw])
   const paywallBlocked =
     isSubscriptionInactiveError(projectsQuery.error) || isSubscriptionInactiveError(clientsQuery.error)
   const listLoadFailed =
     !paywallBlocked && (projectsQueryFailed || clientsQueryFailed)
 
-  const clientName = (clientFilter && (clientsList as { id: string; name: string }[]).find((c) => c.id === clientFilter)?.name) || null
+  const clientName = (clientFilter && clientsList.find((c) => c.id === clientFilter)?.name) || null
   const clearClientFilter = () => {
     setClientFilter('')
     setSearchParams((prev) => {
@@ -235,7 +237,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
               aria-label="Filter by client"
             >
               <option value="">All clients</option>
-              {(clientsList as { id: string; name: string }[]).map((c) => (
+              {clientsList.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
