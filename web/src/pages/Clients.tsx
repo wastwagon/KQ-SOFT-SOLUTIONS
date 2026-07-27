@@ -17,8 +17,14 @@ function normalizeClientsPayload(data: unknown): {
   unassignedProjectCount: number
   totalProjectCount: number
 } {
+  if (data == null) {
+    return { list: [], unassignedProjectCount: 0, totalProjectCount: 0 }
+  }
   if (Array.isArray(data)) {
     return { list: data as ClientRow[], unassignedProjectCount: 0, totalProjectCount: 0 }
+  }
+  if (typeof data !== 'object') {
+    return { list: [], unassignedProjectCount: 0, totalProjectCount: 0 }
   }
   const obj = data as {
     clients?: ClientRow[]
@@ -26,7 +32,7 @@ function normalizeClientsPayload(data: unknown): {
     totalProjectCount?: number
   }
   return {
-    list: obj.clients ?? [],
+    list: Array.isArray(obj.clients) ? obj.clients : [],
     unassignedProjectCount: obj.unassignedProjectCount ?? 0,
     totalProjectCount: obj.totalProjectCount ?? 0,
   }
