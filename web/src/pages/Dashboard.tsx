@@ -426,6 +426,7 @@ export default function Dashboard() {
             )}
             <ul className="space-y-3">
               {[
+                { id: 'ai_suggestions', label: 'Auto-match suggestions & AI ranking' },
                 { id: 'bulk_match', label: 'Bulk Match (50 items)' },
                 { id: 'audit_trail', label: 'Full Audit Trail' },
                 { id: 'one_to_many', label: 'One-to-Many Matching' },

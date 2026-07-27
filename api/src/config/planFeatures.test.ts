@@ -10,11 +10,11 @@ describe('planFeatures', () => {
     expect(planRank('unknown')).toBe(-1)
   })
 
-  it('gates ai_suggestions to Standard+', () => {
-    expect(hasPlanFeature('basic', 'ai_suggestions')).toBe(false)
-    expect(hasPlanFeature('standard', 'ai_suggestions')).toBe(true)
-    expect(hasPlanFeature('premium', 'ai_suggestions')).toBe(true)
-    expect(hasPlanFeature('firm', 'ai_suggestions')).toBe(true)
+  it('enables ai_suggestions and bulk_match on every tier', () => {
+    for (const plan of ['basic', 'standard', 'premium', 'firm'] as const) {
+      expect(hasPlanFeature(plan, 'ai_suggestions')).toBe(true)
+      expect(hasPlanFeature(plan, 'bulk_match')).toBe(true)
+    }
   })
 
   it('keeps one_to_many on Premium+', () => {

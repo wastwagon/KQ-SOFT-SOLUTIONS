@@ -295,13 +295,14 @@ Match each payment to its corresponding bank debit (or leave unmatched if it is 
 #### How to Match
 
 1. **Single match:** Select one cash book line and one bank line, then click **Match**.
-2. **Bulk match (Standard+):** Select multiple pairs (up to 50) and click **Bulk match**.
+2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all** for safe high-confidence suggestions. Available on all tiers.
 3. **1-to-many / many-to-many (Premium+):** Select one cash book line and multiple bank lines (or vice versa), then match.
 
 #### Suggestions
 
-- If your plan includes AI suggestions, suggested matches appear. Review and accept or ignore.
-- Use **Bank rules** (Settings → Bank rules) to auto-suggest matches based on conditions.
+- Suggested matches appear on all tiers (amount, date, reference). Review and accept or ignore.
+- AI ranking from previously confirmed pairs also runs on all tiers when match memory is available.
+- Use **Bank rules** (Settings → Bank rules, Standard+) to auto-suggest matches based on conditions.
 
 #### Filters
 

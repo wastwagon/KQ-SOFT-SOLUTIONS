@@ -22,9 +22,11 @@ const PLAN_ORDER = ['basic', 'standard', 'premium', 'firm'] as const
 
 /** Minimum plan required for each feature */
 const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
+  // Jul 2026 pricing: tier differences are bank seats + txn caps (+ higher-tier tools).
+  // Auto-suggestions / bulk apply of suggestions are available on every paid tier.
   bank_rules: 'standard',
-  bulk_match: 'standard',
-  ai_suggestions: 'standard',
+  bulk_match: 'basic',
+  ai_suggestions: 'basic',
   audit_trail: 'standard',
   discrepancy_report: 'standard',
   missing_cheques_report: 'standard',
@@ -47,7 +49,7 @@ export const USER_LIMIT_BY_PLAN: Record<string, number> = {
   firm: -1,
 }
 
-/** Bulk match max transactions for Standard+ (Basic = 0, no bulk) */
+/** Bulk / phased auto-match max pairs per request (all tiers). */
 export const BULK_MATCH_LIMIT = 50
 
 export function planRank(plan: string): number {

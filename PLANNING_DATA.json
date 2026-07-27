@@ -33,7 +33,7 @@
       "projects_per_month": 10,
       "transactions_per_month": 1000,
       "users": 1,
-      "features": ["document_upload", "basic_matching", "brs_report", "basic_branding", "bookkeeping_advisory"]
+      "features": ["document_upload", "basic_matching", "suggested_matches", "bulk_match", "ai_suggestions", "brs_report", "basic_branding", "bookkeeping_advisory"]
     },
     "standard": {
       "name": "Standard",
@@ -45,7 +45,7 @@
       "projects_per_month": 30,
       "transactions_per_month": 5000,
       "users": 3,
-      "features": ["all_basic", "bank_rules", "bulk_match", "ai_suggestions", "audit_trail", "discrepancy_report", "full_branding"]
+      "features": ["all_basic", "bank_rules", "audit_trail", "discrepancy_report", "full_branding"]
     },
     "premium": {
       "name": "Premium",

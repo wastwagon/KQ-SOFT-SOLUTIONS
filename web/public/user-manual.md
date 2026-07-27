@@ -300,7 +300,8 @@ Create and revoke keys for programmatic access.
 | Capability | From |
 |------------|------|
 | 1:1 match, BRS export, OCR, clean tools | Basic+ |
-| Bulk match, AI suggestions, bank rules, audit, discrepancy | Standard+ |
+| Suggested matches, bulk / auto-match, AI ranking | All tiers |
+| Bank rules, audit, discrepancy | Standard+ |
 | 1:many / many:many, roll-forward, threshold approval, priority support | Premium+ |
 | Multi-client workspace, public API, custom contract | Custom |
 

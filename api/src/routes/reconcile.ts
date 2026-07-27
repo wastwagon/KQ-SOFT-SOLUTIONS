@@ -576,7 +576,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     )
   }
 
-  // Organisation match memory (Standard+): one DB query for all suggestion amounts
+  // Organisation match memory (all tiers with ai_suggestions): one DB query for all suggestion amounts
   const currency = project.currency || 'GHS'
   if (hasAiSuggestions) {
     const receiptAmounts = [

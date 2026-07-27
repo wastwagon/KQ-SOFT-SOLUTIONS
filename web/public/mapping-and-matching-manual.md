@@ -334,13 +334,14 @@ Rules influence suggestions during Reconcile — they do not replace your review
 |---------|-------|----------|---------|------|
 | Column mapping | ✓ | ✓ | ✓ | ✓ |
 | 1-to-1 manual match | ✓ | ✓ | ✓ | ✓ |
-| Suggested matches | | ✓ | ✓ | ✓ |
-| Bulk match | | ✓ | ✓ | ✓ |
-| Auto-match (phased) | | ✓ | ✓ | ✓ |
+| Suggested matches | ✓ | ✓ | ✓ | ✓ |
+| Bulk match | ✓ | ✓ | ✓ | ✓ |
+| Auto-match (phased) | ✓ | ✓ | ✓ | ✓ |
+| AI match ranking (org memory) | ✓ | ✓ | ✓ | ✓ |
 | Bank rules | | ✓ | ✓ | ✓ |
 | 1-to-many / many-to-many | | | ✓ | ✓ |
 | Split suggestions | | | ✓ | ✓ |
-| Match evidence upload | | ✓ | ✓ | ✓ |
+| Match evidence upload | ✓ | ✓ | ✓ | ✓ |
 
 If a feature is greyed out or shows an upgrade notice, your organisation’s plan does not include it.
 
@@ -394,7 +395,7 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 1. **Receipts vs Credits** → match or leave lodgments unmatched  
 2. **Payments vs Debits** → match or leave unpresented cheques unmatched  
 3. Review **Suggested matches** with **Strict** settings first  
-4. Use **Auto-match all** for remaining safe pairs (Standard+)  
+4. Use **Auto-match all** for remaining safe pairs  
 5. Manually match exceptions  
 6. **Proceed to Review**
 

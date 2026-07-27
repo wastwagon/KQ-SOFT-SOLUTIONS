@@ -324,7 +324,7 @@ router.patch('/members/:userId', async (req: AuthRequest, res) => {
   })
 })
 
-/** Forget a learned match pattern (Standard+ ai_suggestions). */
+/** Forget a learned match pattern (all tiers — ai_suggestions). */
 router.delete('/match-memory/:id', async (req: AuthRequest, res) => {
   const role = req.auth!.role
   if (!canReconcile(role)) {
