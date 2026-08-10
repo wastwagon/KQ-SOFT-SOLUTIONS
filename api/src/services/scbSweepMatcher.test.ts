@@ -223,6 +223,8 @@ describe('suggestScbInwardClearingAmountUniqueMatches', () => {
     expect(out).toHaveLength(1)
     expect(out[0]!.bankTx.id).toBe('d2')
     expect(out[0]!.reason).toMatch(/ref shifted/)
+    // Cap below Phase B auto-match floor (0.85)
+    expect(out[0]!.confidence).toBe(0.84)
   })
 })
 

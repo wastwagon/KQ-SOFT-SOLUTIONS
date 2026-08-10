@@ -6,7 +6,13 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canReconcile, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
-import { suggestMatches, suggestSplitMatches, type Tx, type SuggestedSplitMatch } from '../services/matching.js'
+import {
+  suggestMatches,
+  suggestSplitMatches,
+  amountsWithinTolerance,
+  type Tx,
+  type SuggestedSplitMatch,
+} from '../services/matching.js'
 import { resolveMatchSides } from '../services/sideInversion.js'
 import {
   detectDuplicateChequePayments,
@@ -35,7 +41,34 @@ import {
   suggestScbReturnedChequeCreditMatches,
   suggestScbSweepMatches,
 } from '../services/scbSweepMatcher.js'
-import { getMatchingRule, type BankRule } from '../services/bankRules.js'
+import {
+  isGhanaRegionalPatternMatchReason,
+  mergeGhanaRegionalPaymentSuggestions,
+  mergeGhanaRegionalReceiptSuggestions,
+  resolveAbsaProfile,
+  resolveBoaProfile,
+  resolveGcbProfile,
+  resolveNibProfile,
+  resolvePrudentialProfile,
+  suggestAbsaEboxCreditMatches,
+  suggestAbsaFtMatches,
+  suggestAbsaInvestmentCreditMatches,
+  suggestBoaCashDepositMatches,
+  suggestBoaInterestMatches,
+  suggestBoaInwardChequeMatches,
+  suggestBoaMaturityMatches,
+  suggestGcbBogChqMatches,
+  suggestGcbCashDepositMatches,
+  suggestGcbChequeWithdrawalMatches,
+  suggestNibCashDepositMatches,
+  suggestNibInwardChequeMatches,
+  suggestNibTelexMatches,
+  suggestPrudentialChequeWithdrawalMatches,
+  suggestPrudentialCreditTypeMatches,
+  suggestPrudentialInwardClearingMatches,
+  suggestPrudentialNrtMatches,
+} from '../services/ghanaRegionalMatchers.js'
+import { getMatchingRule, pickBankRuleCashBookMatch, type BankRule } from '../services/bankRules.js'
 import {
   amountToMinor,
   applyOrganisationMatchMemoryBoost,
@@ -306,9 +339,46 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankAccountId,
     sampleBankText,
   })
+  const gcbProfile = resolveGcbProfile({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+  })
+  const nibProfile = resolveNibProfile({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+  })
+  const prudentialProfile = resolvePrudentialProfile({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+  })
+  const absaProfile = resolveAbsaProfile({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+  })
+  const boaProfile = resolveBoaProfile({
+    bankAccounts: project.bankAccounts || [],
+    bankAccountId,
+    sampleBankText,
+  })
   const ghanaBankFormat = ecobankProfile.active
     ? 'ecobank'
-    : resolveGhanaBankFormatLabel(project.bankAccounts || [], bankAccountId)
+    : scbProfile.active
+      ? 'scb'
+      : gcbProfile.active
+        ? 'gcb'
+        : nibProfile.active
+          ? 'nib'
+          : prudentialProfile.active
+            ? 'prudential'
+            : absaProfile.active
+              ? 'absa'
+              : boaProfile.active
+                ? 'boa'
+                : resolveGhanaBankFormatLabel(project.bankAccounts || [], bankAccountId)
   const matchOptions = {
     amountTolerance: platformDefaults.amountTolerance ?? 0.01,
     dateWindowDays: platformDefaults.dateWindowDays ?? 3,
@@ -329,16 +399,22 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     }[],
     matchKind: 'receipt' | 'payment'
   ) =>
-    list.map((s) => ({
-      ...s,
-      matchKind,
-      orgMemoryBoosted: s.orgMemoryBoosted || /org memory/i.test(s.reason) || undefined,
-      orgMemoryId: s.orgMemoryId,
-      orgMemoryConfirmations: s.orgMemoryConfirmations,
-      ecobankPattern:
-        matchKind === 'payment' &&
-        (isEcobankPatternMatchReason(s.reason) || isScbPatternMatchReason(s.reason)),
-    }))
+    list.map((s) => {
+      const bankPattern =
+        isEcobankPatternMatchReason(s.reason) ||
+        isScbPatternMatchReason(s.reason) ||
+        isGhanaRegionalPatternMatchReason(s.reason)
+      return {
+        ...s,
+        matchKind,
+        orgMemoryBoosted: s.orgMemoryBoosted || /org memory/i.test(s.reason) || undefined,
+        orgMemoryId: s.orgMemoryId,
+        orgMemoryConfirmations: s.orgMemoryConfirmations,
+        bankPattern: bankPattern || undefined,
+        // Legacy Phase B flag (payments); prefer bankPattern for new clients.
+        ecobankPattern: (matchKind === 'payment' && bankPattern) || undefined,
+      }
+    })
 
   const scbSweepSuggestions = scbProfile.active
     ? suggestScbSweepMatches(
@@ -426,6 +502,182 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       )
     : []
 
+  // Regional thin pattern layers (mutually exclusive with Ecobank/SCB profiles)
+  const regionalActive =
+    !ecobankProfile.active &&
+    !scbProfile.active &&
+    (gcbProfile.active ||
+      nibProfile.active ||
+      prudentialProfile.active ||
+      absaProfile.active ||
+      boaProfile.active)
+  const gcbPaymentSuggestions =
+    regionalActive && gcbProfile.active
+      ? mergeGhanaRegionalPaymentSuggestions(
+          suggestGcbChequeWithdrawalMatches(
+            paymentsFull,
+            debitsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestGcbBogChqMatches(
+            paymentsFull,
+            debitsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          )
+        )
+      : []
+  const gcbReceiptSuggestions =
+    regionalActive && gcbProfile.active
+      ? suggestGcbCashDepositMatches(
+          receiptsFull,
+          creditsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        )
+      : []
+  const nibPaymentSuggestions =
+    regionalActive && nibProfile.active
+      ? suggestNibInwardChequeMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        )
+      : []
+  const nibReceiptSuggestions =
+    regionalActive && nibProfile.active
+      ? mergeGhanaRegionalReceiptSuggestions(
+          suggestNibCashDepositMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestNibTelexMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          )
+        )
+      : []
+  const prudentialPaymentSuggestions =
+    regionalActive && prudentialProfile.active
+      ? mergeGhanaRegionalPaymentSuggestions(
+          suggestPrudentialInwardClearingMatches(
+            paymentsFull,
+            debitsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestPrudentialChequeWithdrawalMatches(
+            paymentsFull,
+            debitsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestPrudentialNrtMatches(
+            paymentsFull,
+            debitsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          )
+        )
+      : []
+  const prudentialReceiptSuggestions =
+    regionalActive && prudentialProfile.active
+      ? suggestPrudentialCreditTypeMatches(
+          receiptsFull,
+          creditsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        )
+      : []
+  const absaReceiptSuggestions =
+    regionalActive && absaProfile.active
+      ? mergeGhanaRegionalReceiptSuggestions(
+          suggestAbsaInvestmentCreditMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestAbsaEboxCreditMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestAbsaFtMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          )
+        )
+      : []
+  const absaPaymentSuggestions =
+    regionalActive && absaProfile.active
+      ? suggestAbsaFtMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        )
+      : []
+  const boaPaymentSuggestions =
+    regionalActive && boaProfile.active
+      ? suggestBoaInwardChequeMatches(
+          paymentsFull,
+          debitsFull,
+          matchedCbIds,
+          matchedBankIds,
+          matchOptions.amountTolerance
+        )
+      : []
+  const boaReceiptSuggestions =
+    regionalActive && boaProfile.active
+      ? mergeGhanaRegionalReceiptSuggestions(
+          suggestBoaCashDepositMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestBoaMaturityMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          ),
+          suggestBoaInterestMatches(
+            receiptsFull,
+            creditsFull,
+            matchedCbIds,
+            matchedBankIds,
+            matchOptions.amountTolerance
+          )
+        )
+      : []
+
   // Matching suggestions for all plans (intelligent matching clues)
   const { inversion: sideInversion, receiptBank, paymentBank } = resolveMatchSides({
     receipts: receiptsFull,
@@ -433,16 +685,28 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     credits: creditsFull,
     debits: debitsFull,
   })
-  const receiptSuggestions = mergeReceiptSuggestions(
-    scbSweepSuggestions,
-    scbReturnedChequeSuggestions,
-    suggestMatches(receiptsFull, receiptBank, matchedCbIds, matchedBankIds, {
+  const standardReceiptSuggestions = suggestMatches(
+    receiptsFull,
+    receiptBank,
+    matchedCbIds,
+    matchedBankIds,
+    {
       ...matchOptions,
       requireDateMatch: useDate,
       useDate,
       useDocRef,
       useChequeNo,
-    })
+    }
+  )
+  const receiptSuggestions = mergeReceiptSuggestions(
+    scbSweepSuggestions,
+    scbReturnedChequeSuggestions,
+    gcbReceiptSuggestions,
+    nibReceiptSuggestions,
+    prudentialReceiptSuggestions,
+    absaReceiptSuggestions,
+    boaReceiptSuggestions,
+    standardReceiptSuggestions
   )
   const standardPaymentSuggestions = suggestMatches(
     paymentsFull,
@@ -489,6 +753,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         debitsFull
       )
     : []
+  const regionalPaymentSuggestions = mergeGhanaRegionalPaymentSuggestions(
+    gcbPaymentSuggestions,
+    nibPaymentSuggestions,
+    prudentialPaymentSuggestions,
+    absaPaymentSuggestions,
+    boaPaymentSuggestions
+  )
   const paymentSuggestions = ecobankProfile.active
     ? mergePaymentSuggestions(
         mergePaymentSuggestions(
@@ -511,7 +782,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
           scbOtRefSuggestions,
           standardPaymentSuggestions
         )
-      : standardPaymentSuggestions
+      : regionalActive
+        ? mergeGhanaRegionalPaymentSuggestions(
+            regionalPaymentSuggestions,
+            standardPaymentSuggestions
+          )
+        : standardPaymentSuggestions
   const duplicateChequeWarnings = detectDuplicateChequePayments(paymentsFull)
 
   // Apply bank rules for rule-based suggestions and flagged txs (Standard+ only)
@@ -526,9 +802,18 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     conditions: (r.conditions as unknown) as BankRule['conditions'],
     action: r.action,
   }))
-  const toTxLike = (t: Tx) => ({ id: t.id, date: t.date, name: t.name, details: t.details, amount: t.amount })
+  const toTxLike = (t: Tx) => ({
+    id: t.id,
+    date: t.date,
+    name: t.name,
+    details: t.details,
+    amount: t.amount,
+    docRef: t.docRef,
+    chqNo: t.chqNo,
+  })
   const flaggedBankIds: string[] = []
   const tol = matchOptions.amountTolerance
+  const dateWindowDays = matchOptions.dateWindowDays ?? 3
   const addRuleSuggestions = (cbTxs: Tx[], bankTxs: Tx[], base: { cashBookTx: Tx; bankTx: Tx; confidence: number; reason: string }[]) => {
     for (const bk of bankTxs) {
       if (matchedBankIds.has(bk.id)) continue
@@ -539,14 +824,20 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         continue
       }
       if (rule.action === 'suggest_match') {
-        const amtMatch = (cb: Tx) => Math.abs(cb.amount - bk.amount) <= tol
-        const cbMatch = cbTxs.find((cb) => !matchedCbIds.has(cb.id) && amtMatch(cb))
-        if (cbMatch && !base.some((s) => s.cashBookTx.id === cbMatch.id && s.bankTx.id === bk.id)) {
+        // Amount alone is not enough — require date, ref/chq, or narration corroboration.
+        const pick = pickBankRuleCashBookMatch(bk, cbTxs, matchedCbIds, {
+          amountTolerance: tol,
+          dateWindowDays,
+        })
+        if (
+          pick &&
+          !base.some((s) => s.cashBookTx.id === pick.cashBookTx.id && s.bankTx.id === bk.id)
+        ) {
           base.push({
-            cashBookTx: cbMatch,
+            cashBookTx: pick.cashBookTx,
             bankTx: bk,
-            confidence: 0.85,
-            reason: `Rule: ${rule.name}`,
+            confidence: pick.confidence,
+            reason: `Rule: ${rule.name} (${pick.corroboration})`,
           })
         }
       }
@@ -810,6 +1101,26 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
     const alreadyMatched = await findAlreadyMatchedIds(projectId, matchItems.map((m) => m.transactionId))
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
+    }
+
+    // Validate side sums within platform amount tolerance (prevents silent unbalanced multi-matches).
+    const platformDefaults = await getPlatformDefaults()
+    const multiTol = platformDefaults.amountTolerance ?? 0.01
+    const cbAmounts = matchItems
+      .filter((m) => m.side === 'cash_book')
+      .map((m) => Number(txs.find((t) => t.id === m.transactionId)!.amount))
+    const bankAmounts = matchItems
+      .filter((m) => m.side === 'bank')
+      .map((m) => Number(txs.find((t) => t.id === m.transactionId)!.amount))
+    const cbSum = cbAmounts.reduce((s, n) => s + n, 0)
+    const bankSum = bankAmounts.reduce((s, n) => s + n, 0)
+    if (!amountsWithinTolerance(cbSum, bankSum, multiTol)) {
+      return res.status(400).json({
+        error: 'Cash-book and bank amounts must sum to the same total for multi-matches',
+        cashBookSum: cbSum,
+        bankSum,
+        tolerance: multiTol,
+      })
     }
 
     const shouldRememberSplit =

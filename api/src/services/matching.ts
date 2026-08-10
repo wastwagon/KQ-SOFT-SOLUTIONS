@@ -1,6 +1,11 @@
 /**
- * Matching engine: amount ± tolerance, date ± window days
- * Returns suggested matches between cash book and bank transactions
+ * Matching engine for Ghana BRS cash-book ↔ bank reconcile.
+ * Core score: amount ± tolerance, date ± window, ref/chq, narration similarity.
+ *
+ * Product limits (by design — not unfinished work):
+ * - One currency per project; amounts are compared as-is (no FX conversion).
+ * - No pro-rata / open-item partials; use 1:many / many:1 when lines sum to a full amount.
+ * - Many:many confirm requires sum(cash book) ≈ sum(bank) within platform tolerance.
  */
 
 function parseAmount(v: unknown): number {
@@ -17,11 +22,31 @@ function parseDate(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
-function datesWithinWindow(d1: Date | null, d2: Date | null, windowDays: number): boolean {
-  if (!d1 || !d2) return true
+/**
+ * True only when both dates exist and fall within the window.
+ * Missing dates are not treated as a match — callers must not award date confidence for nulls.
+ */
+export function datesWithinWindow(d1: Date | null, d2: Date | null, windowDays: number): boolean {
+  if (!d1 || !d2) return false
   const ms = Math.abs(d1.getTime() - d2.getTime())
   const days = ms / (1000 * 60 * 60 * 24)
   return days <= windowDays
+}
+
+/** Compatible for candidate filtering: unknown dates allowed; conflicting dates rejected. */
+export function datesCompatible(d1: Date | null, d2: Date | null, windowDays: number): boolean {
+  if (!d1 || !d2) return true
+  return datesWithinWindow(d1, d2, windowDays)
+}
+
+/** Sum of amounts within tolerance (for multi-match validation). */
+export function amountsSumMatch(parts: number[], target: number, tolerance: number): boolean {
+  const sum = parts.reduce((s, n) => s + n, 0)
+  return Math.abs(sum - target) <= tolerance
+}
+
+export function amountsWithinTolerance(a: number, b: number, tolerance: number): boolean {
+  return Math.abs(a - b) <= tolerance
 }
 
 function amountsMatch(a1: number, a2: number, tolerance: number): boolean {
@@ -165,6 +190,11 @@ function chequeNumbersMatch(cb: Tx, bk: Tx): boolean {
   return false
 }
 
+/** Shared ref/chq/doc evidence used by bank-rule suggest_match corroboration. */
+export function shareReferenceEvidence(cb: Tx, bk: Tx): boolean {
+  return refsMatch(cb, bk) || docRefsMatch(cb, bk) || chequeNumbersMatch(cb, bk)
+}
+
 export interface Tx {
   id: string
   date: Date | null
@@ -257,21 +287,21 @@ export function suggestMatches(
 
     for (const bk of candidatesFor(cb)) {
       if (!amountsMatch(cb.amount, bk.amount, amountTolerance)) continue
-      const dateMatch = datesWithinWindow(cb.date, bk.date, dateWindowDays)
+      // Date boost/gate only when both sides have real dates within the window.
+      const dateMatch = useDate && datesWithinWindow(cb.date, bk.date, dateWindowDays)
       if (requireDateMatch && useDate && !dateMatch) continue
-      
+
       const chqMatch = useChequeNo ? chequeNumbersMatch(cb, bk) : false
       const docRefMatch = useDocRef ? docRefsMatch(cb, bk) : false
       const textRefMatch = useDocRef || useChequeNo ? refsMatch(cb, bk) : false
       const refMatch = chqMatch || docRefMatch || textRefMatch
-      
+
       if (requireRefForCheques && cb.chqNo?.trim() && !refMatch) continue
 
       const exactAmount = amountsExact(cb.amount, bk.amount)
-      // Within-tolerance (non-exact) amounts are only suggested with
-      // corroborating evidence — a date or reference match — to keep the
-      // false-match rate low.
-      if (!exactAmount && !(useDate && dateMatch) && !refMatch) continue
+      // Within-tolerance (non-exact) amounts need real date or ref evidence —
+      // null dates no longer count as corroboration.
+      if (!exactAmount && !dateMatch && !refMatch) continue
 
       const descScore = descriptionSimilarity(
         [cb.details, cb.name].filter(Boolean).join(' '),
@@ -280,14 +310,14 @@ export function suggestMatches(
       const descMatch = descScore >= 0.3
 
       let confidence = exactAmount ? 0.6 : 0.5 // Base amount match
-      if (useDate && dateMatch) confidence += 0.3
+      if (dateMatch) confidence += 0.3
       if (descMatch) confidence += 0.1 + 0.05 * descScore
       if ((useDocRef || useChequeNo) && refMatch) confidence += 0.15
 
       confidence = Math.min(confidence, 1)
       if (confidence >= 0.6) {
         const reasons: string[] = []
-        if (useDate && dateMatch) reasons.push('date')
+        if (dateMatch) reasons.push('date')
         if (descMatch) reasons.push('description')
         if ((useDocRef || useChequeNo) && refMatch) {
           if (useDocRef && useChequeNo) reasons.push('chq/ref')
@@ -545,7 +575,8 @@ export function suggestSplitMatches(
 
   // 1-to-Many: one cash-book row vs multiple bank rows (e.g. one deposit covering several clearings)
   for (const cb of unmatchedCb) {
-    const windowBank = unmatchedBank.filter((bk) => datesWithinWindow(cb.date, bk.date, dateWindowDays))
+    // Allow unknown dates into the window; reject only conflicting dated pairs.
+    const windowBank = unmatchedBank.filter((bk) => datesCompatible(cb.date, bk.date, dateWindowDays))
     if (windowBank.length < 2) continue
     for (const subset of findSummingSubsets(windowBank, cb.amount, amountTolerance)) {
       const { confidence, reasonBits } = scoreSplitMatch([cb], subset, cb.amount)
@@ -561,7 +592,7 @@ export function suggestSplitMatches(
 
   // Many-to-one: multiple cash-book rows vs one bank row (e.g. several cheques in one bulk debit)
   for (const bk of unmatchedBank) {
-    const windowCb = unmatchedCb.filter((cb) => datesWithinWindow(cb.date, bk.date, dateWindowDays))
+    const windowCb = unmatchedCb.filter((cb) => datesCompatible(cb.date, bk.date, dateWindowDays))
     if (windowCb.length < 2) continue
     for (const subset of findSummingSubsets(windowCb, bk.amount, amountTolerance)) {
       const { confidence, reasonBits } = scoreSplitMatch([bk], subset, bk.amount)

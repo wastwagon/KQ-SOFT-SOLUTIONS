@@ -4,6 +4,9 @@ import {
   suggestSplitMatches,
   descriptionSimilarity,
   findSummingSubsets,
+  datesWithinWindow,
+  datesCompatible,
+  amountsWithinTolerance,
   type Tx,
 } from './matching.js'
 
@@ -41,6 +44,22 @@ describe('suggestMatches', () => {
     expect(result).toHaveLength(1)
     expect(result[0].confidence).toBe(0.6)
     expect(result[0].reason).toBe('Amount match')
+  })
+
+  it('does not award date confidence when either date is null', () => {
+    const cb = [tx('cb1', 500, undefined, 'Receipt')]
+    const bank = [tx('bk1', 500, '2025-01-15', 'Deposit')]
+    const result = suggestMatches(cb, bank, new Set(), new Set())
+    expect(result).toHaveLength(1)
+    expect(result[0].confidence).toBe(0.6)
+    expect(result[0].reason).not.toContain('date')
+  })
+
+  it('rejects near-amount matches when dates are null (no corroboration)', () => {
+    const cb = [tx('cb1', 500.0)]
+    const bank = [tx('bk1', 500.05)]
+    const result = suggestMatches(cb, bank, new Set(), new Set(), { amountTolerance: 0.1 })
+    expect(result).toHaveLength(0)
   })
 
   it('enforces amount+date when requireDateMatch is enabled', () => {
@@ -175,6 +194,32 @@ describe('suggestMatches', () => {
     const result = suggestMatches(cb, bank, new Set(), new Set())
     expect(result).toHaveLength(1)
     expect(result[0].cashBookTx.id).toBe('cb1')
+  })
+})
+
+describe('datesWithinWindow', () => {
+  it('returns false when either date is null', () => {
+    expect(datesWithinWindow(null, new Date('2025-01-15'), 3)).toBe(false)
+    expect(datesWithinWindow(new Date('2025-01-15'), null, 3)).toBe(false)
+    expect(datesWithinWindow(null, null, 3)).toBe(false)
+  })
+
+  it('returns true when both dates fall within the window', () => {
+    expect(datesWithinWindow(new Date('2025-01-15'), new Date('2025-01-16'), 3)).toBe(true)
+  })
+})
+
+describe('datesCompatible', () => {
+  it('allows unknown dates but rejects conflicting ones', () => {
+    expect(datesCompatible(null, new Date('2025-01-15'), 3)).toBe(true)
+    expect(datesCompatible(new Date('2025-01-01'), new Date('2025-02-01'), 3)).toBe(false)
+  })
+})
+
+describe('amountsWithinTolerance', () => {
+  it('compares sums for multi-match validation', () => {
+    expect(amountsWithinTolerance(100 + 200, 150 + 150, 0.01)).toBe(true)
+    expect(amountsWithinTolerance(300, 301, 0.01)).toBe(false)
   })
 })
 

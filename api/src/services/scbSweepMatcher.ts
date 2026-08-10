@@ -315,7 +315,8 @@ export function suggestScbInwardClearingAmountUniqueMatches(
     suggestions.push({
       cashBookTx: cb,
       bankTx: bk,
-      confidence: 0.87,
+      // Below Phase B auto-match floor (0.85) — unique-amount-only needs human review.
+      confidence: 0.84,
       reason: 'SCB inward clearing: unique amount (ref shifted)',
     })
   }
@@ -379,7 +380,7 @@ export function suggestScbWithdrawnToInwClgMatches(
     suggestions.push({
       cashBookTx: cb,
       bankTx: candidates[0]!,
-      confidence: 0.86,
+      confidence: 0.84,
       reason: 'SCB inward clearing: unique amount via bank withdrawal line',
     })
   }
@@ -413,7 +414,7 @@ export function suggestScbInwardClearingAlternateDebitMatches(
     suggestions.push({
       cashBookTx: cb,
       bankTx: candidates[0]!,
-      confidence: 0.86,
+      confidence: 0.84,
       reason: `SCB inward clearing: unique amount via bank ${kind}`,
     })
   }
@@ -443,7 +444,7 @@ export function suggestScbInwardClearingFooterAmountMatches(
     suggestions.push({
       cashBookTx: cb,
       bankTx: candidates[0]!,
-      confidence: 0.85,
+      confidence: 0.84,
       reason: 'SCB inward clearing: unique amount via bank statement footer',
     })
   }

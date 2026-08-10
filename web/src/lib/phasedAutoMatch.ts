@@ -4,7 +4,14 @@ export type BulkMatchPair = { cashBookTransactionId: string; bankTransactionId: 
 
 const ECOBANK_REASON_RE =
   /Ecobank clearing|Ecobank transfer|Ecobank withdrawal|Ecobank statutory deposit/i
-const SCB_REASON_RE = /SCB sweep|SCB inward clearing|ref shifted|via bank/i
+const SCB_REASON_RE = /SCB sweep|SCB inward clearing|SCB returned cheque|ref shifted|via bank/i
+const REGIONAL_REASON_RE =
+  /GCB cheque withdrawal|GCB cash deposit|GCB CHQ lodgement|NIB inward cheque|NIB cash deposit|NIB telex|Prudential inward clearing|Prudential cheque withdrawal|Prudential NRT|Prudential call\/credit|Absa investment|Absa EBOX|Absa FT|BOA inward cheque|BOA cash deposit|BOA maturity|BOA interest/i
+
+function isPhaseBPatternReason(reason: string | undefined): boolean {
+  const r = reason || ''
+  return ECOBANK_REASON_RE.test(r) || SCB_REASON_RE.test(r) || REGIONAL_REASON_RE.test(r)
+}
 
 /** Collect non-overlapping bulk pairs for one reconcile round (mirrors integration test scripts). */
 export function collectPhasedBulkMatches(
@@ -19,11 +26,9 @@ export function collectPhasedBulkMatches(
           (s) =>
             s.confidence >= minConf &&
             !s.duplicateWarning &&
-            ((s.matchKind === 'receipt' && SCB_REASON_RE.test(s.reason || '')) ||
-              (s.matchKind === 'payment' &&
-                (s.ecobankPattern ||
-                  ECOBANK_REASON_RE.test(s.reason || '') ||
-                  SCB_REASON_RE.test(s.reason || ''))))
+            (s.bankPattern ||
+              s.ecobankPattern ||
+              isPhaseBPatternReason(s.reason))
         )
       : suggestions.filter((s) => s.confidence >= minConf && !s.duplicateWarning)
 

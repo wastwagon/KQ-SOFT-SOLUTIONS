@@ -56,11 +56,15 @@ export default function SuggestedMatchesPanel({
   const [listCount, setListCount] = useState(150)
   const highConfidence = suggestions.filter((s) => s.confidence >= 0.95)
   const safeSuggestions = suggestions.filter((s) => !s.duplicateWarning && s.confidence >= 0.9)
+  const phaseBPatternRe =
+    /Ecobank |SCB |GCB |NIB |Prudential |Absa |BOA |ref shifted|via bank/i
   const phaseBSuggestions = suggestions.filter(
     (s) =>
       !s.duplicateWarning &&
       s.confidence >= 0.85 &&
-      (s.matchKind === 'receipt' || s.ecobankPattern)
+      (s.bankPattern ||
+        s.ecobankPattern ||
+        phaseBPatternRe.test(s.reason || ''))
   )
   const visible = suggestions.slice(0, listCount)
   const canBulk = !!features.bulk_match
@@ -103,11 +107,11 @@ export default function SuggestedMatchesPanel({
               size="sm"
               onClick={onPhasedAutoMatch}
               disabled={isMatching || isPhasedAutoMatching}
-              title="Runs safe 90%+ matches, then Ecobank/receipt 85%+ — same as integration test scripts"
+              title="Runs safe 90%+ matches, then bank-pattern suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA)"
             >
               {isPhasedAutoMatching
                 ? 'Auto-matching…'
-                : 'Auto-match all (safe → Ecobank)'}
+                : 'Auto-match all (safe → patterns)'}
             </Button>
           )}
           {highConfidence.length > 0 && (
@@ -163,7 +167,7 @@ export default function SuggestedMatchesPanel({
                 )
               }
               disabled={isMatching || phaseBSuggestions.length === 0}
-              title="Phase B: receipts at 85%+ and Ecobank clearing/transfer/withdrawal patterns only — skips generic payment↔debit guesses"
+              title="Phase B: pattern-matched suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) — skips generic amount-only guesses"
             >
               {isMatching
                 ? 'Matching…'
@@ -248,6 +252,17 @@ export default function SuggestedMatchesPanel({
                       Withdrawal
                     </Badge>
                   )}
+                  {(s.bankPattern || s.ecobankPattern) &&
+                    !/ecobank (clearing|transfer|withdrawal)/i.test(s.reason) && (
+                      <Badge
+                        size="sm"
+                        tone="brand"
+                        className="ml-2"
+                        title={s.reason}
+                      >
+                        Pattern
+                      </Badge>
+                    )}
                   {features.ai_suggestions &&
                     (s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
                     <span className="ml-2 inline-flex items-center gap-1">

@@ -8,13 +8,19 @@
 
 ### 1.1 Matching Engine
 
+> **Canonical user guide:** [Mapping & Matching Manual](./MAPPING_AND_MATCHING_MANUAL.md).  
+> **Go-live close-out:** [MATCHING_GO_LIVE.md](./MATCHING_GO_LIVE.md) — matching methodology work is complete; FX/partials are product limits, not open gaps.
+
 | Factor | Current State | Impact | Recommendation |
 |--------|---------------|--------|----------------|
-| **Amount tolerance** | ±0.01 (hardcoded) | Works for 2-decimal currencies; may be too tight for rounding differences | Make configurable per project or org (e.g. ±0.01, ±0.10, ±1.00) |
-| **Date window** | ±3 days (hardcoded) | Misses valid matches when bank posting lags; may over-suggest when many same-amount txns | Make configurable; consider ±7 days for month-end |
-| **Description similarity** | First 20 chars overlap | Simple; may miss fuzzy matches (typos, abbreviations) | Consider Levenshtein or token-based similarity (as in MASTER_PLAN) |
-| **Duplicate detection** | Not implemented | Same amount + date + description can appear multiple times; risk of wrong match | Add duplicate flag/warning when multiple candidates exist |
-| **Cheque rule** | Requires chq/ref match when chqNo present | Reduces false positives; good | Keep; document for users |
+| **Amount tolerance** | Platform default ±0.01 (admin-configurable) | Works for 2-decimal currencies; may be too tight for rounding differences | Expose per-project override if customers need it |
+| **Date window** | Platform default ±3 days; null dates do **not** get date credit | Misses valid matches when bank posting lags | Keep; Ecobank clearing uses a wider window |
+| **Description similarity** | Token-based (noise-aware overlap + Jaccard) | Handles reordered Ghana narrations | Keep; extend bank pattern layers as needed |
+| **Duplicate detection** | Ambiguity drop + `duplicateWarning` on multi-bank hits | Reduces wrong same-amount pairs | Keep |
+| **Cheque rule** | Requires chq/ref match when chqNo present on payments | Reduces false positives; good | Keep; document for users |
+| **Bank pattern layers** | Ecobank, SCB, GCB, NIB, Prudential, Absa, BOA | Stronger suggestions for clearing/cheque/deposit patterns | Add further banks only when specimens show recurring patterns |
+| **Multi-match sums** | 1:many / many:1 suggestions; many:many confirm validates sum(CB)≈sum(bank) | Prevents unbalanced groups | Keep |
+| **FX / partials** | Unsupported by design (documented) | Mixed-currency and pro-rata open items need manual handling | Closed — see MATCHING_GO_LIVE.md; reopen only on explicit product request |
 
 ### 1.2 Data Parsing
 
@@ -40,7 +46,7 @@
 | **PDF OCR** | Tesseract; max 50 pages | Large PDFs truncated; no native text extraction | Use native PDF text extraction (e.g. pdf-parse) before OCR for text-heavy PDFs |
 | **Table extraction** | Splits on tabs or 2+ spaces | Complex tables can misalign columns | Add validation: row count vs expected; warn if row lengths vary |
 | **OCR language** | `eng` only | Ghana-specific text (e.g. bank names) may misread | Test with real Ghana bank statements; consider `eng+fra` if needed |
-| **Supported banks** | Ecobank, GCB, Access, Stanbic, Fidelity, UBA, Absa | Other banks need manual mapping | Add more banks as user feedback; document manual mapping for unsupported banks |
+| **Supported banks** | Ecobank, GCB, SCB, NIB, ADB, BOA, BOG, Prudential, UMB, Access, Stanbic, Fidelity, UBA, Absa (parse + map); pattern matchers for Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA | Unsupported layouts need manual mapping | See SUPPORTED_BANKS.md; extend parsers from customer specimens |
 
 ---
 

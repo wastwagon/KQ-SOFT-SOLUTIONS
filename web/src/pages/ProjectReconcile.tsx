@@ -15,6 +15,7 @@ import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Button from '../components/ui/Button'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
+import { ghanaBankProfileTip } from '../lib/ghanaBankProfileTips'
 
 /**
  * Orchestrator for the reconcile step of the BRS workflow.
@@ -261,19 +262,28 @@ export default function ProjectReconcile({
       {canReconcile && (
         <p className="text-xs text-slate-600 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
           <strong>Best practice:</strong> For cheques, match only when the amount (and reference if
-          present) matches the bank. Ecobank inward clearing / HSE deposits appear as bank{' '}
-          <strong>credits</strong> — use suggestions tagged <strong>Clearing</strong>.
+          present) matches the bank. Prefer bank-pattern suggestions (Clearing, INW CLG, cheque paid,
+          telex, EBOX/FT, etc.) before generic amount pairs. Each project is one currency — matching
+          does not convert FX.
         </p>
       )}
 
-      {data.reconcileProfile?.ghanaBrs && canReconcile && (
-        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 max-w-2xl">
-          <strong>Ecobank Ghana BRS profile</strong> — clearing matches use a{' '}
-          {data.reconcileProfile.clearingDateWindowDays}-day date window. Use{' '}
-          <strong>Clearing</strong>, <strong>Transfer</strong>, and <strong>Withdrawal</strong>{' '}
-          suggestions before generic payment↔debit pairs.
-        </div>
-      )}
+      {canReconcile &&
+        data.reconcileProfile?.ghanaBrs &&
+        (() => {
+          const tip = ghanaBankProfileTip(data.reconcileProfile?.bankFormat)
+          if (!tip) return null
+          const windowDays = data.reconcileProfile?.clearingDateWindowDays
+          return (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 max-w-2xl">
+              <strong>{tip.title}</strong>
+              {data.reconcileProfile?.bankFormat === 'ecobank' && windowDays
+                ? ` — clearing matches use a ${windowDays}-day date window. `
+                : ' — '}
+              {tip.body}
+            </div>
+          )
+        })()}
 
       {data.sideInversion?.inverted && canReconcile && (
         <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-950 max-w-2xl">

@@ -223,6 +223,12 @@ Each match links:
 
 A matched row cannot be matched again until you **unmatch** it.
 
+**Suggestion scoring (current):** amount (± platform tolerance, default 0.01), date (±3 days when both dates exist), cheque/reference, and narration similarity. Missing dates do **not** count as a date match. Bank rules that suggest matches also need date, ref/chq, or narration corroboration — amount alone is never enough.
+
+**Bank pattern layers:** When the reconcile profile detects Ecobank, SCB, GCB, NIB, Prudential, Absa, or Bank of Africa, dedicated pattern suggestions (clearing, INW CLG, cheque paid, telex, EBOX/FT, MAT.DEPOT, etc.) are ranked ahead of generic pairs. Unique-amount-only pattern tips stay below the Phase B auto-match floor so they need human review.
+
+**Limits (by design):** Each project is **one currency** — matching does not convert FX. Partial/open-item amounts (pro-rata) are not suggested; use 1-to-many / many-to-1 when several lines sum to a full amount. Many-to-many confirm requires cash-book and bank sides to **sum to the same total**.
+
 ### Manual matching (step by step)
 
 1. Switch to **Receipts vs Credits** or **Payments vs Debits**.
@@ -260,7 +266,7 @@ Settings are saved per project in your browser.
 
 | Button | What it does |
 |--------|----------------|
-| **Auto-match all (safe → Ecobank)** | Applies high-confidence matches in phases (90%+ safe, then Ecobank/receipt 85%+) |
+| **Auto-match all (safe → patterns)** | Applies high-confidence matches in phases (90%+ any safe pair, then bank-pattern suggestions at 85%+: Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) |
 | **Match high confidence (95%+)** | Bulk-applies only very confident suggestions |
 | **Match selected** | Applies ticked suggestions |
 | **Match all visible** | Applies all suggestions in the list (review carefully) |
@@ -286,6 +292,17 @@ When the Ecobank Ghana BRS profile is active:
 - Clearing matches use a wider **date window**.
 - Prefer suggestions tagged **Clearing**, **Transfer**, or **Withdrawal** before generic payment↔debit pairs.
 - Inward clearing / HSE deposits appear as bank **credits** — look for **Clearing** suggestions.
+
+### Other Ghana bank pattern tips
+
+| Bank | Prefer these suggestion tags |
+|------|------------------------------|
+| **SCB** | Sweep, inward clearing, OT ref, cash withdrawal |
+| **GCB** | Cheque withdrawal, CHQ lodgement, cash deposit |
+| **NIB** | Inward cheque, cash deposit, telex |
+| **Prudential** | Inward clearing (bank **debit**), cheque withdrawal, NRT |
+| **Absa** | Investment bank, EBOX, FT ref |
+| **Bank of Africa** | Inward cheque (CHECK PAID), cash deposit, maturity (MAT.DEPOT) |
 
 ### Best practice for cheques
 

@@ -2,7 +2,7 @@
  * Ghana Ecobank BRS: cash-book cheque payments often clear via bank CREDIT lines
  * (inward clearing, HSE cheque deposit) — not bank debits.
  */
-import type { SuggestedMatch, SuggestMatchesOptions, Tx } from './matching.js'
+import { datesWithinWindow, type SuggestedMatch, type SuggestMatchesOptions, type Tx } from './matching.js'
 
 /** Minimal tx shape for BRS clearing logic (report routes may use string dates). */
 export type ClearingTxLike = {
@@ -110,10 +110,13 @@ export function resolveGhanaBankFormatLabel(
   if (/ecobank/.test(text)) return 'ecobank'
   if (/\bgcb\b|ghana commercial/.test(text)) return 'gcb'
   if (/standard\s*chartered|\bscb\b/.test(text)) return 'scb'
+  if (/prudential|ring road/.test(text)) return 'prudential'
+  if (/\bnib\b|national investment/.test(text)) return 'nib'
   if (/stanbic|standard bank/.test(text)) return 'stanbic'
   if (/fidelity/.test(text)) return 'fidelity'
   if (/\buba\b|united bank/.test(text)) return 'uba'
   if (/absa|barclays/.test(text)) return 'absa'
+  if (/bank of africa|\bboa\b/.test(text)) return 'boa'
   if (/access bank/.test(text)) return 'access'
   return null
 }
@@ -358,12 +361,6 @@ export function paymentHasTransferCounterpart(
 
 function amountsMatch(a: number, b: number, tolerance: number): boolean {
   return Math.abs(a - b) <= tolerance
-}
-
-function datesWithinWindow(d1: Date | null, d2: Date | null, windowDays: number): boolean {
-  if (!d1 || !d2) return true
-  const days = Math.abs(d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24)
-  return days <= windowDays
 }
 
 export interface ClearingPairIds {

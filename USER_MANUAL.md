@@ -295,14 +295,18 @@ Match each payment to its corresponding bank debit (or leave unmatched if it is 
 #### How to Match
 
 1. **Single match:** Select one cash book line and one bank line, then click **Match**.
-2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all** for safe high-confidence suggestions. Available on all tiers.
-3. **1-to-many / many-to-many (Premium+):** Select one cash book line and multiple bank lines (or vice versa), then match.
+2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all (safe → patterns)** for phased high-confidence suggestions (90%+ any safe pair, then bank-pattern suggestions at 85%+). Available on Standard+ with bulk match.
+3. **1-to-many / many-to-many (Premium+):** Select one cash book line and multiple bank lines (or vice versa), then match. Many-to-many requires both sides to sum to the same total.
 
 #### Suggestions
 
-- Suggested matches appear on all tiers (amount, date, reference). Review and accept or ignore.
-- AI ranking from previously confirmed pairs also runs on all tiers when match memory is available.
-- Use **Bank rules** (Settings → Bank rules, Standard+) to auto-suggest matches based on conditions.
+- Suggested matches appear on all tiers (amount, date, reference/cheque, narration). Missing dates do not count as a date match. Review and accept or ignore.
+- Bank pattern layers (Ecobank, SCB, GCB, NIB, Prudential, Absa, Bank of Africa) rank ahead of generic pairs when the profile is detected.
+- Bank rules (Settings → Bank rules, Standard+) need amount **plus** date, ref/chq, or narration corroboration — amount alone is never enough.
+- AI ranking from previously confirmed pairs also runs when match memory is available.
+- **Limits:** one currency per project (no FX conversion in matching); no pro-rata partial amounts — use 1-to-many / many-to-1 when several lines sum to a full amount.
+
+For the full mapping & matching guide, see [Mapping & Matching Manual](docs/MAPPING_AND_MATCHING_MANUAL.md).
 
 #### Filters
 

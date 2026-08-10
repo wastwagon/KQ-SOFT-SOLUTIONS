@@ -21,6 +21,9 @@ export interface SuggestedMatch {
   reason: string
   duplicateWarning?: boolean
   matchKind?: 'receipt' | 'payment'
+  /** True when suggestion came from a bank pattern layer (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA). */
+  bankPattern?: boolean
+  /** @deprecated Prefer bankPattern — kept for older Phase B clients (payments only). */
   ecobankPattern?: boolean
   /** True when organisation match memory raised this suggestion’s confidence. */
   orgMemoryBoosted?: boolean
