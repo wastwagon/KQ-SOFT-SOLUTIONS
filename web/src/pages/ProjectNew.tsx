@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
@@ -16,6 +16,7 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import { useAuth } from '../store/auth'
 import { COMMON_PROJECT_CURRENCIES, getCurrencySymbol } from '../lib/currency'
+import { composeProjectDisplayName } from '../lib/projectIdentity'
 
 function SelectWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -29,6 +30,8 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 export default function ProjectNew() {
   const org = useAuth((s) => s.org)
   const [name, setName] = useState('')
+  const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
+  const [statementBusinessName, setStatementBusinessName] = useState('')
   const [currencyOverride, setCurrencyOverride] = useState<string | null>(null)
   const [currencySymbolOverride, setCurrencySymbolOverride] = useState('')
   const [customCurrencyCode, setCustomCurrencyCode] = useState('')
@@ -42,8 +45,25 @@ export default function ProjectNew() {
   const [reconciliationDate, setReconciliationDate] = useState('')
   const [rollForwardFromProjectId, setRollForwardFromProjectId] = useState('')
   const [primaryBankName, setPrimaryBankName] = useState('')
+  const [primaryAccountName, setPrimaryAccountName] = useState('')
   const [primaryAccountNo, setPrimaryAccountNo] = useState('')
   const [error, setError] = useState('')
+
+  const composedName = useMemo(
+    () =>
+      composeProjectDisplayName({
+        statementBusinessName,
+        bankAccountName: primaryAccountName || primaryBankName,
+        accountNo: primaryAccountNo,
+        reconciliationDate,
+      }),
+    [statementBusinessName, primaryAccountName, primaryBankName, primaryAccountNo, reconciliationDate]
+  )
+
+  // Auto-compose project name until the user edits it manually (safe: never overwrites custom names).
+  useEffect(() => {
+    if (!nameManuallyEdited && composedName) setName(composedName)
+  }, [composedName, nameManuallyEdited])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -96,16 +116,25 @@ export default function ProjectNew() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    const finalName = name.trim() || composedName
+    if (!finalName) {
+      setError(
+        'Enter a project name, or fill statement business name / bank account / closing date to compose one.'
+      )
+      return
+    }
     mutation.mutate({
-      name,
+      name: finalName,
+      statementBusinessName: statementBusinessName.trim() || undefined,
       clientId: clientId || undefined,
       reconciliationDate: reconciliationDate ? `${reconciliationDate}T00:00:00.000Z` : undefined,
       rollForwardFromProjectId: rollForwardFromProjectId || undefined,
       currency: currency.toUpperCase(),
       ...(currencySymbolOverride.trim() ? { currencySymbol: currencySymbolOverride.trim() } : {}),
-      ...(primaryBankName.trim() || primaryAccountNo.trim()
+      ...(primaryBankName.trim() || primaryAccountName.trim() || primaryAccountNo.trim()
         ? {
             primaryBankName: primaryBankName.trim() || undefined,
+            primaryAccountName: primaryAccountName.trim() || undefined,
             primaryAccountNo: primaryAccountNo.trim() || undefined,
           }
         : {}),
@@ -172,7 +201,8 @@ export default function ProjectNew() {
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
             <p className="text-gray-500">
-              Give this engagement a clear name, link an optional client, and optionally save bank label and account number for your BRS letterhead.
+              Capture the business name as on the bank statement, account details, and closing date for
+              tracking. The printed BRS uses the statement business name when provided.
             </p>
           </>
         }
@@ -211,7 +241,10 @@ export default function ProjectNew() {
                 if (p) {
                   setClientId(p.clientId || '')
                   setCurrencyOverride((p.currency as 'GHS' | 'USD' | 'EUR') || 'GHS')
-                  if (!name && p.name) setName(`${p.name} (copy)`)
+                  if (!name && p.name) {
+                    setNameManuallyEdited(true)
+                    setName(`${p.name} (copy)`)
+                  }
                 }
                 e.target.value = ''
               }}
@@ -242,12 +275,44 @@ export default function ProjectNew() {
         </div>
         <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50/90 to-white p-5 space-y-4 ring-1 ring-gray-100">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-primary-600">Bank details for reports</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-primary-600">
+              Tracking &amp; printed BRS identity
+            </p>
             <p className="mt-1 text-sm text-gray-600 leading-relaxed">
-              Optional. Shown on your final BRS letterhead (with your logo and address) as the account line—same wording many firms put under the title on the worksheet.
+              Recommended for firms preparing BRS for clients. The <strong>business name as on the
+              bank statement</strong> becomes the company line on the printed BRS. Your firm logo and
+              footer still come from organization branding.
             </p>
           </div>
+          <div>
+            <label htmlFor="statement-business-name" className={labelClass}>
+              Business name as on bank statement
+            </label>
+            <input
+              id="statement-business-name"
+              type="text"
+              value={statementBusinessName}
+              onChange={(e) => setStatementBusinessName(e.target.value)}
+              placeholder="e.g. GHANA COCOA BOARD"
+              autoComplete="organization"
+              className={inputClass}
+            />
+            <p className={hintClass}>Use the exact account-holder name shown on the statement.</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="primary-account-name" className={labelClass}>
+                Bank account name
+              </label>
+              <input
+                id="primary-account-name"
+                type="text"
+                value={primaryAccountName}
+                onChange={(e) => setPrimaryAccountName(e.target.value)}
+                placeholder="e.g. Current / Operating"
+                className={inputClass}
+              />
+            </div>
             <div>
               <label htmlFor="primary-bank-name" className={labelClass}>
                 Bank name
@@ -264,7 +329,7 @@ export default function ProjectNew() {
             </div>
             <div>
               <label htmlFor="primary-account-no" className={labelClass}>
-                Account number
+                Bank account number
               </label>
               <input
                 id="primary-account-no"
@@ -276,17 +341,20 @@ export default function ProjectNew() {
                 className={inputClass}
               />
             </div>
+            <div>
+              <label htmlFor="reconciliation-date" className={labelClass}>
+                Closing date of BRS
+              </label>
+              <input
+                id="reconciliation-date"
+                type="date"
+                value={reconciliationDate}
+                onChange={(e) => setReconciliationDate(e.target.value)}
+                className={inputClass}
+              />
+              <p className={hintClass}>As-at date for the reconciliation report.</p>
+            </div>
           </div>
-        </div>
-        <div>
-          <label className={labelClass}>Reconciliation date (optional)</label>
-          <input
-            type="date"
-            value={reconciliationDate}
-            onChange={(e) => setReconciliationDate(e.target.value)}
-            className={inputClass}
-          />
-          <p className={hintClass}>Date as at which the reconciliation is prepared.</p>
         </div>
         {features.roll_forward && (
           <div>
@@ -368,11 +436,34 @@ export default function ProjectNew() {
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder="e.g. Lordship Insurance BRS Dec 2025"
+            onChange={(e) => {
+              setNameManuallyEdited(true)
+              setName(e.target.value)
+            }}
+            required={!composedName}
+            placeholder="Auto-filled from the fields above — edit anytime"
             className={inputClass}
           />
+          <p className={hintClass}>
+            Auto-composed for tracking as{' '}
+            <em>Business — Account (number) — as at date</em>. Edit freely if you prefer a shorter
+            name.
+            {nameManuallyEdited && composedName ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="font-medium text-primary-600 hover:underline"
+                  onClick={() => {
+                    setNameManuallyEdited(false)
+                    setName(composedName)
+                  }}
+                >
+                  Reset to auto name
+                </button>
+              </>
+            ) : null}
+          </p>
         </div>
         <div className="flex flex-wrap gap-3 pt-2">
           <button

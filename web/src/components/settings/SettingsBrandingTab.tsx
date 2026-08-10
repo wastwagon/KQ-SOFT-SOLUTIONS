@@ -227,8 +227,9 @@ export default function SettingsBrandingTab({ role, features, branding: b }: Set
       </form>
       {d?.organizationName && (
         <p className="text-sm text-gray-500 mt-4">
-          Company name in reports: <strong>{d.organizationName}</strong> (set when your organisation was
-          created)
+          Fallback company name on reports: <strong>{d.organizationName}</strong> (organisation name).
+          When a project has a <em>business name as on bank statement</em>, that name is used on the
+          printed BRS instead.
         </p>
       )}
     </Card>

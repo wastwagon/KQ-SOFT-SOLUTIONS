@@ -37,6 +37,7 @@ import {
   resolveGhanaBankFormatLabel,
 } from '../services/ecobankClearingMatcher.js'
 import { resolveWorkbookNettingForScope } from '../lib/brsQueryFlags.js'
+import { resolveReportEntityName } from '../lib/projectIdentity.js'
 import {
   unpresentedWithOptionalWorkbookNetting,
   workbookBankOnlyExcludedBankIds,
@@ -957,6 +958,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   })
 
   const branding = (project.organization.branding as Record<string, unknown>) || {}
+  const reportEntityName = resolveReportEntityName(
+    (project as { statementBusinessName?: string | null }).statementBusinessName,
+    project.organization.name
+  )
   const curr = project.currency || 'GHS'
   const fmtAmt = (n: number) => formatAmountForReport(n, curr)
   const defaultNarrative =
@@ -1087,6 +1092,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     project: {
       id: project.id,
       name: project.name,
+      statementBusinessName:
+        (project as { statementBusinessName?: string | null }).statementBusinessName ?? null,
       reconciliationDate: project.reconciliationDate,
       status: project.status,
       bankStatementClosingBalance: bankStatementClosingBalanceValue,
@@ -1101,6 +1108,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       approvedBy: project.approvedBy ? { name: project.approvedBy.name, email: project.approvedBy.email } : null,
       approvedAt: project.approvedAt?.toISOString() ?? null,
     },
+    /** Company line on BRS letterhead: statement business name when set, else preparer org. */
+    reportEntityName,
     organization: { name: project.organization.name, branding },
     summary: {
       matchedCount: project.matches.length,
@@ -1494,6 +1503,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
   const fmt = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '')
   const branding = (project.organization.branding as Record<string, unknown>) || {}
+  const reportEntityName = resolveReportEntityName(
+    (project as { statementBusinessName?: string | null }).statementBusinessName,
+    project.organization.name
+  )
   const platformDefaults = await getPlatformDefaults()
   const reportTitle = (branding.reportTitle as string) || platformDefaults.defaultReportTitle
   const curr = project.currency || 'GHS'
@@ -1906,7 +1919,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         })
       }
       const coverRows: (string | number)[][] = [
-        [`${project.organization.name}`],
+        [`${reportEntityName}`],
         [project.name],
         ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
         [fmtBrsAsAtLine(reconciliationDateExport)],
@@ -1936,7 +1949,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
     // Client-facing workbook: match standard 4-line BRS handout (see LICL template). Full detail stays on web report, NOTES sheet, and other tabs.
     const brsStatementRows: (string | number)[][] = [
-      [`${project.organization.name}`],
+      [`${reportEntityName}`],
       [],
       ['Bank Reconciliation Statement'],
       [fmtBrsAsAtLine(reconciliationDateExport)],
@@ -1969,7 +1982,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
     if (!brsOnlyExport) {
     const additionalInformationRows: (string | number)[][] = [
-      [`${project.organization.name} - ${reportTitle}`],
+      [`${reportEntityName} - ${reportTitle}`],
       [project.name],
       ...(bankAccountHeaderLineExport ? [[bankAccountHeaderLineExport]] : []),
       [`${exportLabels.additionalInformationTitle} - As-at vs Post-period movement`],
@@ -2059,7 +2072,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         // ignore logo render failures and continue with text header
       }
     }
-    doc.fillColor(primaryColor).fontSize(20).text(letterheadCaps(`${project.organization.name}`), { align: 'center' }).fillColor('#000000')
+    doc.fillColor(primaryColor).fontSize(20).text(letterheadCaps(`${reportEntityName}`), { align: 'center' }).fillColor('#000000')
     doc.moveDown(0.35)
     doc.fontSize(10).font('Helvetica-Bold').text(letterheadCaps('Bank Reconciliation Statement'), { align: 'center' }).font('Helvetica')
     doc.moveDown(0.18)

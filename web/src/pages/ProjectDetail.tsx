@@ -121,6 +121,7 @@ export default function ProjectDetail() {
   const updateMutation = useMutation({
     mutationFn: (body: {
       name: string
+      statementBusinessName: string | null
       clientId: string | null
       currency: 'GHS' | 'USD' | 'EUR'
     }) => projects.update(slug!, body),

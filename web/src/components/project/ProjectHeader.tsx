@@ -26,6 +26,8 @@ export interface ProjectHeaderProject {
   name: string
   status: ProjectStatus
   currency?: string | null
+  /** Business name as on bank statement — printed BRS company line when set. */
+  statementBusinessName?: string | null
   client?: ClientLite | null
 }
 
@@ -38,7 +40,12 @@ interface ProjectHeaderProps {
   canDelete: boolean
   isUpdating?: boolean
   isDeleting?: boolean
-  onSave: (body: { name: string; clientId: string | null; currency: Currency }) => void
+  onSave: (body: {
+    name: string
+    statementBusinessName: string | null
+    clientId: string | null
+    currency: Currency
+  }) => void
   onDelete: () => void
 }
 
@@ -57,6 +64,9 @@ export default function ProjectHeader({
 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(project.name)
+  const [editStatementBusinessName, setEditStatementBusinessName] = useState(
+    project.statementBusinessName ?? ''
+  )
   const [editClientId, setEditClientId] = useState(project.client?.id ?? '')
   const [editCurrency, setEditCurrency] = useState<Currency>(
     (project.currency as Currency) || 'GHS'
@@ -64,6 +74,7 @@ export default function ProjectHeader({
 
   const startEdit = () => {
     setEditName(project.name)
+    setEditStatementBusinessName(project.statementBusinessName ?? '')
     setEditClientId(project.client?.id ?? '')
     setEditCurrency((project.currency as Currency) || 'GHS')
     setEditing(true)
@@ -77,7 +88,12 @@ export default function ProjectHeader({
       toast.warning('Project name required')
       return
     }
-    onSave({ name: trimmed, clientId: editClientId || null, currency: editCurrency })
+    onSave({
+      name: trimmed,
+      statementBusinessName: editStatementBusinessName.trim() || null,
+      clientId: editClientId || null,
+      currency: editCurrency,
+    })
     setEditing(false)
   }
 
@@ -120,54 +136,63 @@ export default function ProjectHeader({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {editing && canEdit ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex w-full max-w-2xl flex-col gap-3">
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 placeholder="Project name"
                 aria-label="Project name"
-                className="min-h-[44px] flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 sm:max-w-[320px]"
+                className="min-h-[44px] w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               />
-              <select
-                value={editClientId}
-                onChange={(e) => setEditClientId(e.target.value)}
-                aria-label="Client"
-                className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              >
-                <option value="">— No client —</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={editCurrency}
-                onChange={(e) => setEditCurrency(e.target.value as Currency)}
-                aria-label="Currency"
-                className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              >
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={submitEdit}
-                  disabled={isUpdating}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary-600/20 transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
+              <input
+                value={editStatementBusinessName}
+                onChange={(e) => setEditStatementBusinessName(e.target.value)}
+                placeholder="Business name as on bank statement (printed BRS)"
+                aria-label="Business name as on bank statement"
+                className="min-h-[44px] w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              />
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <select
+                  value={editClientId}
+                  onChange={(e) => setEditClientId(e.target.value)}
+                  aria-label="Client"
+                  className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                 >
-                  {isUpdating ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  <option value="">— No client —</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={editCurrency}
+                  onChange={(e) => setEditCurrency(e.target.value as Currency)}
+                  aria-label="Currency"
+                  className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                 >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                  Cancel
-                </button>
+                  <option value="GHS">GHS</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={submitEdit}
+                    disabled={isUpdating}
+                    className="inline-flex items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary-600/20 transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
+                  >
+                    {isUpdating ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -179,6 +204,12 @@ export default function ProjectHeader({
                 <ProjectStatusPill status={project.status} />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-gray-600">
+                {project.statementBusinessName && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-gray-400">On statement</span>
+                    <span className="font-medium text-gray-700">{project.statementBusinessName}</span>
+                  </span>
+                )}
                 {project.client && (
                   <span className="inline-flex items-center gap-1.5">
                     <span className="text-gray-400">Client</span>

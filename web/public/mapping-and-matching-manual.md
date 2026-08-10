@@ -38,6 +38,8 @@ Mapping and matching happen **after Upload** in every project:
 
 ### Prepare your files
 
+When creating a project, capture the **business name as on the bank statement**, bank account name/number, and closing date. The project name can auto-compose from those fields for tracking. The printed BRS company line uses the statement business name when set (otherwise your organisation name).
+
 Good source data makes mapping and matching much easier:
 
 - Use **one reporting period** per project (e.g. January 2026 only).

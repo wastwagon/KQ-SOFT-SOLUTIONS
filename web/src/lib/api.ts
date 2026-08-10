@@ -137,6 +137,8 @@ export interface ReportMatchRow {
 export interface ReportProjectInfo {
   id?: string
   name?: string
+  /** Business name as on bank statement — preferred printed BRS company line. */
+  statementBusinessName?: string | null
   status?: string
   reconciliationDate?: string | null
   bankStatementClosingBalance?: number | null
@@ -240,6 +242,8 @@ export interface ReportDiscrepancy {
 export interface ReportResponse {
   organization?: { name?: string; branding?: ReportBranding }
   project?: ReportProjectInfo
+  /** Resolved BRS letterhead company line (statement business name when set). */
+  reportEntityName?: string
   bankAccounts?: { id: string; name: string; bankName?: string | null; accountNo?: string | null }[]
   bankAccountId?: string | null
   selectedBankAccountName?: string | null
@@ -616,19 +620,31 @@ export const projects = {
   },
   get: (id: string) => api(`/projects/${id}`),
   create: (body: {
-    name: string
+    name?: string
+    /** Business name as on bank statement — printed BRS company line when set */
+    statementBusinessName?: string
     clientId?: string
     reconciliationDate?: string
     rollForwardFromProjectId?: string
     /** 3–8 letter ISO-style code (e.g. GHS, NGN) */
     currency?: string
     currencySymbol?: string
-    /** Shown on BRS letterhead when set; creates primary bank account record */
+    /** Bank institution name (e.g. Ecobank Ghana) */
     primaryBankName?: string
+    /** Account display name (e.g. Current / Operating) */
+    primaryAccountName?: string
     primaryAccountNo?: string
   }) => api('/projects', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: string, body: { name?: string; clientId?: string | null; currency?: 'GHS' | 'USD' | 'EUR' }) =>
-    api(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  update: (
+    id: string,
+    body: {
+      name?: string
+      statementBusinessName?: string | null
+      reconciliationDate?: string | null
+      clientId?: string | null
+      currency?: 'GHS' | 'USD' | 'EUR' | string
+    }
+  ) => api(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (id: string) =>
     api(`/projects/${id}`, { method: 'DELETE' }),
   reopen: (id: string) =>

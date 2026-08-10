@@ -10,6 +10,7 @@ import { hasPlanFeature } from '../config/planFeatures.js'
 import { getProjectVariance } from '../lib/reconcile-variance.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
+import { composeProjectDisplayName } from '../lib/projectIdentity.js'
 
 const router = Router()
 
@@ -27,7 +28,10 @@ function slugFromName(name: string): string {
 }
 
 const createSchema = z.object({
-  name: z.string().min(1),
+  /** Tracking name; if omitted, composed from statement/account/date fields when possible. */
+  name: z.string().min(1).optional(),
+  /** Business / account-holder name as printed on the bank statement (BRS letterhead). */
+  statementBusinessName: z.string().max(200).optional(),
   clientId: z.string().optional(),
   reconciliationDate: z.string().datetime().optional(),
   rollForwardFromProjectId: z.string().optional(),
@@ -40,6 +44,8 @@ const createSchema = z.object({
   currencySymbol: z.string().min(1).max(8).optional(),
   /** Optional primary bank — creates first BankAccount for BRS letterhead / workbook header */
   primaryBankName: z.string().max(100).optional(),
+  /** Display name of the account (e.g. "Current account") — BankAccount.name */
+  primaryAccountName: z.string().max(200).optional(),
   primaryAccountNo: z.string().max(50).optional(),
 })
 
@@ -108,7 +114,24 @@ router.post('/', async (req: AuthRequest, res) => {
       if (!prev || !rollForwardId) return res.status(400).json({ error: 'Previous project not found for roll-forward' })
       if (prev.status !== 'completed') return res.status(400).json({ error: 'Can only roll forward from a completed project' })
     }
-    const baseSlug = slugFromName(body.name)
+    const statementBusinessName = (body.statementBusinessName ?? '').trim() || null
+    const primaryAccountName = (body.primaryAccountName ?? '').trim()
+    const pb = (body.primaryBankName ?? '').trim()
+    const pa = (body.primaryAccountNo ?? '').trim()
+    const composedName = composeProjectDisplayName({
+      statementBusinessName,
+      bankAccountName: primaryAccountName || pb || null,
+      accountNo: pa || null,
+      reconciliationDate: body.reconciliationDate ?? null,
+    })
+    const projectName = (body.name ?? '').trim() || composedName
+    if (!projectName) {
+      return res.status(400).json({
+        error:
+          'Provide a project name, or statement business name / bank account details / closing date to compose one.',
+      })
+    }
+    const baseSlug = slugFromName(projectName)
     let slug = baseSlug
     let suffix = 2
     while (await prisma.project.findFirst({ where: { organizationId: orgId, slug } })) {
@@ -117,8 +140,9 @@ router.post('/', async (req: AuthRequest, res) => {
     const project = await prisma.project.create({
       data: {
         organizationId: orgId,
-        name: body.name,
+        name: projectName,
         slug,
+        statementBusinessName,
         clientId,
         rollForwardFromProjectId: rollForwardId,
         reconciliationDate: body.reconciliationDate ? new Date(body.reconciliationDate) : null,
@@ -126,14 +150,13 @@ router.post('/', async (req: AuthRequest, res) => {
         currencySymbol: body.currencySymbol?.trim() || null,
       },
     })
-    const pb = (body.primaryBankName ?? '').trim()
-    const pa = (body.primaryAccountNo ?? '').trim()
-    if (pb || pa) {
+    if (pb || pa || primaryAccountName) {
       const bankLimitCheck = await canAddBankAccount(project.id, org.plan)
       if (!bankLimitCheck.ok) {
         return res.status(403).json({ error: bankLimitCheck.message })
       }
-      const displayName = pb || (pa ? `Account ${pa}` : 'Primary bank account')
+      const displayName =
+        primaryAccountName || pb || (pa ? `Account ${pa}` : 'Primary bank account')
       await prisma.bankAccount.create({
         data: {
           projectId: project.id,
@@ -155,6 +178,8 @@ router.post('/', async (req: AuthRequest, res) => {
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
+  statementBusinessName: z.string().max(200).nullable().optional(),
+  reconciliationDate: z.string().datetime().nullable().optional(),
   clientId: z.string().nullable().optional(),
   currency: z
     .string()
@@ -191,11 +216,21 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     }
     const data: {
       name?: string
+      statementBusinessName?: string | null
+      reconciliationDate?: Date | null
       clientId?: string | null
       currency?: string
       currencySymbol?: string | null
     } = {}
     if (body.name !== undefined) data.name = body.name
+    if (body.statementBusinessName !== undefined) {
+      data.statementBusinessName = body.statementBusinessName?.trim() || null
+    }
+    if (body.reconciliationDate !== undefined) {
+      data.reconciliationDate = body.reconciliationDate
+        ? new Date(body.reconciliationDate)
+        : null
+    }
     if (body.clientId !== undefined) data.clientId = body.clientId
     if (body.currency !== undefined) data.currency = body.currency.toUpperCase()
     if (body.currencySymbol !== undefined) data.currencySymbol = body.currencySymbol.trim() || null

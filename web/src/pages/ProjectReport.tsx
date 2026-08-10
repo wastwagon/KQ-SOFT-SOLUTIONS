@@ -533,7 +533,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         : selectedBankAccountNo
           ? `Account Number ${selectedBankAccountNo}`
           : null)
-  const organizationDisplayName = (data.organization?.name || 'KQ SOFT SOLUTIONS').replace(/KQ-SOFT/gi, 'KQ SOFT')
+  // Printed BRS company line: statement business name when set; else preparer organization.
+  const organizationDisplayName = (
+    data.reportEntityName ||
+    data.project?.statementBusinessName ||
+    data.organization?.name ||
+    'KQ SOFT SOLUTIONS'
+  ).replace(/KQ-SOFT/gi, 'KQ SOFT')
 
   const labels = {
     openingBankStatementBalance: profileLabels?.openingBankStatementBalance || 'Opening bank statement balance',

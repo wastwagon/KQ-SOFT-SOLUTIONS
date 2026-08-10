@@ -225,6 +225,8 @@ model Project {
   name                    String
   slug                    String    // URL-friendly identifier, unique per org
   status                  String    @default("draft") // draft | mapping | reconciling | submitted_for_review | approved | completed
+  // Business / account-holder name as on the bank statement — printed BRS letterhead when set.
+  statementBusinessName   String?   @map("statement_business_name")
   reconciliationDate      DateTime? @map("reconciliation_date")
   currency                String    @default("GHS")  // ISO-style code, e.g. GHS, USD, NGN
   currencySymbol          String?   @map("currency_symbol") // optional display override, e.g. ₦
