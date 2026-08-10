@@ -119,12 +119,15 @@ function classifyAbsaAmount(
   balance: number | null,
   previousBalance: number
 ): { debit: number; credit: number; nextBalance: number } {
+  // Prefer absolute magnitude so signed reversals never emit negative debit/credit.
+  const signed = Math.round(txnAmount * 100) / 100
+  const amt = Math.abs(signed)
+
   if (balance == null) {
-    return { debit: txnAmount, credit: 0, nextBalance: previousBalance - txnAmount }
+    return { debit: amt, credit: 0, nextBalance: previousBalance - amt }
   }
 
   const delta = Math.round((balance - previousBalance) * 100) / 100
-  const amt = Math.round(txnAmount * 100) / 100
 
   if (Math.abs(delta - amt) < 0.02) {
     return { debit: 0, credit: amt, nextBalance: balance }
@@ -135,6 +138,13 @@ function classifyAbsaAmount(
 
   const creditHints = /\b(ebox|deposit|credit|received|investment\s+bank)\b/i
   const debitHints = /\b(commission|charge|fee|debit)\b/i
+
+  if (signed < 0) {
+    if (creditHints.test(description) && !debitHints.test(description)) {
+      return { debit: amt, credit: 0, nextBalance: balance }
+    }
+    return { debit: amt, credit: 0, nextBalance: balance }
+  }
 
   if (creditHints.test(description) && !debitHints.test(description)) {
     return { debit: 0, credit: amt, nextBalance: balance }

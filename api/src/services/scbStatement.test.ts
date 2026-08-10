@@ -7,14 +7,21 @@ import {
   extractScbTransactions,
   isScbGluedRow,
   isScbStatementLayout,
+  looksLikeScbStatementText,
   normalizeScbExcelTable,
   parseScbGluedRow,
+  parseScbPdfText,
 } from './scbStatement.js'
 import { parseExcel } from './parser.js'
-import { detectGhanaBankFormat } from './ghanaBankParsers.js'
+import { parseBankPdf } from './documentParse.js'
+import { detectGhanaBankFormat, resolveDetectedBankFormat } from './ghanaBankParsers.js'
 import { buildSuggestedMappingForDocument, canAutoMap } from './autoMapDocument.js'
 
 const SCB_RAW = path.resolve(import.meta.dirname, '../../../specimenbankstatementformats/scb statement.xlsx')
+const SCB_PDF = path.resolve(
+  import.meta.dirname,
+  '../../../resultofcleanedfile/cocobod STANCHART SEPT 23.pdf'
+)
 
 describe('scbStatement', () => {
   it('parses glued first-page rows', () => {
@@ -75,4 +82,51 @@ describe('scbStatement', () => {
     expect(cr.credit).toBe(5)
     expect(dr.debit).toBe(4)
   })
+
+  it('detects and parses SCB PDF withdrawal/deposit glued lines', () => {
+    const text = `Statement of Account
+DepositDescriptionDateBalanceWithdrawal
+Thank you for banking with Standard Chartered.
+77,070,899.92
+Balance Brought Forward
+5,903,288.8301 Sep 2023SWEEP TO GHS 0100103114800  SWEEP TO
+GHS 0100103114800   /2023/09/01-2816474
+201407150016 / 01 T2006/001
+71,167,611.09
+11 Sep 202385,551.81SWEEP FROM GHS 0100103114800  SWEEP
+FROM GHS 0100103114800    201407150015 /
+02 T2006/002
+21,001,974.75`
+    expect(looksLikeScbStatementText(text)).toBe(true)
+    const r = parseScbPdfText(text)
+    expect(r.rows.length).toBe(2)
+    expect(r.rows[0]![4]).toBeCloseTo(5_903_288.83, 2)
+    expect(r.rows[0]![5]).toBeNull()
+    expect(r.rows[0]![6]).toBeCloseTo(71_167_611.09, 2)
+    expect(String(r.rows[0]![2])).toMatch(/SWEEP TO/i)
+    expect(r.rows[1]![5]).toBeCloseTo(85_551.81, 2)
+    expect(r.rows[1]![4]).toBeNull()
+    expect(String(r.rows[1]![2])).toMatch(/SWEEP FROM/i)
+  })
+
+  it('parseBankPdf uses SCB PDF parser for StanChart specimen', async () => {
+    if (!fs.existsSync(SCB_PDF)) return
+    const result = await parseBankPdf(SCB_PDF)
+    expect(result.parseMethod).toBe('scb_pdf')
+    expect(result.rows.length).toBeGreaterThanOrEqual(18)
+    expect(result.rows.length).toBeLessThanOrEqual(30)
+    expect(resolveDetectedBankFormat(result.headers, result.rows.slice(0, 3), result.parseMethod)).toBe(
+      'scb'
+    )
+    const sumDebit = result.rows.reduce((s, r) => s + (Number(r[4]) || 0), 0)
+    const sumCredit = result.rows.reduce((s, r) => s + (Number(r[5]) || 0), 0)
+    expect(sumDebit).toBeGreaterThan(100_000_000)
+    expect(sumCredit).toBeGreaterThan(100_000_000)
+    const lastBalance = Number(result.rows[result.rows.length - 1]![6])
+    expect(lastBalance).toBeGreaterThan(10_000_000)
+    const cr = buildSuggestedMappingForDocument('bank_credits', result.headers, 'scb')
+    const dr = buildSuggestedMappingForDocument('bank_debits', result.headers, 'scb')
+    expect(canAutoMap('bank_credits', result.headers, cr)).toBe(true)
+    expect(canAutoMap('bank_debits', result.headers, dr)).toBe(true)
+  }, 30000)
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import path from 'path'
 import fs from 'fs'
 import {
+  joinNibNarrationParts,
   looksLikeNibStatementText,
   parseNibAmountLine,
   parseNibPdfText,
@@ -91,6 +92,46 @@ DARKO FRANKLIN
     const r = parseNibPdfText(text)
     expect(r.rows.length).toBe(2)
     expect(r.rows[0]![5]).toBe(2637)
+    expect(r.rows[0]![2]).toBe('Cash Deposit DARKO FRANKLIN')
     expect(r.rows[1]![4]).toBe(2930)
   })
+
+  it('joins mid-word PDF wraps in narration', () => {
+    expect(joinNibNarrationParts(['Inward Telex Paym', 'ent', 'GHANA COCOA'])).toBe(
+      'Inward Telex Payment GHANA COCOA'
+    )
+    expect(joinNibNarrationParts(['CHQ NO 000399 FR', 'OM NIB ACCRA MA', 'IN IFO Chq 000399'])).toBe(
+      'CHQ NO 000399 FROM NIB ACCRA MAIN IFO Chq 000399'
+    )
+    expect(
+      joinNibNarrationParts([
+        'CHQ NO 000376 F',
+        'ROM NIB ACCRA M',
+        'AIN IFO Chq 00037',
+        '6 ifo FALIDU TAHIR',
+        'U Ordering Cust: 37',
+        '5052',
+      ])
+    ).toBe('CHQ NO 000376 FROM NIB ACCRA MAIN IFO Chq 000376 ifo FALIDU TAHIRU Ordering Cust: 375052')
+    expect(joinNibNarrationParts(['By cheque No: 000', '404'])).toBe('By cheque No: 000404')
+    expect(joinNibNarrationParts(['DARKO FRANKLIN', 'A'])).toBe('DARKO FRANKLIN A')
+  })
+
+  it('keeps post-amount description details from real specimen', async () => {
+    if (!fs.existsSync(NIB_PDF)) return
+
+    const result = await parseBankPdf(NIB_PDF)
+    const byRef = Object.fromEntries(result.rows.map((r) => [String(r[1]), String(r[2])]))
+
+    expect(byRef.TT23278G3SMB).toContain('DARKO FRANKLIN')
+    expect(byRef.FT23278B7PSK).toMatch(/CHQ NO 000399.*FROM NIB ACCRA MAIN/i)
+    expect(byRef.TT232794G1HG).toMatch(/ISAAC YAW NORTEY/i)
+    expect(byRef.TT232794G1HG).toMatch(/By cheque No:\s*000404/i)
+    expect(byRef.FT232916PM3C).toMatch(/Inward Telex Payment/i)
+    expect(byRef.FT232916PM3C).toContain('GHANA COCOA')
+    expect(byRef.FT232916PM3C).not.toMatch(/Paym ent/)
+    expect(byRef.FT23304393BV).toBe(
+      'Application Of Charges ACCT MAINT CHARGE AS AT 31 OCT 2023'
+    )
+  }, 30000)
 })

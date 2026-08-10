@@ -47,6 +47,11 @@ import {
   parseUmbPdfText,
   shouldUseUmbPdfParser,
 } from './umbStatement.js'
+import {
+  looksLikeScbStatementText,
+  parseScbPdfText,
+  shouldUseScbPdfParser,
+} from './scbStatement.js'
 import { resolveOcrLanguages } from './ocrLang.js'
 import { pickBetterParse, scoreParseQuality } from './ocrQuality.js'
 import {
@@ -73,7 +78,7 @@ export type ParsedDocument = ParseResult & {
   pdfTruncated?: boolean
   pdfPagesProcessed?: number
   pdfTotalPages?: number
-  parseMethod?: 'ecobank_pdf' | 'gcb_pdf' | 'absa_pdf' | 'prudential_pdf' | 'uba_pdf' | 'nib_pdf' | 'adb_pdf' | 'umb_pdf' | 'ecobank_excel' | 'native_text' | 'ocr' | 'ocr_geometry' | 'excel' | 'csv' | 'image'
+  parseMethod?: 'ecobank_pdf' | 'gcb_pdf' | 'absa_pdf' | 'prudential_pdf' | 'uba_pdf' | 'nib_pdf' | 'adb_pdf' | 'umb_pdf' | 'scb_pdf' | 'ecobank_excel' | 'native_text' | 'ocr' | 'ocr_geometry' | 'excel' | 'csv' | 'image'
   /** 0–100 parse quality score (OCR / generic native tables). */
   parseQualityScore?: number
   /** True when a higher-resolution OCR retry was attempted. */
@@ -159,6 +164,13 @@ function tryGcbFromText(text: string, numpages?: number): ParsedDocument | null 
   return { ...gcb, pdfTotalPages: numpages, parseMethod: 'gcb_pdf' }
 }
 
+function tryScbFromText(text: string, numpages?: number): ParsedDocument | null {
+  if (!looksLikeScbStatementText(text)) return null
+  const scb = parseScbPdfText(text)
+  if (scb.rows.length === 0) return null
+  return { ...scb, pdfTotalPages: numpages, parseMethod: 'scb_pdf' }
+}
+
 function withTruncation(
   doc: ParsedDocument,
   truncated: boolean,
@@ -191,6 +203,8 @@ function finalizeFromOcrText(
   if (absa) return withTruncation(absa, truncated, pageCount, totalPages)
   const gcb = tryGcbFromText(ocrText, totalPages)
   if (gcb) return withTruncation(gcb, truncated, pageCount, totalPages)
+  const scb = tryScbFromText(ocrText, totalPages)
+  if (scb) return withTruncation(scb, truncated, pageCount, totalPages)
   const ecobank = tryEcobankFromText(ocrText, totalPages)
   if (ecobank) return withTruncation(ecobank, truncated, pageCount, totalPages)
   const base = textToTableFromOcrText(ocrText)
@@ -372,6 +386,10 @@ function trySpecializeGeneric(
     const retryGcb = tryGcbFromText(text, numpages)
     if (retryGcb) return retryGcb
   }
+  if (shouldUseScbPdfParser(generic)) {
+    const retryScb = tryScbFromText(text, numpages)
+    if (retryScb) return retryScb
+  }
   if (shouldUseEcobankPdfParser(generic)) {
     const retry = tryEcobankFromText(text, numpages)
     if (retry) return retry
@@ -398,6 +416,8 @@ export async function parseBankPdf(filepath: string): Promise<ParsedDocument> {
     if (absa) return absa
     const gcb = tryGcbFromText(nativeResult.text, nativeResult.numpages)
     if (gcb) return gcb
+    const scb = tryScbFromText(nativeResult.text, nativeResult.numpages)
+    if (scb) return scb
     const ecobank = tryEcobankFromText(nativeResult.text, nativeResult.numpages)
     if (ecobank) return ecobank
     const generic = textToTableFromOcrText(nativeResult.text)
@@ -520,7 +540,14 @@ export async function parseDocumentFile(
   const ft = detectFileType(localPath)
   if (ft === 'excel') {
     const r = parseExcel(localPath, sheetIndex)
-    return { ...r, parseMethod: r.headers.includes('Debit') ? 'ecobank_excel' : 'excel' }
+    // Ecobank normalize emits Title-Case "Debit"; BOA does too — don't mis-tag BOA.
+    const isBoaExcel =
+      r.headers.some((h) => /^our\s*reference$/i.test(h)) &&
+      r.headers.some((h) => /^trxn\s*code$/i.test(h))
+    return {
+      ...r,
+      parseMethod: !isBoaExcel && r.headers.includes('Debit') ? 'ecobank_excel' : 'excel',
+    }
   }
   if (ft === 'csv') {
     const r = parseCsv(localPath)

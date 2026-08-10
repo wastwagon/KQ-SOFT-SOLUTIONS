@@ -117,12 +117,16 @@ function classifyGcbAmount(
   balance: number | null,
   previousBalance: number
 ): { debit: number; credit: number; nextBalance: number } {
+  // GCB occasionally prints signed amounts (e.g. "-8,000.00") for reversals.
+  // Always classify by magnitude against the balance delta; never emit negative debit/credit.
+  const signed = Math.round(txnAmount * 100) / 100
+  const amt = Math.abs(signed)
+
   if (balance == null) {
-    return { debit: txnAmount, credit: 0, nextBalance: previousBalance - txnAmount }
+    return { debit: amt, credit: 0, nextBalance: previousBalance - amt }
   }
 
   const delta = Math.round((balance - previousBalance) * 100) / 100
-  const amt = Math.round(txnAmount * 100) / 100
 
   if (Math.abs(delta - amt) < 0.02) {
     return { debit: 0, credit: amt, nextBalance: balance }
@@ -135,6 +139,17 @@ function classifyGcbAmount(
     /\b(deposit|chq\s*-|inward|credit|lodg|received|trfd\s+from|reversal|zexa)\b/i
   const debitHints =
     /\b(withdrawal|chg|charge|procu|sweep|trfr|ach\s*:|payment|debit|indi|inwc|paid)\b/i
+
+  // Signed-negative rows are reversals: reverse a credit-like narration → debit, and vice versa.
+  if (signed < 0) {
+    if (creditHints.test(description) && !debitHints.test(description)) {
+      return { debit: amt, credit: 0, nextBalance: balance }
+    }
+    if (debitHints.test(description) && !creditHints.test(description)) {
+      return { debit: 0, credit: amt, nextBalance: balance }
+    }
+    return { debit: amt, credit: 0, nextBalance: balance }
+  }
 
   if (creditHints.test(description) && !debitHints.test(description)) {
     return { debit: 0, credit: amt, nextBalance: balance }

@@ -10,6 +10,23 @@ function norm(h: string): string {
   return (h || '').toLowerCase().replace(/[\s_]+/g, ' ').trim()
 }
 
+function cellText(value: unknown): string {
+  if (value == null) return ''
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const dd = String(value.getDate()).padStart(2, '0')
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const mon = months[value.getMonth()] ?? 'Jan'
+    const yy = String(value.getFullYear()).slice(-2)
+    return `${dd}-${mon}-${yy}`
+  }
+  return String(value).replace(/\s+/g, ' ').trim()
+}
+
+function isDashPlaceholder(value: unknown): boolean {
+  const s = String(value ?? '').trim()
+  return s === '' || /^-\s*$/.test(s) || /^-+$/.test(s)
+}
+
 export function isBankOfAfricaStatementLayout(headers: string[], rows: unknown[][]): boolean {
   const h = headers.map(norm).join(' ')
   if (/\bdebit\b/.test(h) && /\bcredit\b/.test(h) && /value date/.test(h) && /description/.test(h)) {
@@ -38,7 +55,13 @@ function colIndex(headers: string[], patterns: RegExp[]): number {
   return normHeaders.findIndex((h) => patterns.some((p) => p.test(h)))
 }
 
-/** Drop padding rows and zero-amount lines from the BOA template export. */
+/**
+ * Clean BOA template export:
+ * - keep only real transaction columns (drop control / Col_* padding)
+ * - trim text, turn "-" debit/credit placeholders into null
+ * - emit numeric debit/credit/balance
+ * - drop zero-amount padding rows
+ */
 export function normalizeBankOfAfricaExcelTable(result: ParseResult): ParseResult {
   const matrix = [result.headers, ...result.rows]
   const headerRow = findBankOfAfricaTransactionHeaderRow(matrix)
@@ -47,17 +70,59 @@ export function normalizeBankOfAfricaExcelTable(result: ParseResult): ParseResul
   const headerCells = (matrix[headerRow] || []).map((c) => String(c ?? '').trim())
   const headers = headerCells.map((c, i) => c || `Col_${i}`)
 
+  const refIdx = colIndex(headers, [/^our reference$/])
+  const trxnIdx = colIndex(headers, [/^trxn code$/])
+  const acctIdx = colIndex(headers, [/^account number$/])
+  const opDateIdx = colIndex(headers, [/^operation date$/])
+  const valueDateIdx = colIndex(headers, [/^value date$/])
+  const descIdx = colIndex(headers, [/^description$/])
   const debitIdx = colIndex(headers, [/^debit$/])
   const creditIdx = colIndex(headers, [/^credit$/])
-  const descIdx = colIndex(headers, [/^description$/])
+  const chqIdx = colIndex(headers, [/^cheque number$/])
+  const balIdx = colIndex(headers, [/^balance$/])
 
-  const rows = matrix.slice(headerRow + 1).filter((row) => {
-    const debit = debitIdx >= 0 ? parseImportedAmount(row[debitIdx]) : 0
-    const credit = creditIdx >= 0 ? parseImportedAmount(row[creditIdx]) : 0
-    const desc = descIdx >= 0 ? String(row[descIdx] ?? '').trim() : ''
-    if (debit > 0 || credit > 0) return true
-    return desc.length > 0 && (debit !== 0 || credit !== 0)
-  })
+  const outHeaders = [
+    'Our Reference',
+    'Trxn Code',
+    'Account Number',
+    'Operation Date',
+    'Value Date',
+    'Description',
+    'Debit',
+    'Credit',
+    'Cheque Number',
+    'Balance',
+  ]
 
-  return { ...result, headers, rows }
+  const rows: unknown[][] = []
+  for (const row of matrix.slice(headerRow + 1)) {
+    const get = (i: number) => (i >= 0 && i < row.length ? row[i] : null)
+    const debitRaw = get(debitIdx)
+    const creditRaw = get(creditIdx)
+    const debit = debitIdx >= 0 && !isDashPlaceholder(debitRaw) ? parseImportedAmount(debitRaw) : 0
+    const credit = creditIdx >= 0 && !isDashPlaceholder(creditRaw) ? parseImportedAmount(creditRaw) : 0
+    const desc = cellText(get(descIdx))
+    if (debit <= 0 && credit <= 0) continue
+
+    const balanceRaw = get(balIdx)
+    const balance =
+      balIdx >= 0 && balanceRaw != null && String(balanceRaw).trim() !== ''
+        ? parseImportedAmount(balanceRaw)
+        : null
+
+    rows.push([
+      cellText(get(refIdx)) || null,
+      cellText(get(trxnIdx)) || null,
+      cellText(get(acctIdx)) || null,
+      cellText(get(opDateIdx)) || null,
+      cellText(get(valueDateIdx)) || null,
+      desc || null,
+      debit > 0 ? debit : null,
+      credit > 0 ? credit : null,
+      cellText(get(chqIdx)) || null,
+      balance,
+    ])
+  }
+
+  return { ...result, headers: outHeaders, rows }
 }

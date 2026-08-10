@@ -15,6 +15,7 @@ import { looksLikeAbsaStatementText, parseAbsaPdfText } from './absaStatement.js
 import { looksLikePrudentialStatementText, parsePrudentialPdfText, shouldUsePrudentialPdfParser } from './prudentialStatement.js'
 import { looksLikeUbaStatementText, parseUbaPdfText } from './ubaStatement.js'
 import { looksLikeNibStatementText, parseNibPdfText } from './nibStatement.js'
+import { looksLikeScbStatementText, parseScbPdfText } from './scbStatement.js'
 import { looksLikeUmbStatementText, parseUmbPdfText } from './umbStatement.js'
 import { looksLikeAdbStatementText, parseAdbPdfText } from './adbStatement.js'
 import { extractPdfTextNative } from './documentParse.js'
@@ -118,6 +119,12 @@ export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPage
           return { ...gcb, pdfTotalPages: nativeResult.numpages }
         }
       }
+      if (looksLikeScbStatementText(nativeResult.text)) {
+        const scb = parseScbPdfText(nativeResult.text)
+        if (scb.rows.length > 0) {
+          return { ...scb, pdfTotalPages: nativeResult.numpages }
+        }
+      }
       if (looksLikeEcobankStatementText(nativeResult.text)) {
         const ecobank = parseEcobankPdfText(nativeResult.text)
         if (ecobank.rows.length > 0) {
@@ -210,6 +217,14 @@ export async function parsePdf(filepath: string, maxPages = resolvePdfOcrMaxPage
       return truncated
         ? { ...gcb, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
         : { ...gcb, pdfTotalPages: totalPages }
+    }
+  }
+  if (looksLikeScbStatementText(ocrText)) {
+    const scb = parseScbPdfText(ocrText)
+    if (scb.rows.length > 0) {
+      return truncated
+        ? { ...scb, pdfTruncated: true, pdfPagesProcessed: pageCount, pdfTotalPages: totalPages }
+        : { ...scb, pdfTotalPages: totalPages }
     }
   }
   if (looksLikeEcobankStatementText(ocrText)) {

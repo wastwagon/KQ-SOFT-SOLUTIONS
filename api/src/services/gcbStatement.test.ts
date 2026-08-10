@@ -50,6 +50,23 @@ Cheque Withdrawal // FRANCIS GYAMFI OCRAN
     expect(r.rows[0]![7]).toBe('530773')
   })
 
+  it('processes signed-negative reversal amounts as absolute debit/credit', () => {
+    const sample = `DateDescriptionRef / Chq No.Value Date DebitCreditBalance
+Opening Balance
+20,321.10
+22-Sep-2023
+BANK OF GHANA CHQ - bog chq 139425~139425 - DEP. AT REPUBLIC HOUSE
+555OUTC232631034
+/Chq_No - 139425
+22-Sep-2023-8,000.0012,321.10`
+    const r = parseGcbPdfText(sample)
+    expect(r.rows.length).toBe(1)
+    expect(r.rows[0]![4]).toBe(8000)
+    expect(r.rows[0]![5]).toBeNull()
+    expect(r.rows[0]![6]).toBe(12321.1)
+    expect(r.rows[0]![7]).toBe('139425')
+  })
+
   it('shouldUseGcbPdfParser flags generic junk from line-splitter', () => {
     expect(
       shouldUseGcbPdfParser({
@@ -82,6 +99,16 @@ Cheque Withdrawal // FRANCIS GYAMFI OCRAN
 
     const lastBalance = Number(parsed.rows[parsed.rows.length - 1]![6])
     expect(lastBalance).toBeCloseTo(11373.41, 0)
+
+    const reversal = parsed.rows.find(
+      (row) =>
+        String(row[7]) === '139425' &&
+        String(row[0]).startsWith('22-Sep') &&
+        Number(row[6]) === 12321.1
+    )
+    expect(reversal).toBeTruthy()
+    expect(Number(reversal![4])).toBe(8000)
+    expect(reversal![5]).toBeNull()
   }, 20000)
 
   it('parseBankPdf uses GCB parser for GCB specimen', async () => {

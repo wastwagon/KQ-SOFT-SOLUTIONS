@@ -37,6 +37,21 @@ export function shouldUsePrudentialPdfParser(result: { headers: string[]; rows: 
   )
 }
 
+function isPruFooterLine(line: string): boolean {
+  return (
+    /\bunauthorised\s+entry\b/i.test(line) ||
+    /\bcustomer\s+notice\b/i.test(line) ||
+    /always keep your (?:account number|cheque books)/i.test(line) ||
+    /please note that the statement/i.test(line) ||
+    /customers?\s+enjoying\s+facilities/i.test(line) ||
+    /stop\s+payment\s+instructions/i.test(line) ||
+    /for a loan account statement/i.test(line) ||
+    /^\*\s*=/.test(line) ||
+    /^\*\s*\*\s*\*/.test(line) ||
+    /^\d+\.\s+(?:for\s+a\s+loan|customers?\s+)/i.test(line)
+  )
+}
+
 function isNoiseLine(line: string): boolean {
   return (
     /^transaction\s*details/i.test(line) ||
@@ -64,8 +79,17 @@ function isNoiseLine(line: string): boolean {
     /^ghs$/i.test(line) ||
     /^per\s+statement/i.test(line) ||
     /^dr\d/i.test(line) ||
-    /^\d+,\d{3},\d{3},\d{2}\.\d{2}$/.test(line)
+    /^\d+,\d{3},\d{3},\d{2}\.\d{2}$/.test(line) ||
+    isPruFooterLine(line)
   )
+}
+
+function stripPruFooterFromDescription(description: string): string {
+  return description
+    .replace(/\s*\*\s*=\s*UNAUTHORISED[\s\S]*$/i, '')
+    .replace(/\s*\*\s*\*\s*\*\s*C\s*U\s*S\s*T\s*O\s*M\s*E\s*R[\s\S]*$/i, '')
+    .replace(/\s*a\.\s*Always keep your account number[\s\S]*$/i, '')
+    .trim()
 }
 
 function formatPruDate(value: string): string {
@@ -124,6 +148,13 @@ function isDescriptionLine(line: string): boolean {
   return /[A-Za-z]/.test(s)
 }
 
+/** True bank transaction-type headers — not payee/narrative continuations. */
+function isPruTxnTypeLine(line: string): boolean {
+  return /^(PRINCIPAL\s+PAYMENT|INTEREST|CALL\s+TRANSACTIONS|SWIFT\s+TRANSFER|FIXED\s+DEPOSIT|DIRECT\s+CREDIT|COMM\s+ON\s+SUNDRY|INWARD\s+CLEARING|SWIFT\s+CHARGES|ONLINE\s+OUTGOING|COMMISSION|OUTGOING\s+RT\s+ACH|NRT\s+ACH\s+OUT|ACCOUNT\s+TO\s+ACCOUNT|DEBIT\s+TRANSFER|DIGITAL\s+BANKING|CHEQUE\s+WITHDRAWAL|SERVICE\s+CHARGES)\b/i.test(
+    line.trim()
+  )
+}
+
 function extractOpeningBalance(text: string): number {
   const glued = text.match(/01-SEP-23\s*([\d,]+\.\d{2})\s*DR/i)
   if (glued) return -parseImportedAmount(glued[1])
@@ -143,13 +174,7 @@ function classifyPruAmount(
   const amt = Math.round(amount * 100) / 100
   const head = description.trim()
 
-  if (/inward|principal\s+payment|\binterest\b/i.test(head)) {
-    return { debit: 0, credit: amt, nextBalance: balance }
-  }
-  if (/call\s+transactions\s*-\s*dr|nrt\s+ach\s+out|exp\s*:/i.test(head)) {
-    return { debit: amt, credit: 0, nextBalance: balance }
-  }
-
+  // Balance delta is authoritative when it clearly matches the amount.
   if (Math.abs(delta - amt) < 0.02) {
     return { debit: 0, credit: amt, nextBalance: balance }
   }
@@ -157,10 +182,19 @@ function classifyPruAmount(
     return { debit: amt, credit: 0, nextBalance: balance }
   }
 
+  // INWARD CLEARING* are cheques presented against the account (debits).
+  // Do not treat bare "inward" as a credit — that misclassified clearing rows.
+  if (/inward\s+clearing|call\s+transactions\s*-\s*dr|nrt\s+ach\s+out|exp\s*:/i.test(head)) {
+    return { debit: amt, credit: 0, nextBalance: balance }
+  }
+  if (/principal\s+payment|\binterest\b|call\s+transactions\s*-\s*cr/i.test(head)) {
+    return { debit: 0, credit: amt, nextBalance: balance }
+  }
+
   const creditHints =
-    /\b(cr|credit|incoming|inward|principal\s+payment|interest|deposit|received|repo)\b/i
+    /\b(cr|credit|incoming|principal\s+payment|interest|deposit|received|repo)\b/i
   const debitHints =
-    /\b(dr|debit|withdrawal|outgoing|commission|comm|charges?|swift\s+charges?|transfer)\b/i
+    /\b(dr|debit|withdrawal|outgoing|commission|comm|charges?|swift\s+charges?|transfer|clearing)\b/i
 
   if (creditHints.test(description) && !debitHints.test(description)) {
     return { debit: 0, credit: amt, nextBalance: balance }
@@ -216,16 +250,18 @@ export function parsePrudentialPdfText(text: string): ParseResult {
     }
 
     const extra = pending.extra.join(' ').replace(/\s+/g, ' ').trim()
-    const refMatch = extra.match(/(\/[\w]+)/)
+    const refMatch = extra.match(/(\/[A-Za-z0-9]+)/)
     const reference = refMatch?.[1] ?? ''
-    const description = [pending.description, extra.replace(/\/[\w]+/g, '').trim()]
-      .filter(Boolean)
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 240)
+    const description = stripPruFooterFromDescription(
+      [pending.description, extra.replace(/\/[A-Za-z0-9]+/g, '').trim()]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\s*--\s*$/g, '')
+        .trim()
+    )
 
-    if (!description || /^\/[\w]/.test(description)) {
+    if (!description || /^\/[A-Za-z0-9]/.test(description)) {
       pending = null
       return
     }
@@ -257,7 +293,7 @@ export function parsePrudentialPdfText(text: string): ParseResult {
   }
 
   for (const line of lines) {
-    if (isDescriptionLine(line) && !pending) {
+    if (isPruTxnTypeLine(line) && !pending) {
       pending = {
         description: line,
         transDate: '',
@@ -268,11 +304,23 @@ export function parsePrudentialPdfText(text: string): ParseResult {
       continue
     }
 
-    if (!pending) continue
+    if (!pending) {
+      // Rare non-catalog headers still start a block.
+      if (isDescriptionLine(line)) {
+        pending = {
+          description: line,
+          transDate: '',
+          valueDate: '',
+          amountLine: '',
+          extra: [],
+        }
+      }
+      continue
+    }
 
     // Multi-line bank descriptions (NRT ACH OUT … then LTD:…) before dates
     if (!pending.transDate && !pending.amountLine) {
-      if (isDescriptionLine(line)) {
+      if (isPruTxnTypeLine(line)) {
         pending = {
           description: line,
           transDate: '',
@@ -319,7 +367,15 @@ export function parsePrudentialPdfText(text: string): ParseResult {
     }
 
     if (pending.amountLine) {
-      if (isDescriptionLine(line)) {
+      // Statement footers mark end of transactions — do not attach as narration.
+      if (isPruFooterLine(line)) {
+        flush()
+        pending = null
+        continue
+      }
+      // Payee / IFO / || narrative lines must stay with this txn.
+      // Only a real transaction-type header starts the next block.
+      if (isPruTxnTypeLine(line)) {
         flush()
         pending = {
           description: line,
@@ -334,7 +390,7 @@ export function parsePrudentialPdfText(text: string): ParseResult {
       continue
     }
 
-    if (pending.transDate && pending.valueDate && !pending.amountLine && isDescriptionLine(line)) {
+    if (pending.transDate && pending.valueDate && !pending.amountLine && isPruTxnTypeLine(line)) {
       flush()
       pending = {
         description: line,

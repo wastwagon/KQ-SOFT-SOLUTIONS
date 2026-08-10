@@ -1,12 +1,160 @@
 /**
- * Standard Chartered Bank (Ghana) multi-page Excel statement normalizer.
- * SCB exports pack some pages into multiline "glued" cells; others use one row per transaction.
+ * Standard Chartered Bank (Ghana) statement parsers.
+ * - Excel: multi-page exports with multiline "glued" cells or one row per transaction.
+ * - PDF: DepositDescriptionDateBalanceWithdrawal layout (amount+date or date+amount glued).
  */
 
 import { parseImportedAmount } from './amountParser.js'
 import type { ParseResult } from './parser.js'
 
 const SCB_HEADERS = ['ENTRY DATE', 'VALUE DATE', 'DESCRIPTION', 'Col_3', 'DEBITS', 'CREDITS', 'BALANCE']
+
+const SCB_PDF_DATE = /\d{2} [A-Za-z]{3} \d{4}/
+/** Withdrawal column: amount immediately before date. */
+const SCB_PDF_WITHDRAWAL = /^([\d,]+\.\d{2})(\d{2} [A-Za-z]{3} \d{4})(.*)$/i
+/** Deposit column: date immediately before amount. */
+const SCB_PDF_DEPOSIT = /^(\d{2} [A-Za-z]{3} \d{4})([\d,]+\.\d{2})(.*)$/i
+const SCB_PDF_BALANCE_ONLY = /^[\d,]+\.\d{2}$/
+
+export function looksLikeScbStatementText(text: string): boolean {
+  const flat = text.replace(/\s+/g, ' ')
+  if (/DepositDescriptionDateBalanceWithdrawal/i.test(flat)) return true
+  if (
+    /standard\s+chartered/i.test(flat) &&
+    /statement\s+of\s+account/i.test(flat) &&
+    SCB_PDF_DATE.test(flat) &&
+    (/sweep\s+to\s+ghs|sweep\s+from\s+ghs|credit\s+interest/i.test(flat) ||
+      /balance\s+brought\s+forward/i.test(flat))
+  ) {
+    return true
+  }
+  return false
+}
+
+export function shouldUseScbPdfParser(result: { headers: string[]; rows: unknown[][] }): boolean {
+  const h = result.headers.map((x) => (x || '').toLowerCase()).join(' ')
+  if (/\bdebits?\b/.test(h) && /\bcredits?\b/.test(h) && /entry\s*date/.test(h)) return false
+  return (
+    /statement\s*date|depositdescription|account\s*number/.test(h) ||
+    (result.headers.length <= 3 && result.rows.length > 20)
+  )
+}
+
+function formatScbPdfDate(value: string): string {
+  const m = value.trim().match(/^(\d{2})\s+([A-Za-z]{3})\s+(\d{4})$/)
+  if (!m) return value.trim()
+  return `${m[1]}-${m[2]}-${m[3]}`
+}
+
+function isScbPdfNoiseLine(line: string): boolean {
+  return (
+    /^statement\s+of\s+account$/i.test(line) ||
+    /^depositdescription/i.test(line) ||
+    /^account\s+type/i.test(line) ||
+    /^account\s+number/i.test(line) ||
+    /^currency/i.test(line) ||
+    /^statement\s+date/i.test(line) ||
+    /^branch/i.test(line) ||
+    /^page\s+\d+\s+of/i.test(line) ||
+    /^\d+\s*page\s+\d+\s+of/i.test(line) ||
+    /^generated\s+on/i.test(line) ||
+    /^thank\s+you\s+for\s+banking/i.test(line) ||
+    /^\(company\s+name\)$/i.test(line) ||
+    /^\(address\)$/i.test(line) ||
+    /^\(account\s+name\)$/i.test(line) ||
+    /^to$/i.test(line) ||
+    /^ca$/i.test(line) ||
+    /^ghs$/i.test(line) ||
+    /^\d{10,}$/.test(line) ||
+    /^\d{2} [A-Za-z]{3} \d{4}\d{2} [A-Za-z]{3} \d{4}$/i.test(line)
+  )
+}
+
+function extractScbPdfOpeningBalance(text: string): number {
+  const m = text.match(/([\d,]+\.\d{2})\s*\n\s*Balance Brought Forward/i)
+  return m ? parseImportedAmount(m[1]) : 0
+}
+
+/** Parse Standard Chartered Ghana PDF text into the same columns as the Excel cleaner. */
+export function parseScbPdfText(text: string): ParseResult {
+  const rows: unknown[][] = []
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !isScbPdfNoiseLine(l))
+
+  let i = 0
+  // Skip opening balance marker; keep for continuity only.
+  extractScbPdfOpeningBalance(text)
+
+  while (i < lines.length) {
+    const line = lines[i]!
+
+    if (/^balance\s+brought\s+forward$/i.test(line)) {
+      i++
+      continue
+    }
+
+    let kind: 'debit' | 'credit' | null = null
+    let date = ''
+    let amount = 0
+    let descParts: string[] = []
+
+    const withdrawal = line.match(SCB_PDF_WITHDRAWAL)
+    const deposit = !withdrawal ? line.match(SCB_PDF_DEPOSIT) : null
+
+    if (withdrawal) {
+      kind = 'debit'
+      amount = parseImportedAmount(withdrawal[1])
+      date = withdrawal[2]!
+      if (withdrawal[3]?.trim()) descParts.push(withdrawal[3].trim())
+    } else if (deposit) {
+      kind = 'credit'
+      date = deposit[1]!
+      amount = parseImportedAmount(deposit[2])
+      if (deposit[3]?.trim()) descParts.push(deposit[3].trim())
+    } else {
+      i++
+      continue
+    }
+
+    i++
+    let balance: number | null = null
+    while (i < lines.length) {
+      const next = lines[i]!
+      if (SCB_PDF_WITHDRAWAL.test(next) || SCB_PDF_DEPOSIT.test(next)) break
+      if (/^balance\s+brought\s+forward$/i.test(next)) break
+      if (SCB_PDF_BALANCE_ONLY.test(next)) {
+        balance = parseImportedAmount(next)
+        i++
+        break
+      }
+      descParts.push(next)
+      i++
+    }
+
+    if (amount <= 0 || balance == null) continue
+
+    const description = descParts
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!description) continue
+
+    const formatted = formatScbPdfDate(date)
+    rows.push([
+      formatted,
+      formatted,
+      description,
+      null,
+      kind === 'debit' ? amount : null,
+      kind === 'credit' ? amount : null,
+      balance,
+    ])
+  }
+
+  return { headers: [...SCB_HEADERS], rows }
+}
 
 function isScbTransactionDate(value: unknown): boolean {
   if (typeof value === 'number' && value > 40000) return true

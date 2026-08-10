@@ -98,8 +98,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "16379:6379"
+    # No host port publish — API/workers reach redis via Docker network
+    # (avoids clashes with other local stacks on 16379/16380).
     volumes:
       - redis_data:/data
 

@@ -49,18 +49,68 @@ PRINCIPAL PAYMENT
     expect(extractPruDateFromLine('15-SEP-23')).toBe('15-SEP-23')
   })
 
-  it('parses inward clearing block with embedded value date', () => {
+  it('parses inward clearing as debit (cheque presented against account)', () => {
     const text = `BALANCE BROUGHT FWD.
 01-SEP-23265.00DR
+CALL TRANSACTIONS - CR
+06-SEP-23
+06-SEP-23
+750.00485.00
+/009SWI2191540006
 INWARD CLEARING
-15-SEP-23
-19034915-SEP-23
-91,021.553,488,237.93DR
-: ENTERPRISE INSURANCE CO LTD  /0096744232580001`
+06-SEP-23
+19035006-SEP-23
+30,529.0030,044.00DR
+: ENTERPRISE LIFE ASSURANCE CO LTD  /0096932232490001`
+    const r = parsePrudentialPdfText(text)
+    expect(r.rows.length).toBe(2)
+    const inward = r.rows[1]!
+    expect(String(inward[1])).toMatch(/INWARD CLEARING/i)
+    expect(String(inward[1])).toMatch(/ENTERPRISE LIFE/i)
+    expect(inward[4]).toBeCloseTo(30_529, 2)
+    expect(inward[5]).toBeNull()
+    expect(inward[6]).toBeCloseTo(-30_044, 2)
+  })
+
+  it('strips customer-notice footer from last transaction description', () => {
+    const text = `BALANCE BROUGHT FWD.
+01-SEP-23265.00DR
+CALL TRANSACTIONS - CR
+29-SEP-23
+29-SEP-23
+869.78-265.00
+/009SWI2191540006
+* = UNAUTHORISED ENTRY / R = REVERSAL ENTRY
+a. Always keep your account number or any account information confidential.
+* * * C U S T O M E R N O T I C E * * *`
     const r = parsePrudentialPdfText(text)
     expect(r.rows.length).toBe(1)
-    expect(r.rows[0]![5]).toBeCloseTo(91_021.55, 2)
-    expect(String(r.rows[0]![1])).toMatch(/INWARD CLEARING/i)
+    expect(String(r.rows[0]![1])).toBe('CALL TRANSACTIONS - CR')
+    expect(String(r.rows[0]![1])).not.toMatch(/UNAUTHORISED|CUSTOMER NOTICE/i)
+  })
+
+  it('keeps post-amount payee narrative on ONLINE OUTGOING TRANSFER', () => {
+    const text = `BALANCE BROUGHT FWD.
+01-SEP-23265.00DR
+ONLINE OUTGOING TRANSFER
+07-SEP-23
+07-SEP-23
+360,271.448,487,575.68DR
+202309070357207||6011505570||  AMP LOGISTICS GHANA
+LIMITED /009BGIP232500001
+COMMISSION
+07-SEP-23
+07-SEP-23
+4.508,487,580.18DR
+202309070357207||6011505570||  AMP LOGISTICS GHANA
+LIMITED /009BGIP232500001`
+    const r = parsePrudentialPdfText(text)
+    expect(r.rows.length).toBe(2)
+    expect(String(r.rows[0]![1])).toMatch(/AMP LOGISTICS/i)
+    expect(r.rows[0]![2]).toBe('/009BGIP232500001')
+    expect(r.rows[0]![4]).toBeCloseTo(360_271.44, 2)
+    expect(String(r.rows[1]![1])).toMatch(/COMMISSION/i)
+    expect(String(r.rows[1]![1])).toMatch(/AMP LOGISTICS/i)
   })
 
   it('shouldUsePrudentialPdfParser flags generic junk headers', () => {
@@ -83,13 +133,21 @@ INWARD CLEARING
     expect(result.rows.length).toBeLessThan(500)
 
     const creditRows = result.rows.filter((r) => Number(r[5]) > 0)
-    expect(creditRows.length).toBeGreaterThanOrEqual(45)
-    expect(result.rows.some((r) => Math.abs(Number(r[5]) - 91_021.55) < 0.01)).toBe(true)
-    expect(result.rows.some((r) => Math.abs(Number(r[5]) - 351_241.25) < 0.01)).toBe(true)
+    expect(creditRows.length).toBeGreaterThanOrEqual(20)
+    expect(result.rows.some((r) => Math.abs(Number(r[4]) - 91_021.55) < 0.01)).toBe(true)
+    expect(result.rows.some((r) => Math.abs(Number(r[4]) - 351_241.25) < 0.01)).toBe(true)
+
+    const inwardAsCredit = result.rows.filter(
+      (r) => /INWARD CLEARING/i.test(String(r[1])) && Number(r[5]) > 0
+    )
+    expect(inwardAsCredit.length).toBe(0)
 
     const debits45 = result.rows.filter((r) => Number(r[4]) === 4.5).length
     // Tiny commission lines (e.g. glued 4.50 fees) must be kept — they are real bank charges.
     expect(debits45).toBeGreaterThanOrEqual(80)
+
+    const amp = result.rows.find((r) => /AMP LOGISTICS/i.test(String(r[1])) && Number(r[4]) > 1000)
+    expect(amp).toBeTruthy()
 
     const cr = buildSuggestedMappingForDocument('bank_credits', result.headers, 'prudential')
     const dr = buildSuggestedMappingForDocument('bank_debits', result.headers, 'prudential')
@@ -101,7 +159,7 @@ INWARD CLEARING
 
     const sumDebit = result.rows.reduce((s, r) => s + (Number(r[4]) || 0), 0)
     const sumCredit = result.rows.reduce((s, r) => s + (Number(r[5]) || 0), 0)
-    expect(sumCredit).toBeGreaterThan(423_285_158)
+    expect(sumCredit).toBeGreaterThan(400_000_000)
     expect(sumCredit).toBeLessThan(440_000_000)
     expect(sumDebit).toBeGreaterThan(20_000_000)
 

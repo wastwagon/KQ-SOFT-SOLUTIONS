@@ -17,6 +17,8 @@
     "test": "prisma generate && vitest run",
     "test:integration": "prisma generate && vitest run --config vitest.integration.config.ts",
     "test:licl-qtest": "vitest run --run src/routes/report.qtest-licl-golden.test.ts",
+    "test:go-live": "vitest run src/services/matching.test.ts src/services/bankRules.test.ts src/services/scbSweepMatcher.test.ts src/services/ecobankClearingMatcher.test.ts src/services/ghanaRegionalMatchers.test.ts src/lib/projectIdentity.test.ts src/services/gcbStatement.test.ts src/services/nibStatement.test.ts src/services/prudentialStatement.test.ts src/services/absaStatement.test.ts src/services/bankOfAfricaStatement.test.ts src/services/scbStatement.test.ts",
+    "verify:go-live": "tsx scripts/verify-go-live.ts",
     "test:watch": "vitest",
     "worker:parse": "tsx src/worker/parseWorker.ts",
     "start:worker:parse": "node dist/worker/parseWorker.js",

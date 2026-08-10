@@ -3,6 +3,7 @@
  * Native text merges columns and uses multi-line blocks:
  *   BookingDate+Reference+Description+ValueDate [+Debit]
  *   Amount+Closing Balance (or balance-only line)
+ *   Optional narration lines after the amount (names, CHQ details, etc.)
  */
 
 import { parseImportedAmount } from './amountParser.js'
@@ -12,6 +13,7 @@ const NIB_BOOKING = /^(\d{2} [A-Z]{3} \d{2})/
 const NIB_HEAD =
   /^(\d{2} [A-Z]{3} \d{2})((?:FT|TT)\d{5,6}[A-Z0-9]+?)(?=[A-Z][a-z]|[^A-Z0-9]|$)(.*)$/
 const NIB_VALUE_DATE_AMOUNT = /(\d{2} [A-Z]{3} \d{2})([\d,]+\.\d{2})$/
+const NIB_VALUE_DATE_ONLY = /^\d{2} [A-Z]{3} \d{2}$/
 
 export function looksLikeNibStatementText(text: string): boolean {
   const flat = text.replace(/\s+/g, ' ')
@@ -54,9 +56,6 @@ function isNoiseLine(line: string): boolean {
     /^balance\s+at\s+period/i.test(line) ||
     /^tart$/i.test(line) ||
     /^nd$/i.test(line) ||
-    /^ordering\s+cust/i.test(line) ||
-    /^acct\s+maint/i.test(line) ||
-    /^ge\s+as\s+at/i.test(line) ||
     /^retrenc$/i.test(line)
   )
 }
@@ -223,6 +222,98 @@ function transactionSectionLines(text: string): string[] {
     .filter((l) => l && !isNoiseLine(l))
 }
 
+/** Join NIB PDF column-wrap fragments without breaking words. */
+export function joinNibNarrationParts(parts: string[]): string {
+  let out = ''
+  for (const raw of parts) {
+    const part = raw.replace(/\s+/g, ' ').trim()
+    if (!part) continue
+    if (!out) {
+      out = part
+      continue
+    }
+
+    const prevLastWord = out.match(/([A-Za-z0-9]+)$/)?.[1] ?? ''
+    const nextFirstWord = part.match(/^([A-Za-z0-9]+)/)?.[1] ?? ''
+
+    const letterToLower = /[A-Za-z]$/.test(out) && /^[a-z]/.test(part)
+    const digitRun = /\d$/.test(out) && /^\d/.test(part)
+    // Column wraps often split ALL-CAPS words across lines ("F"+"ROM", "MA"+"IN").
+    const upperWrap =
+      /^[A-Z]+$/.test(prevLastWord) &&
+      prevLastWord.length >= 1 &&
+      prevLastWord.length <= 5 &&
+      /^[A-Z]+$/.test(nextFirstWord) &&
+      nextFirstWord.length >= 2 &&
+      nextFirstWord.length <= 3
+    // "TAHIR" + "U Ordering..." (not a lone initial like "A" on its own line).
+    const upperLetterContinuation =
+      /^[A-Z]+$/.test(prevLastWord) &&
+      prevLastWord.length >= 3 &&
+      prevLastWord.length <= 8 &&
+      /^[A-Z]\s+\S/.test(part)
+
+    if (letterToLower || digitRun || upperWrap || upperLetterContinuation) {
+      out += part
+    } else {
+      out += ` ${part}`
+    }
+  }
+  return out.replace(/\s+/g, ' ').trim()
+}
+
+function dedupeAdjacentPhrases(text: string): string {
+  const tokens = text.split(' ').filter(Boolean)
+  const out: string[] = []
+  for (const token of tokens) {
+    if (out.length > 0 && out[out.length - 1]!.toLowerCase() === token.toLowerCase()) continue
+    out.push(token)
+  }
+  let joined = out.join(' ')
+  // Collapse duplicated 2–4 word phrases (e.g. ACCT MAINT CHAR ACCT MAINT CHAR)
+  joined = joined.replace(/\b([\w./:-]+(?:\s+[\w./:-]+){1,3})\s+\1\b/gi, '$1')
+  // "ACCT MAINT CHAR ACCT MAINT CHARGE" → "ACCT MAINT CHARGE"
+  joined = joined.replace(/\b((?:[A-Z0-9]+(?:\s+[A-Z0-9]+){0,3}))\s+(\1[A-Z]+)\b/g, '$2')
+  return joined.trim()
+}
+
+function stripNibBankMarker(text: string): string {
+  return text
+    .replace(/^\\?BN\s*K\b\s*/i, '')
+    .replace(/^\\?BNK\b\s*/i, '')
+    .replace(/^\\?BN\b\s*/i, '')
+    .trim()
+}
+
+function assembleNibDescription(
+  headDescription: string,
+  extras: string[],
+  valueDate: string
+): { description: string; valueDate: string } {
+  let vd = valueDate
+  const parts: string[] = []
+  if (headDescription) parts.push(headDescription)
+
+  for (const line of extras) {
+    const s = line.trim()
+    if (!s) continue
+    if (NIB_VALUE_DATE_ONLY.test(s)) {
+      if (!vd) vd = s
+      continue
+    }
+    // Lone "K" continues a wrapped "\BN" / "BN" bank marker from the head line.
+    if (/^K$/i.test(s) && /^(?:\\?BN)$/i.test(parts[parts.length - 1] ?? headDescription)) {
+      parts[parts.length - 1] = 'BNK'
+      continue
+    }
+    parts.push(s)
+  }
+
+  let description = stripNibBankMarker(joinNibNarrationParts(parts))
+  description = dedupeAdjacentPhrases(description)
+  return { description, valueDate: vd || valueDate }
+}
+
 /** Parse NIB Ghana PDF text into a standard transaction table. */
 export function parseNibPdfText(text: string): ParseResult {
   const headers = [
@@ -268,13 +359,12 @@ export function parseNibPdfText(text: string): ParseResult {
     const usedAmountLine = blockAmounts?.amountLine || amountLine
     const usedBalanceLine = blockAmounts?.balanceLine || amountLine
 
-    const extra = block
-      .filter((l) => l !== headLine && l !== usedAmountLine && l !== usedBalanceLine)
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim()
+    const extras = block.filter(
+      (l) => l !== headLine && l !== usedAmountLine && l !== usedBalanceLine
+    )
 
-    const description = [head.description, extra].filter(Boolean).join(' ').trim()
+    const assembled = assembleNibDescription(head.description, extras, head.valueDate)
+    const description = assembled.description
     const { debit, credit, nextBalance } = classifyNibAmount(
       description,
       txn,
@@ -292,7 +382,7 @@ export function parseNibPdfText(text: string): ParseResult {
       formatNibDate(head.bookingDate),
       head.reference,
       description,
-      formatNibDate(head.valueDate),
+      formatNibDate(assembled.valueDate),
       debit > 0 ? debit : null,
       credit > 0 ? credit : null,
       balance,
@@ -306,8 +396,8 @@ export function parseNibPdfText(text: string): ParseResult {
       flush()
       block = [line]
     } else if (block.length > 0) {
+      // Keep post-amount narration in the same block until the next booking line.
       block.push(line)
-      if (isNibAmountLine(line)) flush()
     }
   }
   flush()

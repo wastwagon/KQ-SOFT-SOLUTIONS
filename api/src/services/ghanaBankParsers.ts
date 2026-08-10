@@ -10,6 +10,7 @@ import { looksLikeAdbStatementText } from './adbStatement.js'
 import { looksLikeEcobankStatementText } from './ecobankStatement.js'
 import { looksLikeUmbStatementText } from './umbStatement.js'
 import { looksLikeUbaStatementText } from './ubaStatement.js'
+import { looksLikeScbStatementText } from './scbStatement.js'
 
 export type GhanaBankFormat =
   | 'ecobank'
@@ -94,6 +95,7 @@ export function detectGhanaBankFormat(
 ): GhanaBankFormat {
   const headerStr = headers.join(' ').toLowerCase()
   if (sourceText && looksLikeGcbStatementText(sourceText)) return 'gcb'
+  if (sourceText && looksLikeScbStatementText(sourceText)) return 'scb'
   if (sourceText && looksLikeEcobankStatementText(sourceText)) return 'ecobank'
   if (sourceText && looksLikeUmbStatementText(sourceText)) return 'nib'
   if (sourceText && looksLikeNibStatementText(sourceText)) return 'nib'
@@ -288,6 +290,8 @@ export function bankFormatFromParseMethod(parseMethod?: string): GhanaBankFormat
       return 'absa'
     case 'gcb_pdf':
       return 'gcb'
+    case 'scb_pdf':
+      return 'scb'
     case 'ecobank_pdf':
       return 'ecobank'
     default:
