@@ -37,6 +37,7 @@ if npx vitest run \
   src/services/ecobankClearingMatcher.test.ts \
   src/services/ghanaRegionalMatchers.test.ts \
   src/lib/projectIdentity.test.ts \
+  src/services/countMatchDiagnostic.test.ts \
   src/services/gcbStatement.test.ts \
   src/services/nibStatement.test.ts \
   src/services/prudentialStatement.test.ts \

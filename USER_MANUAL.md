@@ -304,6 +304,7 @@ Match each payment to its corresponding bank debit (or leave unmatched if it is 
 - Bank pattern layers (Ecobank, SCB, GCB, NIB, Prudential, Absa, Bank of Africa) rank ahead of generic pairs when the profile is detected.
 - Bank rules (Settings → Bank rules, Standard+) need amount **plus** date, ref/chq, or narration corroboration — amount alone is never enough.
 - AI ranking from previously confirmed pairs also runs when match memory is available.
+- **Match by counting:** On Reconcile, use the counting panel for only-CB / only-bank / open-imbalance lists and a separate batch-cancel schedule. Export Excel or PDF if needed. **Select lines** is capped at 50 per side. Counts never auto-clear — confirm matches as usual.
 - **Limits:** one currency per project (no FX conversion in matching); no pro-rata partial amounts — use 1-to-many / many-to-1 when several lines sum to a full amount.
 
 For the full mapping & matching guide, see [Mapping & Matching Manual](docs/MAPPING_AND_MATCHING_MANUAL.md).

@@ -6,6 +6,7 @@ import ConfirmedMatchesPanel from '../components/reconcile/ConfirmedMatchesPanel
 import MatchActionBar from '../components/reconcile/MatchActionBar'
 import ReconcileToolbar from '../components/reconcile/ReconcileToolbar'
 import ReconcileTransactionsTables from '../components/reconcile/ReconcileTransactionsTables'
+import CountMatchPanel from '../components/reconcile/CountMatchPanel'
 import SplitSuggestionsPanel from '../components/reconcile/SplitSuggestionsPanel'
 import SuggestedMatchesPanel from '../components/reconcile/SuggestedMatchesPanel'
 import { useReconcileSession } from '../components/reconcile/useReconcileSession'
@@ -299,6 +300,25 @@ export default function ProjectReconcile({
           {data.duplicateChequeWarnings!.map((w) => `${w.chqNo} (×${w.count})`).join(', ')}. Match
           each row carefully — bulk match skips ambiguous pairs.
         </div>
+      )}
+
+      {canReconcile && (
+        <CountMatchPanel
+          projectId={projectId}
+          projectName={(data.project as { name?: string } | undefined)?.name}
+          projectSlug={
+            ((data.project as { name?: string } | undefined)?.name || 'project')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '') || 'project'
+          }
+          currency={currency}
+          bankAccountId={bankAccountId || undefined}
+          onSelectAmountRows={(cbIds, bankIds) => {
+            setSelectedCbIds(new Set(cbIds))
+            setSelectedBankIds(new Set(bankIds))
+          }}
+        />
       )}
 
       {suggestions.length > 0 && canReconcile && (

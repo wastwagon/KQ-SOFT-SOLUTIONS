@@ -231,6 +231,19 @@ A matched row cannot be matched again until you **unmatch** it.
 
 **Limits (by design):** Each project is **one currency** — matching does not convert FX. Partial/open-item amounts (pro-rata) are not suggested; use 1-to-many / many-to-1 when several lines sum to a full amount. Many-to-many confirm requires cash-book and bank sides to **sum to the same total**. See [MATCHING_GO_LIVE.md](./MATCHING_GO_LIVE.md) for go-live close-out status.
 
+### Match by counting (diagnostic)
+
+The **Match by counting** panel on Reconcile builds amount-frequency schedules (cash book count vs bank count per amount, by side):
+
+- Amounts only in the cash book (Received / Payment)
+- Amounts only on the bank (Lodgment / Debits)
+- Both sides where batch counts do **not** cancel (open more/less imbalances)
+- Both sides where batch counts **do** cancel — a **separate schedule**, not the main BRS
+
+Default scope is **unmatched** lines (toggle **All lines** if needed). Export to **Excel or PDF** from the panel. **Select lines** pre-selects those transactions for manual or suggested matching (capped at 50 lines per side so bulk match stays safe).
+
+Counting is **diagnostic only**. It never auto-clears. Confirmed clears still use suggested/manual matching with amount plus date / reference / cheque / narration corroboration.
+
 ### Manual matching (step by step)
 
 1. Switch to **Receipts vs Credits** or **Payments vs Debits**.

@@ -14,6 +14,7 @@ import {
   type SuggestedSplitMatch,
 } from '../services/matching.js'
 import { resolveMatchSides } from '../services/sideInversion.js'
+import { buildCountMatchDiagnostic } from '../services/countMatchDiagnostic.js'
 import {
   detectDuplicateChequePayments,
   isEcobankPatternMatchReason,
@@ -158,6 +159,112 @@ export function getMatchConflictErrorBody(e: unknown) {
   if (!isUniqueConstraintError(e)) return null
   return { error: 'One or more transactions are already matched' }
 }
+
+/**
+ * Match-by-counting diagnostic (read-only). Does not create or suggest clears.
+ * Query: bankAccountId?, scope=unmatched|all (default unmatched)
+ */
+router.get('/:projectId/count-match', async (req: AuthRequest, res) => {
+  const orgId = req.auth!.orgId
+  try {
+    const projectId = await resolveProjectId(req.params.projectId, orgId)
+    if (!projectId) return res.status(404).json({ error: 'Project not found' })
+    const bankAccountId = (req.query.bankAccountId as string) || undefined
+    const scopeRaw = String(req.query.scope || 'unmatched').toLowerCase()
+    const scope = scopeRaw === 'all' ? 'all' : 'unmatched'
+
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, organizationId: orgId },
+      include: {
+        documents: {
+          select: { id: true, type: true, bankAccountId: true },
+        },
+        matches: { include: { matchItems: true } },
+      },
+    })
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+
+    const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
+    const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
+    const creditsDocs = project.documents.filter(
+      (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    )
+    const debitsDocs = project.documents.filter(
+      (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    )
+
+    const receiptDocIds = receiptsDocs.map((d) => d.id)
+    const paymentDocIds = paymentsDocs.map((d) => d.id)
+    const creditDocIds = creditsDocs.map((d) => d.id)
+    const debitDocIds = debitsDocs.map((d) => d.id)
+    const perCategory = resolveReconcileMaxLimit()
+
+    const [rRecLane, rCredLane, rPayLane, rDebLane, platformDefaults] = await Promise.all([
+      loadReconcileLane({ documentIds: receiptDocIds, perCategory }),
+      loadReconcileLane({ documentIds: creditDocIds, perCategory }),
+      loadReconcileLane({ documentIds: paymentDocIds, perCategory }),
+      loadReconcileLane({ documentIds: debitDocIds, perCategory }),
+      getPlatformDefaults(),
+    ])
+
+    const matchedCbIds = new Set<string>()
+    const matchedBankIds = new Set<string>()
+    for (const m of project.matches) {
+      for (const mi of m.matchItems) {
+        if (mi.side === 'cash_book') matchedCbIds.add(mi.transactionId)
+        else matchedBankIds.add(mi.transactionId)
+      }
+    }
+
+    const sides = resolveMatchSides({
+      receipts: rRecLane.full,
+      payments: rPayLane.full,
+      credits: rCredLane.full,
+      debits: rDebLane.full,
+    })
+
+    const diagnostic = buildCountMatchDiagnostic({
+      receipts: rRecLane.full,
+      payments: rPayLane.full,
+      receiptBank: sides.receiptBank,
+      paymentBank: sides.paymentBank,
+      matchedCbIds,
+      matchedBankIds,
+      scope,
+      invertedSides: sides.inversion.inverted,
+      amountTolerance: platformDefaults.amountTolerance ?? 0.01,
+    })
+
+    const laneTruncated =
+      rRecLane.totalCount > rRecLane.full.length ||
+      rPayLane.totalCount > rPayLane.full.length ||
+      rCredLane.totalCount > rCredLane.full.length ||
+      rDebLane.totalCount > rDebLane.full.length
+
+    res.json({
+      ...diagnostic,
+      meta: {
+        bankAccountId: bankAccountId || null,
+        laneTruncated,
+        totals: {
+          receipts: rRecLane.totalCount,
+          payments: rPayLane.totalCount,
+          credits: rCredLane.totalCount,
+          debits: rDebLane.totalCount,
+          loadedReceipts: rRecLane.full.length,
+          loadedPayments: rPayLane.full.length,
+          loadedCredits: rCredLane.full.length,
+          loadedDebits: rDebLane.full.length,
+        },
+        clearsNote:
+          'Counting is diagnostic only. Confirm matches with suggested/manual matching — amount counts never auto-clear.',
+      },
+    })
+  } catch (e) {
+    logger.error({ err: e }, 'count-match diagnostic failed')
+    res.status(500).json({ error: 'Failed to build count-match diagnostic' })
+  }
+})
 
 router.get('/:projectId', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId

@@ -281,6 +281,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+    queryClient.invalidateQueries({ queryKey: ['reconcile-count-match', projectId] })
     queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     queryClient.invalidateQueries({ queryKey: ['projects'] })
   }

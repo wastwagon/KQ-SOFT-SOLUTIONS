@@ -1045,6 +1045,16 @@ export const reconcile = {
     setWorkbookNettingQuery(q, params?.workbookNetting)
     return api(`/reconcile/${projectId}${q.toString() ? `?${q}` : ''}`)
   },
+  /** Read-only match-by-counting diagnostic (does not clear or suggest matches). */
+  getCountMatch: (
+    projectId: string,
+    params?: { bankAccountId?: string; scope?: 'unmatched' | 'all' }
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
+    if (params?.scope) q.set('scope', params.scope)
+    return api(`/reconcile/${projectId}/count-match${q.toString() ? `?${q}` : ''}`)
+  },
   createMatch: (projectId: string, body: { cashBookTransactionId: string; bankTransactionId: string }) =>
     api(`/reconcile/${projectId}/match`, { method: 'POST', body: JSON.stringify(body) }),
   createMatchMulti: (
