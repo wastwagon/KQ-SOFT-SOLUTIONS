@@ -1,6 +1,10 @@
 # Go-live verification (unified)
 
-One command to re-check matching hardenings, bank pattern layers, parsers, and project/report identity.
+**This is the ship checklist** for Ghana BRS product go-live (matching, parsers, identity, date order, count-match diagnostic, clean-export A+B).
+
+Matching methodology close-out only (FX/partials, pattern banks) lives in [MATCHING_GO_LIVE.md](./MATCHING_GO_LIVE.md) — do not treat that file as the full product gate.
+
+Customer training week plan in the in-app user manual is separate from this engineer/ops verify harness.
 
 ## Quick run
 
@@ -32,6 +36,7 @@ SMOKE_EMAIL='you@example.com' SMOKE_PASSWORD='…' ./scripts/verify-go-live.sh -
 | Parsers | Unit: GCB/NIB/Prudential/Absa/BOA/SCB statement tests |
 | Count-match diagnostic | Unit + DB smoke helpers: open/cancel classification (never auto-clears) |
 | Newest-first date order | Unit: import/cleanup/reconcile sort (30 Dec → 1 Jan) |
+| Clean export A+B | Unit: sample truncate + watermark; smoke: tier quotas + `clean_exports_count`; route enforces full-export quota |
 | Phase B UI logic | Web unit: `phasedAutoMatch`, profile tips |
 | Project identity | DB smoke: create project with `statementBusinessName`, report entity resolution, cleanup |
 | Live API (optional) | `/healthz`, optional login → create project → report entity name |
@@ -51,7 +56,8 @@ npm run verify:go-live        # DB unification smoke only
 3. **Report** — company line shows statement business name (not firm org name). PDF/Excel same.
 4. **Reconcile** — bank tip banner (where detected); Phase B says “safe → patterns”; **Match by counting** panel lists/export work; counts never auto-clear.
 5. **Date order** — reconcile tables and cleanup preview show **newest date first**.
-6. Legacy project with empty statement business name — report still shows org name.
+6. **Clean tools** — Sample Excel/PDF watermarked + truncated; Full export shows remaining quota and blocks at limit.
+7. Legacy project with empty statement business name — report still shows org name.
 
 ## If Docker API is unhealthy
 

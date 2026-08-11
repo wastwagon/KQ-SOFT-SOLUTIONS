@@ -1,6 +1,9 @@
 /**
  * Standalone clean-export helpers: turn a parse result into Excel / PDF buffers
  * for download without creating a reconciliation project.
+ *
+ * Sample mode truncates rows and watermarks files so prospects can validate
+ * parsers without receiving ops-ready full extracts (those use plan quota).
  */
 import PDFDocument from 'pdfkit'
 import * as XLSX from 'xlsx'
@@ -9,6 +12,11 @@ import { withParsedRowsNewestFirst } from '../lib/transactionDateOrder.js'
 import type { ParseResult } from './parser.js'
 
 export type CleanExportKind = 'bank_statement' | 'cash_book'
+export type CleanExportMode = 'sample' | 'full'
+
+/** Rows included in sample Excel/PDF downloads (preview JSON stays smaller). */
+export const CLEAN_SAMPLE_ROW_LIMIT = 25
+export const CLEAN_SAMPLE_WATERMARK = 'BRS DEMO — NOT FOR OPERATIONAL USE'
 
 export interface CleanExportMeta {
   source?: string
@@ -17,6 +25,10 @@ export interface CleanExportMeta {
   sumDebit: number
   sumCredit: number
   rowCount: number
+  mode?: CleanExportMode
+  totalRowCount?: number
+  truncated?: boolean
+  watermark?: string
 }
 
 function amountColumnIndex(headers: string[], side: 'debit' | 'credit'): number {
@@ -48,37 +60,82 @@ export function summarizeParsed(parsed: Pick<ParseResult, 'headers' | 'rows'>): 
   return { sumDebit, sumCredit, rowCount: parsed.rows.length }
 }
 
+/** Newest-first order, then optional sample truncation. Full-file sums stay on total rows. */
+export function prepareCleanExportRows(
+  parsed: Pick<ParseResult, 'headers' | 'rows'>,
+  mode: CleanExportMode
+): {
+  ordered: Pick<ParseResult, 'headers' | 'rows'>
+  exportRows: Pick<ParseResult, 'headers' | 'rows'>
+  totalRowCount: number
+  truncated: boolean
+  fullSums: { sumDebit: number; sumCredit: number; rowCount: number }
+} {
+  const ordered = withParsedRowsNewestFirst(parsed)
+  const fullSums = summarizeParsed(ordered)
+  const truncated = mode === 'sample' && ordered.rows.length > CLEAN_SAMPLE_ROW_LIMIT
+  const exportRows =
+    mode === 'sample'
+      ? { headers: ordered.headers, rows: ordered.rows.slice(0, CLEAN_SAMPLE_ROW_LIMIT) }
+      : ordered
+  return {
+    ordered,
+    exportRows,
+    totalRowCount: fullSums.rowCount,
+    truncated,
+    fullSums,
+  }
+}
+
+function titleFor(kind: CleanExportKind, mode: CleanExportMode): string {
+  const base =
+    kind === 'cash_book' ? 'BRS cleaned cash book extract' : 'BRS cleaned bank statement extract'
+  return mode === 'sample' ? `${base} (SAMPLE)` : base
+}
+
 export function buildParsedExcelBuffer(
   parsed: Pick<ParseResult, 'headers' | 'rows'>,
   meta: Omit<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'> &
-    Partial<Pick<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'>>
+    Partial<Pick<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'>>,
+  mode: CleanExportMode = 'full'
 ): { buffer: Buffer; meta: CleanExportMeta } {
-  const ordered = withParsedRowsNewestFirst(parsed)
-  const sums = summarizeParsed(ordered)
+  const prepared = prepareCleanExportRows(parsed, mode)
+  const exportSums = summarizeParsed(prepared.exportRows)
   const fullMeta: CleanExportMeta = {
     kind: meta.kind,
     source: meta.source,
     parseMethod: meta.parseMethod,
-    sumDebit: meta.sumDebit ?? sums.sumDebit,
-    sumCredit: meta.sumCredit ?? sums.sumCredit,
-    rowCount: meta.rowCount ?? sums.rowCount,
+    sumDebit: meta.sumDebit ?? prepared.fullSums.sumDebit,
+    sumCredit: meta.sumCredit ?? prepared.fullSums.sumCredit,
+    rowCount: meta.rowCount ?? exportSums.rowCount,
+    mode,
+    totalRowCount: prepared.totalRowCount,
+    truncated: prepared.truncated,
+    watermark: mode === 'sample' ? CLEAN_SAMPLE_WATERMARK : undefined,
   }
-  const title =
-    meta.kind === 'cash_book'
-      ? 'BRS cleaned cash book extract'
-      : 'BRS cleaned bank statement extract'
   const metaRows: unknown[][] = [
-    [title],
+    [titleFor(meta.kind, mode)],
+    ...(mode === 'sample'
+      ? [
+          ['Watermark', CLEAN_SAMPLE_WATERMARK],
+          [
+            'Sample notice',
+            `Showing ${exportSums.rowCount} of ${prepared.totalRowCount} rows. Upgrade / use Full download for the complete extract.`,
+          ],
+        ]
+      : []),
     ['Source', meta.source || ''],
     ['Parse method', meta.parseMethod || ''],
     ['Exported', new Date().toISOString()],
     ['Row order', 'Newest transaction date first'],
-    ['Row count', fullMeta.rowCount],
-    ['Sum debits / payments', fullMeta.sumDebit || ''],
-    ['Sum credits / receipts', fullMeta.sumCredit || ''],
+    ['Export mode', mode],
+    ['Rows in file', fullMeta.rowCount],
+    ...(mode === 'sample' ? [['Total rows in source', prepared.totalRowCount]] : []),
+    ['Sum debits / payments (full file)', fullMeta.sumDebit || ''],
+    ['Sum credits / receipts (full file)', fullMeta.sumCredit || ''],
     [],
-    ordered.headers,
-    ...ordered.rows,
+    prepared.exportRows.headers,
+    ...prepared.exportRows.rows,
   ]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(metaRows), 'Transactions')
@@ -99,11 +156,38 @@ function formatCell(value: unknown): string {
   return s
 }
 
+function drawPdfWatermark(doc: InstanceType<typeof PDFDocument>) {
+  const { width, height } = doc.page
+  doc.save()
+  doc.fillColor('#cc0000').opacity(0.12)
+  doc.font('Helvetica-Bold').fontSize(28)
+  doc.rotate(-28, { origin: [width / 2, height / 2] })
+  doc.text(CLEAN_SAMPLE_WATERMARK, 48, height / 2 - 20, {
+    width: width - 96,
+    align: 'center',
+    lineBreak: false,
+  })
+  doc.restore()
+  doc.fillColor('#000').opacity(1)
+}
+
 export function buildParsedPdfBuffer(
   parsed: Pick<ParseResult, 'headers' | 'rows'>,
-  meta: CleanExportMeta
+  meta: CleanExportMeta,
+  mode: CleanExportMode = 'full'
 ): Promise<Buffer> {
-  const ordered = withParsedRowsNewestFirst(parsed)
+  const prepared = prepareCleanExportRows(parsed, mode)
+  const exportMeta: CleanExportMeta = {
+    ...meta,
+    mode,
+    rowCount: prepared.exportRows.rows.length,
+    totalRowCount: prepared.totalRowCount,
+    truncated: prepared.truncated,
+    watermark: mode === 'sample' ? CLEAN_SAMPLE_WATERMARK : undefined,
+    sumDebit: meta.sumDebit,
+    sumCredit: meta.sumCredit,
+  }
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 36, layout: 'landscape' })
     const chunks: Buffer[] = []
@@ -112,7 +196,7 @@ export function buildParsedPdfBuffer(
     doc.on('error', reject)
 
     const pageW = doc.page.width - 72
-    const headers = ordered.headers
+    const headers = prepared.exportRows.headers
     const colCount = headers.length
     const weights = headers.map((h) => {
       const l = String(h).toLowerCase()
@@ -137,22 +221,32 @@ export function buildParsedPdfBuffer(
       x += w
     }
 
-    const title =
-      meta.kind === 'cash_book'
-        ? 'BRS cleaned cash book extract'
-        : 'BRS cleaned bank statement extract'
+    const title = titleFor(exportMeta.kind, mode)
     const subtitleParts = [
-      meta.source ? `Source: ${meta.source}` : '',
-      meta.parseMethod ? `Parser: ${meta.parseMethod}` : '',
+      mode === 'sample' ? CLEAN_SAMPLE_WATERMARK : '',
+      mode === 'sample'
+        ? `Sample: ${exportMeta.rowCount} of ${exportMeta.totalRowCount} rows`
+        : '',
+      exportMeta.source ? `Source: ${exportMeta.source}` : '',
+      exportMeta.parseMethod ? `Parser: ${exportMeta.parseMethod}` : '',
       `Exported: ${new Date().toISOString().slice(0, 10)}`,
-      `Rows: ${ordered.rows.length}`,
+      mode === 'full' ? `Rows: ${prepared.exportRows.rows.length}` : '',
       'Order: newest date first',
-      `Total debits: GHS ${formatCell(meta.sumDebit)}`,
-      `Total credits: GHS ${formatCell(meta.sumCredit)}`,
+      `Total debits: GHS ${formatCell(exportMeta.sumDebit)}`,
+      `Total credits: GHS ${formatCell(exportMeta.sumCredit)}`,
     ].filter(Boolean)
 
     function drawHeader() {
+      if (mode === 'sample') drawPdfWatermark(doc)
       doc.fontSize(13).font('Helvetica-Bold').fillColor('#000').text(title, 36, 36, { width: pageW })
+      if (mode === 'sample') {
+        doc
+          .fontSize(9)
+          .font('Helvetica-Bold')
+          .fillColor('#990000')
+          .text(CLEAN_SAMPLE_WATERMARK, 36, doc.y + 2, { width: pageW })
+        doc.fillColor('#000')
+      }
       doc
         .fontSize(8)
         .font('Helvetica')
@@ -175,7 +269,7 @@ export function buildParsedPdfBuffer(
 
     drawHeader()
 
-    for (const row of ordered.rows) {
+    for (const row of prepared.exportRows.rows) {
       if (doc.y > doc.page.height - 48) {
         doc.addPage({ size: 'A4', layout: 'landscape', margin: 36 })
         drawHeader()

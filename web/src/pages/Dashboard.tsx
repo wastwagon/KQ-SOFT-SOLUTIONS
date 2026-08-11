@@ -478,8 +478,8 @@ export default function Dashboard() {
 
       <Card title="Clean & export tools" className="shadow-sm">
         <p className="text-sm text-gray-600 mb-5">
-          Parse a bank statement or cash book and download a cleaned Excel or PDF — no reconciliation
-          project needed.
+          Validate bank or cash-book formats with the same parsers. Preview is free; sample downloads
+          are truncated and watermarked; full Excel/PDF uses your plan’s monthly clean-export quota.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link
@@ -491,7 +491,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight text-gray-900">Clean bank statement</span>
             <span className="text-xs text-gray-500 leading-snug">
-              Upload PDF/Excel → download cleaned PDF &amp; Excel
+              Upload PDF/Excel → preview, sample, or full cleaned file
             </span>
           </Link>
           <Link
@@ -503,7 +503,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight text-gray-900">Clean cash book</span>
             <span className="text-xs text-gray-500 leading-snug">
-              Upload cash book → download cleaned PDF &amp; Excel
+              Upload cash book → preview, sample, or full cleaned file
             </span>
           </Link>
         </div>

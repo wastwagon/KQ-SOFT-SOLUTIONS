@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildParsedExcelBuffer,
+  buildParsedPdfBuffer,
+  CLEAN_SAMPLE_ROW_LIMIT,
+  CLEAN_SAMPLE_WATERMARK,
+  prepareCleanExportRows,
   summarizeParsed,
 } from './cleanExport.js'
 
@@ -59,5 +63,65 @@ describe('cleanExport', () => {
     expect(aoa[headerIdx + 1]![1]).toBe('Newest')
     expect(aoa[headerIdx + 2]![1]).toBe('Mid')
     expect(aoa[headerIdx + 3]![1]).toBe('Oldest')
+  })
+
+  it('truncates sample exports and watermarks Excel', async () => {
+    const rows = Array.from({ length: CLEAN_SAMPLE_ROW_LIMIT + 10 }, (_, i) => [
+      `0${(i % 9) + 1}/01/2026`,
+      `Row ${i}`,
+      i + 1,
+      null,
+    ])
+    const parsed = {
+      headers: ['Date', 'Description', 'Debit', 'Credit'],
+      rows,
+    }
+    const prepared = prepareCleanExportRows(parsed, 'sample')
+    expect(prepared.truncated).toBe(true)
+    expect(prepared.exportRows.rows).toHaveLength(CLEAN_SAMPLE_ROW_LIMIT)
+    expect(prepared.totalRowCount).toBe(CLEAN_SAMPLE_ROW_LIMIT + 10)
+
+    const { buffer, meta } = buildParsedExcelBuffer(
+      parsed,
+      { kind: 'bank_statement', source: 'big.pdf', parseMethod: 'test' },
+      'sample'
+    )
+    expect(meta.mode).toBe('sample')
+    expect(meta.watermark).toBe(CLEAN_SAMPLE_WATERMARK)
+    expect(meta.truncated).toBe(true)
+    expect(meta.rowCount).toBe(CLEAN_SAMPLE_ROW_LIMIT)
+
+    const XLSX = await import('xlsx')
+    const wb = XLSX.read(buffer, { type: 'buffer' })
+    const sheet = wb.Sheets[wb.SheetNames[0]!]!
+    const aoa = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1 })
+    const flat = aoa.map((r) => (Array.isArray(r) ? r.join(' ') : '')).join('\n')
+    expect(flat).toContain(CLEAN_SAMPLE_WATERMARK)
+    expect(flat).toContain('SAMPLE')
+  })
+
+  it('builds a watermarked sample PDF', async () => {
+    const parsed = {
+      headers: ['Date', 'Description', 'Debit', 'Credit'],
+      rows: [
+        ['01/01/2026', 'A', 10, null],
+        ['02/01/2026', 'B', null, 20],
+      ],
+    }
+    const buffer = await buildParsedPdfBuffer(
+      parsed,
+      {
+        kind: 'bank_statement',
+        source: 'demo.pdf',
+        parseMethod: 'test',
+        sumDebit: 10,
+        sumCredit: 20,
+        rowCount: 2,
+      },
+      'sample'
+    )
+    expect(Buffer.isBuffer(buffer)).toBe(true)
+    expect(buffer.byteLength).toBeGreaterThan(200)
+    expect(buffer.subarray(0, 5).toString('utf8')).toBe('%PDF-')
   })
 })

@@ -16,7 +16,13 @@ export async function getOrCreateUsage(organizationId: string, period: string) {
     where: {
       organizationId_period: { organizationId, period },
     },
-    create: { organizationId, period, projectsCount: 0, transactionsCount: 0 },
+    create: {
+      organizationId,
+      period,
+      projectsCount: 0,
+      transactionsCount: 0,
+      cleanExportsCount: 0,
+    },
     update: {},
   })
 }
@@ -35,6 +41,8 @@ export async function getUsageWithLimits(organizationId: string, planSlug: strin
   const bankAccountsUsed = await countOrgBankAccounts(organizationId)
   const bankAccountsLimit = quota.bankAccounts
   const bankAccountsUnlimited = isUnlimited(bankAccountsLimit)
+  const cleanExportsLimit = quota.cleanExportsPerMonth
+  const cleanExportsUnlimited = isUnlimited(cleanExportsLimit)
   return {
     period,
     projectsUsed: log.projectsCount,
@@ -46,6 +54,9 @@ export async function getUsageWithLimits(organizationId: string, planSlug: strin
     bankAccountsUsed,
     bankAccountsLimit,
     bankAccountsUnlimited,
+    cleanExportsUsed: log.cleanExportsCount,
+    cleanExportsLimit,
+    cleanExportsUnlimited,
   }
 }
 
@@ -86,6 +97,32 @@ export async function incrementProjects(organizationId: string): Promise<void> {
 export async function incrementTransactions(organizationId: string, count: number): Promise<void> {
   if (count === 0) return
   await adjustTransactions(organizationId, count)
+}
+
+export async function canExportFullClean(
+  organizationId: string,
+  plan: string
+): Promise<{ ok: boolean; message?: string; used?: number; limit?: number }> {
+  const usage = await getUsageWithLimits(organizationId, plan)
+  if (usage.cleanExportsUnlimited) return { ok: true, used: usage.cleanExportsUsed, limit: -1 }
+  if (usage.cleanExportsUsed >= usage.cleanExportsLimit) {
+    return {
+      ok: false,
+      used: usage.cleanExportsUsed,
+      limit: usage.cleanExportsLimit,
+      message: `Full clean export limit reached (${usage.cleanExportsLimit}/month). Download a sample file, or upgrade for more full exports.`,
+    }
+  }
+  return { ok: true, used: usage.cleanExportsUsed, limit: usage.cleanExportsLimit }
+}
+
+export async function incrementCleanExports(organizationId: string): Promise<void> {
+  const period = currentPeriod()
+  await getOrCreateUsage(organizationId, period)
+  await prisma.usageLog.update({
+    where: { organizationId_period: { organizationId, period } },
+    data: { cleanExportsCount: { increment: 1 } },
+  })
 }
 
 /** Apply delta to monthly transaction meter (re-map safe; never below zero). */

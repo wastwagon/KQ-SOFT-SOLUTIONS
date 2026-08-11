@@ -1,6 +1,9 @@
 /**
  * Standalone clean tools — parse a bank statement or cash book and download
  * cleaned Excel / PDF without creating a reconciliation project.
+ *
+ * Sample downloads are truncated + watermarked (free). Full downloads consume
+ * the org's monthly clean-export quota.
  */
 import { Router } from 'express'
 import multer from 'multer'
@@ -19,11 +22,15 @@ import { detectFileType } from '../services/parser.js'
 import {
   buildParsedExcelBuffer,
   buildParsedPdfBuffer,
+  CLEAN_SAMPLE_ROW_LIMIT,
   summarizeParsed,
   type CleanExportKind,
+  type CleanExportMode,
 } from '../services/cleanExport.js'
 import { withParsedRowsNewestFirst } from '../lib/transactionDateOrder.js'
 import { logAudit } from '../services/audit.js'
+import { prisma } from '../lib/prisma.js'
+import { canExportFullClean, getUsageWithLimits, incrementCleanExports } from '../services/usage.js'
 
 const router = Router()
 ensureLocalUploadDirs()
@@ -60,9 +67,28 @@ function parseFormat(raw: unknown): CleanFormat {
   return 'xlsx'
 }
 
+/** Default sample for binary downloads — full requires explicit mode=full. */
+function parseMode(raw: unknown, format: CleanFormat): CleanExportMode {
+  if (format === 'json') return 'sample'
+  const v = String(raw || 'sample').toLowerCase()
+  return v === 'full' ? 'full' : 'sample'
+}
+
 function safeBaseName(original: string): string {
   const base = path.basename(original, path.extname(original))
   return sanitizeFilename(base).slice(0, 80) || 'cleaned'
+}
+
+async function cleanExportQuotaSnapshot(orgId: string, plan: string) {
+  const usage = await getUsageWithLimits(orgId, plan)
+  return {
+    used: usage.cleanExportsUsed,
+    limit: usage.cleanExportsLimit,
+    unlimited: usage.cleanExportsUnlimited,
+    remaining: usage.cleanExportsUnlimited
+      ? null
+      : Math.max(0, usage.cleanExportsLimit - usage.cleanExportsUsed),
+  }
 }
 
 async function handleClean(
@@ -75,8 +101,16 @@ async function handleClean(
   const filepath = req.file.path
   const originalName = req.file.originalname
   const format = parseFormat(req.query.format ?? req.body?.format)
+  const mode = parseMode(req.query.mode ?? req.body?.mode, format)
+  const orgId = req.auth!.orgId
 
   try {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { plan: true },
+    })
+    if (!org) return res.status(404).json({ error: 'Organization not found' })
+
     const ft = detectFileType(filepath)
     const sheetIndex =
       ft === 'excel' ? pickBestExcelSheetIndex(filepath, docType) : 0
@@ -89,6 +123,7 @@ async function handleClean(
       parseMethod: parsed.parseMethod,
       ...sums,
     }
+    const quota = await cleanExportQuotaSnapshot(orgId, org.plan)
 
     if (format === 'json') {
       return res.json({
@@ -101,41 +136,61 @@ async function handleClean(
         sumCredit: sums.sumCredit,
         rowOrder: 'newest_date_first',
         sampleRows: parsed.rows.slice(0, 12),
+        sampleDownloadRowLimit: CLEAN_SAMPLE_ROW_LIMIT,
+        cleanExportQuota: quota,
       })
+    }
+
+    if (mode === 'full') {
+      const gate = await canExportFullClean(orgId, org.plan)
+      if (!gate.ok) {
+        return res.status(403).json({
+          error: gate.message || 'Full clean export limit reached',
+          code: 'CLEAN_EXPORT_QUOTA',
+          cleanExportQuota: await cleanExportQuotaSnapshot(orgId, org.plan),
+        })
+      }
     }
 
     const base = safeBaseName(originalName)
     const label = kind === 'cash_book' ? 'cash-book' : 'bank-statement'
+    const modeSuffix = mode === 'sample' ? '-sample' : ''
+    const filenameStem = `${base}-${label}${modeSuffix}-cleaned`
 
     if (format === 'pdf') {
-      const buffer = await buildParsedPdfBuffer(parsed, metaBase)
+      const buffer = await buildParsedPdfBuffer(parsed, metaBase, mode)
+      if (mode === 'full') await incrementCleanExports(orgId)
       await logAudit({
-        organizationId: req.auth!.orgId,
+        organizationId: orgId,
         userId: req.auth!.userId,
         action: 'tools_clean_export',
         details: {
           kind,
           format: 'pdf',
+          mode,
           parseMethod: parsed.parseMethod,
           rowCount: sums.rowCount,
           source: originalName,
         },
       })
       res.setHeader('Content-Type', 'application/pdf')
-      res.setHeader('Content-Disposition', `attachment; filename="${base}-${label}-cleaned.pdf"`)
+      res.setHeader('Content-Disposition', `attachment; filename="${filenameStem}.pdf"`)
       res.setHeader('X-Parse-Method', String(parsed.parseMethod || ''))
       res.setHeader('X-Row-Count', String(sums.rowCount))
+      res.setHeader('X-Clean-Export-Mode', mode)
       return res.send(buffer)
     }
 
-    const { buffer } = buildParsedExcelBuffer(parsed, metaBase)
+    const { buffer } = buildParsedExcelBuffer(parsed, metaBase, mode)
+    if (mode === 'full') await incrementCleanExports(orgId)
     await logAudit({
-      organizationId: req.auth!.orgId,
+      organizationId: orgId,
       userId: req.auth!.userId,
       action: 'tools_clean_export',
       details: {
         kind,
         format: 'xlsx',
+        mode,
         parseMethod: parsed.parseMethod,
         rowCount: sums.rowCount,
         source: originalName,
@@ -145,9 +200,10 @@ async function handleClean(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    res.setHeader('Content-Disposition', `attachment; filename="${base}-${label}-cleaned.xlsx"`)
+    res.setHeader('Content-Disposition', `attachment; filename="${filenameStem}.xlsx"`)
     res.setHeader('X-Parse-Method', String(parsed.parseMethod || ''))
     res.setHeader('X-Row-Count', String(sums.rowCount))
+    res.setHeader('X-Clean-Export-Mode', mode)
     return res.send(buffer)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to parse file'

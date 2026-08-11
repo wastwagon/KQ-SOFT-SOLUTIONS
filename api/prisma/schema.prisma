@@ -421,6 +421,8 @@ model UsageLog {
   period         String   // YYYY-MM
   projectsCount  Int      @default(0) @map("projects_count")
   transactionsCount Int   @default(0) @map("transactions_count")
+  /// Full Tools clean Excel/PDF exports this period (sample downloads excluded).
+  cleanExportsCount Int   @default(0) @map("clean_exports_count")
   createdAt      DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

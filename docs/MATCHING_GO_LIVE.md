@@ -1,8 +1,10 @@
 # Matching — go-live status
 
-**Status: complete for Ghana BRS go-live.** This document is the close-out record so matching methodology work does not need to be reopened unless a new product requirement appears.
+**Status: complete for Ghana BRS matching methodology.** This document is the close-out record so matching work does not need to be reopened unless a new product requirement appears.
 
-Canonical user guide: [MAPPING_AND_MATCHING_MANUAL.md](./MAPPING_AND_MATCHING_MANUAL.md).
+**Not the full product ship gate** — use [GO_LIVE_VERIFICATION.md](./GO_LIVE_VERIFICATION.md) for parsers, identity, date order, count-match, and clean-export A+B verification.
+
+Canonical user guide: [MAPPING_AND_MATCHING_MANUAL.md](./MAPPING_AND_MATCHING_MANUAL.md) (keep in-app [`web/public/mapping-and-matching-manual.md`](../web/public/mapping-and-matching-manual.md) aligned).
 
 ## Shipped
 

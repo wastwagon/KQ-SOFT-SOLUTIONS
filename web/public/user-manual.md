@@ -45,7 +45,7 @@ Core capabilities:
 - Reconcile receipts vs credits and payments vs debits
 - Review exceptions and complete sign-off
 - Export final reports in PDF and Excel
-- Optional **Clean bank statement** / **Clean cash book** tools (parse and download without a full project)
+- Optional **Clean bank statement** / **Clean cash book** tools (preview free; sample downloads watermarked; full Excel/PDF on plan quota)
 
 ---
 
@@ -53,7 +53,7 @@ Core capabilities:
 
 - **Dashboard**: projects, usage meters (projects / transactions / **bank account seats**), quick actions
 - **Projects**: create and manage reconciliation jobs
-- **Clean bank statement** / **Clean cash book**: standalone parse → Excel/PDF export (no project required)
+- **Clean bank statement** / **Clean cash book**: validate parsers → sample (watermarked) or full export (plan quota)
 - **Reports**: completed jobs and exports
 - **Clients**: client directory
 - **Audit log**: activity records (Standard+)
@@ -143,12 +143,14 @@ Go to **Projects → New project**, then set:
 Supported formats:
 - `.xlsx`, `.xls`, `.csv`, `.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`
 
-### Clean document tools (no project)
-From the dashboard or sidebar:
-- **Clean bank statement** — upload a statement, parse with the same engine, download Excel or PDF
-- **Clean cash book** — same for cash book files  
+### Clean document tools
+From the dashboard or sidebar (no project required to preview):
+- **Clean bank statement** — upload a statement, parse with the same engine, preview rows
+- **Clean cash book** — same for cash book files
+- **Sample Excel/PDF** — truncated and watermarked (`BRS DEMO — NOT FOR OPERATIONAL USE`)
+- **Full Excel/PDF** — complete extract; counts against your plan’s monthly clean-export quota
 
-Useful for one-off cleanup or validating a file before starting a full reconciliation.
+Useful for validating a bank format before starting a full reconciliation.
 
 ---
 
@@ -299,7 +301,9 @@ Create and revoke keys for programmatic access.
 
 | Capability | From |
 |------------|------|
-| 1:1 match, BRS export, OCR, clean tools | Basic+ |
+| 1:1 match, BRS export, OCR | Basic+ |
+| Clean tools preview + sample (watermarked) download | Basic+ |
+| Full clean Excel/PDF export | Basic+ with monthly quota (Basic 5 / Standard 20 / Premium 60 / Custom unlimited) |
 | Suggested matches, bulk / auto-match, AI ranking | All tiers |
 | Match by counting (diagnostic lists / cancel schedule; never auto-clears) | All tiers |
 | Bank rules, audit, discrepancy | Standard+ |
@@ -391,10 +395,13 @@ When enabled by the platform, eligible workspaces get **50% off** for their firs
 
 ## Training and Go-Live Plan
 
+> Customer rollout plan for your firm — not the engineering verify harness (`docs/GO_LIVE_VERIFICATION.md`).
+
 ### Week 1
 - Complete onboarding checklist
 - Run one pilot reconciliation end-to-end
 - Confirm bank seat usage on the Dashboard
+- Try Clean tools: preview + sample download; note full-export quota on Billing
 
 ### Week 2
 - Move live periods to platform

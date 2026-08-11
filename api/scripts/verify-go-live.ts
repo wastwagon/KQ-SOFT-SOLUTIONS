@@ -20,6 +20,12 @@ import { datesWithinWindow } from '../src/services/matching.js'
 import { pickBankRuleCashBookMatch } from '../src/services/bankRules.js'
 import { buildCountMatchDiagnostic } from '../src/services/countMatchDiagnostic.js'
 import { sortParsedRowsNewestFirst } from '../src/lib/transactionDateOrder.js'
+import {
+  buildParsedExcelBuffer,
+  CLEAN_SAMPLE_ROW_LIMIT,
+  CLEAN_SAMPLE_WATERMARK,
+} from '../src/services/cleanExport.js'
+import { TIER_LIMITS } from '../src/config/subscription.js'
 import type { Tx } from '../src/services/matching.js'
 
 const prisma = new PrismaClient()
@@ -132,6 +138,26 @@ async function main() {
     !countDiag.cancelSchedule.receiptsEqualsCredits.some((r) => r.amountKey === '100.00')
   )
 
+  check('basic plan has clean-export quota', TIER_LIMITS.basic.cleanExportsPerMonth === 5)
+  check('firm plan has unlimited clean exports', TIER_LIMITS.firm.cleanExportsPerMonth === -1)
+  const sampleRows = Array.from({ length: CLEAN_SAMPLE_ROW_LIMIT + 5 }, (_, i) => [
+    '01/01/2026',
+    `R${i}`,
+    i + 1,
+    null,
+  ])
+  const sampleExcel = buildParsedExcelBuffer(
+    { headers: ['Date', 'Description', 'Debit', 'Credit'], rows: sampleRows },
+    { kind: 'bank_statement', source: 'verify.pdf', parseMethod: 'test' },
+    'sample'
+  )
+  check(
+    'sample clean export truncates + watermarks',
+    sampleExcel.meta.truncated === true &&
+      sampleExcel.meta.rowCount === CLEAN_SAMPLE_ROW_LIMIT &&
+      sampleExcel.meta.watermark === CLEAN_SAMPLE_WATERMARK
+  )
+
   // ── DB connectivity + project identity persistence ───────────────────────
   console.log('\n2) Database project identity')
   await prisma.$queryRaw`SELECT 1`
@@ -142,6 +168,12 @@ async function main() {
      WHERE table_name = 'projects' AND column_name = 'statement_business_name'`
   )
   check('statement_business_name column exists', col.length === 1)
+
+  const cleanCol = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'usage_logs' AND column_name = 'clean_exports_count'`
+  )
+  check('usage_logs.clean_exports_count column exists', cleanCol.length === 1)
 
   const org =
     (await prisma.organization.findFirst({ orderBy: { createdAt: 'asc' } })) ||

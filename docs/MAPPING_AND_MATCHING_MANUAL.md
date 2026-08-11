@@ -3,9 +3,11 @@
 **Product:** KQ Bank Reconciliation System (BRS)  
 **Company:** KQ SOFT SOLUTIONS  
 **Audience:** Preparers, reviewers, and trainers  
-**Updated:** June 2026
+**Updated:** August 2026
 
 This guide explains how to **map** uploaded files to the correct columns and **match** cash book lines to bank statement lines. It is the detailed companion to the main [User Manual](../web/public/user-manual.md).
+
+> **In-app copy:** also update [`web/public/mapping-and-matching-manual.md`](../web/public/mapping-and-matching-manual.md) — that is what the product mapping page serves.
 
 ---
 

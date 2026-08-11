@@ -45,7 +45,20 @@ export default function AdminOrgDetail() {
       createdAt: string
       members: { user: { id: string; email: string; name: string | null }; role: string }[]
       _count: { projects: number; clients: number }
-      usage: { projectsUsed: number; projectsLimit: number; projectsUnlimited: boolean; transactionsUsed: number; transactionsLimit: number; transactionsUnlimited: boolean; bankAccountsUsed?: number; bankAccountsLimit?: number; bankAccountsUnlimited?: boolean }
+      usage: {
+        projectsUsed: number
+        projectsLimit: number
+        projectsUnlimited: boolean
+        transactionsUsed: number
+        transactionsLimit: number
+        transactionsUnlimited: boolean
+        bankAccountsUsed?: number
+        bankAccountsLimit?: number
+        bankAccountsUnlimited?: boolean
+        cleanExportsUsed?: number
+        cleanExportsLimit?: number
+        cleanExportsUnlimited?: boolean
+      }
       totalPaid: number
       payments: { id: string; amount: number; currency: string; plan: string; period: string; reference: string | null; status: string; createdAt: string }[]
       subscription?: {
@@ -405,6 +418,11 @@ export default function AdminOrgDetail() {
             {org.usage.bankAccountsUnlimited
               ? `${org.usage.bankAccountsUsed ?? 0} banks (unlimited)`
               : `${org.usage.bankAccountsUsed ?? 0} / ${org.usage.bankAccountsLimit ?? '—'} banks`}
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {org.usage.cleanExportsUnlimited
+              ? `${org.usage.cleanExportsUsed ?? 0} full cleans (unlimited)`
+              : `${org.usage.cleanExportsUsed ?? 0} / ${org.usage.cleanExportsLimit ?? '—'} full cleans`}
           </p>
         </Card>
         <Card className="p-4 shadow-sm">

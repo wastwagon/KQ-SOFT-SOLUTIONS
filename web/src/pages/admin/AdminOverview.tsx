@@ -53,13 +53,13 @@ export default function AdminOverview() {
     {
       to: '/platform-admin/tools/clean-bank-statement',
       label: 'Clean bank statement',
-      hint: 'Parse PDF/Excel → download cleaned files',
+      hint: 'Preview / sample / full cleaned export',
       icon: Landmark,
     },
     {
       to: '/platform-admin/tools/clean-cash-book',
       label: 'Clean cash book',
-      hint: 'Normalise cash book → download cleaned files',
+      hint: 'Preview / sample / full cleaned export',
       icon: FileSpreadsheet,
     },
     {

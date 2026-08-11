@@ -3,9 +3,11 @@
 **Product:** KQ Bank Reconciliation System (BRS)  
 **Company:** KQ SOFT SOLUTIONS  
 **Audience:** Preparers, reviewers, and trainers  
-**Updated:** June 2026
+**Updated:** August 2026
 
 This guide explains how to **map** uploaded files to the correct columns and **match** cash book lines to bank statement lines. It is the detailed companion to the main [User Manual](/user-manual.md).
+
+> **Maintainers:** keep this file aligned with the repo copy `docs/MAPPING_AND_MATCHING_MANUAL.md` (this public file is what the in-app mapping page loads).
 
 ---
 
@@ -230,6 +232,19 @@ A matched row cannot be matched again until you **unmatch** it.
 **Bank pattern layers:** When the reconcile profile detects Ecobank, SCB, GCB, NIB, Prudential, Absa, or Bank of Africa, dedicated pattern suggestions (clearing, INW CLG, cheque paid, telex, EBOX/FT, MAT.DEPOT, etc.) are ranked ahead of generic pairs. Unique-amount-only pattern tips stay below the Phase B auto-match floor so they need human review.
 
 **Limits (by design):** Each project is **one currency** — matching does not convert FX. Partial/open-item amounts (pro-rata) are not suggested; use 1-to-many / many-to-1 when several lines sum to a full amount. Many-to-many confirm requires cash-book and bank sides to **sum to the same total**.
+
+### Match by counting (diagnostic)
+
+The **Match by counting** panel on Reconcile builds amount-frequency schedules (cash book count vs bank count per amount, by side):
+
+- Amounts only in the cash book (Received / Payment)
+- Amounts only on the bank (Lodgment / Debits)
+- Both sides where batch counts do **not** cancel (open more/less imbalances)
+- Both sides where batch counts **do** cancel — a **separate schedule**, not the main BRS
+
+Default scope is **unmatched** lines (toggle **All lines** if needed). Export to **Excel or PDF** from the panel. **Select lines** pre-selects those transactions for manual or suggested matching (capped at 50 lines per side so bulk match stays safe).
+
+Counting is **diagnostic only**. It never auto-clears. Confirmed clears still use suggested/manual matching with amount plus date / reference / cheque / narration corroboration.
 
 ### Manual matching (step by step)
 

@@ -22,6 +22,7 @@ interface BillingProps {
           projectsDisplay?: string
           transactionsDisplay?: string
           bankAccountsDisplay?: string
+          cleanExportsDisplay?: string
           projectsUsed?: number
           projectsLimit?: number
           projectsUnlimited?: boolean
@@ -31,6 +32,9 @@ interface BillingProps {
           bankAccountsUsed?: number
           bankAccountsLimit?: number
           bankAccountsUnlimited?: boolean
+          cleanExportsUsed?: number
+          cleanExportsLimit?: number
+          cleanExportsUnlimited?: boolean
         }
         subscription?: {
           status?: string
@@ -75,7 +79,7 @@ export default function SettingsBillingTab({
         <strong className="capitalize text-gray-900">{usageData?.organization?.plan || 'basic'}</strong>
       </p>
       {usageData?.usage && (
-        <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Projects / mo</p>
             <p className="mt-0.5 font-semibold text-gray-900">
@@ -103,6 +107,16 @@ export default function SettingsBillingTab({
                   : `${usageData.usage.bankAccountsUsed ?? 0} / ${usageData.usage.bankAccountsLimit ?? '—'}`)}
             </p>
             <p className="text-[11px] text-gray-500 mt-0.5">Org-wide seats</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Full clean exports / mo</p>
+            <p className="mt-0.5 font-semibold text-gray-900">
+              {usageData.usage.cleanExportsDisplay ??
+                (usageData.usage.cleanExportsUnlimited
+                  ? `${usageData.usage.cleanExportsUsed ?? 0} (unlimited)`
+                  : `${usageData.usage.cleanExportsUsed ?? 0} / ${usageData.usage.cleanExportsLimit ?? '—'}`)}
+            </p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Sample downloads free</p>
           </div>
         </div>
       )}

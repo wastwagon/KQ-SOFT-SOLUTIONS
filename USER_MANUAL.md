@@ -1,10 +1,10 @@
 # Bank Reconciliation System — User Manual
 
-> **Canonical in-app manual:** edit and deploy [`web/public/user-manual.md`](web/public/user-manual.md) — that file is what `/manual` loads. Keep this root copy aligned or treat it as a planning mirror only.
+> **Canonical in-app manual:** edit and deploy [`web/public/user-manual.md`](web/public/user-manual.md) — that file is what `/manual` loads. This root copy is a planning mirror; when they diverge, **trust the public file**.
 
 **KQ SOFT SOLUTIONS** | Global product · HQ Ghana  
-**Version 1.4** | July 2026  
-**Updated:** July 26, 2026
+**Version 1.5** | August 2026  
+**Updated:** August 11, 2026
 
 ---
 
@@ -58,6 +58,8 @@ The system ships pre-built parsers for many regional bank statement layouts (wit
 | **Export** | Export report as PDF or Excel |
 | **Clients** | Link projects to clients for organisation |
 | **Currency** | Support for GHS, USD, EUR per project |
+| **Clean tools** | Validate bank / cash-book parsers without a project: free preview + watermarked sample downloads; full Excel/PDF on monthly plan quota |
+| **Match by counting** | Diagnostic amount-frequency lists on Reconcile (never auto-clears) |
 
 ### Standard Plan and Above
 
@@ -157,8 +159,9 @@ The Dashboard gives you an overview of your organisation.
 
 ### What You See
 
-- **Usage metrics** — Number of projects and transactions used this month vs your plan limit
+- **Usage metrics** — Projects, transactions, bank seats, and full clean exports used this month vs plan limits
 - **Recent projects** — Quick links to your latest projects
+- **Clean & export tools** — Preview parsers; sample (watermarked) or full cleaned Excel/PDF
 - **Quick actions** — Links to create a new project, view reports, or go to settings
 
 ### Navigation
@@ -167,6 +170,7 @@ Use the main navigation menu:
 
 - **Dashboard** — Home
 - **Projects** — List and manage projects
+- **Clean bank statement** / **Clean cash book** — Tools (preview free; sample watermarked; full on quota)
 - **Reports** — Completed projects (ready for export)
 - **Clients** — Manage clients
 - **Audit** — Action history (Standard plan and above)
@@ -437,12 +441,12 @@ Create rules to auto-suggest matches:
 
 ## 12. Subscription Plans & Limits
 
-| Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Users |
-|------|-------------|-----------------|--------------------------|-------|
-| Basic | 10 | 1,000 | 5 | 1 |
-| Standard | 30 | 5,000 | 10 | 3 |
-| Premium | 100 | 20,000 | 30 | 5 |
-| Custom (firm) | Unlimited | Unlimited | Unlimited | Unlimited |
+| Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Full clean exports/mo | Users |
+|------|-------------|-----------------|--------------------------|------------------------|-------|
+| Basic | 10 | 1,000 | 5 | 5 | 1 |
+| Standard | 30 | 5,000 | 10 | 20 | 3 |
+| Premium | 100 | 20,000 | 30 | 60 | 5 |
+| Custom (firm) | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited |
 
 | Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
 |------|---------------|-----------------|--------------|
@@ -457,6 +461,7 @@ Create rules to auto-suggest matches:
 - **Intro offer:** 50% off your first 2 months when enabled by the platform.
 - **Billing periods:** monthly, quarterly (~5% off), or yearly (~17% off vs monthly).
 - **Bank account seats** are counted across the whole organisation (not per project).
+- **Clean tools:** preview is free; sample Excel/PDF is truncated and watermarked (`BRS DEMO — NOT FOR OPERATIONAL USE`); full cleans use the monthly quota above (see Settings → Billing).
 
 ---
 

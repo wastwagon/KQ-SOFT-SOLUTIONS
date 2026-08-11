@@ -7,6 +7,7 @@ import {
   cleanTools,
   isSubscriptionInactiveError,
   unlessSubscriptionInactive,
+  type CleanDownloadMode,
   type CleanPreviewResult,
   type CleanToolKind,
 } from '../lib/api'
@@ -26,6 +27,13 @@ function triggerBlobDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function quotaLabel(preview: CleanPreviewResult): string | null {
+  const q = preview.cleanExportQuota
+  if (!q) return null
+  if (q.unlimited) return `${q.used} full clean exports used this month (unlimited)`
+  return `${q.used} / ${q.limit} full clean exports used this month`
+}
+
 const COPY: Record<
   CleanToolKind,
   { title: string; eyebrow: string; blurb: string; acceptHint: string }
@@ -34,17 +42,19 @@ const COPY: Record<
     title: 'Clean bank statement',
     eyebrow: 'Tools',
     blurb:
-      'Upload a bank statement PDF or Excel file to extract transactions with the BRS parsers. Rows are ordered newest date first. Download a cleaned Excel or PDF for other uses — no reconciliation project required.',
+      'Upload a bank statement PDF or Excel to validate BRS parsers. Preview is free. Sample Excel/PDF downloads are truncated and watermarked. Full cleaned files use your plan’s monthly clean-export quota.',
     acceptHint: 'PDF, Excel (.xlsx / .xls / .xlsm), CSV, or image',
   },
   'cash-book': {
     title: 'Clean cash book',
     eyebrow: 'Tools',
     blurb:
-      'Upload a cash book Excel, CSV, or PDF to normalise receipts and payments into a clean transaction table. Rows are ordered newest date first. Download Excel or PDF — no reconciliation project required.',
+      'Upload a cash book to validate normalisation. Preview is free. Sample Excel/PDF downloads are truncated and watermarked. Full cleaned files use your plan’s monthly clean-export quota.',
     acceptHint: 'Excel (.xlsx / .xls / .xlsm), CSV, PDF, or image',
   },
 }
+
+type DownloadKey = `${CleanDownloadMode}-${'xlsx' | 'pdf'}`
 
 export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
   const copy = COPY[kind]
@@ -56,7 +66,7 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
   const [error, setError] = useState('')
   const [paywall, setPaywall] = useState(false)
   const [parsing, setParsing] = useState(false)
-  const [downloading, setDownloading] = useState<'xlsx' | 'pdf' | null>(null)
+  const [downloading, setDownloading] = useState<DownloadKey | null>(null)
 
   async function runPreview(next: File) {
     setFile(next)
@@ -88,17 +98,33 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
     }
   }
 
-  async function download(format: 'xlsx' | 'pdf') {
+  async function download(format: 'xlsx' | 'pdf', mode: CleanDownloadMode) {
     if (!file) return
-    setDownloading(format)
+    const key: DownloadKey = `${mode}-${format}`
+    setDownloading(key)
     setError('')
     setPaywall(false)
     try {
-      const blob = await cleanTools.download(kind, file, format)
-      const stem = file.name.replace(/\.[^.]+$/, '') || 'cleaned'
-      const suffix = kind === 'cash-book' ? 'cash-book' : 'bank-statement'
-      triggerBlobDownload(blob, `${stem}-${suffix}-cleaned.${format === 'pdf' ? 'pdf' : 'xlsx'}`)
-      toast.success(format === 'pdf' ? 'PDF downloaded.' : 'Excel downloaded.')
+      const { blob, filename } = await cleanTools.download(kind, file, format, mode)
+      triggerBlobDownload(blob, filename)
+      toast.success(
+        mode === 'sample'
+          ? format === 'pdf'
+            ? 'Sample PDF downloaded (watermarked).'
+            : 'Sample Excel downloaded (watermarked).'
+          : format === 'pdf'
+            ? 'Full PDF downloaded.'
+            : 'Full Excel downloaded.'
+      )
+      // Refresh quota after full export
+      if (mode === 'full') {
+        try {
+          const refreshed = await cleanTools.preview(kind, file)
+          setPreview(refreshed)
+        } catch {
+          /* keep prior preview */
+        }
+      }
     } catch (err) {
       if (isSubscriptionInactiveError(err)) {
         setPaywall(true)
@@ -115,6 +141,12 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
     }
   }
 
+  const sampleLimit = preview?.sampleDownloadRowLimit ?? 25
+  const fullBlocked =
+    !!preview?.cleanExportQuota &&
+    !preview.cleanExportQuota.unlimited &&
+    (preview.cleanExportQuota.remaining ?? 0) <= 0
+
   return (
     <div className="space-y-8 w-full">
       <PageHeader
@@ -127,7 +159,8 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
 
       <Card title="Upload file" className="shadow-sm">
         <p className="text-sm text-gray-600 mb-4">
-          Accepted: {copy.acceptHint}. Parsing uses the same engines as project uploads.
+          Accepted: {copy.acceptHint}. Parsing uses the same engines as project uploads. Rows are
+          ordered newest date first.
         </p>
         <input
           ref={inputRef}
@@ -192,27 +225,73 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
             </div>
           </dl>
 
-          <div className="flex flex-wrap gap-3 mb-6">
-            <Button
-              type="button"
-              variant="primary"
-              isLoading={downloading === 'xlsx'}
-              disabled={!!downloading || preview.rowCount === 0}
-              onClick={() => void download('xlsx')}
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-2" aria-hidden />
-              Download Excel
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              isLoading={downloading === 'pdf'}
-              disabled={!!downloading || preview.rowCount === 0}
-              onClick={() => void download('pdf')}
-            >
-              <FileText className="w-4 h-4 mr-2" aria-hidden />
-              Download PDF
-            </Button>
+          {quotaLabel(preview) && (
+            <p className="text-sm text-gray-600 mb-4">
+              {quotaLabel(preview)}
+              {fullBlocked && (
+                <span className="block mt-1 text-amber-800">
+                  Full export quota used for this month — sample downloads remain available. Upgrade
+                  for more full exports.
+                </span>
+              )}
+            </p>
+          )}
+
+          <div className="space-y-3 mb-6">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                Sample download (watermarked, up to {sampleLimit} rows)
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="primary"
+                  isLoading={downloading === 'sample-xlsx'}
+                  disabled={!!downloading || preview.rowCount === 0}
+                  onClick={() => void download('xlsx', 'sample')}
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-2" aria-hidden />
+                  Sample Excel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  isLoading={downloading === 'sample-pdf'}
+                  disabled={!!downloading || preview.rowCount === 0}
+                  onClick={() => void download('pdf', 'sample')}
+                >
+                  <FileText className="w-4 h-4 mr-2" aria-hidden />
+                  Sample PDF
+                </Button>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                Full download (uses plan quota)
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  isLoading={downloading === 'full-xlsx'}
+                  disabled={!!downloading || preview.rowCount === 0 || fullBlocked}
+                  onClick={() => void download('xlsx', 'full')}
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-2" aria-hidden />
+                  Full Excel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  isLoading={downloading === 'full-pdf'}
+                  disabled={!!downloading || preview.rowCount === 0 || fullBlocked}
+                  onClick={() => void download('pdf', 'full')}
+                >
+                  <FileText className="w-4 h-4 mr-2" aria-hidden />
+                  Full PDF
+                </Button>
+              </div>
+            </div>
           </div>
 
           {preview.sampleRows.length > 0 && (
@@ -271,7 +350,8 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
               {preview.rowCount > preview.sampleRows.length && (
                 <p className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100 bg-gray-50">
                   Showing first {preview.sampleRows.length} of {preview.rowCount.toLocaleString()}{' '}
-                  rows. Download Excel or PDF for the full extract.
+                  rows in preview. Sample downloads include up to {sampleLimit} rows with a demo
+                  watermark; full downloads include every row and use quota.
                 </p>
               )}
             </div>
@@ -279,8 +359,8 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
 
           <p className="mt-4 text-xs text-gray-500 flex items-start gap-2">
             <Download className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden />
-            Cleaned files are for review and other workflows. To reconcile against a cash book, create
-            a project and upload there instead.
+            Cleaning validates bank formats. Reconcile against a cash book in a project — that is the
+            main BRS product.
           </p>
         </Card>
       )}

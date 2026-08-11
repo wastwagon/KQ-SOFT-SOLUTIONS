@@ -12,22 +12,28 @@ export interface PlanQuotaLimits {
    * Limits are org-wide, not per project.
    */
   bankAccountsPerProject: number
+  /** Full Tools clean Excel/PDF exports per month (-1 = unlimited). */
+  cleanExportsPerMonth: number
 }
 
 export async function getPlanQuotaLimits(planSlug: string): Promise<PlanQuotaLimits> {
   const planData = await getPlanBySlug(planSlug)
   const bankAccounts = TIER_LIMITS[planSlug]?.bankAccounts ?? TIER_LIMITS.basic.bankAccounts
+  const cleanExportsPerMonth =
+    TIER_LIMITS[planSlug]?.cleanExportsPerMonth ?? TIER_LIMITS.basic.cleanExportsPerMonth
   const limits = planData
     ? {
         projectsPerMonth: planData.projectsPerMonth,
         transactionsPerMonth: planData.transactionsPerMonth,
         bankAccounts,
         bankAccountsPerProject: bankAccounts,
+        cleanExportsPerMonth,
       }
     : {
         ...getLimits(planSlug),
         bankAccounts,
         bankAccountsPerProject: bankAccounts,
+        cleanExportsPerMonth,
       }
   return limits
 }

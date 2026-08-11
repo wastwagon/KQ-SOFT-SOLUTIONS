@@ -141,12 +141,16 @@ router.get('/usage', async (req: AuthRequest, res) => {
       bankAccountsDisplay: usage.bankAccountsUnlimited
         ? `${usage.bankAccountsUsed} (unlimited)`
         : `${usage.bankAccountsUsed} / ${usage.bankAccountsLimit}`,
+      cleanExportsDisplay: usage.cleanExportsUnlimited
+        ? `${usage.cleanExportsUsed} (unlimited)`
+        : `${usage.cleanExportsUsed} / ${usage.cleanExportsLimit}`,
     },
     limits: {
       projectsPerMonth: limits.projectsPerMonth,
       transactionsPerMonth: limits.transactionsPerMonth,
       bankAccounts: limits.bankAccounts,
       bankAccountsPerProject: limits.bankAccountsPerProject,
+      cleanExportsPerMonth: quotaLimits.cleanExportsPerMonth,
     },
     subscription,
   })

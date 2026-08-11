@@ -155,6 +155,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     bullets: [
       '5 bank accounts · 1,000 transactions / month',
       'Up to 10 projects / month · 1 team member',
+      '5 full clean exports / month (sample downloads free)',
       '14-day free trial',
       '50% off your first 2 months',
       'Bookkeeping consultancy / advisory',
@@ -214,6 +215,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     bullets: [
       '10 bank accounts · 5,000 transactions / month',
       'Up to 30 projects / month · 3 team members',
+      '20 full clean exports / month (sample downloads free)',
       'Bulk match (up to 50 pairs)',
       'AI-powered match ranking',
       'Bank rules engine',
@@ -267,6 +269,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     bullets: [
       '30 bank accounts · 20,000 transactions / month',
       'Up to 100 projects / month · 5 team members',
+      '60 full clean exports / month (sample downloads free)',
       'One-to-many & many-to-many matches',
       'Roll forward across periods',
       'Threshold approval workflow',
@@ -319,6 +322,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     inheritsFromLabel: 'Everything in Premium, plus:',
     bullets: [
       'Unlimited bank accounts, transactions & members',
+      'Unlimited full clean exports (sample downloads free)',
       'Multi-client workspace',
       'Public REST API access',
       'Personalised onboarding',

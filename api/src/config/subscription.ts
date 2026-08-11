@@ -14,27 +14,33 @@ export const TIER_LIMITS: Record<
     transactionsPerMonth: number
     /** Org-wide bank account seats (-1 = unlimited). */
     bankAccounts: number
+    /** Full Tools clean Excel/PDF exports per month (-1 = unlimited). Sample downloads free. */
+    cleanExportsPerMonth: number
   }
 > = {
   basic: {
     projectsPerMonth: 10,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.basic,
     bankAccounts: 5,
+    cleanExportsPerMonth: 5,
   },
   standard: {
     projectsPerMonth: 30,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.standard,
     bankAccounts: 10,
+    cleanExportsPerMonth: 20,
   },
   premium: {
     projectsPerMonth: 100,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.premium,
     bankAccounts: 30,
+    cleanExportsPerMonth: 60,
   },
   firm: {
     projectsPerMonth: -1,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.firm,
     bankAccounts: -1,
+    cleanExportsPerMonth: -1,
   },
 }
 

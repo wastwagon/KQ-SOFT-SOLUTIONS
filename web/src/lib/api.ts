@@ -396,12 +396,17 @@ export interface SubscriptionUsageResponse {
     bankAccountsLimit?: number
     bankAccountsUnlimited?: boolean
     bankAccountsDisplay?: string
+    cleanExportsUsed?: number
+    cleanExportsLimit?: number
+    cleanExportsUnlimited?: boolean
+    cleanExportsDisplay?: string
   }
   limits: {
     projectsPerMonth: number
     transactionsPerMonth: number
     bankAccountsPerProject: number
     bankAccounts?: number
+    cleanExportsPerMonth?: number
   }
   subscription?: {
     status: 'trial' | 'active' | 'expired' | 'free'
@@ -1114,6 +1119,13 @@ export function uploadBankStatement(
 
 export type CleanToolKind = 'bank-statement' | 'cash-book'
 
+export type CleanExportQuota = {
+  used: number
+  limit: number
+  unlimited: boolean
+  remaining: number | null
+}
+
 export type CleanPreviewResult = {
   kind: string
   source: string
@@ -1123,10 +1135,20 @@ export type CleanPreviewResult = {
   sumDebit: number
   sumCredit: number
   sampleRows: unknown[][]
+  sampleDownloadRowLimit?: number
+  cleanExportQuota?: CleanExportQuota
 }
+
+export type CleanDownloadMode = 'sample' | 'full'
 
 function cleanToolPath(kind: CleanToolKind): string {
   return kind === 'cash-book' ? '/tools/clean-cash-book' : '/tools/clean-bank-statement'
+}
+
+function filenameFromDisposition(header: string | null, fallback: string): string {
+  if (!header) return fallback
+  const m = /filename="([^"]+)"/i.exec(header) || /filename=([^;]+)/i.exec(header)
+  return m?.[1]?.trim() || fallback
 }
 
 export const cleanTools = {
@@ -1143,20 +1165,35 @@ export const cleanTools = {
     if (!res.ok) throwFromFailedResponse(res, data)
     return data as CleanPreviewResult
   },
-  download: async (kind: CleanToolKind, file: File, format: 'xlsx' | 'pdf'): Promise<Blob> => {
+  download: async (
+    kind: CleanToolKind,
+    file: File,
+    format: 'xlsx' | 'pdf',
+    mode: CleanDownloadMode = 'sample'
+  ): Promise<{ blob: Blob; filename: string }> => {
     const form = new FormData()
     form.append('file', file)
     const token = getToken()
-    const res = await fetch(`${API_URL}/api/v1${cleanToolPath(kind)}?format=${format}`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    })
+    const res = await fetch(
+      `${API_URL}/api/v1${cleanToolPath(kind)}?format=${format}&mode=${mode}`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      }
+    )
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throwFromFailedResponse(res, data)
     }
-    return res.blob()
+    const stem = file.name.replace(/\.[^.]+$/, '') || 'cleaned'
+    const suffix = kind === 'cash-book' ? 'cash-book' : 'bank-statement'
+    const modePart = mode === 'sample' ? '-sample' : ''
+    const fallback = `${stem}-${suffix}${modePart}-cleaned.${format === 'pdf' ? 'pdf' : 'xlsx'}`
+    return {
+      blob: await res.blob(),
+      filename: filenameFromDisposition(res.headers.get('Content-Disposition'), fallback),
+    }
   },
 }
 
