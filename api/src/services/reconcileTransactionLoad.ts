@@ -5,6 +5,7 @@
 import { prisma } from '../lib/prisma.js'
 import type { Tx } from './matching.js'
 import { resolveReconcileMaxLimit } from '../config/importLimits.js'
+import { TRANSACTION_DATE_ORDER_BY } from '../lib/transactionDateOrder.js'
 
 const TX_SELECT = {
   id: true,
@@ -65,7 +66,7 @@ export async function loadReconcileLane(opts: {
       ? []
       : await prisma.transaction.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: [{ date: 'asc' }, { rowIndex: 'asc' }],
+          orderBy: TRANSACTION_DATE_ORDER_BY,
           take: matchTake,
           select: TX_SELECT,
         })

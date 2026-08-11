@@ -30,6 +30,8 @@ SMOKE_EMAIL='you@example.com' SMOKE_PASSWORD='…' ./scripts/verify-go-live.sh -
 | Matching false-positives | Unit: null dates, bank-rule corroboration, SCB unique-amount, multi-sum helpers |
 | Pattern banks | Unit: Ecobank, SCB, GCB, NIB, Prudential, Absa, BOA |
 | Parsers | Unit: GCB/NIB/Prudential/Absa/BOA/SCB statement tests |
+| Count-match diagnostic | Unit + DB smoke helpers: open/cancel classification (never auto-clears) |
+| Newest-first date order | Unit: import/cleanup/reconcile sort (30 Dec → 1 Jan) |
 | Phase B UI logic | Web unit: `phasedAutoMatch`, profile tips |
 | Project identity | DB smoke: create project with `statementBusinessName`, report entity resolution, cleanup |
 | Live API (optional) | `/healthz`, optional login → create project → report entity name |
@@ -47,8 +49,9 @@ npm run verify:go-live        # DB unification smoke only
 1. **New project** — fill statement business name, account name/number, closing date → name auto-composes.
 2. Open project header → “On statement” shows the business name; edit + save works.
 3. **Report** — company line shows statement business name (not firm org name). PDF/Excel same.
-4. **Reconcile** — for a GCB/NIB/Prudential/Absa/BOA/SCB/Ecobank project, bank tip banner appears; Phase B button says “safe → patterns”.
-5. Legacy project with empty statement business name — report still shows org name.
+4. **Reconcile** — bank tip banner (where detected); Phase B says “safe → patterns”; **Match by counting** panel lists/export work; counts never auto-clear.
+5. **Date order** — reconcile tables and cleanup preview show **newest date first**.
+6. Legacy project with empty statement business name — report still shows org name.
 
 ## If Docker API is unhealthy
 

@@ -35,4 +35,29 @@ describe('cleanExport', () => {
     expect(meta.rowCount).toBe(1)
     expect(meta.sumDebit).toBe(10)
   })
+
+  it('orders Excel data rows newest date first', async () => {
+    const parsed = {
+      headers: ['Date', 'Description', 'Debit', 'Credit'],
+      rows: [
+        ['01/01/2026', 'Oldest', 10, null],
+        ['30/12/2026', 'Newest', 30, null],
+        ['15/06/2026', 'Mid', 20, null],
+      ],
+    }
+    const { buffer } = buildParsedExcelBuffer(parsed, {
+      kind: 'bank_statement',
+      source: 'sample.xlsx',
+      parseMethod: 'test',
+    })
+    const XLSX = await import('xlsx')
+    const wb = XLSX.read(buffer, { type: 'buffer' })
+    const sheet = wb.Sheets[wb.SheetNames[0]!]!
+    const aoa = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1 })
+    const headerIdx = aoa.findIndex((r) => Array.isArray(r) && r[0] === 'Date')
+    expect(headerIdx).toBeGreaterThanOrEqual(0)
+    expect(aoa[headerIdx + 1]![1]).toBe('Newest')
+    expect(aoa[headerIdx + 2]![1]).toBe('Mid')
+    expect(aoa[headerIdx + 3]![1]).toBe('Oldest')
+  })
 })

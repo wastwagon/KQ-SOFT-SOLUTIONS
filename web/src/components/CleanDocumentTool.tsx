@@ -34,14 +34,14 @@ const COPY: Record<
     title: 'Clean bank statement',
     eyebrow: 'Tools',
     blurb:
-      'Upload a bank statement PDF or Excel file to extract transactions with the BRS parsers. Download a cleaned Excel or PDF for other uses — no reconciliation project required.',
+      'Upload a bank statement PDF or Excel file to extract transactions with the BRS parsers. Rows are ordered newest date first. Download a cleaned Excel or PDF for other uses — no reconciliation project required.',
     acceptHint: 'PDF, Excel (.xlsx / .xls / .xlsm), CSV, or image',
   },
   'cash-book': {
     title: 'Clean cash book',
     eyebrow: 'Tools',
     blurb:
-      'Upload a cash book Excel, CSV, or PDF to normalise receipts and payments into a clean transaction table. Download Excel or PDF — no reconciliation project required.',
+      'Upload a cash book Excel, CSV, or PDF to normalise receipts and payments into a clean transaction table. Rows are ordered newest date first. Download Excel or PDF — no reconciliation project required.',
     acceptHint: 'Excel (.xlsx / .xls / .xlsm), CSV, PDF, or image',
   },
 }

@@ -18,6 +18,9 @@ import {
 import { isGhanaRegionalPatternMatchReason } from '../src/services/ghanaRegionalMatchers.js'
 import { datesWithinWindow } from '../src/services/matching.js'
 import { pickBankRuleCashBookMatch } from '../src/services/bankRules.js'
+import { buildCountMatchDiagnostic } from '../src/services/countMatchDiagnostic.js'
+import { sortParsedRowsNewestFirst } from '../src/lib/transactionDateOrder.js'
+import type { Tx } from '../src/services/matching.js'
 
 const prisma = new PrismaClient()
 
@@ -91,6 +94,42 @@ async function main() {
   check(
     'regional pattern reasons are bulk-safe',
     regionalReasons.every((r) => isGhanaRegionalPatternMatchReason(r))
+  )
+
+  const sortedRows = sortParsedRowsNewestFirst(
+    ['Date', 'Description'],
+    [
+      ['01/01/2026', 'Oldest'],
+      ['30/12/2026', 'Newest'],
+      ['15/06/2026', 'Mid'],
+    ]
+  )
+  check(
+    'transaction lists sort newest-first',
+    sortedRows.map((r) => r[1]).join(',') === 'Newest,Mid,Oldest'
+  )
+
+  const tx = (id: string, amount: number): Tx => ({
+    id,
+    date: null,
+    name: null,
+    details: null,
+    amount,
+  })
+  const countDiag = buildCountMatchDiagnostic({
+    receipts: [tx('r1', 100), tx('r2', 100)],
+    payments: [],
+    receiptBank: [tx('c1', 100)],
+    paymentBank: [],
+    scope: 'all',
+  })
+  check(
+    'count-match open imbalance classified',
+    countDiag.brsDetails.openReceiptsVsCreditsCbSurplus.some((r) => r.amountKey === '100.00')
+  )
+  check(
+    'count-match does not invent cancel when counts differ',
+    !countDiag.cancelSchedule.receiptsEqualsCredits.some((r) => r.amountKey === '100.00')
   )
 
   // ── DB connectivity + project identity persistence ───────────────────────

@@ -22,6 +22,7 @@ import {
   summarizeParsed,
   type CleanExportKind,
 } from '../services/cleanExport.js'
+import { withParsedRowsNewestFirst } from '../lib/transactionDateOrder.js'
 import { logAudit } from '../services/audit.js'
 
 const router = Router()
@@ -79,7 +80,8 @@ async function handleClean(
     const ft = detectFileType(filepath)
     const sheetIndex =
       ft === 'excel' ? pickBestExcelSheetIndex(filepath, docType) : 0
-    const parsed = await parseDocumentFile(filepath, docType, sheetIndex)
+    const parsedRaw = await parseDocumentFile(filepath, docType, sheetIndex)
+    const parsed = withParsedRowsNewestFirst(parsedRaw)
     const sums = summarizeParsed(parsed)
     const metaBase = {
       kind,
@@ -97,6 +99,7 @@ async function handleClean(
         rowCount: sums.rowCount,
         sumDebit: sums.sumDebit,
         sumCredit: sums.sumCredit,
+        rowOrder: 'newest_date_first',
         sampleRows: parsed.rows.slice(0, 12),
       })
     }

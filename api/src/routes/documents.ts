@@ -438,7 +438,8 @@ router.get('/:id/transactions', async (req: AuthRequest, res) => {
   }
   const transactions = await prisma.transaction.findMany({
     where: { documentId: id },
-    orderBy: { rowIndex: 'asc' },
+    // Newest transaction date first (stakeholder list preference).
+    orderBy: [{ date: 'desc' }, { rowIndex: 'desc' }],
   })
   res.json(transactions)
 })

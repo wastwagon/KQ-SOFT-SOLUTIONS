@@ -5,6 +5,7 @@
 import PDFDocument from 'pdfkit'
 import * as XLSX from 'xlsx'
 import { parseImportedAmount } from './amountParser.js'
+import { withParsedRowsNewestFirst } from '../lib/transactionDateOrder.js'
 import type { ParseResult } from './parser.js'
 
 export type CleanExportKind = 'bank_statement' | 'cash_book'
@@ -52,7 +53,8 @@ export function buildParsedExcelBuffer(
   meta: Omit<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'> &
     Partial<Pick<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'>>
 ): { buffer: Buffer; meta: CleanExportMeta } {
-  const sums = summarizeParsed(parsed)
+  const ordered = withParsedRowsNewestFirst(parsed)
+  const sums = summarizeParsed(ordered)
   const fullMeta: CleanExportMeta = {
     kind: meta.kind,
     source: meta.source,
@@ -70,12 +72,13 @@ export function buildParsedExcelBuffer(
     ['Source', meta.source || ''],
     ['Parse method', meta.parseMethod || ''],
     ['Exported', new Date().toISOString()],
+    ['Row order', 'Newest transaction date first'],
     ['Row count', fullMeta.rowCount],
     ['Sum debits / payments', fullMeta.sumDebit || ''],
     ['Sum credits / receipts', fullMeta.sumCredit || ''],
     [],
-    parsed.headers,
-    ...parsed.rows,
+    ordered.headers,
+    ...ordered.rows,
   ]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(metaRows), 'Transactions')
@@ -100,6 +103,7 @@ export function buildParsedPdfBuffer(
   parsed: Pick<ParseResult, 'headers' | 'rows'>,
   meta: CleanExportMeta
 ): Promise<Buffer> {
+  const ordered = withParsedRowsNewestFirst(parsed)
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 36, layout: 'landscape' })
     const chunks: Buffer[] = []
@@ -108,7 +112,7 @@ export function buildParsedPdfBuffer(
     doc.on('error', reject)
 
     const pageW = doc.page.width - 72
-    const headers = parsed.headers
+    const headers = ordered.headers
     const colCount = headers.length
     const weights = headers.map((h) => {
       const l = String(h).toLowerCase()
@@ -141,7 +145,8 @@ export function buildParsedPdfBuffer(
       meta.source ? `Source: ${meta.source}` : '',
       meta.parseMethod ? `Parser: ${meta.parseMethod}` : '',
       `Exported: ${new Date().toISOString().slice(0, 10)}`,
-      `Rows: ${parsed.rows.length}`,
+      `Rows: ${ordered.rows.length}`,
+      'Order: newest date first',
       `Total debits: GHS ${formatCell(meta.sumDebit)}`,
       `Total credits: GHS ${formatCell(meta.sumCredit)}`,
     ].filter(Boolean)
@@ -170,7 +175,7 @@ export function buildParsedPdfBuffer(
 
     drawHeader()
 
-    for (const row of parsed.rows) {
+    for (const row of ordered.rows) {
       if (doc.y > doc.page.height - 48) {
         doc.addPage({ size: 'A4', layout: 'landscape', margin: 36 })
         drawHeader()

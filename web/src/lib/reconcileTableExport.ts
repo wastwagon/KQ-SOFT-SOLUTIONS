@@ -25,10 +25,16 @@ export type ReconcileExportInput = {
   matchedBankIds: Set<string>
 }
 
+/** Newest transaction date first; undated rows sink to the bottom. */
 const sortByDate = (a: Tx, b: Tx) => {
-  const da = a.date ? new Date(a.date).getTime() : 0
-  const db = b.date ? new Date(b.date).getTime() : 0
-  return da - db
+  const da = a.date ? new Date(a.date).getTime() : NaN
+  const db = b.date ? new Date(b.date).getTime() : NaN
+  const aOk = Number.isFinite(da)
+  const bOk = Number.isFinite(db)
+  if (aOk && bOk) return db - da
+  if (aOk) return -1
+  if (bOk) return 1
+  return 0
 }
 
 function safeFilenamePart(s: string): string {
