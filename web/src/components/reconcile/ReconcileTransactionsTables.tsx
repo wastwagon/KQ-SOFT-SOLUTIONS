@@ -1,6 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { formatAmountNumber, formatDateCompact } from '../../lib/format'
 import { amountColumnHeader, getCurrencySymbol } from '../../lib/currency'
+import {
+  getStoredDateOrder,
+  setStoredDateOrder,
+  sortTxsByDate,
+  type DateOrder,
+} from '../../lib/transactionDateOrder'
+import DateOrderToggle from '../DateOrderToggle'
 import ReconcileTableExportButtons from './ReconcileTableExportButtons'
 import type { ReconcileView, SuggestedMatch, Tx } from './types'
 
@@ -34,18 +41,6 @@ interface ReconcileTransactionsTablesProps {
   onToggleBank: (id: string) => void
 }
 
-/** Newest transaction date first; undated rows sink to the bottom. */
-const sortByDate = (a: Tx, b: Tx) => {
-  const da = a.date ? new Date(a.date).getTime() : NaN
-  const db = b.date ? new Date(b.date).getTime() : NaN
-  const aOk = Number.isFinite(da)
-  const bOk = Number.isFinite(db)
-  if (aOk && bOk) return db - da
-  if (aOk) return -1
-  if (bOk) return 1
-  return 0
-}
-
 function fmtAmt(n: number) {
   return formatAmountNumber(Number.isFinite(n) ? n : 0)
 }
@@ -74,6 +69,13 @@ export default function ReconcileTransactionsTables({
   onToggleCb,
   onToggleBank,
 }: ReconcileTransactionsTablesProps) {
+  const [dateOrder, setDateOrder] = useState<DateOrder>(() => getStoredDateOrder())
+
+  function changeDateOrder(next: DateOrder) {
+    setDateOrder(next)
+    setStoredDateOrder(next)
+  }
+
   // Build suggestion lookup tables once per render — used for the 🔗 marker
   // and the row tooltip.
   const cbReceiptToBank = useMemo(() => buildCbToBank(receiptSugs), [receiptSugs])
@@ -81,67 +83,72 @@ export default function ReconcileTransactionsTables({
   const bankCreditToCb = useMemo(() => buildBankToCb(receiptSugs), [receiptSugs])
   const bankDebitToCb = useMemo(() => buildBankToCb(paymentSugs), [paymentSugs])
 
-  const cbTxs = useMemo<Array<Tx & { _type?: 'receipt' | 'payment' }>>(() => {
+  // Always chronological for balances; reverse for newest-first display.
+  const cbTxsChrono = useMemo<Array<Tx & { _type?: 'receipt' | 'payment' }>>(() => {
     if (view === 'all') {
-      return [
-        ...receipts.map((t) => ({ ...t, _type: 'receipt' as const })),
-        ...payments.map((t) => ({ ...t, _type: 'payment' as const })),
-      ].sort(sortByDate)
+      return sortTxsByDate(
+        [
+          ...receipts.map((t) => ({ ...t, _type: 'receipt' as const })),
+          ...payments.map((t) => ({ ...t, _type: 'payment' as const })),
+        ],
+        'oldest_first'
+      )
     }
-    return view === 'receipts' ? receipts : payments
+    return sortTxsByDate(view === 'receipts' ? [...receipts] : [...payments], 'oldest_first')
   }, [view, receipts, payments])
 
-  const bankTxs = useMemo<Array<Tx & { _type?: 'credit' | 'debit' }>>(() => {
+  const bankTxsChrono = useMemo<Array<Tx & { _type?: 'credit' | 'debit' }>>(() => {
     if (view === 'all') {
-      return [
-        ...credits.map((t) => ({ ...t, _type: 'credit' as const })),
-        ...debits.map((t) => ({ ...t, _type: 'debit' as const })),
-      ].sort(sortByDate)
+      return sortTxsByDate(
+        [
+          ...credits.map((t) => ({ ...t, _type: 'credit' as const })),
+          ...debits.map((t) => ({ ...t, _type: 'debit' as const })),
+        ],
+        'oldest_first'
+      )
     }
-    return view === 'receipts' ? credits : debits
+    return sortTxsByDate(view === 'receipts' ? [...credits] : [...debits], 'oldest_first')
   }, [view, credits, debits])
 
   // NOTE: We use `reduce` rather than a `let runningBalance` accumulator
   // because the React Hooks lint rule (`react-hooks/immutability`) flags
   // mutable closures inside `useMemo` — they can cause inconsistent reads
   // on subsequent renders.  Each row carries its own pre-summed balance.
-  const cbRows = useMemo(
-    () =>
-      cbTxs.reduce<
-        Array<{
-          t: Tx & { _type?: 'receipt' | 'payment' }
-          isReceipt: boolean
-          runningBalance: number
-        }>
-      >((acc, t) => {
-        const isReceipt = view === 'all' ? t._type === 'receipt' : view === 'receipts'
-        const prev = acc.length > 0 ? acc[acc.length - 1].runningBalance : 0
-        const next = prev + (isReceipt ? Number(t.amount) : -Number(t.amount))
-        acc.push({ t, isReceipt, runningBalance: next })
-        return acc
-      }, []),
-    [cbTxs, view]
-  )
+  const cbRows = useMemo(() => {
+    const chrono = cbTxsChrono.reduce<
+      Array<{
+        t: Tx & { _type?: 'receipt' | 'payment' }
+        isReceipt: boolean
+        runningBalance: number
+      }>
+    >((acc, t) => {
+      const isReceipt = view === 'all' ? t._type === 'receipt' : view === 'receipts'
+      const prev = acc.length > 0 ? acc[acc.length - 1].runningBalance : 0
+      const next = prev + (isReceipt ? Number(t.amount) : -Number(t.amount))
+      acc.push({ t, isReceipt, runningBalance: next })
+      return acc
+    }, [])
+    return dateOrder === 'newest_first' ? [...chrono].reverse() : chrono
+  }, [cbTxsChrono, view, dateOrder])
 
-  const bankRows = useMemo(
-    () =>
-      bankTxs.reduce<
-        Array<{
-          t: Tx & { _type?: 'credit' | 'debit' }
-          amt: number
-          isCredit: boolean
-          runningBalance: number
-        }>
-      >((acc, t) => {
-        const amt = Number(t.amount)
-        const isCredit = view === 'all' ? t._type === 'credit' : view === 'receipts'
-        const prev = acc.length > 0 ? acc[acc.length - 1].runningBalance : 0
-        const next = prev + (isCredit ? amt : -amt)
-        acc.push({ t, amt, isCredit, runningBalance: next })
-        return acc
-      }, []),
-    [bankTxs, view]
-  )
+  const bankRows = useMemo(() => {
+    const chrono = bankTxsChrono.reduce<
+      Array<{
+        t: Tx & { _type?: 'credit' | 'debit' }
+        amt: number
+        isCredit: boolean
+        runningBalance: number
+      }>
+    >((acc, t) => {
+      const amt = Number(t.amount)
+      const isCredit = view === 'all' ? t._type === 'credit' : view === 'receipts'
+      const prev = acc.length > 0 ? acc[acc.length - 1].runningBalance : 0
+      const next = prev + (isCredit ? amt : -amt)
+      acc.push({ t, amt, isCredit, runningBalance: next })
+      return acc
+    }, [])
+    return dateOrder === 'newest_first' ? [...chrono].reverse() : chrono
+  }, [bankTxsChrono, view, dateOrder])
 
   function getUnmatchedReason(t: Tx, isCashBook: boolean): string {
     if (isCashBook) {
@@ -185,10 +192,19 @@ export default function ReconcileTransactionsTables({
     debits,
     matchedCbIds,
     matchedBankIds,
+    dateOrder,
   }
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-gray-500">
+          Default list order is oldest → newest (cash book style). Switch to newest first to scan
+          recent activity; running balances stay period-correct either way.
+        </p>
+        <DateOrderToggle value={dateOrder} onChange={changeDateOrder} />
+      </div>
+
       {/* Cash Book table */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">

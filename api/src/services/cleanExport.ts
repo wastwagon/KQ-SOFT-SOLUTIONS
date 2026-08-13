@@ -8,11 +8,15 @@
 import PDFDocument from 'pdfkit'
 import * as XLSX from 'xlsx'
 import { parseImportedAmount } from './amountParser.js'
-import { withParsedRowsNewestFirst } from '../lib/transactionDateOrder.js'
+import {
+  withParsedRowsByDateOrder,
+  type TransactionDateOrder,
+} from '../lib/transactionDateOrder.js'
 import type { ParseResult } from './parser.js'
 
 export type CleanExportKind = 'bank_statement' | 'cash_book'
 export type CleanExportMode = 'sample' | 'full'
+export type { TransactionDateOrder as CleanDateOrder }
 
 /** Rows included in sample Excel/PDF downloads (preview JSON stays smaller). */
 export const CLEAN_SAMPLE_ROW_LIMIT = 25
@@ -60,18 +64,26 @@ export function summarizeParsed(parsed: Pick<ParseResult, 'headers' | 'rows'>): 
   return { sumDebit, sumCredit, rowCount: parsed.rows.length }
 }
 
-/** Newest-first order, then optional sample truncation. Full-file sums stay on total rows. */
+function rowOrderLabel(order: TransactionDateOrder): string {
+  return order === 'newest_first'
+    ? 'Newest transaction date first'
+    : 'Oldest transaction date first'
+}
+
+/** Sort by chosen date order, then optional sample truncation. Full-file sums stay on total rows. */
 export function prepareCleanExportRows(
   parsed: Pick<ParseResult, 'headers' | 'rows'>,
-  mode: CleanExportMode
+  mode: CleanExportMode,
+  dateOrder: TransactionDateOrder = 'oldest_first'
 ): {
   ordered: Pick<ParseResult, 'headers' | 'rows'>
   exportRows: Pick<ParseResult, 'headers' | 'rows'>
   totalRowCount: number
   truncated: boolean
   fullSums: { sumDebit: number; sumCredit: number; rowCount: number }
+  dateOrder: TransactionDateOrder
 } {
-  const ordered = withParsedRowsNewestFirst(parsed)
+  const ordered = withParsedRowsByDateOrder(parsed, dateOrder)
   const fullSums = summarizeParsed(ordered)
   const truncated = mode === 'sample' && ordered.rows.length > CLEAN_SAMPLE_ROW_LIMIT
   const exportRows =
@@ -84,6 +96,7 @@ export function prepareCleanExportRows(
     totalRowCount: fullSums.rowCount,
     truncated,
     fullSums,
+    dateOrder,
   }
 }
 
@@ -97,9 +110,10 @@ export function buildParsedExcelBuffer(
   parsed: Pick<ParseResult, 'headers' | 'rows'>,
   meta: Omit<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'> &
     Partial<Pick<CleanExportMeta, 'sumDebit' | 'sumCredit' | 'rowCount'>>,
-  mode: CleanExportMode = 'full'
+  mode: CleanExportMode = 'full',
+  dateOrder: TransactionDateOrder = 'oldest_first'
 ): { buffer: Buffer; meta: CleanExportMeta } {
-  const prepared = prepareCleanExportRows(parsed, mode)
+  const prepared = prepareCleanExportRows(parsed, mode, dateOrder)
   const exportSums = summarizeParsed(prepared.exportRows)
   const fullMeta: CleanExportMeta = {
     kind: meta.kind,
@@ -127,7 +141,7 @@ export function buildParsedExcelBuffer(
     ['Source', meta.source || ''],
     ['Parse method', meta.parseMethod || ''],
     ['Exported', new Date().toISOString()],
-    ['Row order', 'Newest transaction date first'],
+    ['Row order', rowOrderLabel(dateOrder)],
     ['Export mode', mode],
     ['Rows in file', fullMeta.rowCount],
     ...(mode === 'sample' ? [['Total rows in source', prepared.totalRowCount]] : []),
@@ -174,9 +188,10 @@ function drawPdfWatermark(doc: InstanceType<typeof PDFDocument>) {
 export function buildParsedPdfBuffer(
   parsed: Pick<ParseResult, 'headers' | 'rows'>,
   meta: CleanExportMeta,
-  mode: CleanExportMode = 'full'
+  mode: CleanExportMode = 'full',
+  dateOrder: TransactionDateOrder = 'oldest_first'
 ): Promise<Buffer> {
-  const prepared = prepareCleanExportRows(parsed, mode)
+  const prepared = prepareCleanExportRows(parsed, mode, dateOrder)
   const exportMeta: CleanExportMeta = {
     ...meta,
     mode,
@@ -231,7 +246,7 @@ export function buildParsedPdfBuffer(
       exportMeta.parseMethod ? `Parser: ${exportMeta.parseMethod}` : '',
       `Exported: ${new Date().toISOString().slice(0, 10)}`,
       mode === 'full' ? `Rows: ${prepared.exportRows.rows.length}` : '',
-      'Order: newest date first',
+      `Order: ${dateOrder === 'newest_first' ? 'newest date first' : 'oldest date first'}`,
       `Total debits: GHS ${formatCell(exportMeta.sumDebit)}`,
       `Total credits: GHS ${formatCell(exportMeta.sumCredit)}`,
     ].filter(Boolean)

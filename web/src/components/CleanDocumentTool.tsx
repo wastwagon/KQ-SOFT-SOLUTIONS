@@ -11,6 +11,8 @@ import {
   type CleanPreviewResult,
   type CleanToolKind,
 } from '../lib/api'
+import { getStoredDateOrder, setStoredDateOrder, type DateOrder } from '../lib/transactionDateOrder'
+import DateOrderToggle from './DateOrderToggle'
 import { useToast } from './ui/Toast'
 import SubscriptionRenewalPanel from './SubscriptionRenewalPanel'
 
@@ -67,20 +69,23 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
   const [paywall, setPaywall] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [downloading, setDownloading] = useState<DownloadKey | null>(null)
+  const [dateOrder, setDateOrder] = useState<DateOrder>(() => getStoredDateOrder())
 
-  async function runPreview(next: File) {
+  async function runPreview(next: File, order: DateOrder = dateOrder, quiet = false) {
     setFile(next)
-    setPreview(null)
+    if (!quiet) setPreview(null)
     setError('')
     setPaywall(false)
     setParsing(true)
     try {
-      const result = await cleanTools.preview(kind, next)
+      const result = await cleanTools.preview(kind, next, order)
       setPreview(result)
-      if (result.rowCount === 0) {
-        toast.warning('Parsed, but no transaction rows were found.')
-      } else {
-        toast.success(`Parsed ${result.rowCount.toLocaleString()} transactions.`)
+      if (!quiet) {
+        if (result.rowCount === 0) {
+          toast.warning('Parsed, but no transaction rows were found.')
+        } else {
+          toast.success(`Parsed ${result.rowCount.toLocaleString()} transactions.`)
+        }
       }
     } catch (err) {
       if (isSubscriptionInactiveError(err)) {
@@ -98,6 +103,12 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
     }
   }
 
+  function changeDateOrder(next: DateOrder) {
+    setDateOrder(next)
+    setStoredDateOrder(next)
+    if (file) void runPreview(file, next, true)
+  }
+
   async function download(format: 'xlsx' | 'pdf', mode: CleanDownloadMode) {
     if (!file) return
     const key: DownloadKey = `${mode}-${format}`
@@ -105,7 +116,7 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
     setError('')
     setPaywall(false)
     try {
-      const { blob, filename } = await cleanTools.download(kind, file, format, mode)
+      const { blob, filename } = await cleanTools.download(kind, file, format, mode, dateOrder)
       triggerBlobDownload(blob, filename)
       toast.success(
         mode === 'sample'
@@ -119,7 +130,7 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
       // Refresh quota after full export
       if (mode === 'full') {
         try {
-          const refreshed = await cleanTools.preview(kind, file)
+          const refreshed = await cleanTools.preview(kind, file, dateOrder)
           setPreview(refreshed)
         } catch {
           /* keep prior preview */
@@ -159,8 +170,8 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
 
       <Card title="Upload file" className="shadow-sm">
         <p className="text-sm text-gray-600 mb-4">
-          Accepted: {copy.acceptHint}. Parsing uses the same engines as project uploads. Rows are
-          ordered newest date first.
+          Accepted: {copy.acceptHint}. Parsing uses the same engines as project uploads. Choose
+          date order below before you download — preview and Excel/PDF follow that choice.
         </p>
         <input
           ref={inputRef}
@@ -236,6 +247,22 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
               )}
             </p>
           )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Date order for download</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Applies to preview and Sample/Full Excel &amp; PDF. Default is oldest first (Jan →
+                Dec).
+              </p>
+            </div>
+            <DateOrderToggle
+              value={dateOrder}
+              onChange={changeDateOrder}
+              disabled={parsing || !!downloading}
+              ariaLabel="Clean export date order"
+            />
+          </div>
 
           <div className="space-y-3 mb-6">
             <div>

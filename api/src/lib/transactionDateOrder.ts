@@ -1,10 +1,29 @@
 /**
- * Display / import order for transaction lists: newest date first (descending).
- * Example: 30 Dec 2026 at top … 1 Jan 2026 at bottom. Null dates sink to the end.
+ * Display / import order for transaction lists.
+ * Default: oldest date first (Jan → Dec) — Ghana cash book / BRS practice.
+ * Optional: newest date first for inbox-style scanning (UI toggle).
+ * Null / unparseable dates sink to the end in both modes.
  */
 import { parseImportedDate } from '../services/dateParser.js'
 
-export function compareDatesDescending(
+export type TransactionDateOrder = 'oldest_first' | 'newest_first'
+
+export function compareDatesAscending(
+  a: Date | string | null | undefined,
+  b: Date | string | null | undefined
+): number {
+  const ta = a ? new Date(a).getTime() : NaN
+  const tb = b ? new Date(b).getTime() : NaN
+  const aOk = Number.isFinite(ta)
+  const bOk = Number.isFinite(tb)
+  if (aOk && bOk) return ta - tb
+  if (aOk) return -1
+  if (bOk) return 1
+  return 0
+}
+
+/** Newest first — used when UI requests inbox-style order. */
+export function compareDatesNewestFirst(
   a: Date | string | null | undefined,
   b: Date | string | null | undefined
 ): number {
@@ -18,8 +37,11 @@ export function compareDatesDescending(
   return 0
 }
 
-/** Prisma / API orderBy for transaction lanes and document lists. */
-export const TRANSACTION_DATE_ORDER_BY = [{ date: 'desc' as const }, { rowIndex: 'desc' as const }]
+/** Alias kept for older call sites; same as newest-first. */
+export const compareDatesDescending = compareDatesNewestFirst
+
+/** Prisma / API orderBy for persisted lanes (book order). */
+export const TRANSACTION_DATE_ORDER_BY = [{ date: 'asc' as const }, { rowIndex: 'asc' as const }]
 
 const DATE_HEADER_RE =
   /^(transaction[_\s-]?date|value[_\s-]?date|booking[_\s-]?date|post(?:ing)?[_\s-]?date|operation[_\s-]?date|doc\.?\s*date|date)$/i
@@ -28,7 +50,6 @@ export function findDateColumnIndex(headers: string[]): number {
   for (let i = 0; i < headers.length; i++) {
     if (DATE_HEADER_RE.test(String(headers[i] ?? '').trim())) return i
   }
-  // Soft fallback: first header containing "date"
   for (let i = 0; i < headers.length; i++) {
     if (/date/i.test(String(headers[i] ?? ''))) return i
   }
@@ -36,31 +57,51 @@ export function findDateColumnIndex(headers: string[]): number {
 }
 
 /**
- * Sort parsed table rows newest-first by the date column (for cleanup export/preview).
- * Stable for equal dates; rows with unparseable dates go last.
+ * Sort parsed table rows by date column.
+ * Default oldest-first; pass `newest_first` for inbox-style exports.
+ * Stable for equal dates; unparseable dates go last.
  */
-export function sortParsedRowsNewestFirst<T extends unknown[]>(
+export function sortParsedRowsByDate<T extends unknown[]>(
   headers: string[],
-  rows: T[]
+  rows: T[],
+  order: TransactionDateOrder = 'oldest_first'
 ): T[] {
   const dateCol = findDateColumnIndex(headers)
   if (dateCol < 0 || rows.length < 2) return rows
+  const cmp = order === 'newest_first' ? compareDatesNewestFirst : compareDatesAscending
 
   return rows
     .map((row, index) => ({ row, index, date: parseImportedDate(row[dateCol]) }))
     .sort((a, b) => {
-      const byDate = compareDatesDescending(a.date, b.date)
+      const byDate = cmp(a.date, b.date)
       if (byDate !== 0) return byDate
       return a.index - b.index
     })
     .map((x) => x.row)
 }
 
-export function withParsedRowsNewestFirst<T extends { headers: string[]; rows: unknown[][] }>(
-  parsed: T
+export function sortParsedRowsOldestFirst<T extends unknown[]>(headers: string[], rows: T[]): T[] {
+  return sortParsedRowsByDate(headers, rows, 'oldest_first')
+}
+
+/** Optional inbox-style sort. */
+export function sortParsedRowsNewestFirst<T extends unknown[]>(headers: string[], rows: T[]): T[] {
+  return sortParsedRowsByDate(headers, rows, 'newest_first')
+}
+
+export function withParsedRowsByDateOrder<T extends { headers: string[]; rows: unknown[][] }>(
+  parsed: T,
+  order: TransactionDateOrder = 'oldest_first'
 ): T {
   return {
     ...parsed,
-    rows: sortParsedRowsNewestFirst(parsed.headers, parsed.rows),
+    rows: sortParsedRowsByDate(parsed.headers, parsed.rows, order),
   }
+}
+
+/** Default book order for cleanup / import. */
+export function withParsedRowsOldestFirst<T extends { headers: string[]; rows: unknown[][] }>(
+  parsed: T
+): T {
+  return withParsedRowsByDateOrder(parsed, 'oldest_first')
 }

@@ -4,7 +4,7 @@
 import type { DocumentType } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { parseImportedDate } from './dateParser.js'
-import { compareDatesDescending } from '../lib/transactionDateOrder.js'
+import { compareDatesAscending } from '../lib/transactionDateOrder.js'
 import { parseImportedAmount } from './amountParser.js'
 import { extractChqNoFromDescription } from './ghanaBankParsers.js'
 import { shouldSkipBankStatementImportRow } from './bankStatementImport.js'
@@ -170,9 +170,9 @@ export async function applyDocumentMapping(
     })
   }
 
-  // Newest date first (e.g. 30 Dec … 1 Jan); null dates last. Re-index for stable lists.
+  // Oldest date first (e.g. 1 Jan … 30 Dec); null dates last. Re-index for stable lists.
   transactions.sort((a, b) => {
-    const byDate = compareDatesDescending(a.date, b.date)
+    const byDate = compareDatesAscending(a.date, b.date)
     if (byDate !== 0) return byDate
     return a.rowIndex - b.rowIndex
   })

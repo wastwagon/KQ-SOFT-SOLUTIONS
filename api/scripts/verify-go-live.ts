@@ -19,7 +19,7 @@ import { isGhanaRegionalPatternMatchReason } from '../src/services/ghanaRegional
 import { datesWithinWindow } from '../src/services/matching.js'
 import { pickBankRuleCashBookMatch } from '../src/services/bankRules.js'
 import { buildCountMatchDiagnostic } from '../src/services/countMatchDiagnostic.js'
-import { sortParsedRowsNewestFirst } from '../src/lib/transactionDateOrder.js'
+import { sortParsedRowsOldestFirst } from '../src/lib/transactionDateOrder.js'
 import {
   buildParsedExcelBuffer,
   CLEAN_SAMPLE_ROW_LIMIT,
@@ -102,17 +102,17 @@ async function main() {
     regionalReasons.every((r) => isGhanaRegionalPatternMatchReason(r))
   )
 
-  const sortedRows = sortParsedRowsNewestFirst(
+  const sortedRows = sortParsedRowsOldestFirst(
     ['Date', 'Description'],
     [
-      ['01/01/2026', 'Oldest'],
       ['30/12/2026', 'Newest'],
+      ['01/01/2026', 'Oldest'],
       ['15/06/2026', 'Mid'],
     ]
   )
   check(
-    'transaction lists sort newest-first',
-    sortedRows.map((r) => r[1]).join(',') === 'Newest,Mid,Oldest'
+    'transaction lists sort oldest-first',
+    sortedRows.map((r) => r[1]).join(',') === 'Oldest,Mid,Newest'
   )
 
   const tx = (id: string, amount: number): Tx => ({

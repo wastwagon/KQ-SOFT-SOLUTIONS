@@ -4,6 +4,7 @@
  */
 import { amountColumnHeader, getCurrencySymbol } from './currency'
 import { formatAmountNumber, formatDateCompact } from './format'
+import { sortTxsByDate, type DateOrder } from './transactionDateOrder'
 import type { ReconcileView, Tx } from '../components/reconcile/types'
 
 export type ReconcileExportSide = 'cash_book' | 'bank_statement'
@@ -23,18 +24,8 @@ export type ReconcileExportInput = {
   debits: Tx[]
   matchedCbIds: Set<string>
   matchedBankIds: Set<string>
-}
-
-/** Newest transaction date first; undated rows sink to the bottom. */
-const sortByDate = (a: Tx, b: Tx) => {
-  const da = a.date ? new Date(a.date).getTime() : NaN
-  const db = b.date ? new Date(b.date).getTime() : NaN
-  const aOk = Number.isFinite(da)
-  const bOk = Number.isFinite(db)
-  if (aOk && bOk) return db - da
-  if (aOk) return -1
-  if (bOk) return 1
-  return 0
+  /** Display/export order; balances always computed oldest→newest first. */
+  dateOrder?: DateOrder
 }
 
 function safeFilenamePart(s: string): string {
@@ -53,18 +44,21 @@ function getUnmatchedReason(t: Tx, isCashBook: boolean, view: ReconcileView): st
 }
 
 function buildCashBookRows(input: ReconcileExportInput): { headers: string[]; rows: (string | number)[][] } {
-  const { view, currency, receipts, payments, matchedCbIds } = input
+  const { view, currency, receipts, payments, matchedCbIds, dateOrder = 'oldest_first' } = input
   const amt = amountColumnHeader(currency)
   const balSym = getCurrencySymbol(currency)
 
   let txs: CbRow[]
   if (view === 'all') {
-    txs = [
-      ...receipts.map((t) => ({ ...t, _type: 'receipt' as const })),
-      ...payments.map((t) => ({ ...t, _type: 'payment' as const })),
-    ].sort(sortByDate)
+    txs = sortTxsByDate(
+      [
+        ...receipts.map((t) => ({ ...t, _type: 'receipt' as const })),
+        ...payments.map((t) => ({ ...t, _type: 'payment' as const })),
+      ],
+      'oldest_first'
+    )
   } else {
-    txs = view === 'receipts' ? [...receipts] : [...payments]
+    txs = sortTxsByDate(view === 'receipts' ? [...receipts] : [...payments], 'oldest_first')
   }
 
   let running = 0
@@ -105,6 +99,8 @@ function buildCashBookRows(input: ReconcileExportInput): { headers: string[]; ro
     }
   }
 
+  if (dateOrder === 'newest_first') dataRows.reverse()
+
   const headers =
     view === 'all'
       ? ['Type', 'Date', 'Name', 'Description', 'Chq no.', 'Ref. Doc. No.', `${amt} (receipt)`, `${amt} (payment)`, `Balance (${balSym})`, 'Status', 'Note']
@@ -114,18 +110,21 @@ function buildCashBookRows(input: ReconcileExportInput): { headers: string[]; ro
 }
 
 function buildBankRows(input: ReconcileExportInput): { headers: string[]; rows: (string | number)[][] } {
-  const { view, currency, credits, debits, matchedBankIds } = input
+  const { view, currency, credits, debits, matchedBankIds, dateOrder = 'oldest_first' } = input
   const amt = amountColumnHeader(currency)
   const balSym = getCurrencySymbol(currency)
 
   let txs: BankRow[]
   if (view === 'all') {
-    txs = [
-      ...credits.map((t) => ({ ...t, _type: 'credit' as const })),
-      ...debits.map((t) => ({ ...t, _type: 'debit' as const })),
-    ].sort(sortByDate)
+    txs = sortTxsByDate(
+      [
+        ...credits.map((t) => ({ ...t, _type: 'credit' as const })),
+        ...debits.map((t) => ({ ...t, _type: 'debit' as const })),
+      ],
+      'oldest_first'
+    )
   } else {
-    txs = view === 'receipts' ? [...credits] : [...debits]
+    txs = sortTxsByDate(view === 'receipts' ? [...credits] : [...debits], 'oldest_first')
   }
 
   let running = 0
@@ -176,6 +175,8 @@ function buildBankRows(input: ReconcileExportInput): { headers: string[]; rows: 
       ])
     }
   }
+
+  if (dateOrder === 'newest_first') dataRows.reverse()
 
   const headers =
     view === 'all'

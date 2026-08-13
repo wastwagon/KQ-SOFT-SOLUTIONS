@@ -35,7 +35,7 @@ SMOKE_EMAIL='you@example.com' SMOKE_PASSWORD='…' ./scripts/verify-go-live.sh -
 | Pattern banks | Unit: Ecobank, SCB, GCB, NIB, Prudential, Absa, BOA |
 | Parsers | Unit: GCB/NIB/Prudential/Absa/BOA/SCB statement tests |
 | Count-match diagnostic | Unit + DB smoke helpers: open/cancel classification (never auto-clears) |
-| Newest-first date order | Unit: import/cleanup/reconcile sort (30 Dec → 1 Jan) |
+| Oldest-first date order (default) | Unit: import/cleanup/reconcile sort (1 Jan → 30 Dec); optional newest-first via UI toggle |
 | Clean export A+B | Unit: sample truncate + watermark; smoke: tier quotas + `clean_exports_count`; route enforces full-export quota |
 | Phase B UI logic | Web unit: `phasedAutoMatch`, profile tips |
 | Project identity | DB smoke: create project with `statementBusinessName`, report entity resolution, cleanup |
@@ -55,7 +55,7 @@ npm run verify:go-live        # DB unification smoke only
 2. Open project header → “On statement” shows the business name; edit + save works.
 3. **Report** — company line shows statement business name (not firm org name). PDF/Excel same.
 4. **Reconcile** — bank tip banner (where detected); Phase B says “safe → patterns”; **Match by counting** panel lists/export work; counts never auto-clear.
-5. **Date order** — reconcile tables and cleanup preview show **newest date first**.
+5. **Date order** — default **oldest date first** (Jan → Dec) on reconcile, cleanup preview, and clean downloads. Reconcile and Clean tools both offer an optional **Newest first** toggle before export.
 6. **Clean tools** — Sample Excel/PDF watermarked + truncated; Full export shows remaining quota and blocks at limit.
 7. Legacy project with empty statement business name — report still shows org name.
 

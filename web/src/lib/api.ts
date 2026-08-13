@@ -1,6 +1,10 @@
 import { useAuth } from '../store/auth'
+import type { DateOrder } from './transactionDateOrder'
 
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+/** @deprecated Prefer {@link DateOrder} from `./transactionDateOrder` */
+export type CleanDateOrder = DateOrder
 
 /** Dispatched when the API returns `code: SUBSCRIPTION_INACTIVE` (see {@link SubscriptionPaywallToastBridge}). */
 export const SUBSCRIPTION_INACTIVE_EVENT = 'brs:subscription-inactive' as const
@@ -1137,6 +1141,7 @@ export type CleanPreviewResult = {
   sampleRows: unknown[][]
   sampleDownloadRowLimit?: number
   cleanExportQuota?: CleanExportQuota
+  rowOrder?: DateOrder | string
 }
 
 export type CleanDownloadMode = 'sample' | 'full'
@@ -1152,11 +1157,16 @@ function filenameFromDisposition(header: string | null, fallback: string): strin
 }
 
 export const cleanTools = {
-  preview: async (kind: CleanToolKind, file: File): Promise<CleanPreviewResult> => {
+  preview: async (
+    kind: CleanToolKind,
+    file: File,
+    dateOrder: DateOrder = 'oldest_first'
+  ): Promise<CleanPreviewResult> => {
     const form = new FormData()
     form.append('file', file)
     const token = getToken()
-    const res = await fetch(`${API_URL}/api/v1${cleanToolPath(kind)}?format=json`, {
+    const qs = new URLSearchParams({ format: 'json', dateOrder })
+    const res = await fetch(`${API_URL}/api/v1${cleanToolPath(kind)}?${qs}`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
@@ -1169,19 +1179,18 @@ export const cleanTools = {
     kind: CleanToolKind,
     file: File,
     format: 'xlsx' | 'pdf',
-    mode: CleanDownloadMode = 'sample'
+    mode: CleanDownloadMode = 'sample',
+    dateOrder: DateOrder = 'oldest_first'
   ): Promise<{ blob: Blob; filename: string }> => {
     const form = new FormData()
     form.append('file', file)
     const token = getToken()
-    const res = await fetch(
-      `${API_URL}/api/v1${cleanToolPath(kind)}?format=${format}&mode=${mode}`,
-      {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      }
-    )
+    const qs = new URLSearchParams({ format, mode, dateOrder })
+    const res = await fetch(`${API_URL}/api/v1${cleanToolPath(kind)}?${qs}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throwFromFailedResponse(res, data)

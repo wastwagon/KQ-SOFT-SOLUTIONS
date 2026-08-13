@@ -27,7 +27,10 @@ import {
   type CleanExportKind,
   type CleanExportMode,
 } from '../services/cleanExport.js'
-import { withParsedRowsNewestFirst } from '../lib/transactionDateOrder.js'
+import {
+  withParsedRowsByDateOrder,
+  type TransactionDateOrder,
+} from '../lib/transactionDateOrder.js'
 import { logAudit } from '../services/audit.js'
 import { prisma } from '../lib/prisma.js'
 import { canExportFullClean, getUsageWithLimits, incrementCleanExports } from '../services/usage.js'
@@ -74,6 +77,13 @@ function parseMode(raw: unknown, format: CleanFormat): CleanExportMode {
   return v === 'full' ? 'full' : 'sample'
 }
 
+function parseDateOrder(raw: unknown): TransactionDateOrder {
+  const v = String(raw || 'oldest_first').toLowerCase().replace(/-/g, '_')
+  if (v === 'newest_first' || v === 'newest_date_first') return 'newest_first'
+  // oldest_first | oldest_date_first | anything else → book order
+  return 'oldest_first'
+}
+
 function safeBaseName(original: string): string {
   const base = path.basename(original, path.extname(original))
   return sanitizeFilename(base).slice(0, 80) || 'cleaned'
@@ -102,6 +112,7 @@ async function handleClean(
   const originalName = req.file.originalname
   const format = parseFormat(req.query.format ?? req.body?.format)
   const mode = parseMode(req.query.mode ?? req.body?.mode, format)
+  const dateOrder = parseDateOrder(req.query.dateOrder ?? req.body?.dateOrder)
   const orgId = req.auth!.orgId
 
   try {
@@ -115,7 +126,7 @@ async function handleClean(
     const sheetIndex =
       ft === 'excel' ? pickBestExcelSheetIndex(filepath, docType) : 0
     const parsedRaw = await parseDocumentFile(filepath, docType, sheetIndex)
-    const parsed = withParsedRowsNewestFirst(parsedRaw)
+    const parsed = withParsedRowsByDateOrder(parsedRaw, dateOrder)
     const sums = summarizeParsed(parsed)
     const metaBase = {
       kind,
@@ -134,7 +145,7 @@ async function handleClean(
         rowCount: sums.rowCount,
         sumDebit: sums.sumDebit,
         sumCredit: sums.sumCredit,
-        rowOrder: 'newest_date_first',
+        rowOrder: dateOrder,
         sampleRows: parsed.rows.slice(0, 12),
         sampleDownloadRowLimit: CLEAN_SAMPLE_ROW_LIMIT,
         cleanExportQuota: quota,
@@ -158,7 +169,7 @@ async function handleClean(
     const filenameStem = `${base}-${label}${modeSuffix}-cleaned`
 
     if (format === 'pdf') {
-      const buffer = await buildParsedPdfBuffer(parsed, metaBase, mode)
+      const buffer = await buildParsedPdfBuffer(parsed, metaBase, mode, dateOrder)
       if (mode === 'full') await incrementCleanExports(orgId)
       await logAudit({
         organizationId: orgId,
@@ -168,6 +179,7 @@ async function handleClean(
           kind,
           format: 'pdf',
           mode,
+          dateOrder,
           parseMethod: parsed.parseMethod,
           rowCount: sums.rowCount,
           source: originalName,
@@ -178,10 +190,11 @@ async function handleClean(
       res.setHeader('X-Parse-Method', String(parsed.parseMethod || ''))
       res.setHeader('X-Row-Count', String(sums.rowCount))
       res.setHeader('X-Clean-Export-Mode', mode)
+      res.setHeader('X-Date-Order', dateOrder)
       return res.send(buffer)
     }
 
-    const { buffer } = buildParsedExcelBuffer(parsed, metaBase, mode)
+    const { buffer } = buildParsedExcelBuffer(parsed, metaBase, mode, dateOrder)
     if (mode === 'full') await incrementCleanExports(orgId)
     await logAudit({
       organizationId: orgId,
@@ -191,6 +204,7 @@ async function handleClean(
         kind,
         format: 'xlsx',
         mode,
+        dateOrder,
         parseMethod: parsed.parseMethod,
         rowCount: sums.rowCount,
         source: originalName,
@@ -204,6 +218,7 @@ async function handleClean(
     res.setHeader('X-Parse-Method', String(parsed.parseMethod || ''))
     res.setHeader('X-Row-Count', String(sums.rowCount))
     res.setHeader('X-Clean-Export-Mode', mode)
+    res.setHeader('X-Date-Order', dateOrder)
     return res.send(buffer)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to parse file'

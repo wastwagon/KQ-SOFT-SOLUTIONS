@@ -33,6 +33,7 @@ import {
 } from '../services/documentTypeInference.js'
 import { changeDocumentType } from '../services/changeDocumentType.js'
 import { uploadParseRouteLimiter } from '../middleware/heavyRouteLimiter.js'
+import { TRANSACTION_DATE_ORDER_BY } from '../lib/transactionDateOrder.js'
 import { isOcrGateError } from '../lib/ocrGate.js'
 import { markDocumentParseReady } from '../lib/documentParseJob.js'
 import { incOpsMetric, observeParseQuality } from '../lib/opsMetrics.js'
@@ -438,8 +439,8 @@ router.get('/:id/transactions', async (req: AuthRequest, res) => {
   }
   const transactions = await prisma.transaction.findMany({
     where: { documentId: id },
-    // Newest transaction date first (stakeholder list preference).
-    orderBy: [{ date: 'desc' }, { rowIndex: 'desc' }],
+    // Oldest transaction date first (cash book / BRS book order).
+    orderBy: TRANSACTION_DATE_ORDER_BY,
   })
   res.json(transactions)
 })

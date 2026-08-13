@@ -40,12 +40,12 @@ describe('cleanExport', () => {
     expect(meta.sumDebit).toBe(10)
   })
 
-  it('orders Excel data rows newest date first', async () => {
+  it('orders Excel data rows oldest date first', async () => {
     const parsed = {
       headers: ['Date', 'Description', 'Debit', 'Credit'],
       rows: [
-        ['01/01/2026', 'Oldest', 10, null],
         ['30/12/2026', 'Newest', 30, null],
+        ['01/01/2026', 'Oldest', 10, null],
         ['15/06/2026', 'Mid', 20, null],
       ],
     }
@@ -60,9 +60,9 @@ describe('cleanExport', () => {
     const aoa = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1 })
     const headerIdx = aoa.findIndex((r) => Array.isArray(r) && r[0] === 'Date')
     expect(headerIdx).toBeGreaterThanOrEqual(0)
-    expect(aoa[headerIdx + 1]![1]).toBe('Newest')
+    expect(aoa[headerIdx + 1]![1]).toBe('Oldest')
     expect(aoa[headerIdx + 2]![1]).toBe('Mid')
-    expect(aoa[headerIdx + 3]![1]).toBe('Oldest')
+    expect(aoa[headerIdx + 3]![1]).toBe('Newest')
   })
 
   it('truncates sample exports and watermarks Excel', async () => {
