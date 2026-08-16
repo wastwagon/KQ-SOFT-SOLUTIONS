@@ -92,6 +92,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const [exportMenu, setExportMenu] = useState('')
   /** Stable “print moment” for footer line while this view is open. */
   const [reportPrintAt] = useState(() => new Date())
+  /** null = follow hasSignAnomaly; set after the user toggles the panel. */
+  const [signDiagnosticsOpen, setSignDiagnosticsOpen] = useState<boolean | null>(null)
 
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -1156,7 +1158,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         {!!sourceFilterLogic && canViewDiagnostics && (
           <details
             className="mb-6 rounded-xl border border-slate-200 bg-slate-50/60 p-4 print:border-slate-300 print:bg-white"
-            defaultOpen={hasSignAnomaly}
+            open={signDiagnosticsOpen ?? hasSignAnomaly}
+            onToggle={(e) => setSignDiagnosticsOpen((e.currentTarget as HTMLDetailsElement).open)}
           >
             <summary className="cursor-pointer text-sm font-medium text-slate-800 print:hidden">
               Sign diagnostics
