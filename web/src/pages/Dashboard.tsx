@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -8,8 +8,6 @@ import {
   Users,
   X,
   ChevronRight,
-  CheckCircle2,
-  CircleDot,
   Palette,
   CreditCard,
   Key,
@@ -26,11 +24,13 @@ import MetricCard from '../components/ui/MetricCard'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
-import Button from '../components/ui/Button'
+import Button, { buttonClassName } from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
+import Alert from '../components/ui/Alert'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
+import ProjectStatusPill from '../components/project/ProjectStatusPill'
 
 const BRS_SUMMARY_STATUSES = new Set([
   'reconciling',
@@ -38,6 +38,31 @@ const BRS_SUMMARY_STATUSES = new Set([
   'approved',
   'completed',
 ])
+
+function DashLinkCard({
+  to,
+  icon,
+  title,
+  description,
+}: {
+  to: string
+  icon: ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <Link
+      to={to}
+      className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+    >
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+        {icon}
+      </span>
+      <span className="font-semibold tracking-tight text-gray-900">{title}</span>
+      <span className="text-xs text-gray-500 leading-snug">{description}</span>
+    </Link>
+  )
+}
 
 const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
 
@@ -120,34 +145,44 @@ export default function Dashboard() {
   const bankAccountsUsed = usage?.usage?.bankAccountsUsed ?? 0
   const bankAccountsLimit = usage?.usage?.bankAccountsLimit ?? usage?.limits?.bankAccounts ?? 5
   const bankAccountsUnlimited = usage?.usage?.bankAccountsUnlimited ?? false
-  const inProgressCount = projectsList.filter((p: { status: string }) => p.status !== 'completed').length
+  const pendingReviewCount = projectsList.filter(
+    (p: { status: string }) => p.status === 'submitted_for_review'
+  ).length
+  const inProgressCount = projectsList.filter(
+    (p: { status: string }) => p.status !== 'completed' && p.status !== 'approved'
+  ).length
   const completedCount = projectsList.filter((p: { status: string }) => p.status === 'completed').length
 
-  const isPlatformAdmin = useAuth((s) => s.isPlatformAdmin)
-  const subStatus = usage?.subscription?.status
-  const subscriptionBypass = isPlatformAdmin || !!usage?.subscriptionBypass
-  const showSubscriptionPaywallBanner =
-    !subscriptionBypass &&
-    !!usage?.paywallEnabled &&
-    (subStatus === 'free' || subStatus === 'expired')
+  const nextActions = useMemo(() => {
+    type ProjectRow = { id: string; name: string; slug?: string; status: string }
+    const href = (p: ProjectRow, hash?: string) =>
+      `/projects/${p.slug ?? p.id}${hash ? `#${hash}` : ''}`
+    const items: { key: string; title: string; hint: string; to: string }[] = []
+    for (const p of projectsList as ProjectRow[]) {
+      if (p.status === 'submitted_for_review') {
+        items.push({ key: p.id, title: `Review ${p.name}`, hint: 'Submitted for review', to: href(p, 'review') })
+      } else if (p.status === 'reconciling') {
+        items.push({ key: p.id, title: `Continue matching ${p.name}`, hint: 'Reconciling', to: href(p, 'reconcile') })
+      } else if (p.status === 'mapping') {
+        items.push({ key: p.id, title: `Finish mapping ${p.name}`, hint: 'Map columns', to: href(p, 'map') })
+      } else if (p.status === 'draft') {
+        items.push({ key: p.id, title: `Upload statements for ${p.name}`, hint: 'Draft', to: href(p, 'upload') })
+      }
+    }
+    return items.slice(0, 5)
+  }, [projectsList])
 
   if (projectsLoadFailed) {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Overview" title="Dashboard" />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          <p className="font-medium text-red-900">Could not load projects</p>
-          <p className="mt-1">
-            {projectsError instanceof Error ? projectsError.message : 'Something went wrong.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load projects"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
+        >
+          {projectsError instanceof Error ? projectsError.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -163,16 +198,6 @@ export default function Dashboard() {
             ? 'Viewer'
             : role ?? 'Member'
 
-  const projectsBarPct = projectsUnlimited
-    ? 0
-    : Math.min(100, (projectsUsed / Math.max(1, projectsLimit)) * 100)
-  const transactionsBarPct = transactionsUnlimited
-    ? 0
-    : Math.min(100, (transactionsUsed / Math.max(1, transactionsLimit)) * 100)
-  const bankAccountsBarPct = bankAccountsUnlimited
-    ? 0
-    : Math.min(100, (bankAccountsUsed / Math.max(1, bankAccountsLimit)) * 100)
-
   return (
     <div className="space-y-10">
       <PageHeader
@@ -185,109 +210,90 @@ export default function Dashboard() {
           </>
         }
         actions={
-          <>
-            <Button variant="outline" type="button" onClick={() => navigate('/manual')}>
-              Help / User Manual
-            </Button>
-            <Badge
-              tone={
-                isAdmin
-                  ? 'brand'
-                  : role === 'reviewer'
-                    ? 'success'
-                    : role === 'preparer'
-                      ? 'brand'
-                      : 'neutral'
-              }
-            >
-              {roleLabel}
-            </Badge>
-          </>
+          <Badge
+            tone={
+              isAdmin
+                ? 'brand'
+                : role === 'reviewer'
+                  ? 'success'
+                  : role === 'preparer'
+                    ? 'brand'
+                    : 'neutral'
+            }
+          >
+            {roleLabel}
+          </Badge>
         }
       />
 
-      {showSubscriptionPaywallBanner && (
-        <div
-          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-          role="status"
-        >
-          <strong className="font-semibold">Subscription inactive.</strong> Core reconciliation features are
-          unavailable until an admin renews. Ask an organisation admin to open{' '}
-          <Link to="/settings/billing" className="font-semibold underline hover:no-underline">
-            Settings → Billing
-          </Link>{' '}
-          and complete payment, or contact support if you are on a custom plan.
-        </div>
-      )}
-
       {isAdmin && membersQueryFailed && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 max-w-2xl">
-          <span>Team member count could not be loaded. </span>
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })}
-            className="font-semibold text-amber-900 underline hover:no-underline"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="warning"
+          title="Team member count could not be loaded"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })}
+          className="max-w-2xl"
+        />
       )}
 
       {!isLoading && projectsList.length === 0 && !getStartedDismissed && !projectsPaywallBlocked && (
-        <Card className="border-l-4 border-l-primary-500 bg-primary-50/30 overflow-hidden">
-          <div className="flex items-start justify-between gap-6 p-5 sm:p-7">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold tracking-tight text-primary-900 mb-2">Welcome to your new workspace</h2>
-              <p className="text-sm text-primary-800 mb-8 max-w-2xl leading-relaxed">
-                Follow these best practices to set up your firm for professional bank reconciliation and collaboration.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">1</div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary-900">Branding</h3>
-                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Set your logo and colors for professional reports.</p>
-                    <Link to="/settings/branding" className="text-sm font-semibold text-primary-600 hover:underline">Configure branding →</Link>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">2</div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary-900">Team</h3>
-                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Invite employees for a clear audit trail.</p>
-                    <Link to="/settings/members" className="text-sm font-semibold text-primary-600 hover:underline">Invite members →</Link>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">3</div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary-900">Clients</h3>
-                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Add the entities you are reconciling for.</p>
-                    <Link to="/clients" className="text-sm font-semibold text-primary-600 hover:underline">Add clients →</Link>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 border border-primary-100 shadow-sm">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">4</div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary-900">Projects</h3>
-                    <p className="text-sm text-gray-600 mt-1.5 mb-3 leading-snug">Start your first reconciliation project.</p>
-                    {canCreateProject(role) && (
-                      <Link to="/projects/new" className="text-sm font-semibold text-primary-600 hover:underline">New Project →</Link>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button
+        <Card
+          title="Get started"
+          sublabel="Set up your firm, then start the first reconciliation."
+          actions={
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={dismissGetStarted}
-              className="flex-shrink-0 rounded p-1 text-primary-600 hover:bg-primary-100 transition-colors"
+              className="flex-shrink-0 p-1"
               aria-label="Dismiss"
             >
               <X className="w-5 h-5" />
-            </button>
-          </div>
+            </Button>
+          }
+        >
+          <ol className="space-y-2 text-sm">
+            <li className="flex gap-3">
+              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">1.</span>
+              <span>
+                <Link to="/settings/branding" className="font-medium text-primary-700 hover:underline">
+                  Branding
+                </Link>
+                <span className="text-gray-600"> — logo and colours for reports</span>
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">2.</span>
+              <span>
+                <Link to="/settings/members" className="font-medium text-primary-700 hover:underline">
+                  Team
+                </Link>
+                <span className="text-gray-600"> — invite members for an audit trail</span>
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">3.</span>
+              <span>
+                <Link to="/clients" className="font-medium text-primary-700 hover:underline">
+                  Clients
+                </Link>
+                <span className="text-gray-600"> — entities you reconcile for</span>
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">4.</span>
+              <span>
+                {canCreateProject(role) ? (
+                  <Link to="/projects/new" className="font-medium text-primary-700 hover:underline">
+                    New project
+                  </Link>
+                ) : (
+                  <span className="font-medium text-gray-900">Projects</span>
+                )}
+                <span className="text-gray-600"> — start your first reconciliation</span>
+              </span>
+            </li>
+          </ol>
         </Card>
       )}
 
@@ -310,77 +316,48 @@ export default function Dashboard() {
               label="Total Projects"
               value={usage?.usage?.projectsUsed ?? projectsList.length}
               sublabel={
-                <div className="mt-4">
-                  <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
-                    <span>Usage</span>
-                    <span>{projectsUsed} / {projectsUnlimited ? '∞' : projectsLimit}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${projectsBarPct > 90 ? 'bg-red-500' : 'bg-primary-500'}`}
-                      style={{ width: `${projectsBarPct}%` }}
-                    />
-                  </div>
-                </div>
+                projectsUnlimited
+                  ? 'Unlimited on plan'
+                  : `${projectsUsed} of ${projectsLimit} on plan`
               }
               icon={<FolderKanban />}
-              accent="primary"
+              accent="none"
             />
             <MetricCard
-              label="Pending Review"
-              value={inProgressCount}
-              sublabel="Active reconciliation cycles"
+              label="Pending review"
+              value={pendingReviewCount}
+              sublabel={`${inProgressCount} in progress`}
               icon={<FileCheck />}
-              accent="amber"
+              accent="none"
             />
             <MetricCard
               label="Monthly Transactions"
               value={usage?.usage?.transactionsUsed ?? 0}
               sublabel={
-                <div className="mt-4">
-                  <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
-                    <span>Usage</span>
-                    <span>{transactionsUsed} / {transactionsUnlimited ? '∞' : transactionsLimit}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${transactionsBarPct > 90 ? 'bg-red-500' : 'bg-green-500'}`}
-                      style={{ width: `${transactionsBarPct}%` }}
-                    />
-                  </div>
-                </div>
+                transactionsUnlimited
+                  ? 'Unlimited on plan'
+                  : `${transactionsUsed} of ${transactionsLimit} this month`
               }
               icon={<LayoutDashboard />}
-              accent="green"
+              accent="none"
             />
             <MetricCard
               label="Bank Accounts"
               value={bankAccountsUsed}
               sublabel={
-                <div className="mt-4">
-                  <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-1">
-                    <span>Org seats</span>
-                    <span>
-                      {bankAccountsUsed} / {bankAccountsUnlimited ? '∞' : bankAccountsLimit}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${bankAccountsBarPct > 90 ? 'bg-red-500' : 'bg-primary-500'}`}
-                      style={{ width: `${bankAccountsBarPct}%` }}
-                    />
-                  </div>
-                </div>
+                bankAccountsUnlimited
+                  ? 'Unlimited org seats'
+                  : `${bankAccountsUsed} of ${bankAccountsLimit} org seats`
               }
               icon={<Building2 />}
-              accent="brand"
+              accent="none"
             />
             <MetricCard
               label="Team Members"
               value={memberCount}
               sublabel="Active firm accounts"
               icon={<Users />}
-              accent="brand"
+              accent="none"
             />
           </>
         )}
@@ -389,85 +366,59 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <Card title="What’s new" className="shadow-sm">
+          <Card title="What’s new">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 {latestRelease ? (
                   <>
                     <p className="text-sm text-gray-600">
-                      <span className="font-medium text-gray-900">Version {latestRelease.version}</span> - {latestRelease.changes}
+                      <span className="font-medium text-gray-900">Version {latestRelease.version}</span> — {latestRelease.changes}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">Released: {latestRelease.date}</p>
+                    <p className="text-xs text-gray-500 mt-1">Released {latestRelease.date}</p>
                   </>
                 ) : (
-                  <>
-                    <p className="text-sm text-gray-600">No changelog entry found yet.</p>
-                    <p className="text-xs text-gray-500 mt-1">Add a row under the manual changelog table to display updates here.</p>
-                  </>
+                  <p className="text-sm text-gray-600">No recent release notes on the dashboard.</p>
                 )}
               </div>
-              <Link
-                to="/manual"
-                className="inline-flex items-center justify-center font-medium px-3 py-1.5 text-sm rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                View full changelog
+              <Link to="/manual" className={buttonClassName('outline', 'sm')}>
+                Open user manual
               </Link>
             </div>
           </Card>
         </div>
 
         <div className="space-y-6">
-          <Card title="Plan features" className="shadow-sm">
-            <p className="text-xs text-gray-500 mb-5 uppercase font-bold tracking-widest">Included in your plan</p>
-            {showSubscriptionPaywallBanner && (
-              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                Subscription inactive — renew to unlock plan features below.
+          <Card title="Next actions">
+            {nextActions.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Nothing waiting on you. Start a project or open{' '}
+                <Link to="/settings/billing" className="font-medium text-primary-600 hover:underline">
+                  Billing
+                </Link>{' '}
+                to review plan features.
               </p>
-            )}
-            <ul className="space-y-3">
-              {[
-                { id: 'ai_suggestions', label: 'Auto-match suggestions & AI ranking' },
-                { id: 'bulk_match', label: 'Bulk Match (50 items)' },
-                { id: 'audit_trail', label: 'Full Audit Trail' },
-                { id: 'one_to_many', label: 'One-to-Many Matching' },
-                { id: 'discrepancy_report', label: 'Discrepancy Reporting' },
-                { id: 'full_branding', label: 'Custom Branding' },
-                { id: 'multi_client', label: 'Multi-Client Support' },
-              ].map((f) => {
-                const included = !!features[f.id]
-                const lockedBySubscription = included && showSubscriptionPaywallBanner
-                return (
-                  <li
-                    key={f.id}
-                    className={`flex items-center gap-3 text-sm ${
-                      included && !lockedBySubscription ? 'text-gray-900' : 'text-gray-400'
-                    }`}
-                  >
-                    {included && !lockedBySubscription ? (
-                      <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" aria-hidden />
-                    ) : lockedBySubscription ? (
-                      <CircleDot className="w-4 h-4 shrink-0 text-amber-500" aria-hidden />
-                    ) : (
-                      <CircleDot className="w-4 h-4 shrink-0 text-gray-300" aria-hidden />
-                    )}
-                    <span className="flex-1 min-w-0">{f.label}</span>
-                    {lockedBySubscription ? (
-                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-                        Renew
+            ) : (
+              <ul className="space-y-1">
+                {nextActions.map((item) => (
+                  <li key={item.key}>
+                    <Link
+                      to={item.to}
+                      className="flex items-start justify-between gap-3 rounded-xl px-3 py-2.5 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-gray-900 truncate">{item.title}</span>
+                        <span className="block text-xs text-gray-500 mt-0.5">{item.hint}</span>
                       </span>
-                    ) : !included ? (
-                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                        Upgrade
-                      </span>
-                    ) : null}
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0 mt-1" aria-hidden />
+                    </Link>
                   </li>
-                )
-              })}
-            </ul>
+                ))}
+              </ul>
+            )}
             {isAdmin && (
               <Link
                 to="/settings/billing"
-                className="mt-6 block w-full text-center px-4 py-2.5 text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl transition-colors border border-primary-200 shadow-sm"
+                className={`${buttonClassName('outline', 'sm')} mt-4 w-full`}
               >
                 Manage subscription
               </Link>
@@ -476,172 +427,116 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Card title="Clean & export tools" className="shadow-sm">
+      <Card title="Clean & export tools">
         <p className="text-sm text-gray-600 mb-5">
           Validate bank or cash-book formats with the same parsers. Preview is free; sample downloads
           are truncated and watermarked; full Excel/PDF uses your plan’s monthly clean-export quota.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Link
+          <DashLinkCard
             to="/tools/clean-bank-statement"
-            className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-              <Landmark className="w-4 h-4" aria-hidden />
-            </span>
-            <span className="font-semibold tracking-tight text-gray-900">Clean bank statement</span>
-            <span className="text-xs text-gray-500 leading-snug">
-              Upload PDF/Excel → preview, sample, or full cleaned file
-            </span>
-          </Link>
-          <Link
+            icon={<Landmark className="w-4 h-4" aria-hidden />}
+            title="Clean bank statement"
+            description="Upload PDF/Excel → preview, sample, or full cleaned file"
+          />
+          <DashLinkCard
             to="/tools/clean-cash-book"
-            className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-              <FileSpreadsheet className="w-4 h-4" aria-hidden />
-            </span>
-            <span className="font-semibold tracking-tight text-gray-900">Clean cash book</span>
-            <span className="text-xs text-gray-500 leading-snug">
-              Upload cash book → preview, sample, or full cleaned file
-            </span>
-          </Link>
+            icon={<FileSpreadsheet className="w-4 h-4" aria-hidden />}
+            title="Clean cash book"
+            description="Upload cash book → preview, sample, or full cleaned file"
+          />
         </div>
       </Card>
 
       {isAdmin && (
-        <Card title="Manage app & settings" className="shadow-sm">
+        <Card title="Manage app & settings">
           <p className="text-sm text-gray-600 mb-5">
             Control branding, billing, bank rules, API keys, and view activity.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <Link
+            <DashLinkCard
               to="/settings/branding"
-              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                <Palette className="w-4 h-4" aria-hidden />
-              </span>
-              <span className="font-semibold tracking-tight text-gray-900">Branding</span>
-              <span className="text-xs text-gray-500 leading-snug">Logo, colours, report title</span>
-            </Link>
-            <Link
+              icon={<Palette className="w-4 h-4" aria-hidden />}
+              title="Branding"
+              description="Logo, colours, report title"
+            />
+            <DashLinkCard
               to="/settings/billing"
-              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                <CreditCard className="w-4 h-4" aria-hidden />
-              </span>
-              <span className="font-semibold tracking-tight text-gray-900">Billing</span>
-              <span className="text-xs text-gray-500 leading-snug">Plan & payment</span>
-            </Link>
-            <Link
+              icon={<CreditCard className="w-4 h-4" aria-hidden />}
+              title="Billing"
+              description="Plan & payment"
+            />
+            <DashLinkCard
               to="/settings/members"
-              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                <Users className="w-4 h-4" aria-hidden />
-              </span>
-              <span className="font-semibold tracking-tight text-gray-900">Members</span>
-              <span className="text-xs text-gray-500 leading-snug">Add & manage team</span>
-            </Link>
+              icon={<Users className="w-4 h-4" aria-hidden />}
+              title="Members"
+              description="Add & manage team"
+            />
             {features.api_access && (
-              <Link
+              <DashLinkCard
                 to="/settings/api-keys"
-                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                  <Key className="w-4 h-4" aria-hidden />
-                </span>
-                <span className="font-semibold tracking-tight text-gray-900">API keys</span>
-                <span className="text-xs text-gray-500 leading-snug">Create & manage API access</span>
-              </Link>
+                icon={<Key className="w-4 h-4" aria-hidden />}
+                title="API keys"
+                description="Create & manage API access"
+              />
             )}
             {features.bank_rules && (
-              <Link
+              <DashLinkCard
                 to="/settings/bank-rules"
-                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                  <Landmark className="w-4 h-4" aria-hidden />
-                </span>
-                <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
-                <span className="text-xs text-gray-500 leading-snug">Auto-suggest & flag rules</span>
-              </Link>
+                icon={<Landmark className="w-4 h-4" aria-hidden />}
+                title="Bank rules"
+                description="Auto-suggest & flag rules"
+              />
             )}
             {features.audit_trail && (
-              <Link
+              <DashLinkCard
                 to="/audit"
-                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                  <Shield className="w-4 h-4" aria-hidden />
-                </span>
-                <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
-                <span className="text-xs text-gray-500 leading-snug">All actions & exports</span>
-              </Link>
+                icon={<Shield className="w-4 h-4" aria-hidden />}
+                title="Audit log"
+                description="All actions & exports"
+              />
             )}
           </div>
         </Card>
       )}
 
       {!isAdmin && (
-        <Card title="Settings" className="shadow-sm">
+        <Card title="Settings">
           <p className="text-sm text-gray-600 mb-5">Branding, billing, and team — manage your organisation.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Link
+            <DashLinkCard
               to="/settings/branding"
-              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                <Palette className="w-4 h-4" aria-hidden />
-              </span>
-              <span className="font-semibold tracking-tight text-gray-900">Branding</span>
-              <span className="text-xs text-gray-500 leading-snug">Logo, colours, report title</span>
-            </Link>
-            <Link
+              icon={<Palette className="w-4 h-4" aria-hidden />}
+              title="Branding"
+              description="Logo, colours, report title"
+            />
+            <DashLinkCard
               to="/settings/billing"
-              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                <CreditCard className="w-4 h-4" aria-hidden />
-              </span>
-              <span className="font-semibold tracking-tight text-gray-900">Billing</span>
-              <span className="text-xs text-gray-500 leading-snug">Plan & payment</span>
-            </Link>
-            <Link
+              icon={<CreditCard className="w-4 h-4" aria-hidden />}
+              title="Billing"
+              description="Plan & payment"
+            />
+            <DashLinkCard
               to="/settings/members"
-              className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                <Users className="w-4 h-4" aria-hidden />
-              </span>
-              <span className="font-semibold tracking-tight text-gray-900">Members</span>
-              <span className="text-xs text-gray-500 leading-snug">Add & manage team</span>
-            </Link>
+              icon={<Users className="w-4 h-4" aria-hidden />}
+              title="Members"
+              description="Add & manage team"
+            />
             {features.bank_rules && (
-              <Link
+              <DashLinkCard
                 to="/settings/bank-rules"
-                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                  <Landmark className="w-4 h-4" aria-hidden />
-                </span>
-                <span className="font-semibold tracking-tight text-gray-900">Bank rules</span>
-                <span className="text-xs text-gray-500 leading-snug">Auto-suggest & flag rules</span>
-              </Link>
+                icon={<Landmark className="w-4 h-4" aria-hidden />}
+                title="Bank rules"
+                description="Auto-suggest & flag rules"
+              />
             )}
             {features.audit_trail && (
-              <Link
+              <DashLinkCard
                 to="/audit"
-                className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
-                  <Shield className="w-4 h-4" aria-hidden />
-                </span>
-                <span className="font-semibold tracking-tight text-gray-900">Audit log</span>
-                <span className="text-xs text-gray-500 leading-snug">Actions & exports</span>
-              </Link>
+                icon={<Shield className="w-4 h-4" aria-hidden />}
+                title="Audit log"
+                description="Actions & exports"
+              />
             )}
           </div>
         </Card>
@@ -651,7 +546,6 @@ export default function Dashboard() {
         id="recent-projects"
         title="Recent projects"
         sublabel={projectsList.length > 0 ? `${inProgressCount} in progress · ${completedCount} completed` : undefined}
-        className="shadow-sm"
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" type="button" onClick={() => navigate('/projects')}>
@@ -659,7 +553,7 @@ export default function Dashboard() {
             </Button>
             {canCreateProject(role) && (
               <Button size="sm" type="button" onClick={() => navigate('/projects/new')}>
-                + New project
+                New project
               </Button>
             )}
           </div>
@@ -679,7 +573,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : projectsPaywallBlocked ? (
-            <div className="px-6 py-8">
+            <div className="px-6 py-6">
               <SubscriptionRenewalPanel />
             </div>
           ) : projectsList.length === 0 ? (
@@ -689,11 +583,8 @@ export default function Dashboard() {
               description="Create your first project to start reconciling cash book and bank statement. Upload files, match transactions, then export your BRS report."
               action={
             canCreateProject(role) ? (
-            <Link
-              to="/projects/new"
-              className="inline-flex items-center justify-center font-medium px-4 py-2 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500"
-            >
-              + New Project
+            <Link to="/projects/new" className={buttonClassName('primary', 'md')}>
+              New project
             </Link>
             ) : undefined
               }
@@ -710,15 +601,7 @@ export default function Dashboard() {
                     {p.name}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        p.status === 'completed'
-                          ? 'bg-green-50 text-green-800 ring-1 ring-inset ring-green-600/15'
-                          : 'bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-600/15'
-                      }`}
-                    >
-                      {p.status === 'completed' ? 'Completed' : 'In progress'}
-                    </span>
+                    <ProjectStatusPill status={p.status} size="sm" />
                     {BRS_SUMMARY_STATUSES.has(p.status) && (
                       <BrsVarianceBadge projectId={p.id} compact />
                     )}

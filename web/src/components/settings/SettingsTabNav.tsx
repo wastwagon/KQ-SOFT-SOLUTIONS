@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import Tabs from '../ui/Tabs'
 
 export default function SettingsTabNav({
   showApiKeys,
@@ -7,37 +8,24 @@ export default function SettingsTabNav({
   showApiKeys: boolean
   showBankRules: boolean
 }) {
-  const tabClass = ({ isActive }: { isActive: boolean }) =>
-    `px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
-      isActive
-        ? 'text-primary-700 border-primary-600 bg-white'
-        : 'text-gray-600 border-transparent hover:text-primary-600 hover:border-gray-300'
-    }`
+  const navigate = useNavigate()
+  const { tab } = useParams<{ tab: string }>()
+  const items = [
+    { id: 'branding', label: 'Branding' },
+    { id: 'billing', label: 'Billing' },
+    { id: 'members', label: 'Members' },
+    { id: 'connections', label: 'Connections' },
+    ...(showApiKeys ? [{ id: 'api-keys', label: 'API keys' }] : []),
+    ...(showBankRules ? [{ id: 'bank-rules', label: 'Bank rules' }] : []),
+  ]
+  const value = items.some((item) => item.id === tab) ? tab! : 'branding'
 
   return (
-    <nav className="flex gap-0.5 mb-6 border-b border-gray-200" aria-label="Settings sections">
-      <NavLink to="/settings/branding" end className={tabClass}>
-        Branding
-      </NavLink>
-      <NavLink to="/settings/billing" className={tabClass}>
-        Billing
-      </NavLink>
-      <NavLink to="/settings/members" className={tabClass}>
-        Members
-      </NavLink>
-      <NavLink to="/settings/connections" className={tabClass}>
-        Connections
-      </NavLink>
-      {showApiKeys && (
-        <NavLink to="/settings/api-keys" className={tabClass}>
-          API keys
-        </NavLink>
-      )}
-      {showBankRules && (
-        <NavLink to="/settings/bank-rules" className={tabClass}>
-          Bank rules
-        </NavLink>
-      )}
-    </nav>
+    <Tabs
+      aria-label="Settings sections"
+      value={value}
+      onChange={(id) => navigate(`/settings/${id}`)}
+      items={items}
+    />
   )
 }

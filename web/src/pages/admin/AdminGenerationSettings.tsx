@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings } from 'lucide-react'
 import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
+import Alert from '../../components/ui/Alert'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
+import { useConfirm } from '../../components/ui/ConfirmDialog'
 import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../../lib/brandColors'
 import PageHeader from '../../components/layout/PageHeader'
 
@@ -24,6 +28,7 @@ type GenerationSettings = {
 
 export default function AdminGenerationSettings() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [form, setForm] = useState<GenerationSettings>({
     defaultReportTitle: 'Bank Reconciliation Statement',
     defaultFooter: 'Prepared by your organisation',
@@ -39,7 +44,7 @@ export default function AdminGenerationSettings() {
     ghanaBrsWorkbookNetting: false,
   })
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'settings', 'generation'],
     queryFn: () => api('/admin/settings') as Promise<GenerationSettings>,
   })
@@ -87,6 +92,23 @@ export default function AdminGenerationSettings() {
     updateMutation.mutate(form)
   }
 
+  if (isError) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Generation settings"
+          subtitle={
+            <p className="text-gray-500">Platform-wide defaults for reports, API limits, and new organisations.</p>
+          }
+        />
+        <Alert tone="error" title="Could not load generation settings" onRetry={() => void refetch()}>
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -97,7 +119,7 @@ export default function AdminGenerationSettings() {
             <p className="text-gray-500">Platform-wide defaults for reports, API limits, and new organisations.</p>
           }
         />
-        <p className="text-gray-500 text-sm">Loading settings…</p>
+        <PageBodySkeleton label="Loading settings" />
       </div>
     )
   }
@@ -114,90 +136,80 @@ export default function AdminGenerationSettings() {
         }
       />
 
-      <Card className="shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <Settings className="w-6 h-6 text-primary-500" />
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Report generation defaults</h2>
-            <p className="text-sm text-gray-500">
-              Default branding applied to new organisations and used as template when copying settings.
-            </p>
-          </div>
-        </div>
+      <Card
+        title="Report generation defaults"
+        sublabel="Default branding applied to new organisations and used as template when copying settings."
+      >
 
         <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Default report title</label>
-            <input
-              type="text"
-              value={form.defaultReportTitle}
-              onChange={(e) => setForm((f) => ({ ...f, defaultReportTitle: e.target.value }))}
-              placeholder="Bank Reconciliation Statement"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900 placeholder-gray-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Default footer</label>
-            <input
-              type="text"
-              value={form.defaultFooter}
-              onChange={(e) => setForm((f) => ({ ...f, defaultFooter: e.target.value }))}
-              placeholder="Prepared by your organisation"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900 placeholder-gray-500"
-            />
-          </div>
+          <Input
+            type="text"
+            label="Default report title"
+            value={form.defaultReportTitle}
+            onChange={(e) => setForm((f) => ({ ...f, defaultReportTitle: e.target.value }))}
+            placeholder="Bank Reconciliation Statement"
+          />
+          <Input
+            type="text"
+            label="Default footer"
+            value={form.defaultFooter}
+            onChange={(e) => setForm((f) => ({ ...f, defaultFooter: e.target.value }))}
+            placeholder="Prepared by your organisation"
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Default primary colour</label>
+              <p className="mb-1.5 text-sm font-medium text-gray-700">Default primary colour</p>
               <div className="flex gap-2">
                 <input
                   type="color"
                   value={form.defaultPrimaryColor}
                   onChange={(e) => setForm((f) => ({ ...f, defaultPrimaryColor: e.target.value }))}
-                  className="h-10 w-14 rounded cursor-pointer border border-border"
+                  aria-label="Default primary colour"
+                  className="h-11 w-14 shrink-0 rounded-xl cursor-pointer border border-gray-200"
                 />
-                <input
-                  type="text"
-                  value={form.defaultPrimaryColor}
-                  onChange={(e) => setForm((f) => ({ ...f, defaultPrimaryColor: e.target.value }))}
-                  className="flex-1 px-3 py-2 border border-border rounded-lg text-sm font-mono bg-white text-gray-900"
-                />
+                <div className="flex-1 min-w-0">
+                  <Input
+                    type="text"
+                    value={form.defaultPrimaryColor}
+                    onChange={(e) => setForm((f) => ({ ...f, defaultPrimaryColor: e.target.value }))}
+                    className="font-mono"
+                  />
+                </div>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Default secondary colour</label>
+              <p className="mb-1.5 text-sm font-medium text-gray-700">Default secondary colour</p>
               <div className="flex gap-2">
                 <input
                   type="color"
                   value={form.defaultSecondaryColor}
                   onChange={(e) => setForm((f) => ({ ...f, defaultSecondaryColor: e.target.value }))}
-                  className="h-10 w-14 rounded cursor-pointer border border-border"
+                  aria-label="Default secondary colour"
+                  className="h-11 w-14 shrink-0 rounded-xl cursor-pointer border border-gray-200"
                 />
-                <input
-                  type="text"
-                  value={form.defaultSecondaryColor}
-                  onChange={(e) => setForm((f) => ({ ...f, defaultSecondaryColor: e.target.value }))}
-                  className="flex-1 px-3 py-2 border border-border rounded-lg text-sm font-mono bg-white text-gray-900"
-                />
+                <div className="flex-1 min-w-0">
+                  <Input
+                    type="text"
+                    value={form.defaultSecondaryColor}
+                    onChange={(e) => setForm((f) => ({ ...f, defaultSecondaryColor: e.target.value }))}
+                    className="font-mono"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Default currency</label>
-            <select
-              value={form.defaultCurrency}
-              onChange={(e) => setForm((f) => ({ ...f, defaultCurrency: e.target.value as 'GHS' | 'USD' | 'EUR' }))}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
-            >
-              <option value="GHS">GHS (Cedi)</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">Used when creating new projects.</p>
-          </div>
+          <Select
+            label="Default currency"
+            value={form.defaultCurrency}
+            onChange={(e) => setForm((f) => ({ ...f, defaultCurrency: e.target.value as 'GHS' | 'USD' | 'EUR' }))}
+            hint="Used when creating new projects."
+          >
+            <option value="GHS">GHS (Cedi)</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </Select>
 
           <div className="border-t border-border pt-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Manual exchange rates (override)</h3>
@@ -205,42 +217,36 @@ export default function AdminGenerationSettings() {
               Used when API is unavailable or when &quot;Use manual rates only&quot; is enabled. 1 GHS = X USD/EUR.
             </p>
             <div className="grid grid-cols-2 gap-4 mb-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">GHS → USD (1 GHS = ? USD)</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min={0}
-                  placeholder="e.g. 0.0925"
-                  value={form.manualRates.GHS_USD ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setForm((f) => ({
-                      ...f,
-                      manualRates: { ...f.manualRates, GHS_USD: v === '' ? null : Number(v) },
-                    }))
-                  }}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">GHS → EUR (1 GHS = ? EUR)</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min={0}
-                  placeholder="e.g. 0.0796"
-                  value={form.manualRates.GHS_EUR ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setForm((f) => ({
-                      ...f,
-                      manualRates: { ...f.manualRates, GHS_EUR: v === '' ? null : Number(v) },
-                    }))
-                  }}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
-                />
-              </div>
+              <Input
+                type="number"
+                step="0.0001"
+                min={0}
+                label="GHS → USD (1 GHS = ? USD)"
+                placeholder="e.g. 0.0925"
+                value={form.manualRates.GHS_USD ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setForm((f) => ({
+                    ...f,
+                    manualRates: { ...f.manualRates, GHS_USD: v === '' ? null : Number(v) },
+                  }))
+                }}
+              />
+              <Input
+                type="number"
+                step="0.0001"
+                min={0}
+                label="GHS → EUR (1 GHS = ? EUR)"
+                placeholder="e.g. 0.0796"
+                value={form.manualRates.GHS_EUR ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setForm((f) => ({
+                    ...f,
+                    manualRates: { ...f.manualRates, GHS_EUR: v === '' ? null : Number(v) },
+                  }))
+                }}
+              />
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -278,78 +284,69 @@ export default function AdminGenerationSettings() {
               Amount tolerance and date window for AI match suggestions.
             </p>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Amount tolerance (±)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  max={100}
-                  value={form.amountTolerance}
-                  onChange={(e) => setForm((f) => ({ ...f, amountTolerance: Number(e.target.value) || 0.01 }))}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
-                />
-                <p className="text-xs text-gray-500 mt-0.5">e.g. 0.01 = ±GH₵0.01</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Date window (days)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={90}
-                  value={form.dateWindowDays}
-                  onChange={(e) => setForm((f) => ({ ...f, dateWindowDays: Number(e.target.value) || 3 }))}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
-                />
-                <p className="text-xs text-gray-500 mt-0.5">e.g. 3 = ±3 days</p>
-              </div>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                max={100}
+                label="Amount tolerance (±)"
+                value={form.amountTolerance}
+                onChange={(e) => setForm((f) => ({ ...f, amountTolerance: Number(e.target.value) || 0.01 }))}
+                hint="e.g. 0.01 = ±GH₵0.01"
+              />
+              <Input
+                type="number"
+                min={0}
+                max={90}
+                label="Date window (days)"
+                value={form.dateWindowDays}
+                onChange={(e) => setForm((f) => ({ ...f, dateWindowDays: Number(e.target.value) || 3 }))}
+                hint="e.g. 3 = ±3 days"
+              />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data retention (years)</label>
-            <input
+            <Input
               type="number"
               min={1}
               max={30}
+              label="Data retention (years)"
               value={form.dataRetentionYears}
               onChange={(e) => setForm((f) => ({ ...f, dataRetentionYears: Number(e.target.value) || 7 }))}
-              className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
+              className="max-w-xs"
+              hint="Completed/approved projects older than this (by reconciliation date, else last update) are eligible for permanent delete via prune. Preview with dry-run first."
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Completed/approved projects older than this (by reconciliation date, else last update) are
-              eligible for permanent delete via prune. Preview with dry-run first.
-            </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="secondary"
-                disabled={retentionPreview.isPending || retentionExecute.isPending}
+                disabled={retentionExecute.isPending}
+                isLoading={retentionPreview.isPending}
                 onClick={() => retentionPreview.mutate()}
               >
-                {retentionPreview.isPending ? 'Previewing…' : 'Preview prune (dry-run)'}
+                Preview prune (dry-run)
               </Button>
               <Button
                 type="button"
                 variant="danger"
                 disabled={
-                  retentionExecute.isPending ||
                   !retentionPreview.data ||
                   retentionPreview.data.eligibleProjects === 0
                 }
-                onClick={() => {
+                isLoading={retentionExecute.isPending}
+                onClick={async () => {
                   const n = retentionPreview.data?.eligibleProjects ?? 0
-                  if (
-                    !window.confirm(
-                      `Permanently delete ${n} completed/approved project(s) and their upload files? This cannot be undone.`
-                    )
-                  ) {
-                    return
-                  }
-                  retentionExecute.mutate()
+                  const ok = await confirm({
+                    title: `Permanently delete ${n} project(s)?`,
+                    description: 'Completed/approved projects and their upload files will be removed. This cannot be undone.',
+                    confirmLabel: 'Delete projects',
+                    tone: 'danger',
+                  })
+                  if (ok) retentionExecute.mutate()
                 }}
               >
-                {retentionExecute.isPending ? 'Deleting…' : 'Run prune (confirm)'}
+                Run prune
               </Button>
             </div>
             {retentionPreview.data && (
@@ -360,40 +357,38 @@ export default function AdminGenerationSettings() {
               </p>
             )}
             {retentionExecute.data && !retentionExecute.data.dryRun && (
-              <p className="mt-1 text-xs text-green-700">
+              <Alert tone="success" title="Prune complete" className="mt-2">
                 Deleted {retentionExecute.data.deletedProjects} project(s), removed{' '}
                 {retentionExecute.data.filesRemoved} file(s).
-              </p>
+              </Alert>
             )}
             {(retentionPreview.error || retentionExecute.error) && (
-              <p className="mt-1 text-xs text-red-600">
+              <Alert tone="error" title="Prune failed" className="mt-2">
                 {((retentionPreview.error || retentionExecute.error) as Error).message}
-              </p>
+              </Alert>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">API rate limit (per minute)</label>
-            <input
-              type="number"
-              min={10}
-              max={1000}
-              value={form.apiRateLimitPerMin}
-              onChange={(e) => setForm((f) => ({ ...f, apiRateLimitPerMin: Number(e.target.value) || 100 }))}
-              className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Maximum requests per API key per minute. Applied after API restart.
-            </p>
-          </div>
+          <Input
+            type="number"
+            min={10}
+            max={1000}
+            label="API rate limit (per minute)"
+            value={form.apiRateLimitPerMin}
+            onChange={(e) => setForm((f) => ({ ...f, apiRateLimitPerMin: Number(e.target.value) || 100 }))}
+            className="max-w-xs"
+            hint="Maximum requests per API key per minute. Applied after API restart."
+          />
 
           {updateMutation.error && (
-            <p className="text-sm text-red-600">{(updateMutation.error as Error).message}</p>
+            <Alert tone="error" title="Could not save settings">
+              {(updateMutation.error as Error).message}
+            </Alert>
           )}
 
           <div className="flex items-center gap-3 pt-2">
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Saving...' : 'Save settings'}
+            <Button type="submit" isLoading={updateMutation.isPending}>
+              Save settings
             </Button>
             {updateMutation.isSuccess && (
               <span className="text-sm text-green-600">Saved.</span>

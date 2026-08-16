@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Check, FileText, ShieldCheck, Zap } from 'lucide-react'
 import BrandLogo from './BrandLogo'
+import Card from './ui/Card'
 
 const BENEFITS = [
   { icon: Zap, text: 'Smart matching tuned for common bank statement layouts' },
@@ -78,20 +79,20 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
       </aside>
 
       {/* Mobile / tablet: compact brand strip */}
-      <div className="lg:hidden border-b border-gray-100 bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-5 text-center shadow-sm">
+      <div className="lg:hidden border-b border-border bg-white px-4 py-4 text-center">
         <Link
           to="/"
-          className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-2 shadow-md"
+          className="inline-flex items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <BrandLogo className="h-9 w-auto" />
         </Link>
-        <p className="mt-3 text-xs font-medium uppercase tracking-wider text-primary-100/90">
+        <p className="mt-2 text-xs font-medium uppercase tracking-wider text-gray-500">
           Bank reconciliation · cloud workspace
         </p>
       </div>
 
       {/* Form column */}
-      <main className="flex flex-1 flex-col justify-center px-4 py-10 sm:px-8 sm:py-14 lg:px-12 xl:px-20 bg-surface lg:border-l lg:border-gray-200/80">
+      <main className="flex flex-1 flex-col justify-center px-4 py-10 sm:px-8 sm:py-14 lg:px-12 xl:px-20 bg-surface lg:border-l lg:border-border">
         <div className="mx-auto w-full max-w-md">
           <Link
             to="/"
@@ -101,7 +102,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
             Back to home
           </Link>
 
-          <div className="rounded-xl border border-gray-200 bg-white px-5 py-6 sm:px-8 sm:py-8">
+          <Card>
             {eyebrow && (
               <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">{eyebrow}</p>
             )}
@@ -113,10 +114,10 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
             {subtitle && (
               <p className="mt-2 text-sm text-gray-600 leading-relaxed">{subtitle}</p>
             )}
-            <div className="mt-5 border-t border-gray-100 pt-5 sm:mt-6 sm:pt-6">{children}</div>
-          </div>
+            <div className="mt-5 border-t border-border-muted pt-5 sm:mt-6 sm:pt-6">{children}</div>
+          </Card>
 
-          <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 rounded-xl border border-gray-200/80 bg-white/60 px-4 py-3 text-xs text-gray-500 shadow-sm lg:justify-start">
+          <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 rounded-xl border border-border bg-white px-4 py-3 text-xs text-gray-500 shadow-card lg:justify-start">
             <li className="flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 shrink-0 text-green-600" aria-hidden />
               <span>HTTPS & encrypted sessions</span>
@@ -131,9 +132,3 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
     </div>
   )
 }
-
-export const authAlertErrorClass =
-  'rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm'
-
-export const authAlertWarnClass =
-  'rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm'

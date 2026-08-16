@@ -1,4 +1,5 @@
 import type { DateOrder } from '../lib/transactionDateOrder'
+import Button from './ui/Button'
 
 type Props = {
   value: DateOrder
@@ -21,36 +22,42 @@ export default function DateOrderToggle({
 }: Props) {
   return (
     <div
-      className={`inline-flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-sm ${className}`}
+      className={`inline-flex rounded-lg border border-border bg-white p-0.5 shadow-card ${className}`}
       role="group"
       aria-label={ariaLabel}
     >
-      <button
+      <Button
         type="button"
+        size="xs"
+        variant="ghost"
         disabled={disabled}
+        aria-pressed={value === 'oldest_first'}
         onClick={() => onChange('oldest_first')}
-        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+        className={
           value === 'oldest_first'
-            ? 'bg-gray-900 text-white shadow-sm'
+            ? '!bg-gray-900 !text-white hover:!bg-gray-800'
             : 'text-gray-600 hover:text-gray-900'
-        }`}
+        }
         title="January at top, December below"
       >
         Oldest first
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        size="xs"
+        variant="ghost"
         disabled={disabled}
+        aria-pressed={value === 'newest_first'}
         onClick={() => onChange('newest_first')}
-        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+        className={
           value === 'newest_first'
-            ? 'bg-gray-900 text-white shadow-sm'
+            ? '!bg-gray-900 !text-white hover:!bg-gray-800'
             : 'text-gray-600 hover:text-gray-900'
-        }`}
+        }
         title="December at top, January below"
       >
         Newest first
-      </button>
+      </Button>
     </div>
   )
 }

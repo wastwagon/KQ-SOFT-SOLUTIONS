@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Database, RefreshCw, Server, Wrench } from 'lucide-react'
+import { RefreshCw, Server } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Alert from '../../components/ui/Alert'
+import Badge from '../../components/ui/Badge'
+import Select from '../../components/ui/Select'
 import { platformAdminDatabase, type PlatformDatabaseOpResult } from '../../lib/api'
 import PageHeader from '../../components/layout/PageHeader'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
@@ -14,11 +17,9 @@ function OutputBlock({ title, result }: { title: string; result: PlatformDatabas
     <div>
       <p className="text-sm font-medium text-gray-800 mb-1">
         {title}
-        <span
-          className={`ml-2 text-xs font-semibold ${result.success ? 'text-green-600' : 'text-red-600'}`}
-        >
+        <Badge tone={result.success ? 'success' : 'danger'} size="sm" className="ml-2">
           {result.success ? 'OK' : 'Failed'}
-        </span>
+        </Badge>
         <span className="ml-2 text-xs text-gray-500">exit {result.exitCode}</span>
       </p>
       <pre className="text-xs font-mono bg-slate-900 text-slate-100 rounded-lg p-4 max-h-80 overflow-auto whitespace-pre-wrap break-words">
@@ -131,19 +132,16 @@ export default function AdminDatabase() {
         }
       />
 
-      <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-sm text-amber-900 shadow-sm max-w-4xl">
-        <strong>Recommended order after a failed deploy:</strong>{' '}
-        1) Refresh migration status → 2) Migrate resolve (if P3009) → 3) Run migrate deploy → 4) Seed plans (safe) →
-        5) Full seed only on staging/demo.
-      </div>
+      <Alert tone="warning" title="Recommended order after a failed deploy" className="max-w-4xl">
+        1) Refresh migration status → 2) Migrate resolve (if P3009) → 3) Run migrate deploy → 4) Seed
+        plans (safe) → 5) Full seed only on staging/demo.
+      </Alert>
 
       <div className="space-y-6 max-w-4xl">
-        <Card className="rounded-xl border-l-4 border-l-primary-500">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
-            <Database className="w-5 h-5" aria-hidden />
-            Migration status
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">Read-only. Does not change the database.</p>
+        <Card
+          title="Migration status"
+          sublabel="Read-only. Does not change the database."
+        >
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <Button
               type="button"
@@ -155,20 +153,30 @@ export default function AdminDatabase() {
               disabled={statusQuery.isFetching}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${statusQuery.isFetching ? 'animate-spin' : ''}`} />
-              {statusQuery.isFetching ? 'Refreshing...' : 'Refresh status'}
+              Refresh status
             </Button>
           </div>
           {statusQuery.isError && (
-            <p className="text-sm text-red-600 mb-2">{(statusQuery.error as Error).message}</p>
+            <Alert
+              tone="error"
+              title="Could not load migration status"
+              className="mb-2"
+              onRetry={() => void statusQuery.refetch()}
+            >
+              {(statusQuery.error as Error).message}
+            </Alert>
           )}
           <OutputBlock title="prisma migrate status" result={statusQuery.data ?? null} />
         </Card>
 
-        <Card className="rounded-xl border-l-4 border-l-slate-500">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Apply migrations</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Runs <code className="text-xs">prisma migrate deploy</code> (same as API startup script).
-          </p>
+        <Card
+          title="Apply migrations"
+          sublabel={
+            <>
+              Runs <code className="text-xs">prisma migrate deploy</code> (same as API startup script).
+            </>
+          }
+        >
           <Button
             type="button"
             onClick={() => {
@@ -176,21 +184,22 @@ export default function AdminDatabase() {
               migrateMutation.mutate()
             }}
             disabled={migrateMutation.isPending}
+            isLoading={migrateMutation.isPending}
             className="mb-4"
           >
-            {migrateMutation.isPending ? 'Running...' : 'Run migrate deploy'}
+            Run migrate deploy
           </Button>
           <OutputBlock title="Output" result={migrateResult} />
         </Card>
 
-        <Card className="rounded-xl border-l-4 border-l-orange-500">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
-            <Wrench className="w-5 h-5" aria-hidden />
-            Recovery tools
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Same helpers as <code className="text-xs">start-api.sh</code> when automatic recovery did not run.
-          </p>
+        <Card
+          title="Recovery tools"
+          sublabel={
+            <>
+              Same helpers as <code className="text-xs">start-api.sh</code> when automatic recovery did not run.
+            </>
+          }
+        >
 
           <div className="space-y-4 mb-4">
             <div>
@@ -200,23 +209,33 @@ export default function AdminDatabase() {
                 variant="outline"
                 onClick={() => { void handleDbPush() }}
                 disabled={dbPushMutation.isPending}
+                isLoading={dbPushMutation.isPending}
               >
-                {dbPushMutation.isPending ? 'Running...' : 'Run db push'}
+                Run db push
               </Button>
             </div>
 
             <div>
               <p className="text-sm font-medium text-gray-800 mb-2">Migrate resolve (P3009)</p>
+              {migrationsQuery.isError && (
+                <Alert
+                  tone="error"
+                  title="Could not load migrations"
+                  className="mb-2"
+                  onRetry={() => void migrationsQuery.refetch()}
+                >
+                  {migrationsQuery.error instanceof Error
+                    ? migrationsQuery.error.message
+                    : 'Something went wrong.'}
+                </Alert>
+              )}
               <div className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label htmlFor="resolve-migration" className="block text-xs text-gray-600 mb-1">
-                    Migration
-                  </label>
-                  <select
+                <div className="min-w-[280px] flex-1">
+                  <Select
                     id="resolve-migration"
+                    label="Migration"
                     value={resolveMigration}
                     onChange={(e) => setResolveMigration(e.target.value)}
-                    className="min-w-[280px] px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
                   >
                     <option value="">Select migration…</option>
                     {migrationOptions.map((m) => (
@@ -224,29 +243,27 @@ export default function AdminDatabase() {
                         {m}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
-                <div>
-                  <label htmlFor="resolve-action" className="block text-xs text-gray-600 mb-1">
-                    Action
-                  </label>
-                  <select
+                <div className="w-56 shrink-0">
+                  <Select
                     id="resolve-action"
+                    label="Action"
                     value={resolveAction}
                     onChange={(e) => setResolveAction(e.target.value as 'rolled-back' | 'applied')}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
                   >
                     <option value="rolled-back">rolled-back (retry deploy)</option>
                     <option value="applied">applied (mark done)</option>
-                  </select>
+                  </Select>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => { void handleMigrateResolve() }}
-                  disabled={!resolveMigration || migrateResolveMutation.isPending}
+                  disabled={!resolveMigration}
+                  isLoading={migrateResolveMutation.isPending}
                 >
-                  {migrateResolveMutation.isPending ? 'Running...' : 'Run migrate resolve'}
+                  Run migrate resolve
                 </Button>
               </div>
             </div>
@@ -255,12 +272,15 @@ export default function AdminDatabase() {
           <OutputBlock title="Recovery output" result={recoveryResult} />
         </Card>
 
-        <Card className="rounded-xl border-l-4 border-l-emerald-600">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Seed subscription plans</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Runs <code className="text-xs">prisma/seed-plans.ts</code> (idempotent — same as startup). Safe to re-run;
-            does not create demo users.
-          </p>
+        <Card
+          title="Seed subscription plans"
+          sublabel={
+            <>
+              Runs <code className="text-xs">prisma/seed-plans.ts</code> (idempotent — same as startup). Safe to
+              re-run; does not create demo users.
+            </>
+          }
+        >
           <Button
             type="button"
             onClick={() => {
@@ -268,29 +288,38 @@ export default function AdminDatabase() {
               seedPlansMutation.mutate()
             }}
             disabled={seedPlansMutation.isPending}
+            isLoading={seedPlansMutation.isPending}
             className="mb-4"
           >
-            {seedPlansMutation.isPending ? 'Running...' : 'Run seed plans'}
+            Run seed plans
           </Button>
           <OutputBlock title="Output" result={seedPlansResult} />
         </Card>
 
-        <Card className="rounded-xl border-l-4 border-l-amber-600">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Full seed (plans + demo users)</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Runs <code className="text-xs">prisma db seed</code> — creates test orgs/users (
-            <code className="text-xs">premium@test.com</code> / Test123!). Staging and demo only.
-          </p>
+        <Card
+          title="Full seed (plans + demo users)"
+          sublabel={
+            <>
+              Runs <code className="text-xs">prisma db seed</code>.
+            </>
+          }
+        >
+          <Alert tone="warning" title="Staging and demo only" className="mb-4">
+            Creates test orgs/users (<code className="text-xs">premium@test.com</code> / Test123!). Do not run
+            on production with real tenants.
+          </Alert>
           <Button
             type="button"
+            variant="danger"
             onClick={() => {
               setSeedResult(null)
               seedMutation.mutate()
             }}
             disabled={seedMutation.isPending}
-            className="mb-4 bg-amber-600 hover:bg-amber-700 text-white"
+            isLoading={seedMutation.isPending}
+            className="mb-4"
           >
-            {seedMutation.isPending ? 'Running...' : 'Run full seed'}
+            Run full seed
           </Button>
           <OutputBlock title="Output" result={seedResult} />
         </Card>

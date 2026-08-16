@@ -37,7 +37,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             aria-invalid={error ? true : undefined}
             aria-describedby={describedBy}
-            className={`${fieldBase} ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-200'} ${leading ? 'pl-10' : ''} ${trailing ? 'pr-10' : ''} ${className}`}
+            className={`${fieldBase} ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-border'} ${leading ? 'pl-10' : ''} ${trailing ? 'pr-10' : ''} ${className}`}
             {...props}
           />
           {trailing && (

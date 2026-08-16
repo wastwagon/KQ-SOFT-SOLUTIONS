@@ -4,6 +4,11 @@ import { Plus } from 'lucide-react'
 import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
+import Alert from '../../components/ui/Alert'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import PageHeader from '../../components/layout/PageHeader'
 
@@ -13,7 +18,7 @@ export default function AdminPlans() {
   const [editing, setEditing] = useState<{ id: string; slug: string; name: string; projectsPerMonth: number; transactionsPerMonth: number; monthlyGhs: number; yearlyGhs: number } | null>(null)
   const [showNew, setShowNew] = useState(false)
 
-  const { data: plans = [], isLoading } = useQuery({
+  const { data: plans = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'plans'],
     queryFn: () => api('/admin/plans') as Promise<
       { id: string; slug: string; name: string; projectsPerMonth: number; transactionsPerMonth: number; monthlyGhs: number; yearlyGhs: number; active: boolean }[]
@@ -43,6 +48,21 @@ export default function AdminPlans() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] }),
   })
 
+  if (isError) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Plans"
+          subtitle={<p className="text-gray-500">Manage subscription tiers: limits and pricing.</p>}
+        />
+        <Alert tone="error" title="Could not load plans" onRetry={() => void refetch()}>
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -51,7 +71,7 @@ export default function AdminPlans() {
           title="Plans"
           subtitle={<p className="text-gray-500">Manage subscription tiers: limits and pricing.</p>}
         />
-        <p className="text-gray-500 text-sm">Loading plans…</p>
+        <PageBodySkeleton label="Loading plans" />
       </div>
     )
   }
@@ -71,8 +91,7 @@ export default function AdminPlans() {
       />
 
       {showNew && (
-        <Card className="mb-6 p-4 shadow-sm border-l-4 border-l-primary-500">
-          <h3 className="font-medium text-gray-900 mb-4">New plan</h3>
+        <Card title="New plan" className="mb-6">
           <PlanForm
             onSubmit={(b) => createMutation.mutate(b)}
             onCancel={() => setShowNew(false)}
@@ -82,25 +101,24 @@ export default function AdminPlans() {
         </Card>
       )}
 
-      <Card noPadding className="shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-surface">
+      <Card noPadding>
+        <Table>
+          <TableHead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slug</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Projects/mo</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tx/mo</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monthly (GHS)</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Yearly (GHS)</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <TableTh>Slug</TableTh>
+              <TableTh>Name</TableTh>
+              <TableTh className="text-right">Projects/mo</TableTh>
+              <TableTh className="text-right">Tx/mo</TableTh>
+              <TableTh className="text-right">Monthly (GHS)</TableTh>
+              <TableTh className="text-right">Yearly (GHS)</TableTh>
+              <TableTh className="text-right">Actions</TableTh>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
+          </TableHead>
+          <TableBody>
             {plans.map((p) =>
               editing?.id === p.id ? (
-                <tr key={p.id} className="bg-surface">
-                  <td colSpan={7} className="px-6 py-4">
+                <TableRow key={p.id} className="bg-surface">
+                  <TableTd colSpan={7}>
                     <PlanForm
                       initial={p}
                       onSubmit={(b) => updateMutation.mutate({ id: p.id, ...b })}
@@ -108,30 +126,28 @@ export default function AdminPlans() {
                       loading={updateMutation.isPending}
                       error={updateMutation.error?.message}
                     />
-                  </td>
-                </tr>
+                  </TableTd>
+                </TableRow>
               ) : (
-                <tr key={p.id} className="hover:bg-surface">
-                  <td className="px-6 py-4 font-mono text-sm text-gray-900">{p.slug}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{p.name}</td>
-                  <td className="px-6 py-4 text-right text-sm text-gray-600">
+                <TableRow key={p.id}>
+                  <TableTd className="font-mono text-gray-900">{p.slug}</TableTd>
+                  <TableTd className="text-gray-900">{p.name}</TableTd>
+                  <TableTd className="text-right">
                     {p.projectsPerMonth < 0 ? 'Unlimited' : p.projectsPerMonth}
-                  </td>
-                  <td className="px-6 py-4 text-right text-sm text-gray-600">
+                  </TableTd>
+                  <TableTd className="text-right">
                     {p.transactionsPerMonth < 0 ? 'Unlimited' : p.transactionsPerMonth.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-right text-sm text-gray-600">{p.monthlyGhs}</td>
-                  <td className="px-6 py-4 text-right text-sm text-gray-600">{p.yearlyGhs}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setEditing(p)}
-                      className="text-primary-600 hover:underline mr-3"
-                    >
+                  </TableTd>
+                  <TableTd className="text-right">{p.monthlyGhs}</TableTd>
+                  <TableTd className="text-right">{p.yearlyGhs}</TableTd>
+                  <TableTd className="text-right">
+                    <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(p)}>
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={async () => {
                         const ok = await confirm({
                           title: `Delete the "${p.name}" plan?`,
@@ -141,17 +157,16 @@ export default function AdminPlans() {
                         })
                         if (ok) deleteMutation.mutate(p.id)
                       }}
-                      className="text-red-600 hover:underline"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       Delete
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </TableTd>
+                </TableRow>
               )
             )}
-          </tbody>
-        </table>
-        </div>
+          </TableBody>
+        </Table>
       </Card>
     </div>
   )
@@ -191,81 +206,71 @@ function PlanForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <Alert tone="error" title="Could not save plan">
+          {error}
+        </Alert>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
-          {initial ? (
-            <input value={slug} readOnly className="w-full px-3 py-2 border border-border rounded-lg bg-gray-50 text-gray-600 font-mono" />
-          ) : (
-            <select
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-            >
-              <option value="">Select plan tier</option>
-              <option value="basic">basic</option>
-              <option value="standard">standard</option>
-              <option value="premium">premium</option>
-              <option value="firm">firm</option>
-            </select>
-          )}
-          <p className="text-xs text-gray-500 mt-0.5">Only standard tiers (basic, standard, premium, firm) are supported for feature gating.</p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+        {initial ? (
+          <Input label="Slug" value={slug} readOnly hint="Only standard tiers (basic, standard, premium, firm) are supported for feature gating." className="font-mono" />
+        ) : (
+          <Select
+            label="Slug"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-            placeholder="Basic"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Projects/month</label>
-          <input
-            type="number"
-            value={projectsPerMonth}
-            onChange={(e) => setProjectsPerMonth(e.target.value)}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-            placeholder="-1 for unlimited"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Transactions/month</label>
-          <input
-            type="number"
-            value={transactionsPerMonth}
-            onChange={(e) => setTransactionsPerMonth(e.target.value)}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Monthly (GHS)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={monthlyGhs}
-            onChange={(e) => setMonthlyGhs(e.target.value)}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Yearly (GHS)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={yearlyGhs}
-            onChange={(e) => setYearlyGhs(e.target.value)}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-white text-gray-900"
-          />
-        </div>
+            hint="Only standard tiers (basic, standard, premium, firm) are supported for feature gating."
+          >
+            <option value="">Select plan tier</option>
+            <option value="basic">basic</option>
+            <option value="standard">standard</option>
+            <option value="premium">premium</option>
+            <option value="firm">firm</option>
+          </Select>
+        )}
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          placeholder="Basic"
+        />
+        <Input
+          type="number"
+          label="Projects/month"
+          value={projectsPerMonth}
+          onChange={(e) => setProjectsPerMonth(e.target.value)}
+          placeholder="-1 for unlimited"
+        />
+        <Input
+          type="number"
+          label="Transactions/month"
+          value={transactionsPerMonth}
+          onChange={(e) => setTransactionsPerMonth(e.target.value)}
+        />
+        <Input
+          type="number"
+          step="0.01"
+          label="Monthly (GHS)"
+          value={monthlyGhs}
+          onChange={(e) => setMonthlyGhs(e.target.value)}
+        />
+        <Input
+          type="number"
+          step="0.01"
+          label="Yearly (GHS)"
+          value={yearlyGhs}
+          onChange={(e) => setYearlyGhs(e.target.value)}
+        />
       </div>
       <div className="flex gap-2">
-        <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" isLoading={loading}>
+          Save
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
     </form>
   )

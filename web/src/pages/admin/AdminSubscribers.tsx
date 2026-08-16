@@ -5,7 +5,14 @@ import { Search, ChevronLeft, ChevronRight, Download, LogIn } from 'lucide-react
 import { api } from '../../lib/api'
 import { useAuth } from '../../store/auth'
 import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
 import PageHeader from '../../components/layout/PageHeader'
+import Alert from '../../components/ui/Alert'
+import Badge from '../../components/ui/Badge'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import { useToast } from '../../components/ui/Toast'
 
@@ -24,16 +31,16 @@ type Org = {
   _count: { members: number; projects: number; clients: number }
 }
 
-function subscriptionBadgeClass(status: SubscriptionStatus): string {
+function subscriptionTone(status: SubscriptionStatus): 'success' | 'brand' | 'warning' | 'neutral' {
   switch (status) {
     case 'active':
-      return 'bg-green-100 text-green-700'
+      return 'success'
     case 'trial':
-      return 'bg-blue-100 text-blue-700'
+      return 'brand'
     case 'expired':
-      return 'bg-amber-100 text-amber-800'
+      return 'warning'
     default:
-      return 'bg-gray-100 text-gray-600'
+      return 'neutral'
   }
 }
 
@@ -49,7 +56,7 @@ export default function AdminSubscribers() {
   const queryClient = useQueryClient()
   const setAuth = useAuth((s) => s.setAuth)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'subscribers', page, search, planFilter],
     queryFn: () =>
       api(
@@ -136,11 +143,22 @@ export default function AdminSubscribers() {
   const fmt = (n: number) =>
     new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(n)
 
+  if (isError) {
+    return (
+      <div className="space-y-8">
+        <PageHeader eyebrow="Platform admin" title="Organizations" />
+        <Alert tone="error" title="Could not load organizations" onRetry={() => void refetch()}>
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
+      </div>
+    )
+  }
+
   if (isLoading || !data) {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Platform admin" title="Organizations" />
-        <p className="text-gray-500 text-sm">Loading organizations…</p>
+        <PageBodySkeleton label="Loading organizations" />
       </div>
     )
   }
@@ -160,25 +178,25 @@ export default function AdminSubscribers() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={planFilter}
-              onChange={(e) => {
-                setPlanFilter(e.target.value)
-                setPage(1)
-              }}
-              className="rounded-xl border border-border bg-white px-3 py-2 text-sm text-gray-800"
-              aria-label="Filter by plan"
-            >
-              <option value="">All plans</option>
-              <option value="basic">Basic</option>
-              <option value="standard">Standard</option>
-              <option value="premium">Premium</option>
-              <option value="firm">Firm</option>
-              <option value="paid">Paid (excl. free/trial-only)</option>
-            </select>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden />
-              <input
+            <div className="w-48">
+              <Select
+                value={planFilter}
+                onChange={(e) => {
+                  setPlanFilter(e.target.value)
+                  setPage(1)
+                }}
+                aria-label="Filter by plan"
+              >
+                <option value="">All plans</option>
+                <option value="basic">Basic</option>
+                <option value="standard">Standard</option>
+                <option value="premium">Premium</option>
+                <option value="firm">Firm</option>
+                <option value="paid">Paid (excl. free/trial-only)</option>
+              </Select>
+            </div>
+            <div className="w-56">
+              <Input
                 type="search"
                 value={search}
                 onChange={(e) => {
@@ -186,131 +204,130 @@ export default function AdminSubscribers() {
                   setPage(1)
                 }}
                 placeholder="Search by name…"
-                className="pl-9 pr-3 py-2 rounded-xl border border-border text-sm w-56"
+                leading={<Search className="w-4 h-4" />}
+                aria-label="Search by name"
               />
             </div>
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={exporting}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-surface disabled:opacity-60"
-            >
-              <Download className="w-4 h-4" aria-hidden />
-              {exporting ? 'Exporting…' : 'Export CSV'}
-            </button>
+            <Button type="button" variant="outline" size="sm" onClick={handleExport} isLoading={exporting}>
+              <Download className="w-4 h-4 mr-1.5" aria-hidden />
+              Export CSV
+            </Button>
           </div>
         }
       />
 
-      <Card noPadding className="overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-surface border-b border-border">
-              <tr>
-                <th className="px-4 py-3 text-left">
+      <Card noPadding>
+        <Table>
+          <TableHead>
+            <tr>
+              <TableTh>
+                <input
+                  type="checkbox"
+                  checked={organizations.length > 0 && selectedIds.size === organizations.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-border"
+                />
+              </TableTh>
+              <TableTh>Name</TableTh>
+              <TableTh>Account</TableTh>
+              <TableTh>Subscription</TableTh>
+              <TableTh>Plan</TableTh>
+              <TableTh className="text-right">Total paid</TableTh>
+              <TableTh className="text-right">Members</TableTh>
+              <TableTh className="text-right">Actions</TableTh>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {organizations.map((o) => (
+              <TableRow key={o.id}>
+                <TableTd>
                   <input
                     type="checkbox"
-                    checked={organizations.length > 0 && selectedIds.size === organizations.length}
-                    onChange={toggleSelectAll}
+                    checked={selectedIds.has(o.id)}
+                    onChange={() => toggleSelect(o.id)}
                     className="rounded border-border"
                   />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subscription</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total paid</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Members</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted">
-              {organizations.map((o) => (
-                <tr key={o.id} className="hover:bg-surface/50 transition-colors">
-                  <td className="px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(o.id)}
-                      onChange={() => toggleSelect(o.id)}
-                      className="rounded border-border"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
+                </TableTd>
+                <TableTd>
+                  <Link
+                    to={`/platform-admin/organizations/${o.slug}`}
+                    className="font-medium text-primary-600 hover:underline"
+                  >
+                    {o.name}
+                  </Link>
+                </TableTd>
+                <TableTd>
+                  {o.suspendedAt ? (
+                    <Badge tone="danger" size="sm">
+                      Suspended
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral" size="sm">
+                      OK
+                    </Badge>
+                  )}
+                </TableTd>
+                <TableTd>
+                  <Badge tone={subscriptionTone(o.subscriptionStatus)} size="sm" className="capitalize">
+                    {o.subscriptionStatus}
+                  </Badge>
+                </TableTd>
+                <TableTd className="capitalize">{o.plan}</TableTd>
+                <TableTd className="text-right font-medium text-gray-900">{fmt(o.totalPaid)}</TableTd>
+                <TableTd className="text-right">{o._count.members}</TableTd>
+                <TableTd className="text-right">
+                  <div className="inline-flex items-center justify-end gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => handleEnterWorkspace(o)}
+                      disabled={impersonateMutation.isPending}
+                      isLoading={enteringSlug === o.slug && impersonateMutation.isPending}
+                      title="Enter this subscriber workspace (support mode)"
+                      className="text-amber-800 hover:text-amber-950 hover:bg-amber-50"
+                    >
+                      <LogIn className="w-3.5 h-3.5 mr-1" aria-hidden />
+                      Enter
+                    </Button>
                     <Link
                       to={`/platform-admin/organizations/${o.slug}`}
-                      className="font-medium text-primary-600 hover:underline"
+                      className="text-primary-600 hover:underline text-sm"
                     >
-                      {o.name}
+                      Manage
                     </Link>
-                  </td>
-                  <td className="px-6 py-4">
-                    {o.suspendedAt ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-                        Suspended
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">OK</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${subscriptionBadgeClass(o.subscriptionStatus)}`}
-                    >
-                      {o.subscriptionStatus}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 capitalize">{o.plan}</td>
-                  <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">{fmt(o.totalPaid)}</td>
-                  <td className="px-6 py-4 text-right text-sm text-gray-600">{o._count.members}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="inline-flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleEnterWorkspace(o)}
-                        disabled={impersonateMutation.isPending}
-                        title="Enter this subscriber workspace (support mode)"
-                        className="inline-flex items-center gap-1 text-sm font-medium text-amber-800 hover:text-amber-950 disabled:opacity-60"
-                      >
-                        <LogIn className="w-3.5 h-3.5" aria-hidden />
-                        {enteringSlug === o.slug && impersonateMutation.isPending ? 'Entering…' : 'Enter'}
-                      </button>
-                      <Link
-                        to={`/platform-admin/organizations/${o.slug}`}
-                        className="text-primary-600 hover:underline text-sm"
-                      >
-                        Manage
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </TableTd>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-border">
             <p className="text-sm text-gray-600">
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} organizations)
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-40"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4 mr-1" />
                 Prev
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={page >= pagination.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-40"
               >
                 Next
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
           </div>
         )}

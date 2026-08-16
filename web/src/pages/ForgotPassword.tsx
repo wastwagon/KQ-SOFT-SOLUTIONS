@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import { auth } from '../lib/api'
-import AuthLayout, { authAlertErrorClass } from '../components/AuthLayout'
+import AuthLayout from '../components/AuthLayout'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
 
 export default function ForgotPassword() {
@@ -56,9 +57,9 @@ export default function ForgotPassword() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className={authAlertErrorClass} role="alert">
+              <Alert tone="error" title="Could not send reset link">
                 {error}
-              </div>
+              </Alert>
             )}
             <p className="text-sm text-gray-600 leading-relaxed">
               Enter the email you use for KQ-SOFT. The link expires after a short time for security.
@@ -79,9 +80,8 @@ export default function ForgotPassword() {
               size="lg"
               className="w-full font-semibold shadow-lg shadow-primary-600/25"
               isLoading={loading}
-              disabled={loading}
             >
-              {loading ? 'Sending…' : 'Send reset link'}
+              Send reset link
             </Button>
             <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">
               <Link

@@ -3,6 +3,7 @@ import { Settings } from 'lucide-react'
 import { formatAmount } from '../../lib/format'
 import Button from '../ui/Button'
 import Badge from '../ui/Badge'
+import Card from '../ui/Card'
 import MatchSettingsPanel from './MatchSettingsPanel'
 import type { MatchParams, SuggestedMatch } from './types'
 
@@ -69,30 +70,26 @@ export default function SuggestedMatchesPanel({
   const visible = suggestions.slice(0, listCount)
   const canBulk = !!features.bulk_match
   return (
-    <section className="rounded-xl border border-amber-200/80 bg-amber-50/80 p-5 shadow-sm">
-      <header className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-bold text-amber-900 tracking-tight mb-1">
-            Suggested matches
-          </h3>
-          <p className="text-sm text-amber-800/90">
-            {canBulk
-              ? 'Click a suggestion to pre-select, or tick to bulk-select.'
-              : 'Click a suggestion to pre-select, then click Match.'}
-          </p>
-        </div>
-        <button
+    <Card
+      title="Suggested matches"
+      sublabel={
+        canBulk
+          ? 'Click a suggestion to pre-select, or tick to bulk-select.'
+          : 'Click a suggestion to pre-select, then click Match.'
+      }
+      actions={
+        <Button
           type="button"
+          variant={showSettings ? 'secondary' : 'outline'}
+          size="xs"
           onClick={() => setShowSettings((v) => !v)}
           aria-expanded={showSettings}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-            showSettings ? 'bg-amber-200 text-amber-900' : 'bg-white/80 text-amber-700 hover:bg-white'
-          } border border-amber-200`}
         >
-          <Settings className="w-4 h-4" />
+          <Settings className="w-4 h-4 mr-1.5" />
           {showSettings ? 'Hide Settings' : 'Matching Settings'}
-        </button>
-      </header>
+        </Button>
+      }
+    >
 
       {showSettings && (
         <MatchSettingsPanel value={matchParams} onChange={onMatchParamsChange} />
@@ -106,12 +103,11 @@ export default function SuggestedMatchesPanel({
               variant="secondary"
               size="sm"
               onClick={onPhasedAutoMatch}
-              disabled={isMatching || isPhasedAutoMatching}
+              disabled={isMatching}
+              isLoading={isPhasedAutoMatching}
               title="Runs safe 90%+ matches, then bank-pattern suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA)"
             >
-              {isPhasedAutoMatching
-                ? 'Auto-matching…'
-                : 'Auto-match all (safe → patterns)'}
+              Auto-match all (safe → patterns)
             </Button>
           )}
           {highConfidence.length > 0 && (
@@ -130,9 +126,7 @@ export default function SuggestedMatchesPanel({
               className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
               title="Apply only suggestions with 95%+ confidence"
             >
-              {isMatching
-                ? 'Matching…'
-                : `Match all high-confidence (95%+) — ${highConfidence.length}`}
+              Match all high-confidence (95%+) — {highConfidence.length}
             </Button>
           )}
           <Button
@@ -149,9 +143,7 @@ export default function SuggestedMatchesPanel({
             disabled={isMatching || safeSuggestions.length === 0}
             title="Skips ambiguous duplicates; requires 90%+ confidence"
           >
-            {isMatching
-              ? 'Matching…'
-              : `Match safe suggestions (90%+, no duplicates) — ${safeSuggestions.length}`}
+            Match safe suggestions (90%+, no duplicates) — {safeSuggestions.length}
           </Button>
           {phaseBSuggestions.length > 0 && (
             <Button
@@ -169,9 +161,7 @@ export default function SuggestedMatchesPanel({
               disabled={isMatching || phaseBSuggestions.length === 0}
               title="Phase B: pattern-matched suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) — skips generic amount-only guesses"
             >
-              {isMatching
-                ? 'Matching…'
-                : `Match receipts + Ecobank patterns (85%+) — ${phaseBSuggestions.length}`}
+              Match receipts + Ecobank patterns (85%+) — {phaseBSuggestions.length}
             </Button>
           )}
           {bulkSelected.size > 0 && (
@@ -203,7 +193,7 @@ export default function SuggestedMatchesPanel({
                 className={`flex items-center gap-3 w-full text-left px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
                   isSelected
                     ? 'border-primary-400 bg-primary-50 shadow-sm'
-                    : 'border-amber-200/70 hover:bg-amber-100/70'
+                    : 'border-border hover:bg-gray-50'
                 }`}
               >
                 {canBulk && (
@@ -229,7 +219,7 @@ export default function SuggestedMatchesPanel({
                   <span className="font-semibold text-gray-900">
                     {s.cashBookTx.name || s.cashBookTx.details || '—'}
                   </span>
-                  <span className="mx-1.5 text-amber-600">↔</span>
+                  <span className="mx-1.5 text-gray-400">↔</span>
                   <span className="text-gray-700">
                     {s.bankTx.name || s.bankTx.details || '—'}
                   </span>
@@ -266,8 +256,9 @@ export default function SuggestedMatchesPanel({
                   {features.ai_suggestions &&
                     (s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
                     <span className="ml-2 inline-flex items-center gap-1">
-                      <span
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-900"
+                      <Badge
+                        size="sm"
+                        tone="success"
                         title={
                           s.orgMemoryConfirmations
                             ? `Boosted from ${s.orgMemoryConfirmations} prior confirmation(s) of a similar amount + reference/narration`
@@ -278,46 +269,52 @@ export default function SuggestedMatchesPanel({
                         {s.orgMemoryConfirmations != null && s.orgMemoryConfirmations > 0
                           ? ` · ${s.orgMemoryConfirmations}×`
                           : ''}
-                      </span>
-                      {onForgetMemory && s.orgMemoryId && (
-                        <button
-                          type="button"
-                          disabled={isForgettingMemory}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onForgetMemory(s.orgMemoryId!)
-                          }}
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-emerald-800/80 hover:bg-emerald-200/80 disabled:opacity-50"
-                          title="Stop boosting suggestions from this learned pattern"
-                        >
-                          Forget
-                        </button>
-                      )}
+                      </Badge>
                     </span>
                   )}
                   {s.duplicateWarning && (
-                    <span
-                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                    <Badge
+                      size="sm"
+                      tone="warning"
+                      className="ml-2"
                       title="Multiple bank transactions match this cash book — verify before matching"
                     >
                       Verify
-                    </span>
+                    </Badge>
                   )}
                 </button>
+                {onForgetMemory && s.orgMemoryId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="shrink-0"
+                    disabled={isForgettingMemory}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onForgetMemory(s.orgMemoryId!)
+                    }}
+                    title="Stop boosting suggestions from this learned pattern"
+                  >
+                    Forget
+                  </Button>
+                )}
               </label>
             </li>
           )
         })}
       </ul>
       {suggestions.length > listCount && (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          className="mt-3 w-full"
           onClick={() => setListCount((n) => Math.min(n + 150, suggestions.length))}
-          className="mt-3 w-full py-2 text-sm font-medium text-amber-800 hover:text-amber-900 border border-amber-200 rounded-xl bg-white/80"
         >
           Show more suggestions ({listCount} of {suggestions.length})
-        </button>
+        </Button>
       )}
-    </section>
+    </Card>
   )
 }

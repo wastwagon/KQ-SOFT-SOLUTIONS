@@ -10,7 +10,10 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Button from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
+import Card from '../components/ui/Card'
 import { useToast } from '../components/ui/Toast'
+import SuggestedMatchMark from '../components/reconcile/SuggestedMatchMark'
 
 interface Tx {
   id: string
@@ -72,30 +75,20 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       )
     }
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-red-900 mb-2">Could not load review data</h2>
-        <p className="text-sm text-red-800">
-          {error instanceof Error ? error.message : 'Something went wrong. Try again or go back to Reconcile.'}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
-            className="px-4 py-2 bg-white border border-red-300 text-red-900 rounded-xl font-medium hover:bg-red-100"
-          >
-            Retry
-          </button>
-          {onGoToReconcile && (
-            <button
-              type="button"
-              onClick={onGoToReconcile}
-              className="px-4 py-2 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700"
-            >
+      <Alert
+        tone="error"
+        title="Could not load review data"
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
+        action={
+          onGoToReconcile ? (
+            <Button type="button" size="sm" onClick={onGoToReconcile}>
               Go to Reconcile
-            </button>
-          )}
-        </div>
-      </div>
+            </Button>
+          ) : undefined
+        }
+      >
+        {error instanceof Error ? error.message : 'Something went wrong. Try again or go back to Reconcile.'}
+      </Alert>
     )
   }
 
@@ -152,13 +145,6 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
 
   const projectStatus = (data?.project as { status?: string })?.status ?? ''
 
-  const receiptIdSet = new Set((data?.receipts?.transactions || []).map((t: Tx) => t.id))
-  const matchRows = (data?.matches || []) as { cashBookTxId?: string; cbTx?: { id: string } }[]
-  const matchedReceiptsCreditsCount = matchRows.filter((m) =>
-    receiptIdSet.has(m.cashBookTxId ?? m.cbTx?.id ?? '')
-  ).length
-  const matchedPaymentsDebitsCount = (data?.existingMatches ?? 0) - matchedReceiptsCreditsCount
-
   const currency = (data?.project as { currency?: string })?.currency || 'GHS'
   const fmtAmt = (n: number) => formatAmountNumber(Number.isFinite(n) ? n : 0)
 
@@ -167,126 +153,94 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       <WorkflowStepIntro
         eyebrow="Review"
         title="Review & exceptions"
-        subtitle="Confirm unmatched items and workflow status before generating the BRS. Submit for review or approve when your firm’s process allows."
+        subtitle="Confirm unmatched items before you generate the BRS. Submit or approve when your firm’s process allows."
       />
 
-      <BrsHelp variant="full" />
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 shadow-sm">
-          <p className="text-sm text-green-700 font-medium">Matched</p>
-          <p className="text-xl font-bold text-green-800">{data.existingMatches ?? 0}</p>
-          <p className="text-xs text-green-700 mt-1">
-            Receipts/Credits: {matchedReceiptsCreditsCount} · Payments/Debits: {matchedPaymentsDebitsCount}
+      <div className="sticky top-0 z-20 -mx-1 border-b border-border-muted bg-white/95 px-1 py-3 backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-600">
+            <span className="font-semibold text-gray-900">{data.existingMatches ?? 0} matched</span>
+            {' · '}
+            {unmatchedReceipts.length + unmatchedPayments.length} unmatched cash book
+            {' · '}
+            {unmatchedCredits.length + unmatchedDebits.length} unmatched bank
+            {variance !== 0 ? (
+              <>
+                {' · '}
+                <span className="font-medium text-red-700">
+                  variance {fmtAmt(Math.abs(variance))} {variance > 0 ? '(CB > Bank)' : '(Bank > CB)'}
+                </span>
+              </>
+            ) : null}
           </p>
-        </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <p className="text-sm text-amber-700 font-medium">Unmatched cash book</p>
-          <p className="text-xl font-bold text-amber-800">
-            {unmatchedReceipts.length + unmatchedPayments.length}
-          </p>
-        </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <p className="text-sm text-amber-700 font-medium">Unmatched bank</p>
-          <p className="text-xl font-bold text-amber-800">
-            {unmatchedCredits.length + unmatchedDebits.length}
-          </p>
-        </div>
-        <div
-          className="cursor-help rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
-          title="Difference between total unmatched cash book amounts and total unmatched bank amounts (reconciliation discrepancy indicator)"
-        >
-          <p className="text-sm text-gray-700 font-medium">Variance</p>
-          <p className={`text-xl font-bold ${variance !== 0 ? 'text-red-600' : 'text-gray-800'}`}>
-            {fmtAmt(Math.abs(variance))} {variance !== 0 ? (variance > 0 ? '(CB > Bank)' : '(Bank > CB)') : ''}
-          </p>
-        </div>
-      </div>
-
-      {/* Recommendations */}
-      <div
-        className={`rounded-xl border p-4 shadow-sm ${
-          hasUnmatched ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'
-        }`}
-      >
-        <h3 className="font-medium mb-2 text-gray-900">
-          {hasUnmatched ? 'Recommendations' : 'Ready for report'}
-        </h3>
-        {hasUnmatched ? (
-          <>
-            <p className="text-sm mb-3 text-gray-700">
-              There are unmatched transactions. Review the exception list below, then return to Reconcile to match them or proceed to Report to generate the BRS with exceptions noted.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {onGoToReconcile && (
-                <Button type="button" onClick={onGoToReconcile}>
-                  Go to Reconcile
-                </Button>
-              )}
-              {onGoToReport && (
-                <Button type="button" variant="outline" onClick={onGoToReport}>
-                  Proceed to Report (with exceptions)
-                </Button>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="text-sm mb-3 text-gray-700">All transactions are matched. You can submit for review, approve, or generate the BRS report.</p>
-            <p className="text-xs text-slate-600 mb-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
-              <strong>Draft vs final:</strong> What you see now is the draft report. After <strong>Submit for review</strong> and <strong>Approve</strong>, the report is final and date/time stamped.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {canSubmitForReview(role) && (projectStatus === 'reconciling' || projectStatus === 'mapping' || projectStatus === 'draft') && (
+          <div className="flex flex-wrap gap-2">
+            {hasUnmatched && onGoToReconcile && (
+              <Button type="button" onClick={onGoToReconcile}>
+                Go to Reconcile
+              </Button>
+            )}
+            {canSubmitForReview(role) &&
+              (projectStatus === 'reconciling' || projectStatus === 'mapping' || projectStatus === 'draft') && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={hasUnmatched ? 'outline' : 'primary'}
                   onClick={() => submitMutation.mutate()}
                   disabled={submitMutation.isPending}
+                  isLoading={submitMutation.isPending}
                   title="Submit for review (locks editing)"
                 >
-                  {submitMutation.isPending ? 'Submitting...' : 'Submit for review'}
+                  Submit for review
                 </Button>
               )}
-              {canApprove(role) && projectStatus === 'submitted_for_review' && (
-                <>
-                  <Button
-                    type="button"
-                    onClick={() => approveMutation.mutate()}
-                    disabled={approveMutation.isPending}
-                    title="Approve BRS"
-                  >
-                    {approveMutation.isPending ? 'Approving...' : 'Approve'}
-                  </Button>
-                  {approveMutation.error && !isSubscriptionInactiveError(approveMutation.error) && (
-                    <p className="text-sm text-red-600">{approveMutation.error.message}</p>
-                  )}
-                </>
-              )}
-              {onGoToReport && (
-                <Button type="button" onClick={onGoToReport}>
-                  Generate report
-                </Button>
-              )}
-            </div>
-          </>
-        )}
+            {canApprove(role) && projectStatus === 'submitted_for_review' && (
+              <Button
+                type="button"
+                onClick={() => approveMutation.mutate()}
+                disabled={approveMutation.isPending}
+                isLoading={approveMutation.isPending}
+                title="Approve BRS"
+              >
+                Approve
+              </Button>
+            )}
+            {onGoToReport && (
+              <Button type="button" variant={hasUnmatched ? 'outline' : 'primary'} onClick={onGoToReport}>
+                {hasUnmatched ? 'Proceed to Report' : 'Generate report'}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
+      <BrsHelp variant="review" />
+
+      {hasUnmatched ? (
+        <Alert tone="warning" title="Unmatched items remain">
+          Review the exception list below, then return to Reconcile to match them, or proceed to Report
+          with exceptions noted on the BRS.
+        </Alert>
+      ) : (
+        <Alert tone="success" title="Ready for report">
+          All transactions are matched. Submit for review and approve to stamp the report as final.
+        </Alert>
+      )}
+      {approveMutation.error && !isSubscriptionInactiveError(approveMutation.error) && (
+        <Alert tone="error" title="Could not approve">
+          {approveMutation.error.message}
+        </Alert>
+      )}
+
       {/* Exception list: unmatched transactions with optional Reviewed tick-off */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-medium text-gray-900">Exception list (unmatched transactions)</h3>
-          <span className="text-xs text-gray-500">Tick “Reviewed” when each exception has been checked (for your reference before Submit for review).</span>
-        </div>
-        <p className="text-xs text-primary-600 font-medium">Rows with 🔗 have suggested matches — hover for tooltip.</p>
+      <Card
+        title="Exception list"
+        sublabel="Tick Reviewed after you check each unmatched row. A mark next to the date means there is a suggested match — hover for details."
+      >
         <div className="flex flex-col gap-6">
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Cash Book</h4>
-            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-border rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="bg-white sticky top-0 z-10">
                   <tr>
                     <th className="px-2 py-1.5 text-left w-8" title="Mark as reviewed">✓</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Date</th>
@@ -314,7 +268,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                       return (
                         <tr
                           key={t.id}
-                          className={`border-t border-gray-200 ${sug?.length ? 'bg-primary-50/30' : ''}`}
+                          className={`border-t border-border ${sug?.length ? 'bg-primary-50/30' : ''}`}
                           title={tooltip}
                         >
                           <td className="px-2 py-1.5">
@@ -328,7 +282,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                           </td>
                           <td className="px-2 py-1.5 whitespace-nowrap">
                             {formatDateCompact(t.date)}
-                            {sug?.length ? <span className="ml-1 text-primary-600" title={tooltip}>🔗</span> : null}
+                            {sug?.length ? <SuggestedMatchMark title={tooltip} /> : null}
                           </td>
                           <td className="px-2 py-1.5 truncate max-w-[90px]" title={t.name || ''}>{t.name || '—'}</td>
                           <td className="px-2 py-1.5 truncate max-w-[90px]" title={t.details || ''}>{t.details || '—'}</td>
@@ -346,9 +300,9 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Bank Statement</h4>
-            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-border rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="bg-white sticky top-0 z-10">
                   <tr>
                     <th className="px-2 py-1.5 text-left w-8" title="Mark as reviewed">✓</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Date</th>
@@ -379,7 +333,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                         return (
                           <tr
                             key={t.id}
-                            className={`border-t border-gray-200 ${sug?.length ? 'bg-primary-50/30' : ''}`}
+                            className={`border-t border-border ${sug?.length ? 'bg-primary-50/30' : ''}`}
                             title={tooltip}
                           >
                             <td className="px-2 py-1.5">
@@ -393,7 +347,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                             </td>
                             <td className="px-2 py-1.5 whitespace-nowrap">
                               {formatDateCompact(t.date)}
-                              {sug?.length ? <span className="ml-1 text-primary-600" title={tooltip}>🔗</span> : null}
+                              {sug?.length ? <SuggestedMatchMark title={tooltip} /> : null}
                             </td>
                             <td className="px-2 py-1.5 truncate max-w-[100px]" title={t.details || ''}>{t.name || t.details || '—'}</td>
                             <td className="px-2 py-1.5 font-mono text-xs whitespace-nowrap">{t.chqNo || '—'}</td>
@@ -412,9 +366,9 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Cash Book</h4>
-            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-border rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="bg-white sticky top-0 z-10">
                   <tr>
                     <th className="px-2 py-1.5 text-left w-8" title="Mark as reviewed">✓</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Date</th>
@@ -442,7 +396,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                       return (
                         <tr
                           key={t.id}
-                          className={`border-t border-gray-200 ${sug?.length ? 'bg-primary-50/30' : ''}`}
+                          className={`border-t border-border ${sug?.length ? 'bg-primary-50/30' : ''}`}
                           title={tooltip}
                         >
                           <td className="px-2 py-1.5">
@@ -456,7 +410,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                           </td>
                           <td className="px-2 py-1.5 whitespace-nowrap">
                             {formatDateCompact(t.date)}
-                            {sug?.length ? <span className="ml-1 text-primary-600" title={tooltip}>🔗</span> : null}
+                            {sug?.length ? <SuggestedMatchMark title={tooltip} /> : null}
                           </td>
                           <td className="px-2 py-1.5 truncate max-w-[90px]" title={t.name || ''}>{t.name || '—'}</td>
                           <td className="px-2 py-1.5 truncate max-w-[90px]" title={t.details || ''}>{t.details || '—'}</td>
@@ -474,9 +428,9 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-600 mb-2">Bank Statement</h4>
-            <div className="border border-gray-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
+            <div className="border border-border rounded-xl overflow-x-auto overflow-y-auto max-h-[45rem] bg-white">
               <table className="min-w-full text-xs sm:text-sm text-gray-900">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="bg-white sticky top-0 z-10">
                   <tr>
                     <th className="px-2 py-1.5 text-left w-8" title="Mark as reviewed">✓</th>
                     <th className="px-2 py-1.5 text-left whitespace-nowrap">Date</th>
@@ -507,7 +461,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                         return (
                           <tr
                             key={t.id}
-                            className={`border-t border-gray-200 ${sug?.length ? 'bg-primary-50/30' : ''}`}
+                            className={`border-t border-border ${sug?.length ? 'bg-primary-50/30' : ''}`}
                             title={tooltip}
                           >
                             <td className="px-2 py-1.5">
@@ -521,7 +475,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
                             </td>
                             <td className="px-2 py-1.5 whitespace-nowrap">
                               {formatDateCompact(t.date)}
-                              {sug?.length ? <span className="ml-1 text-primary-600" title={tooltip}>🔗</span> : null}
+                              {sug?.length ? <SuggestedMatchMark title={tooltip} /> : null}
                             </td>
                             <td className="px-2 py-1.5 truncate max-w-[100px]" title={t.details || ''}>{t.name || t.details || '—'}</td>
                             <td className="px-2 py-1.5 font-mono text-xs whitespace-nowrap">{t.chqNo || '—'}</td>
@@ -539,7 +493,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

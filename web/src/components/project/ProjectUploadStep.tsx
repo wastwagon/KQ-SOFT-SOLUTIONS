@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, ChevronDown, FileSpreadsheet, FolderKanban, Landmark, Upload } from 'lucide-react'
+import { ArrowRight, FileSpreadsheet, FolderKanban, Landmark, Upload } from 'lucide-react'
 import {
   bankAccounts,
   uploadBankStatement,
@@ -12,6 +12,11 @@ import { PROJECT_UPLOAD_LIMITS_SUMMARY, validateProjectUploadFiles } from '../..
 import { canUploadDocuments } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
 import Button from '../ui/Button'
+import Alert from '../ui/Alert'
+import Badge from '../ui/Badge'
+import Card from '../ui/Card'
+import Input from '../ui/Input'
+import Select from '../ui/Select'
 import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
 import WorkflowStepIntro from './WorkflowStepIntro'
 import WorkflowStepSkeleton from './WorkflowStepSkeleton'
@@ -208,17 +213,13 @@ export default function ProjectUploadStep({
     const err = bankAccountsQuery.error
     return (
       <div className="space-y-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
-          <p className="font-medium text-red-900">Could not load bank accounts</p>
-          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['bankAccounts', projectSlug] })}
-            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load bank accounts"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['bankAccounts', projectSlug] })}
+        >
+          {err instanceof Error ? err.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -232,26 +233,14 @@ export default function ProjectUploadStep({
       <WorkflowStepIntro
         eyebrow="Upload"
         title="Upload documents"
-        subtitle={
-          <>
-            To begin reconciliation, upload your <strong>Cash Book</strong> and{' '}
-            <strong>Bank Statement</strong>. If a single document contains both receipts and payments, choose
-            &quot;Both&quot;. We will detect and suggest column mappings in the next step.
-          </>
-        }
+        subtitle="Upload a cash book and a bank statement (Excel, CSV, PDF, or image). Choose Both if one file has receipts and payments. Map columns next."
       />
-      <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-4 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          <Hint dotColor="bg-primary-500" text="Cash book date required" />
-          <Hint dotColor="bg-blue-500" text="Excel, CSV, PDF, and images supported" />
-        </div>
-        <p className="mt-3 max-w-3xl text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
-        {!canUpload && (
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-            View-only access. Contact an administrator to upload documents.
-          </p>
-        )}
-      </div>
+      <p className="text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
+      {!canUpload && (
+        <Alert tone="info" title="View only">
+          Contact an administrator to upload documents.
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <UploadCard
@@ -277,8 +266,10 @@ export default function ProjectUploadStep({
               <FilePickerRow
                 files={cbFiles}
                 onFiles={setCbFiles}
-                buttonLabel={progressLabel('Upload', uploadCb.isPending, progress)}
+                isUploading={uploadCb.isPending}
+                progress={uploadCb.isPending ? progress : null}
                 disabled={cbFiles.length === 0 || isUploading}
+                ariaLabel="Cash book files"
                 onSubmit={() => {
                   const v = validateProjectUploadFiles(cbFiles)
                   if (!v.ok) {
@@ -316,19 +307,17 @@ export default function ProjectUploadStep({
                 )}
                 {bankAccountId === '' && (
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <input
+                    <Input
                       type="text"
                       placeholder="Account name (optional)"
                       value={bankAccountName}
                       onChange={(e) => setBankAccountName(e.target.value)}
-                      className="min-h-[40px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                     />
-                    <input
+                    <Input
                       type="text"
                       placeholder="Account number (optional)"
                       value={bankAccountNo}
                       onChange={(e) => setBankAccountNo(e.target.value)}
-                      className="min-h-[40px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                     />
                   </div>
                 )}
@@ -346,8 +335,10 @@ export default function ProjectUploadStep({
               <FilePickerRow
                 files={bsFiles}
                 onFiles={setBsFiles}
-                buttonLabel={progressLabel('Upload', uploadBs.isPending, progress)}
+                isUploading={uploadBs.isPending}
+                progress={uploadBs.isPending ? progress : null}
                 disabled={bsFiles.length === 0 || isUploading}
+                ariaLabel="Bank statement files"
                 onSubmit={() => {
                   const v = validateProjectUploadFiles(bsFiles)
                   if (!v.ok) {
@@ -372,7 +363,7 @@ export default function ProjectUploadStep({
       </div>
 
       {cashBookDocs.length + bankDocs.length > 0 && (
-        <details className="group rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+        <details className="group rounded-xl border border-border bg-white p-4 shadow-card">
           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors group-open:text-gray-700">
             Uploaded files
           </summary>
@@ -413,7 +404,8 @@ export default function ProjectUploadStep({
         </details>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-600">
           {cashBookDocs.length + bankDocs.length > 0
             ? 'Documents uploaded. Map columns next, then reconcile.'
@@ -427,7 +419,8 @@ export default function ProjectUploadStep({
           Proceed to Map
           <ArrowRight className="h-4 w-4 ml-1" aria-hidden="true" />
         </Button>
-      </div>
+        </div>
+      </Card>
     </div>
   )
 }
@@ -458,25 +451,6 @@ function formatDocType(type: string): string {
   }
 }
 
-function progressLabel(
-  defaultLabel: string,
-  isPending: boolean,
-  progress: { current: number; total: number } | null
-): string {
-  if (!isPending) return defaultLabel
-  if (progress && progress.total > 0) return `${progress.current}/${progress.total}`
-  return 'Uploading…'
-}
-
-function Hint({ dotColor, text }: { dotColor: string; text: string }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-xl border border-primary-100 bg-white px-3 py-1.5 text-xs font-medium text-primary-700 shadow-sm">
-      <span className={`h-2 w-2 rounded-full ${dotColor}`} aria-hidden="true" />
-      {text}
-    </span>
-  )
-}
-
 function UploadCard({
   icon: Icon,
   title,
@@ -495,21 +469,26 @@ function UploadCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-600"
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        {uploadedCount > 0 && (
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700 ring-1 ring-green-100">
-            {uploadedCount} file{uploadedCount === 1 ? '' : 's'}
+    <Card
+      title={
+        <span className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-600"
+          >
+            <Icon className="h-4.5 w-4.5" />
           </span>
-        )}
-      </div>
+          {title}
+        </span>
+      }
+      actions={
+        uploadedCount > 0 ? (
+          <Badge tone="success" size="sm">
+            {uploadedCount} file{uploadedCount === 1 ? '' : 's'}
+          </Badge>
+        ) : undefined
+      }
+    >
       {children}
       {uploadedCount > 0 && (
         <p className="border-t border-gray-100 pt-3 text-xs text-gray-500">
@@ -522,7 +501,7 @@ function UploadCard({
       {!canUpload && uploadedCount === 0 && (
         <p className="text-xs text-gray-500">Nothing uploaded yet.</p>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -538,62 +517,86 @@ function SelectField({
   options: { value: string; label: string }[]
 }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-        {label}
-      </span>
-      <span className="relative block">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="min-h-[40px] w-full appearance-none rounded-xl border border-gray-200 bg-white pl-3 pr-9 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-          aria-hidden="true"
-        />
-      </span>
-    </label>
+    <Select label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </Select>
   )
 }
+
+const UPLOAD_ACCEPT = '.xlsx,.xls,.xlsm,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp'
 
 function FilePickerRow({
   files,
   onFiles,
-  buttonLabel,
   disabled,
   onSubmit,
+  isUploading,
+  progress,
+  ariaLabel,
 }: {
   files: File[]
   onFiles: (files: File[]) => void
-  buttonLabel: string
   disabled: boolean
   onSubmit: () => void
+  isUploading: boolean
+  progress: { current: number; total: number } | null
+  ariaLabel: string
 }) {
+  const inputId = useId()
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-3">
       <input
+        id={inputId}
         type="file"
         multiple
-        accept=".xlsx,.xls,.xlsm,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
-        onChange={(e) => onFiles(Array.from(e.target.files || []))}
-        className="text-xs text-gray-500 file:mr-2 file:cursor-pointer file:rounded-xl file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:text-primary-700"
+        className="sr-only"
+        accept={UPLOAD_ACCEPT}
+        aria-label={ariaLabel}
+        onChange={(e) => {
+          onFiles(Array.from(e.target.files || []))
+          e.target.value = ''
+        }}
       />
-      {files.length > 0 && (
-        <span className="text-xs text-gray-500">
-          {files.length} file{files.length === 1 ? '' : 's'}
-        </span>
-      )}
-      <Button type="button" size="sm" onClick={onSubmit} disabled={disabled}>
-        <Upload className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
-        {buttonLabel}
-      </Button>
+      <label
+        htmlFor={inputId}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'copy'
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const next = Array.from(e.dataTransfer.files || [])
+          if (next.length) onFiles(next)
+        }}
+        className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-gray-50/60 px-4 py-6 text-center hover:border-primary-300 hover:bg-primary-50/40 focus-within:border-primary-500"
+      >
+        <Upload className="h-5 w-5 text-gray-400 mb-1.5" aria-hidden />
+        <p className="text-sm font-medium text-gray-900">
+          {files.length > 0
+            ? 'Drop more files or click to replace'
+            : 'Drop files here or click to choose'}
+        </p>
+        {files.length > 0 && (
+          <p className="mt-1 text-xs text-gray-600 truncate max-w-full">
+            {files.length === 1 ? files[0]!.name : `${files.length} files · ${files[0]!.name}…`}
+          </p>
+        )}
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" onClick={onSubmit} disabled={disabled} isLoading={isUploading}>
+          <Upload className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
+          Upload
+        </Button>
+        {isUploading && progress && progress.total > 1 && (
+          <span className="text-xs text-gray-500">
+            {progress.current}/{progress.total}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

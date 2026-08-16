@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { AlertTriangle, HelpCircle, Info, ShieldAlert } from 'lucide-react'
 import { useFocusTrap } from '../../lib/focusTrap'
+import Button from './Button'
 
 /**
  * Branded confirm/alert dialog system.
@@ -55,36 +56,32 @@ const TONE_STYLES: Record<
     iconBg: string
     iconColor: string
     Icon: typeof HelpCircle
-    confirmBtn: string
+    confirmVariant: 'primary' | 'danger' | 'warning'
   }
 > = {
   default: {
     iconBg: 'bg-primary-50',
     iconColor: 'text-primary-600',
     Icon: HelpCircle,
-    confirmBtn:
-      'bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-500 shadow-md shadow-primary-600/20',
+    confirmVariant: 'primary',
   },
   info: {
     iconBg: 'bg-blue-50',
     iconColor: 'text-blue-600',
     Icon: Info,
-    confirmBtn:
-      'bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-500 shadow-md shadow-primary-600/20',
+    confirmVariant: 'primary',
   },
   warning: {
     iconBg: 'bg-amber-50',
     iconColor: 'text-amber-600',
     Icon: AlertTriangle,
-    confirmBtn:
-      'bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-500 shadow-md shadow-amber-600/20',
+    confirmVariant: 'warning',
   },
   danger: {
     iconBg: 'bg-red-50',
     iconColor: 'text-red-600',
     Icon: ShieldAlert,
-    confirmBtn:
-      'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 shadow-md shadow-red-600/25',
+    confirmVariant: 'danger',
   },
 }
 
@@ -225,22 +222,13 @@ function ConfirmDialogView({
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-7">
           {!options.hideCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
+            <Button type="button" variant="outline" onClick={onCancel}>
               {options.cancelLabel ?? 'Cancel'}
-            </button>
+            </Button>
           )}
-          <button
-            ref={confirmBtnRef}
-            type="button"
-            onClick={onConfirm}
-            className={`inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${style.confirmBtn}`}
-          >
+          <Button ref={confirmBtnRef} type="button" variant={style.confirmVariant} onClick={onConfirm}>
             {options.confirmLabel ?? (options.hideCancel ? 'OK' : 'Confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

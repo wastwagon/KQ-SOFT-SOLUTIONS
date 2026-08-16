@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { AlertCircle, CheckCircle2, Info, X, AlertTriangle } from 'lucide-react'
+import Button from './Button'
 
 /**
  * Lightweight branded toast system.
@@ -188,14 +189,16 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
             <p className="mt-1 text-sm text-gray-600 break-words">{description}</p>
           )}
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={onDismiss}
-          className="-m-1 inline-flex shrink-0 rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="-m-1 p-1 text-gray-400"
           aria-label="Dismiss notification"
         >
           <X className="h-4 w-4" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </div>
   )

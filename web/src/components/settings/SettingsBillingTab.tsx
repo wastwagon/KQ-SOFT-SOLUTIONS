@@ -1,4 +1,8 @@
 import Card from '../ui/Card'
+import Alert from '../ui/Alert'
+import Button from '../ui/Button'
+import Badge from '../ui/Badge'
+import MetricCard from '../ui/MetricCard'
 import { canManageBilling } from '../../lib/permissions'
 import type { OrgRole } from '../../lib/permissions'
 import { formatYearlyDiscountLabel } from '../../lib/planPricing'
@@ -69,99 +73,103 @@ export default function SettingsBillingTab({
   onUpgrade,
 }: BillingProps) {
   return (
-    <Card className="rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">
-      <h2 className="text-lg font-semibold tracking-tight text-gray-900 mb-2">Billing</h2>
+    <Card title="Billing">
       {!canManageBilling(role) && (
-        <p className="text-sm text-amber-600 mb-4">Only admins can manage billing.</p>
+        <Alert tone="info" title="View only" className="mb-4">
+          Only admins can manage billing.
+        </Alert>
       )}
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 flex flex-wrap items-center gap-2">
         Current plan:{' '}
-        <strong className="capitalize text-gray-900">{usageData?.organization?.plan || 'basic'}</strong>
+        <Badge tone="brand" size="sm" className="capitalize">
+          {usageData?.organization?.plan || 'basic'}
+        </Badge>
       </p>
       {usageData?.usage && (
-        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Projects / mo</p>
-            <p className="mt-0.5 font-semibold text-gray-900">
-              {usageData.usage.projectsDisplay ??
-                (usageData.usage.projectsUnlimited
-                  ? `${usageData.usage.projectsUsed} (unlimited)`
-                  : `${usageData.usage.projectsUsed} / ${usageData.usage.projectsLimit}`)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Transactions / mo</p>
-            <p className="mt-0.5 font-semibold text-gray-900">
-              {usageData.usage.transactionsDisplay ??
-                (usageData.usage.transactionsUnlimited
-                  ? `${usageData.usage.transactionsUsed} (unlimited)`
-                  : `${usageData.usage.transactionsUsed} / ${usageData.usage.transactionsLimit}`)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Bank accounts</p>
-            <p className="mt-0.5 font-semibold text-gray-900">
-              {usageData.usage.bankAccountsDisplay ??
-                (usageData.usage.bankAccountsUnlimited
-                  ? `${usageData.usage.bankAccountsUsed ?? 0} (unlimited)`
-                  : `${usageData.usage.bankAccountsUsed ?? 0} / ${usageData.usage.bankAccountsLimit ?? '—'}`)}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Org-wide seats</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Full clean exports / mo</p>
-            <p className="mt-0.5 font-semibold text-gray-900">
-              {usageData.usage.cleanExportsDisplay ??
-                (usageData.usage.cleanExportsUnlimited
-                  ? `${usageData.usage.cleanExportsUsed ?? 0} (unlimited)`
-                  : `${usageData.usage.cleanExportsUsed ?? 0} / ${usageData.usage.cleanExportsLimit ?? '—'}`)}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Sample downloads free</p>
-          </div>
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricCard
+            className="!p-4"
+            label="Projects / mo"
+            value={
+              usageData.usage.projectsDisplay ??
+              (usageData.usage.projectsUnlimited
+                ? `${usageData.usage.projectsUsed} (unlimited)`
+                : `${usageData.usage.projectsUsed} / ${usageData.usage.projectsLimit}`)
+            }
+          />
+          <MetricCard
+            className="!p-4"
+            label="Transactions / mo"
+            value={
+              usageData.usage.transactionsDisplay ??
+              (usageData.usage.transactionsUnlimited
+                ? `${usageData.usage.transactionsUsed} (unlimited)`
+                : `${usageData.usage.transactionsUsed} / ${usageData.usage.transactionsLimit}`)
+            }
+          />
+          <MetricCard
+            className="!p-4"
+            label="Bank accounts"
+            value={
+              usageData.usage.bankAccountsDisplay ??
+              (usageData.usage.bankAccountsUnlimited
+                ? `${usageData.usage.bankAccountsUsed ?? 0} (unlimited)`
+                : `${usageData.usage.bankAccountsUsed ?? 0} / ${usageData.usage.bankAccountsLimit ?? '—'}`)
+            }
+            sublabel="Org-wide seats"
+          />
+          <MetricCard
+            className="!p-4"
+            label="Full clean exports / mo"
+            value={
+              usageData.usage.cleanExportsDisplay ??
+              (usageData.usage.cleanExportsUnlimited
+                ? `${usageData.usage.cleanExportsUsed ?? 0} (unlimited)`
+                : `${usageData.usage.cleanExportsUsed ?? 0} / ${usageData.usage.cleanExportsLimit ?? '—'}`)
+            }
+            sublabel="Sample downloads free"
+          />
         </div>
       )}
-      <p className="text-xs text-gray-500 mb-4 leading-relaxed border-l-2 border-primary-200 pl-3">
+      <p className="text-xs text-gray-500 mb-4 leading-relaxed">
         Workspace subscriptions are charged in <strong>GHS</strong> via Paystack. Each project&apos;s reporting currency
         (GHS, USD, or EUR) is chosen under <strong>Projects</strong> when you create or open a job — it affects BRS and
         workbook amounts only, not what you pay for the plan.
       </p>
       {usageData?.subscription && (
-        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-          <p>
-            Subscription status:{' '}
-            <strong className="capitalize text-gray-900">{usageData.subscription.status}</strong>
-          </p>
+        <Alert
+          tone="info"
+          title={`Subscription: ${(usageData.subscription.status ?? 'unknown').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())}`}
+          className="mb-4"
+        >
           {usageData.subscription.status === 'trial' && usageData.subscription.trialEndsAt && (
-            <p>
-              Trial ends:{' '}
-              <strong>{new Date(usageData.subscription.trialEndsAt).toLocaleString()}</strong>
-            </p>
+            <p>Trial ends: {new Date(usageData.subscription.trialEndsAt).toLocaleString()}</p>
           )}
           {usageData.subscription.currentPeriodEnd && (
             <p>
               Current period ends:{' '}
-              <strong>{new Date(usageData.subscription.currentPeriodEnd).toLocaleString()}</strong>
+              {new Date(usageData.subscription.currentPeriodEnd).toLocaleString()}
             </p>
           )}
           {usageData.subscription.latestPaymentAmount != null && (
             <p>
-              Last payment: <strong>GH₵{usageData.subscription.latestPaymentAmount}</strong>
+              Last payment: GH₵{usageData.subscription.latestPaymentAmount}
               {usageData.subscription.latestPaymentPeriod
                 ? ` (${usageData.subscription.latestPaymentPeriod})`
                 : ''}
             </p>
           )}
-        </div>
+        </Alert>
       )}
       {plansData?.introOffer?.eligible && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-          <strong>Intro offer:</strong> {plansData.introOffer.description}.{' '}
+        <Alert tone="success" title="Intro offer" className="mb-4">
+          {plansData.introOffer.description}.{' '}
           {plansData.introOffer.remainingPeriods != null
             ? `${plansData.introOffer.remainingPeriods} discounted billing period${
                 plansData.introOffer.remainingPeriods === 1 ? '' : 's'
               } remaining.`
             : `Applies to your first ${plansData.introOffer.months ?? 2} billing periods.`}
-        </div>
+        </Alert>
       )}
       {canManageBilling(role) && plansData?.paystackConfigured ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -173,9 +181,9 @@ export default function SettingsBillingTab({
             const firstYearGhs = introEligible ? Math.round(p.yearlyGhs * 0.5 * 100) / 100 : null
             const isCurrentPlan = usageData?.organization?.plan === p.id
             return (
-              <div
+              <Card
                 key={p.id}
-                className="border border-gray-200 rounded-xl p-6 sm:p-7 min-w-0 bg-white shadow-sm hover:shadow transition-shadow flex flex-col"
+                className="flex flex-col min-w-0 hover:shadow-card-hover"
               >
                 <h3 className="font-semibold tracking-tight text-gray-900">{p.name}</h3>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -191,50 +199,49 @@ export default function SettingsBillingTab({
                   GH₵{q}/qtr · GH₵{p.yearlyGhs}/yr ({formatYearlyDiscountLabel(p.monthlyGhs, p.yearlyGhs)})
                 </p>
                 <div className="mt-5 flex flex-col gap-3 flex-1 justify-end">
-                  <button
+                  <Button
                     type="button"
+                    size="lg"
+                    className="w-full"
                     onClick={() => onUpgrade(p.id, 'monthly')}
-                    disabled={initializing === `${p.id}-monthly`}
-                    className="w-full px-5 py-3 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm hover:shadow transition-all"
+                    isLoading={initializing === `${p.id}-monthly`}
                   >
-                    {initializing === `${p.id}-monthly`
-                      ? 'Redirecting...'
-                      : isCurrentPlan
-                        ? firstMonthGhs != null
-                          ? `Renew monthly (GH₵${firstMonthGhs} intro)`
-                          : 'Renew monthly'
-                        : firstMonthGhs != null
-                          ? `Pay monthly (GH₵${firstMonthGhs} intro)`
-                          : 'Pay monthly'}
-                  </button>
-                  <button
+                    {isCurrentPlan
+                      ? firstMonthGhs != null
+                        ? `Renew monthly (GH₵${firstMonthGhs} intro)`
+                        : 'Renew monthly'
+                      : firstMonthGhs != null
+                        ? `Pay monthly (GH₵${firstMonthGhs} intro)`
+                        : 'Pay monthly'}
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="lg"
+                    className="w-full leading-snug"
                     onClick={() => onUpgrade(p.id, 'quarterly')}
-                    disabled={initializing === `${p.id}-quarterly`}
-                    className="w-full px-5 py-3 font-medium border border-gray-300 text-gray-800 bg-white rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm shadow-sm transition-all leading-snug"
+                    isLoading={initializing === `${p.id}-quarterly`}
                   >
-                    {initializing === `${p.id}-quarterly`
-                      ? 'Redirecting...'
-                      : firstQuarterGhs != null
-                        ? `Pay quarterly (GH₵${firstQuarterGhs} intro)`
-                        : `Pay quarterly (GH₵${q})`}
-                  </button>
-                  <button
+                    {firstQuarterGhs != null
+                      ? `Pay quarterly (GH₵${firstQuarterGhs} intro)`
+                      : `Pay quarterly (GH₵${q})`}
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="lg"
+                    className="w-full leading-snug"
                     onClick={() => onUpgrade(p.id, 'yearly')}
-                    disabled={initializing === `${p.id}-yearly`}
-                    className="w-full px-5 py-3 font-medium border border-gray-300 text-gray-800 bg-white rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm shadow-sm transition-all leading-snug"
+                    isLoading={initializing === `${p.id}-yearly`}
                   >
-                    {initializing === `${p.id}-yearly`
-                      ? 'Redirecting...'
-                      : firstYearGhs != null
-                        ? `Pay yearly (GH₵${firstYearGhs} intro)`
-                        : isCurrentPlan
-                          ? `Renew yearly (GH₵${p.yearlyGhs})`
-                          : `Pay yearly (GH₵${p.yearlyGhs})`}
-                  </button>
+                    {firstYearGhs != null
+                      ? `Pay yearly (GH₵${firstYearGhs} intro)`
+                      : isCurrentPlan
+                        ? `Renew yearly (GH₵${p.yearlyGhs})`
+                        : `Pay yearly (GH₵${p.yearlyGhs})`}
+                  </Button>
                 </div>
-              </div>
+              </Card>
             )
           })}
         </div>

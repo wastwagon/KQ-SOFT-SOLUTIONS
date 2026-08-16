@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import BrsHelp from '../components/BrsHelp'
 import ConfirmedMatchesPanel from '../components/reconcile/ConfirmedMatchesPanel'
 import MatchActionBar from '../components/reconcile/MatchActionBar'
@@ -15,6 +15,7 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Button from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 import { ghanaBankProfileTip } from '../lib/ghanaBankProfileTips'
 
@@ -108,21 +109,17 @@ export default function ProjectReconcile({
         ? err.message
         : 'Check your connection and try again.'
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
-        <p className="font-medium text-red-900">Could not load reconciliation data</p>
-        <p className="mt-1">{detail}</p>
-        <p className="mt-2 text-xs text-red-700/90">
+      <Alert
+        tone="error"
+        title="Could not load reconciliation data"
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
+      >
+        <p>{detail}</p>
+        <p className="mt-2 text-xs opacity-90">
           If you just finished mapping, wait a few seconds for imports to settle, then retry. Large PDF/Excel
           files can take longer on first open of Reconcile.
         </p>
-        <button
-          type="button"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
-          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-xl bg-white border border-red-300 text-red-900 hover:bg-red-100"
-        >
-          Retry
-        </button>
-      </div>
+      </Alert>
     )
   }
 
@@ -196,110 +193,116 @@ export default function ProjectReconcile({
     }
   }
 
+  const ghanaTip =
+    canReconcile && data.reconcileProfile?.ghanaBrs
+      ? ghanaBankProfileTip(data.reconcileProfile?.bankFormat)
+      : null
+  const ghanaWindowDays = data.reconcileProfile?.clearingDateWindowDays
+  const hasWarnings =
+    anyTruncated ||
+    (receipts.length === 0 && (view === 'receipts' || view === 'all')) ||
+    (payments.length === 0 && (view === 'payments' || view === 'all')) ||
+    !!data.sideInversion?.inverted ||
+    (data.duplicateChequeWarnings?.length ?? 0) > 0 ||
+    !!ghanaTip
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <WorkflowStepIntro
         eyebrow="Match"
         title="Reconcile transactions"
-        subtitle={
-          <>
-            This step <strong>matches your cash book entries</strong> (receipts or payments) to{' '}
-            <strong>bank statement entries</strong> (credits or debits). Use the suggested matches for speed, or select
-            rows in the tables below and click Match. When you&apos;re done, proceed to Review to finalise.
-          </>
-        }
+        subtitle="Match cash book receipts and payments to bank credits and debits. Confirm suggestions, or select rows and match yourself."
       />
 
       <BrsHelp variant="reconcile" />
 
-      {anyTruncated && (
-        <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
-          <p className="text-sm text-amber-800">
-            Showing first {Math.min(reconcileLimit, RECONCILE_CLIENT_LIMIT) / 4} transactions per category. Some
-            transactions are hidden.
+      <div className="sticky top-0 z-20 -mx-1 border-b border-border-muted bg-surface/95 px-1 py-3 backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-gray-700">
+            <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> matches
+            confirmed
+            {view === 'all'
+              ? '. Switch to Receipts or Payments to match.'
+              : canReconcile
+                ? '. Select a cash book row and a bank row, then confirm.'
+                : '. View-only.'}
           </p>
-          <button
-            type="button"
-            onClick={loadMore}
-            className="px-4 py-2 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-xl transition-colors"
-          >
-            Load more
-          </button>
+          <ReconcileToolbar
+            view={view}
+            onViewChange={setView}
+            bankAccounts={bankAccounts}
+            bankAccountId={bankAccountId}
+            onBankAccountChange={setBankAccountId}
+          />
         </div>
-      )}
+      </div>
 
-      <ReconcileToolbar
-        view={view}
-        onViewChange={setView}
-        bankAccounts={bankAccounts}
-        bankAccountId={bankAccountId}
-        onBankAccountChange={setBankAccountId}
-      />
-
-      <p className="text-sm font-medium text-gray-700">
-        <span className="text-primary-600">{data.existingMatches ?? 0}</span> matches confirmed.
-        {view === 'all'
-          ? ' Cash book (all) shows receipts and payments together. Switch to Receipts or Payments to match.'
-          : canReconcile
-            ? ' Select a cash book row and a bank row, then click Match.'
-            : ' View-only access.'}
-      </p>
-
-      {receipts.length === 0 && (view === 'receipts' || view === 'all') && (
-        <EmptyHint>
-          No cash book receipts found. Upload your cash book as{' '}
-          <strong>Both (receipts + payments)</strong> and map the receipts document with the{' '}
-          <strong>amt_received</strong> column.
-        </EmptyHint>
-      )}
-      {payments.length === 0 && (view === 'payments' || view === 'all') && (
-        <EmptyHint>
-          No cash book payments found. Upload your cash book as{' '}
-          <strong>Both (receipts + payments)</strong> and map the payments document with the{' '}
-          <strong>amt_paid</strong> column.
-        </EmptyHint>
+      {hasWarnings && (
+        <ReconcileNotices>
+          {anyTruncated && (
+            <div className="flex items-center justify-between gap-4">
+              <p>
+                Showing the first {Math.min(reconcileLimit, RECONCILE_CLIENT_LIMIT) / 4} transactions per
+                category. Some rows are hidden.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={loadMore}
+                className="shrink-0"
+              >
+                Load more
+              </Button>
+            </div>
+          )}
+          {receipts.length === 0 && (view === 'receipts' || view === 'all') && (
+            <p>
+              No cash book receipts found. Upload the cash book with both receipts and payments, then map
+              the amount-received column.
+            </p>
+          )}
+          {payments.length === 0 && (view === 'payments' || view === 'all') && (
+            <p>
+              No cash book payments found. Upload the cash book with both receipts and payments, then map
+              the amount-paid column.
+            </p>
+          )}
+          {canReconcile && ghanaTip && (
+            <p>
+              <strong>{ghanaTip.title}</strong>
+              {data.reconcileProfile?.bankFormat === 'ecobank' && ghanaWindowDays
+                ? ` — clearing matches use a ${ghanaWindowDays}-day date window. `
+                : ' — '}
+              {ghanaTip.body}
+            </p>
+          )}
+          {data.sideInversion?.inverted && canReconcile && (
+            <p>
+              <strong>Cash-book sides look swapped</strong> — this export appears to flip receipts with
+              bank debits and payments with bank credits. Suggestions are paired on the crossed sides
+              automatically. {data.sideInversion.reason}
+            </p>
+          )}
+          {(data.duplicateChequeWarnings?.length ?? 0) > 0 && canReconcile && (
+            <p>
+              <strong>Duplicate cheque numbers in cash book:</strong>{' '}
+              {data.duplicateChequeWarnings!.map((w) => `${w.chqNo} (×${w.count})`).join(', ')}. Match
+              each row carefully — bulk match skips ambiguous pairs.
+            </p>
+          )}
+        </ReconcileNotices>
       )}
 
       {canReconcile && (
-        <p className="text-xs text-slate-600 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 max-w-2xl">
-          <strong>Best practice:</strong> For cheques, match only when the amount (and reference if
-          present) matches the bank. Prefer bank-pattern suggestions (Clearing, INW CLG, cheque paid,
-          telex, EBOX/FT, etc.) before generic amount pairs. Each project is one currency — matching
-          does not convert FX.
-        </p>
-      )}
-
-      {canReconcile &&
-        data.reconcileProfile?.ghanaBrs &&
-        (() => {
-          const tip = ghanaBankProfileTip(data.reconcileProfile?.bankFormat)
-          if (!tip) return null
-          const windowDays = data.reconcileProfile?.clearingDateWindowDays
-          return (
-            <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 max-w-2xl">
-              <strong>{tip.title}</strong>
-              {data.reconcileProfile?.bankFormat === 'ecobank' && windowDays
-                ? ` — clearing matches use a ${windowDays}-day date window. `
-                : ' — '}
-              {tip.body}
-            </div>
-          )
-        })()}
-
-      {data.sideInversion?.inverted && canReconcile && (
-        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-950 max-w-2xl">
-          <strong>Cash-book side inversion detected</strong> — this ERP export appears to flip bank
-          sides (receipts line up with bank debits, payments with bank credits). Suggestions are
-          paired on the crossed sides automatically. {data.sideInversion.reason}
-        </div>
-      )}
-
-      {(data.duplicateChequeWarnings?.length ?? 0) > 0 && canReconcile && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 max-w-2xl">
-          <strong>Duplicate cheque numbers in cash book:</strong>{' '}
-          {data.duplicateChequeWarnings!.map((w) => `${w.chqNo} (×${w.count})`).join(', ')}. Match
-          each row carefully — bulk match skips ambiguous pairs.
-        </div>
+        <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 max-w-2xl">
+          <summary className="cursor-pointer font-semibold text-slate-800">Matching tips</summary>
+          <p className="mt-2 leading-relaxed">
+            For cheques, match only when the amount (and reference if present) matches the bank. Prefer
+            bank-pattern suggestions (Clearing, INW CLG, cheque paid, telex, EBOX/FT) before generic
+            amount pairs. Each project is one currency — matching does not convert FX.
+          </p>
+        </details>
       )}
 
       {canReconcile && (
@@ -386,11 +389,11 @@ export default function ProjectReconcile({
         />
       )}
 
-      <p className="text-sm font-medium text-gray-600 mb-3">
+      <p className="text-sm font-medium text-gray-600">
         {view === 'all'
-          ? 'Cash book (all) shows receipts and payments together. Rows with 🔗 have suggested matches — hover for tooltip. Switch to Receipts or Payments to select and match.'
+          ? 'Cash book (all) shows receipts and payments together. A mark next to the date means a suggested match — hover for details. Switch to Receipts or Payments to select and match.'
           : canReconcile
-            ? 'Click rows to select. Rows with 🔗 have suggested matches — hover for tooltip. 1-to-1, 1-to-many, many-to-1, or many-to-many (multiple cash book + multiple bank).'
+            ? 'Click rows to select. A mark next to the date means a suggested match — hover for details. You can match 1-to-1, 1-to-many, many-to-1, or many-to-many.'
             : 'View-only. Row selection is disabled.'}
       </p>
 
@@ -415,12 +418,11 @@ export default function ProjectReconcile({
       />
 
       {onProceedToReview && (
-        <div className="pt-8 mt-12 border-t border-gray-100 flex flex-wrap items-center justify-between gap-6">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-6 border-t border-gray-100 pt-8">
           <div className="max-w-md">
-            <h4 className="text-base font-bold text-gray-900 mb-1">Ready to finalise?</h4>
+            <h4 className="mb-1 text-base font-bold text-gray-900">Ready to finalise?</h4>
             <p className="text-sm text-gray-500">
-              Review your matches and verify un-reconciled items before generating your professional
-              BRS report.
+              Review matches and unmatched items before generating the BRS report.
             </p>
           </div>
           <Button type="button" onClick={onProceedToReview} className="bg-gray-900 hover:bg-gray-800 focus:ring-gray-700">
@@ -433,10 +435,21 @@ export default function ProjectReconcile({
   )
 }
 
-function EmptyHint({ children }: { children: React.ReactNode }) {
+function ReconcileNotices({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(true)
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-      <p className="text-sm font-medium text-amber-800">{children}</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800">
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full !justify-between px-4 py-2.5 h-auto font-semibold text-slate-800 hover:bg-slate-100/80"
+        aria-expanded={open}
+      >
+        Notices
+        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+      </Button>
+      {open && <div className="space-y-3 border-t border-slate-200 px-4 py-3">{children}</div>}
     </div>
   )
 }

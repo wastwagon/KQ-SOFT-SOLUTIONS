@@ -18,7 +18,7 @@ export default function LegalDocument({ title, updated, children }: LegalDocumen
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link
             to="/"
-            className="inline-flex items-center rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-gray-100 transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="inline-flex items-center rounded-xl border border-border bg-white px-3 py-2 shadow-card transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             aria-label="KQ-SOFT home"
           >
             <BrandLogo className="h-8 w-auto" />

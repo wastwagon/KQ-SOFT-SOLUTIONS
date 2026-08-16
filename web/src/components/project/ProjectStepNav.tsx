@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import Button from '../ui/Button'
 
 /**
  * Stepper for the BRS workflow — aligned with Figma golden-path screens.
@@ -43,19 +44,20 @@ export default function ProjectStepNav({ steps, current, onChange }: ProjectStep
             const isCompleted = i < safeCurrent
             return (
               <li key={s.id} className="min-w-0 sm:flex-1">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => onChange(i)}
                   aria-current={isCurrent ? 'step' : undefined}
                   className={[
-                    'group flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-all',
-                    'sm:flex-col sm:gap-2 sm:px-2 sm:py-1.5 sm:text-center',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                    'group w-full !h-auto !min-h-0 items-center gap-2 !rounded-lg px-2.5 py-2 text-sm',
+                    'sm:!flex-col sm:gap-2 sm:px-2 sm:py-1.5 sm:text-center',
                     isCurrent
-                      ? 'bg-primary-50 text-primary-700'
+                      ? '!bg-primary-50 !text-primary-700 hover:!bg-primary-50'
                       : isCompleted
-                        ? 'text-primary-700 hover:bg-primary-50/60'
-                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
+                        ? '!text-primary-700 hover:!bg-primary-50/60'
+                        : '!text-gray-500 hover:!bg-gray-50 hover:!text-gray-700',
                   ].join(' ')}
                 >
                   <span
@@ -75,7 +77,7 @@ export default function ProjectStepNav({ steps, current, onChange }: ProjectStep
                     <span className="sm:hidden">{i + 1}. </span>
                     {s.label}
                   </span>
-                </button>
+                </Button>
               </li>
             )
           })}

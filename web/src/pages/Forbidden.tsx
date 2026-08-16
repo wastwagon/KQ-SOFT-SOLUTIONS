@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Home, ShieldOff } from 'lucide-react'
 import BrandLogo from '../components/BrandLogo'
+import Button, { buttonClassName } from '../components/ui/Button'
 import { useAuth } from '../store/auth'
 
 /**
@@ -19,7 +20,7 @@ export default function Forbidden() {
       <header className="px-4 py-5 sm:px-8">
         <Link
           to={homeHref}
-          className="inline-flex items-center rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-gray-100 transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="inline-flex items-center rounded-xl border border-border bg-white px-3 py-2 shadow-card transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           aria-label="KQ-SOFT home"
         >
           <BrandLogo className="h-8 w-auto" />
@@ -44,21 +45,20 @@ export default function Forbidden() {
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              to={homeHref}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-primary-600/20 transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:w-auto"
-            >
+            <Link to={homeHref} className={buttonClassName('primary', 'lg', 'w-full sm:w-auto gap-2')}>
               <Home className="h-4 w-4" aria-hidden="true" />
               {homeLabel}
             </Link>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="lg"
               onClick={() => window.history.back()}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:w-auto"
+              className="w-full sm:w-auto"
             >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
               Go back
-            </button>
+            </Button>
           </div>
         </div>
       </main>

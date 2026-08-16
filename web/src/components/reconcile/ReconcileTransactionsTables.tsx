@@ -9,16 +9,15 @@ import {
 } from '../../lib/transactionDateOrder'
 import DateOrderToggle from '../DateOrderToggle'
 import ReconcileTableExportButtons from './ReconcileTableExportButtons'
+import SuggestedMatchMark from './SuggestedMatchMark'
+import Badge from '../ui/Badge'
+import Card from '../ui/Card'
 import type { ReconcileView, SuggestedMatch, Tx } from './types'
 
 /**
  * The two stacked transaction tables (Cash Book + Bank Statement) shown at
- * the bottom of the reconcile page.  Owns its own row-tooltip computation
- * (suggestion maps + unmatched reasons) and running-balance accumulation
- * so the page-level orchestrator stays slim.
- *
- * The component is deliberately read-mostly: selection state comes in from
- * the page, and clicks delegate back through `onToggleCb`/`onToggleBank`.
+ * the bottom of the reconcile page. Owns suggestion maps, unmatched reasons,
+ * and running-balance accumulation so the page-level orchestrator stays slim.
  */
 interface ReconcileTransactionsTablesProps {
   projectSlug: string
@@ -49,6 +48,10 @@ function formatMatchTooltip(label: string, t: Tx, conf: number, reason: string) 
   return `${label}: ${formatDateCompact(t.date)} • ${(t.name || t.details || '—').slice(0, 40)} • ${fmtAmt(t.amount)} (${Math.round(conf * 100)}%: ${reason})`
 }
 
+/** Extra columns stay available on wide screens; laptops keep date, narrative, and amounts. */
+const COL_XL = 'hidden xl:table-cell'
+const COL_2XL = 'hidden 2xl:table-cell'
+
 export default function ReconcileTransactionsTables({
   projectSlug,
   projectName,
@@ -76,7 +79,7 @@ export default function ReconcileTransactionsTables({
     setStoredDateOrder(next)
   }
 
-  // Build suggestion lookup tables once per render — used for the 🔗 marker
+  // Build suggestion lookup tables once per render — used for the suggested-match marker
   // and the row tooltip.
   const cbReceiptToBank = useMemo(() => buildCbToBank(receiptSugs), [receiptSugs])
   const cbPaymentToBank = useMemo(() => buildCbToBank(paymentSugs), [paymentSugs])
@@ -206,81 +209,81 @@ export default function ReconcileTransactionsTables({
       </div>
 
       {/* Cash Book table */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <Card noPadding>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-surface border-b border-border">
           <h3 className="text-sm font-bold text-gray-900 tracking-tight">Cash Book</h3>
           <ReconcileTableExportButtons side="cash_book" label="cash book" {...exportBase} />
         </div>
         <div className="overflow-x-auto overflow-y-auto max-h-[45rem]">
           <table className="min-w-full text-xs sm:text-sm text-gray-900">
-            <thead className="bg-gray-100/80 sticky top-0">
+            <thead className="bg-white sticky top-0 z-10">
               <tr>
                 {view !== 'all' && (
                   <th
                     scope="col"
-                    className="px-2 sm:px-3 py-2.5 text-left w-8 text-gray-500 font-medium"
+                    className="px-2 sm:px-3 py-1.5 text-left w-8 text-gray-500 font-medium"
                   />
                 )}
                 {view === 'all' && (
                   <th
                     scope="col"
-                    className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                    className="px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap"
                   >
                     Type
                   </th>
                 )}
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap"
                 >
                   Date
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold min-w-[120px]"
+                  className="px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold max-w-[9rem]"
                 >
                   Name
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold min-w-[180px]"
+                  className={`${COL_XL} px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold max-w-[16rem]`}
                 >
                   Description
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                  className={`${COL_XL} px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap`}
                 >
                   Chq no.
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                  className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap`}
                 >
                   Ref. Doc. No.
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  {amountColumnHeader(currency)}
+                  Received ({amountColumnHeader(currency)})
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  {amountColumnHeader(currency)}
+                  Paid ({amountColumnHeader(currency)})
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
+                  className={`${COL_XL} px-2 sm:px-3 py-1.5 text-right text-gray-600 font-semibold whitespace-nowrap`}
                 >
                   Balance ({getCurrencySymbol(currency)})
                 </th>
                 {view !== 'all' && (
                   <th
                     scope="col"
-                    className="px-2 sm:px-3 py-2.5 text-left text-gray-500 font-medium min-w-[100px] sm:min-w-[140px]"
+                    className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-left text-gray-500 font-medium`}
                   >
                     Note
                   </th>
@@ -308,7 +311,7 @@ export default function ReconcileTransactionsTables({
                     } ${matchedCbIds.has(t.id) ? 'opacity-60' : ''}`}
                   >
                     {view !== 'all' && (
-                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap">
+                      <td className="px-2 sm:px-3 py-1.5 whitespace-nowrap">
                         {selectedCbIds.has(t.id) && (
                           <span className="text-primary-600 font-bold" aria-label="Selected">
                             ✓
@@ -317,54 +320,46 @@ export default function ReconcileTransactionsTables({
                       </td>
                     )}
                     {view === 'all' && (
-                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            isReceipt ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
+                      <td className="px-2 sm:px-3 py-1.5 whitespace-nowrap">
+                        <Badge tone={isReceipt ? 'success' : 'brand'} size="sm">
                           {isReceipt ? 'Receipt' : 'Payment'}
-                        </span>
+                        </Badge>
                       </td>
                     )}
-                    <td className="px-2 sm:px-3 py-2 font-medium text-gray-700 whitespace-nowrap">
+                    <td className="px-2 sm:px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap">
                       {formatDateCompact(t.date)}
-                      {sugMap.has(t.id) && (
-                        <span className="ml-1 text-primary-600" title={tooltip}>
-                          🔗
-                        </span>
-                      )}
+                      {sugMap.has(t.id) && <SuggestedMatchMark title={tooltip} />}
                     </td>
                     <td
-                      className="px-2 sm:px-3 py-2 text-gray-900 min-w-[100px]"
-                      title={t.name || ''}
+                      className="px-2 sm:px-3 py-1.5 text-gray-900 max-w-[9rem] truncate"
+                      title={[t.name, t.details].filter(Boolean).join(' — ') || undefined}
                     >
                       {t.name || '—'}
                     </td>
                     <td
-                      className="px-2 sm:px-3 py-2 text-gray-700 min-w-[140px]"
+                      className={`${COL_XL} px-2 sm:px-3 py-1.5 text-gray-700 max-w-[16rem] truncate`}
                       title={t.details || ''}
                     >
                       {t.details || '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-gray-600 font-mono text-xs whitespace-nowrap">
+                    <td className={`${COL_XL} px-2 sm:px-3 py-1.5 text-gray-600 font-mono text-xs whitespace-nowrap`}>
                       {t.chqNo || '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-gray-600 font-mono text-xs whitespace-nowrap">
+                    <td className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-gray-600 font-mono text-xs whitespace-nowrap`}>
                       {t.docRef || '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                    <td className="px-2 sm:px-3 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap">
                       {isReceipt ? formatAmountNumber(t.amount) : '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                    <td className="px-2 sm:px-3 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap">
                       {!isReceipt ? formatAmountNumber(t.amount) : '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right text-gray-600 whitespace-nowrap">
+                    <td className={`${COL_XL} px-2 sm:px-3 py-1.5 text-right text-gray-600 whitespace-nowrap`}>
                       {formatAmountNumber(runningBalance)}
                     </td>
                     {view !== 'all' && (
                       <td
-                        className="px-2 sm:px-3 py-2 text-xs text-amber-700 truncate min-w-0"
+                        className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-xs text-amber-700 truncate max-w-[12rem]`}
                         title={tooltip}
                       >
                         {!matchedCbIds.has(t.id) && getUnmatchedReason(t, true)}
@@ -376,78 +371,78 @@ export default function ReconcileTransactionsTables({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       {/* Bank Statement table */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <Card noPadding>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-surface border-b border-border">
           <h3 className="text-sm font-bold text-gray-900 tracking-tight">Bank Statement</h3>
           <ReconcileTableExportButtons side="bank_statement" label="bank statement" {...exportBase} />
         </div>
         <div className="overflow-x-auto overflow-y-auto max-h-[45rem]">
           <table className="min-w-full text-xs sm:text-sm text-gray-900">
-            <thead className="bg-gray-100/80 sticky top-0">
+            <thead className="bg-white sticky top-0 z-10">
               <tr>
                 {view !== 'all' && (
                   <th
                     scope="col"
-                    className="px-2 sm:px-3 py-2.5 text-left w-8 text-gray-500 font-medium"
+                    className="px-2 sm:px-3 py-1.5 text-left w-8 text-gray-500 font-medium"
                   />
                 )}
                 {view === 'all' && (
                   <th
                     scope="col"
-                    className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                    className="px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap"
                   >
                     Type
                   </th>
                 )}
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap"
                 >
                   Date
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold min-w-[180px]"
+                  className="px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold max-w-[16rem]"
                 >
                   Description
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                  className={`${COL_XL} px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap`}
                 >
                   Chq no.
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-left text-gray-600 font-semibold whitespace-nowrap"
+                  className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-left text-gray-600 font-semibold whitespace-nowrap`}
                 >
                   Ref. Doc. No.
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  {amountColumnHeader(currency)}
+                  Debit ({amountColumnHeader(currency)})
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1.5 text-right text-gray-600 font-semibold whitespace-nowrap"
                 >
-                  {amountColumnHeader(currency)}
+                  Credit ({amountColumnHeader(currency)})
                 </th>
                 <th
                   scope="col"
-                  className="px-2 sm:px-3 py-2.5 text-right text-gray-600 font-semibold whitespace-nowrap"
+                  className={`${COL_XL} px-2 sm:px-3 py-1.5 text-right text-gray-600 font-semibold whitespace-nowrap`}
                 >
                   Balance ({getCurrencySymbol(currency)})
                 </th>
                 {view !== 'all' && (
                   <th
                     scope="col"
-                    className="px-2 sm:px-3 py-2.5 text-left text-gray-500 font-medium min-w-[100px] sm:min-w-[140px]"
+                    className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-left text-gray-500 font-medium`}
                   >
                     Note
                   </th>
@@ -475,19 +470,13 @@ export default function ReconcileTransactionsTables({
                     } ${matchedBankIds.has(t.id) ? 'opacity-60' : ''}`}
                   >
                     {view === 'all' ? (
-                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            t._type === 'credit'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
+                      <td className="px-2 sm:px-3 py-1.5 whitespace-nowrap">
+                        <Badge tone={t._type === 'credit' ? 'success' : 'brand'} size="sm">
                           {t._type === 'credit' ? 'Credit' : 'Debit'}
-                        </span>
+                        </Badge>
                       </td>
                     ) : (
-                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap">
+                      <td className="px-2 sm:px-3 py-1.5 whitespace-nowrap">
                         {selectedBankIds.has(t.id) && (
                           <span className="text-primary-600 font-bold" aria-label="Selected">
                             ✓
@@ -495,35 +484,28 @@ export default function ReconcileTransactionsTables({
                         )}
                       </td>
                     )}
-                    <td className="px-2 sm:px-3 py-2 font-medium text-gray-700 whitespace-nowrap">
+                    <td className="px-2 sm:px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap">
                       {formatDateCompact(t.date)}
-                      {sugMap.has(t.id) && (
-                        <span className="ml-1 text-primary-600" title={tooltip}>
-                          🔗
-                        </span>
-                      )}
+                      {sugMap.has(t.id) && <SuggestedMatchMark title={tooltip} />}
                     </td>
                     <td
-                      className="px-2 sm:px-3 py-2 text-gray-900 min-w-[140px]"
-                      title={t.details || ''}
+                      className="px-2 sm:px-3 py-1.5 text-gray-900 max-w-[16rem] truncate"
+                      title={t.details || t.name || undefined}
                     >
                       <span>{t.name || t.details || '—'}</span>
                       {flaggedBankIds.has(t.id) && (
-                        <span
-                          className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded"
-                          title="Flagged by bank rule"
-                        >
+                        <Badge size="sm" tone="warning" className="ml-1" title="Flagged by bank rule">
                           Flagged
-                        </span>
+                        </Badge>
                       )}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-gray-600 font-mono text-xs whitespace-nowrap">
+                    <td className={`${COL_XL} px-2 sm:px-3 py-1.5 text-gray-600 font-mono text-xs whitespace-nowrap`}>
                       {t.chqNo || '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-gray-600 font-mono text-xs whitespace-nowrap">
+                    <td className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-gray-600 font-mono text-xs whitespace-nowrap`}>
                       {t.docRef || '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                    <td className="px-2 sm:px-3 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap">
                       {view === 'all'
                         ? !isCredit
                           ? formatAmountNumber(amt)
@@ -532,7 +514,7 @@ export default function ReconcileTransactionsTables({
                           ? formatAmountNumber(amt)
                           : '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                    <td className="px-2 sm:px-3 py-1.5 text-right font-semibold text-gray-900 whitespace-nowrap">
                       {view === 'all'
                         ? isCredit
                           ? formatAmountNumber(amt)
@@ -541,12 +523,12 @@ export default function ReconcileTransactionsTables({
                           ? formatAmountNumber(amt)
                           : '—'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right text-gray-600 whitespace-nowrap">
+                    <td className={`${COL_XL} px-2 sm:px-3 py-1.5 text-right text-gray-600 whitespace-nowrap`}>
                       {formatAmountNumber(runningBalance)}
                     </td>
                     {view !== 'all' && (
                       <td
-                        className="px-2 sm:px-3 py-2 text-xs text-amber-700 truncate min-w-0"
+                        className={`${COL_2XL} px-2 sm:px-3 py-1.5 text-xs text-amber-700 truncate max-w-[12rem]`}
                         title={tooltip}
                       >
                         {!matchedBankIds.has(t.id) && getUnmatchedReason(t, false)}
@@ -558,7 +540,7 @@ export default function ReconcileTransactionsTables({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

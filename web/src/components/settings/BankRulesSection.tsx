@@ -3,7 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bankRules as bankRulesApi, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import Alert from '../ui/Alert'
+import Button from '../ui/Button'
+import Card from '../ui/Card'
+import EmptyState from '../ui/EmptyState'
+import Input from '../ui/Input'
+import Select from '../ui/Select'
 import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
+import { PageBodySkeleton } from '../ui/Skeleton'
+import Badge from '../ui/Badge'
 
 type ConditionRow = { field: string; operator: string; value: string }
 const defaultCondition = (): ConditionRow => ({ field: 'description', operator: 'contains', value: '' })
@@ -105,58 +113,48 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
       </div>
     )
   }
-  if (isLoading) return <p className="text-sm text-gray-500">Loading rules...</p>
+  if (isLoading) {
+    return <PageBodySkeleton label="Loading bank rules" />
+  }
 
   if (rulesQueryError && !paywallBlocked) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        <p className="font-medium text-red-900">Could not load bank rules</p>
-        <p className="mt-1">
-          {rulesQueryError instanceof Error ? rulesQueryError.message : 'Something went wrong.'}
-        </p>
-        <button
-          type="button"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['bank-rules'] })}
-          className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-        >
-          Retry
-        </button>
-      </div>
+      <Alert
+        tone="error"
+        title="Could not load bank rules"
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ['bank-rules'] })}
+      >
+        {rulesQueryError instanceof Error ? rulesQueryError.message : 'Something went wrong.'}
+      </Alert>
     )
   }
 
   return (
     <div className="space-y-4">
       {!canEdit && (
-        <p className="text-sm text-amber-600">
-          You have view-only access to bank rules. Contact an admin or reviewer to add or edit rules.
-        </p>
+        <Alert tone="info" title="View only">
+          Contact an admin or reviewer to add or edit rules.
+        </Alert>
       )}
       {rules.length === 0 && !showForm && (
-        <div className="py-8 text-center rounded-xl border border-gray-200 bg-gray-50/50">
-          <p className="text-base font-semibold tracking-tight text-gray-900">No rules yet</p>
-          <p className="mt-1 text-sm text-gray-600">Add a rule to auto-suggest or flag matching bank transactions.</p>
-        </div>
+        <EmptyState
+          title="No rules yet"
+          description="Add a rule to auto-suggest or flag matching bank transactions."
+        />
       )}
       {rules.length > 0 && (
         <ul className="space-y-2">
           {rules.map((r) => (
             <li
               key={r.id}
-              className="group flex items-center justify-between p-4 border border-gray-200 rounded-xl shadow-sm bg-white hover:border-primary-200 transition-colors"
+              className="group flex items-center justify-between p-4 border border-border rounded-xl shadow-card bg-white hover:border-primary-200 transition-colors"
             >
               <div>
                 <p className="font-semibold text-gray-900">{r.name}</p>
                 <div className="flex flex-wrap gap-2 mt-1.5">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      r.action === 'suggest_match'
-                        ? 'bg-green-50 text-green-700 border border-green-100'
-                        : 'bg-amber-50 text-amber-700 border border-amber-100'
-                    }`}
-                  >
+                  <Badge tone={r.action === 'suggest_match' ? 'success' : 'warning'} size="sm" className="uppercase tracking-wider">
                     {r.action.replace(/_/g, ' ')}
-                  </span>
+                  </Badge>
                   <span className="text-[11px] text-gray-500 font-medium">Priority {r.priority}</span>
                 </div>
                 <p className="mt-1.5 text-xs text-gray-600 leading-relaxed italic">
@@ -171,8 +169,10 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
               </div>
               {canEdit && (
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={() => {
                       setEditId(r.id)
                       setName(r.name)
@@ -187,12 +187,13 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
                       setConditions(conds)
                       setAction((r.action as 'suggest_match' | 'flag_for_review') || 'suggest_match')
                     }}
-                    className="text-sm text-primary-600 hover:text-primary-700"
                   >
                     Edit
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={async () => {
                       const ok = await confirm({
                         title: 'Delete this rule?',
@@ -202,10 +203,10 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
                       })
                       if (ok) deleteMutation.mutate(r.id)
                     }}
-                    className="text-sm text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </li>
@@ -213,137 +214,131 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
         </ul>
       )}
       {canEdit && (showForm || editId) ? (
-        <form onSubmit={handleSubmit} className="p-5 border border-gray-200 rounded-xl bg-gray-50/80 space-y-4 shadow-sm">
-          <h3 className="text-base font-semibold tracking-tight text-gray-900">
-            {editId ? 'Edit rule' : 'Add rule'}
-          </h3>
-          <input
+        <Card title={editId ? 'Edit rule' : 'Add rule'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Rule name (e.g. Bank fees)"
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             required
           />
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs text-gray-500 font-medium">Conditions (all must match)</label>
-              <button
-                type="button"
-                onClick={() => setConditions((c) => [...c, defaultCondition()])}
-                className="text-xs text-primary-600 hover:text-primary-700"
-              >
-                + Add condition
-              </button>
+              <p className="text-xs font-medium text-gray-500">Conditions (all must match)</p>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setConditions((c) => [...c, defaultCondition()])}>
+                Add condition
+              </Button>
             </div>
             <div className="space-y-2">
               {conditions.map((cond, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-wrap items-end gap-2 p-2 bg-white rounded border border-gray-200"
+                  className="flex flex-wrap items-end gap-2 p-2 bg-white rounded border border-border"
                 >
-                  <select
-                    value={cond.field}
-                    onChange={(e) =>
-                      setConditions((c) =>
-                        c.map((x, i) => (i === idx ? { ...x, field: e.target.value } : x))
-                      )
-                    }
-                    className="px-2 py-1.5 border border-gray-300 rounded text-sm w-28 bg-white text-gray-900"
-                  >
-                    <option value="description">description</option>
-                    <option value="details">details</option>
-                    <option value="amount">amount</option>
-                    <option value="name">name</option>
-                  </select>
-                  <select
-                    value={cond.operator}
-                    onChange={(e) =>
-                      setConditions((c) =>
-                        c.map((x, i) => (i === idx ? { ...x, operator: e.target.value } : x))
-                      )
-                    }
-                    className="px-2 py-1.5 border border-gray-300 rounded text-sm w-28 bg-white text-gray-900"
-                  >
-                    <option value="contains">contains</option>
-                    <option value="equals">equals</option>
-                    <option value="starts_with">starts_with</option>
-                    <option value="gt">gt</option>
-                    <option value="gte">gte</option>
-                    <option value="lt">lt</option>
-                    <option value="lte">lte</option>
-                  </select>
-                  <input
-                    value={cond.value}
-                    onChange={(e) =>
-                      setConditions((c) =>
-                        c.map((x, i) => (i === idx ? { ...x, value: e.target.value } : x))
-                      )
-                    }
-                    placeholder="e.g. BANK CHARGES"
-                    className="px-2 py-1.5 border border-gray-300 rounded text-sm flex-1 min-w-[100px] bg-white text-gray-900 placeholder-gray-500"
-                  />
-                  <button
+                  <div className="w-32 shrink-0">
+                    <Select
+                      aria-label="Field"
+                      value={cond.field}
+                      onChange={(e) =>
+                        setConditions((c) =>
+                          c.map((x, i) => (i === idx ? { ...x, field: e.target.value } : x))
+                        )
+                      }
+                    >
+                      <option value="description">description</option>
+                      <option value="details">details</option>
+                      <option value="amount">amount</option>
+                      <option value="name">name</option>
+                    </Select>
+                  </div>
+                  <div className="w-32 shrink-0">
+                    <Select
+                      aria-label="Operator"
+                      value={cond.operator}
+                      onChange={(e) =>
+                        setConditions((c) =>
+                          c.map((x, i) => (i === idx ? { ...x, operator: e.target.value } : x))
+                        )
+                      }
+                    >
+                      <option value="contains">contains</option>
+                      <option value="equals">equals</option>
+                      <option value="starts_with">starts_with</option>
+                      <option value="gt">gt</option>
+                      <option value="gte">gte</option>
+                      <option value="lt">lt</option>
+                      <option value="lte">lte</option>
+                    </Select>
+                  </div>
+                  <div className="flex-1 min-w-[100px]">
+                    <Input
+                      value={cond.value}
+                      onChange={(e) =>
+                        setConditions((c) =>
+                          c.map((x, i) => (i === idx ? { ...x, value: e.target.value } : x))
+                        )
+                      }
+                      placeholder="e.g. BANK CHARGES"
+                    />
+                  </div>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setConditions((c) => (c.length > 1 ? c.filter((_, i) => i !== idx) : c))}
-                    className="text-red-600 hover:text-red-700 text-sm px-1"
                     title="Remove condition"
+                    aria-label="Remove condition"
+                    className="text-red-600 hover:text-red-700"
                   >
                     ×
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Action</label>
-            <select
+          <div className="max-w-md">
+            <Select
+              label="Action"
               value={action}
               onChange={(e) => setAction(e.target.value as 'suggest_match' | 'flag_for_review')}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
             >
               <option value="suggest_match">Suggest match (amount match)</option>
               <option value="flag_for_review">Flag for review</option>
-            </select>
+            </Select>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Priority</label>
-            <input
-              type="number"
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24 bg-white text-gray-900"
-            />
-            <span className="text-xs text-gray-500 ml-2">(lower = higher priority)</span>
-          </div>
+          <Input
+            type="number"
+            label="Priority"
+            value={priority}
+            onChange={(e) => setPriority(Number(e.target.value))}
+            className="max-w-[8rem]"
+            hint="Lower number = higher priority"
+          />
           <div className="flex gap-2">
-            <button
+            <Button
               type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-              className="px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 text-sm shadow-sm focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all"
+              isLoading={createMutation.isPending || updateMutation.isPending}
             >
               {editId ? 'Update' : 'Add'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => {
                 setShowForm(false)
                 setEditId(null)
                 resetForm()
               }}
-              className="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-100 text-gray-700 text-sm font-medium shadow-sm transition-colors"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
+        </Card>
       ) : canEdit ? (
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="px-4 py-2.5 font-medium bg-primary-600 text-white rounded-xl hover:bg-primary-700 shadow-sm hover:shadow text-sm focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all"
-        >
-          + Add rule
-        </button>
+        <Button type="button" onClick={() => setShowForm(true)}>
+          Add rule
+        </Button>
       ) : null}
     </div>
   )

@@ -5,34 +5,25 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
+import Input from '../../components/ui/Input'
+import Button from '../../components/ui/Button'
 import PageHeader from '../../components/layout/PageHeader'
+import Alert from '../../components/ui/Alert'
+import Badge from '../../components/ui/Badge'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 
 export default function AdminUsers() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'users', page, search],
     queryFn: () => api(`/admin/users?page=${page}&limit=20${search ? `&search=${encodeURIComponent(search)}` : ''}`) as Promise<{
       users: { id: string; email: string; name: string | null; suspendedAt: string | null; createdAt: string; memberships: { organization: { name: string }; role: string }[] }[]
       pagination: { page: number; limit: number; total: number; totalPages: number }
     }>,
   })
-
-  if (isLoading || !data) {
-    return (
-      <div className="space-y-8">
-        <PageHeader
-          eyebrow="Platform admin"
-          title="Users"
-          subtitle={<p className="text-gray-500">View and manage platform accounts.</p>}
-        />
-        <p className="text-gray-500 text-sm">Loading users…</p>
-      </div>
-    )
-  }
-
-  const { users, pagination } = data
 
   return (
     <div className="space-y-8">
@@ -41,9 +32,8 @@ export default function AdminUsers() {
         title="Users"
         subtitle={<p className="text-gray-500">View and manage platform accounts.</p>}
         actions={
-          <div className="relative w-full sm:w-72 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
+          <div className="w-full sm:w-72 min-w-0">
+            <Input
               type="search"
               value={search}
               onChange={(e) => {
@@ -51,81 +41,94 @@ export default function AdminUsers() {
                 setPage(1)
               }}
               placeholder="Search by email or name..."
-              className="w-full pl-9 pr-3 py-2.5 border border-border rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 shadow-sm min-h-[44px]"
+              leading={<Search className="w-4 h-4" />}
+              aria-label="Search by email or name"
             />
           </div>
         }
       />
 
-      <Card noPadding className="shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-surface">
+      {isLoading && !data && <PageBodySkeleton label="Loading users" />}
+
+      {isError && (
+        <Alert tone="error" title="Could not load users" onRetry={() => void refetch()}>
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
+      )}
+
+      {data && (
+      <Card noPadding>
+        <Table>
+          <TableHead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Organizations</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+              <TableTh>Email</TableTh>
+              <TableTh>Name</TableTh>
+              <TableTh>Status</TableTh>
+              <TableTh>Organizations</TableTh>
+              <TableTh>Joined</TableTh>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-border-muted">
-            {users.map((u) => (
-              <tr key={u.id} className="hover:bg-surface">
-                <td className="px-6 py-4">
+          </TableHead>
+          <TableBody>
+            {data.users.map((u) => (
+              <TableRow key={u.id}>
+                <TableTd>
                   <Link to={`/platform-admin/users/${u.id}`} className="text-primary-600 hover:underline font-medium">
                     {u.email}
                   </Link>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{u.name || '—'}</td>
-                <td className="px-6 py-4">
+                </TableTd>
+                <TableTd>{u.name || '—'}</TableTd>
+                <TableTd>
                   {u.suspendedAt ? (
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                    <Badge tone="danger" size="sm">
                       Suspended
-                    </span>
+                    </Badge>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                    <Badge tone="success" size="sm">
                       Active
-                    </span>
+                    </Badge>
                   )}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
+                </TableTd>
+                <TableTd>
                   {u.memberships.map((m) => `${m.organization.name} (${m.role})`).join(', ') || '—'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                </TableTd>
+                <TableTd className="text-gray-500">
                   {formatDate(u.createdAt)}
-                </td>
-              </tr>
+                </TableTd>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-        </div>
-        {pagination.totalPages > 1 && (
+          </TableBody>
+        </Table>
+        {data.pagination.totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-border">
             <p className="text-sm text-gray-500">
-              Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+              Page {data.pagination.page} of {data.pagination.totalPages} ({data.pagination.total} total)
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={pagination.page <= 1}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:bg-surface focus:ring-2 focus:ring-primary-500"
+                disabled={data.pagination.page <= 1}
+                aria-label="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                disabled={pagination.page >= pagination.totalPages}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:bg-surface focus:ring-2 focus:ring-primary-500"
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))}
+                disabled={data.pagination.page >= data.pagination.totalPages}
+                aria-label="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </Card>
+      )}
     </div>
   )
 }

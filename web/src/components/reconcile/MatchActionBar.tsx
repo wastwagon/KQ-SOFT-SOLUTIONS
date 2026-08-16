@@ -1,11 +1,11 @@
+import { useEffect } from 'react'
 import { Link as LinkIcon } from 'lucide-react'
 import Button from '../ui/Button'
 
 /**
  * Floating bottom-of-viewport action bar shown while there's a valid
- * cash-book × bank selection ready to be matched.  Renders selection counts
- * + Clear / Confirm Match buttons.  Pure-presentational; the page wires the
- * Confirm action to whichever mutation is appropriate (1:1, 1:N, N:1, N:N).
+ * cash-book × bank selection ready to be matched. Enter confirms when
+ * focus is not in a field.
  */
 interface MatchActionBarProps {
   cbCount: number
@@ -22,6 +22,21 @@ export default function MatchActionBar({
   onClear,
   onConfirm,
 }: MatchActionBarProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || isPending || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target
+      if (!(t instanceof HTMLElement)) return
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) {
+        return
+      }
+      e.preventDefault()
+      onConfirm()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isPending, onConfirm])
+
   return (
     <div
       role="toolbar"
@@ -50,18 +65,12 @@ export default function MatchActionBar({
           >
             Clear
           </Button>
-          <Button type="button" size="sm" onClick={onConfirm} disabled={isPending}>
-            {isPending ? (
-              <>
-                <span className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
-                Matching…
-              </>
-            ) : (
-              <>
-                <LinkIcon className="w-4 h-4 mr-2" aria-hidden />
-                Confirm Match
-              </>
-            )}
+          <Button type="button" size="sm" onClick={onConfirm} disabled={isPending} isLoading={isPending}>
+            <LinkIcon className="w-4 h-4 mr-2" aria-hidden />
+            Confirm match
+            <kbd className="ml-2 hidden sm:inline rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white/70">
+              Enter
+            </kbd>
           </Button>
         </div>
       </div>

@@ -14,6 +14,9 @@ import {
 } from '../lib/permissions'
 import { useAuth } from '../store/auth'
 import { useToast } from '../components/ui/Toast'
+import Alert from '../components/ui/Alert'
+import Card from '../components/ui/Card'
+import EmptyState from '../components/ui/EmptyState'
 import ProjectHeader, { type ProjectHeaderProject } from '../components/project/ProjectHeader'
 import ProjectStepNav, { type ProjectStep } from '../components/project/ProjectStepNav'
 import ProjectStageCard from '../components/project/ProjectStageCard'
@@ -163,20 +166,16 @@ export default function ProjectDetail() {
     const err = projectQuery.error ?? clientsQuery.error
     return (
       <div className="space-y-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
-          <p className="font-medium text-red-900">Could not load project</p>
-          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: ['project', slug] })
-              void queryClient.invalidateQueries({ queryKey: ['clients'] })
-            }}
-            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load project"
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: ['project', slug] })
+            void queryClient.invalidateQueries({ queryKey: ['clients'] })
+          }}
+        >
+          {err instanceof Error ? err.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -185,12 +184,12 @@ export default function ProjectDetail() {
   }
   if (!project) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-        <h1 className="text-lg font-semibold text-gray-900">Project not found</h1>
-        <p className="mt-2 text-sm text-gray-500">
-          The project may have been deleted or you may not have permission to view it.
-        </p>
-      </div>
+      <Card>
+        <EmptyState
+          title="Project not found"
+          description="The project may have been deleted or you may not have permission to view it."
+        />
+      </Card>
     )
   }
 
@@ -274,7 +273,7 @@ export default function ProjectDetail() {
 function ProjectDetailSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading project">
-      <div className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white shadow-sm px-5 py-5 sm:px-7 sm:py-6 space-y-4">
+      <div className="rounded-xl border border-border bg-white shadow-card px-5 py-5 sm:px-7 sm:py-6 space-y-4">
         <Skeleton className="h-4 w-36 rounded-xl" />
         <div className="flex flex-wrap items-center gap-3">
           <Skeleton className="h-9 w-56 sm:w-72 rounded-xl" />

@@ -22,9 +22,12 @@ import ProjectLockedBanner from '../components/project/ProjectLockedBanner'
 import { useToast } from '../components/ui/Toast'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
 import Badge from '../components/ui/Badge'
+import Card from '../components/ui/Card'
 import Select from '../components/ui/Select'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
+import { PageBodySkeleton } from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
@@ -401,21 +404,13 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   }
   if (projectQueryFailed) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
-        <p className="font-medium text-red-900">Could not load project</p>
-        <p className="mt-1">
-          {projectError instanceof Error ? projectError.message : 'Something went wrong.'}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3 border-red-300 text-red-900 hover:bg-red-100"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['project', id] })}
-        >
-          Retry
-        </Button>
-      </div>
+      <Alert
+        tone="error"
+        title="Could not load project"
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ['project', id] })}
+      >
+        {projectError instanceof Error ? projectError.message : 'Something went wrong.'}
+      </Alert>
     )
   }
   if (projectPending || !project) return <WorkflowStepSkeleton bodyRows={3} />
@@ -432,104 +427,46 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       <WorkflowStepIntro
         eyebrow="Map"
         title="Map columns"
-        subtitle={
-          <>
-            Match spreadsheet headers to cash-book and bank fields. Suggested mappings are pre-filled from header names —
-            confirm date and amount columns before continuing. After this, <strong>Reconcile runs automatically</strong>.
-            Tick which files to include, apply suggested mappings in one run, or map each document individually.
-          </>
-        }
+        subtitle="Match each file’s headers to date and amount columns, then apply. Tick files for a bulk run, or map one document at a time. Reconcile starts after mapping."
       />
-      <p className="text-xs text-gray-600 max-w-2xl rounded-xl bg-gray-50 border border-gray-200 px-3 py-2">
-        <strong>Required:</strong> Map the <strong>date</strong> column for each document so transactions can be matched correctly.
-      </p>
-      <p className="text-xs text-primary-800 max-w-2xl rounded-xl bg-primary-50 border border-primary-200 px-3 py-2">
-        <strong>Signed amount mode:</strong> if one amount column contains mixed entries, positive amounts are treated as receipts/credits and negative amounts as payments/debits.
-      </p>
+      <Alert tone="info" title="Date column is required">
+        Confirm date and amount columns before applying. If one amount column mixes signs, positives are
+        treated as receipts or credits and negatives as payments or debits.
+      </Alert>
       {projectLocked && (
         <ProjectLockedBanner projectId={id} status={project.status} role={role} />
       )}
       {!canMap && (
-        <p className="text-sm text-amber-600">You have view-only access. Contact an admin, reviewer, or preparer to map documents.</p>
+        <Alert tone="info" title="View only">
+          Contact an admin, reviewer, or preparer to map documents.
+        </Alert>
       )}
       {parseJobsInflight > 0 && (
-        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-950">
-          <strong>Background parse:</strong> {parseJobsInflight} file
-          {parseJobsInflight === 1 ? ' is' : 's are'} still parsing or auto-mapping. This page refreshes
-          automatically — map manually if a file stays unmapped after it finishes.
-        </div>
+        <Alert tone="info" title="Background parse">
+          {parseJobsInflight} file{parseJobsInflight === 1 ? ' is' : 's are'} still parsing or
+          auto-mapping. This page refreshes automatically — map manually if a file stays unmapped
+          after it finishes.
+        </Alert>
       )}
       {error && (
-        <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700 shadow-sm">{error}</div>
+        <Alert tone="error" title="Mapping failed">
+          {error}
+        </Alert>
       )}
       {mapResult && (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
-          <p className="text-sm text-gray-700">
-            {mapResult.documentsMapped != null && mapResult.documentsMapped > 1 ? (
-              <>
-                Mapped <strong>{mapResult.documentsMapped}</strong> document(s);{' '}
-                <strong>{mapResult.count}</strong> transaction(s) extracted.
-              </>
-            ) : (
-              <>
-                Mapping complete: <strong>{mapResult.count}</strong> transaction(s) extracted.
-              </>
-            )}
-            {(mapResult.signWarningsCount || 0) > 0 && (
-              <span className="ml-1 text-amber-700">
-                {mapResult.signWarningsCount} sign warning(s) found.
-              </span>
-            )}
-          </p>
-          {mapResult.importStats && (
-            <p className="text-sm text-gray-700">
-              Source rows: <strong>{mapResult.importStats.sourceRowCount}</strong> → imported{' '}
-              <strong>{mapResult.importStats.importedCount}</strong>
-              {(mapResult.importStats.skippedZeroAmountRows > 0 ||
-                mapResult.importStats.skippedDuplicateRows > 0) && (
-                <>
-                  {' '}
-                  (skipped {mapResult.importStats.skippedZeroAmountRows} zero-amount,{' '}
-                  {mapResult.importStats.skippedDuplicateRows} duplicate
-                  {mapResult.importStats.previousMappedCount > 0
-                    ? `; replaced ${mapResult.importStats.previousMappedCount} previously mapped`
-                    : ''}
-                  )
-                </>
-              )}
-              . If imported count is far below your statement, check PDF page limits or column mapping.
-            </p>
-          )}
-          {!mapResult.importStats && (mapResult.skippedDuplicateRows || 0) > 0 && (
-            <p className="text-sm text-gray-600">
-              Skipped <strong>{mapResult.skippedDuplicateRows}</strong> duplicate row(s) in the source (same date,
-              amount, and narrative as an earlier row).
-            </p>
-          )}
-          {mapResult.signFilterSummary && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <div className="rounded-lg border border-green-200 bg-green-50 px-2 py-1">Primary: {mapResult.signFilterSummary.primary ?? 0}</div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">Cross-ref: {mapResult.signFilterSummary.cross_reference ?? 0}</div>
-              <div className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1 text-primary-900">Zero: {mapResult.signFilterSummary.zero ?? 0}</div>
-              <div className="rounded-lg border border-gray-200 bg-white px-2 py-1">Empty: {mapResult.signFilterSummary.empty ?? 0}</div>
-            </div>
-          )}
-          {(mapResult.signWarningsPreview || []).length > 0 && (
-            <div className="border border-amber-200 bg-amber-50 rounded p-2">
-              <p className="text-xs font-medium text-amber-800 mb-1">Sign warnings preview</p>
-              <ul className="text-xs text-amber-900 space-y-0.5">
-                {(mapResult.signWarningsPreview || []).slice(0, 5).map((w, i) => (
-                  <li key={i}>Row {w.rowIndex}: {w.amount} ({w.bucket.replace('_', ' ')}) - {w.note}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {hasBankDocuments && canExportReport(role) && (
-            <div className="pt-2">
+        <Alert
+          tone="success"
+          title={
+            mapResult.documentsMapped != null && mapResult.documentsMapped > 1
+              ? `Mapped ${mapResult.documentsMapped} documents`
+              : 'Mapping complete'
+          }
+          action={
+            hasBankDocuments && canExportReport(role) ? (
               <Button
                 type="button"
                 variant="outline"
-                className="border-primary-200 bg-primary-50 text-primary-800 hover:bg-primary-100"
+                size="sm"
                 onClick={() => {
                   void (async () => {
                     try {
@@ -545,23 +482,83 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               >
                 Download mapped bank Excel
               </Button>
-              <p className="mt-1 text-xs text-gray-600">
+            ) : undefined
+          }
+        >
+          <p>
+            <strong>{mapResult.count}</strong> transaction{mapResult.count === 1 ? '' : 's'} extracted.
+            {hasBankDocuments && canExportReport(role) && (
+              <span className="block mt-1 text-xs opacity-90">
                 Credits and debits you have mapped, as Excel — also available under Report → Export.
-              </p>
-            </div>
+              </span>
+            )}
+          </p>
+          {(mapResult.importStats ||
+            (mapResult.skippedDuplicateRows || 0) > 0 ||
+            mapResult.signFilterSummary) && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-medium">Import details</summary>
+              <div className="mt-2 space-y-1 text-xs">
+                {mapResult.importStats && (
+                  <p>
+                    Source rows: <strong>{mapResult.importStats.sourceRowCount}</strong> → imported{' '}
+                    <strong>{mapResult.importStats.importedCount}</strong>
+                    {(mapResult.importStats.skippedZeroAmountRows > 0 ||
+                      mapResult.importStats.skippedDuplicateRows > 0) && (
+                      <>
+                        {' '}
+                        (skipped {mapResult.importStats.skippedZeroAmountRows} zero-amount,{' '}
+                        {mapResult.importStats.skippedDuplicateRows} duplicate
+                        {mapResult.importStats.previousMappedCount > 0
+                          ? `; replaced ${mapResult.importStats.previousMappedCount} previously mapped`
+                          : ''}
+                        )
+                      </>
+                    )}
+                    . If imported count is far below your statement, check PDF page limits or column mapping.
+                  </p>
+                )}
+                {!mapResult.importStats && (mapResult.skippedDuplicateRows || 0) > 0 && (
+                  <p>
+                    Skipped <strong>{mapResult.skippedDuplicateRows}</strong> duplicate row(s) in the source
+                    (same date, amount, and narrative as an earlier row).
+                  </p>
+                )}
+                {mapResult.signFilterSummary && (
+                  <p>
+                    Sign buckets: {mapResult.signFilterSummary.primary ?? 0} primary ·{' '}
+                    {mapResult.signFilterSummary.cross_reference ?? 0} cross-ref ·{' '}
+                    {mapResult.signFilterSummary.zero ?? 0} zero · {mapResult.signFilterSummary.empty ?? 0}{' '}
+                    empty
+                  </p>
+                )}
+              </div>
+            </details>
           )}
-        </div>
+        </Alert>
+      )}
+      {mapResult && (mapResult.signWarningsPreview || []).length > 0 && (
+        <Alert
+          tone="warning"
+          title={`${mapResult.signWarningsCount || (mapResult.signWarningsPreview || []).length} sign warning(s)`}
+        >
+          <ul className="mt-1 space-y-0.5">
+            {(mapResult.signWarningsPreview || []).slice(0, 5).map((w, i) => (
+              <li key={i}>
+                Row {w.rowIndex}: {w.amount} ({w.bucket.replace('_', ' ')}) — {w.note}
+              </li>
+            ))}
+          </ul>
+        </Alert>
       )}
 
       {canMap && !projectLocked && docs.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3 max-w-2xl">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Bulk apply — which files?</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Only ticked files are processed (any supported upload—CSV/Excel, PDF, images, etc.). New uploads are ticked
-              automatically; untick any file you want to skip or map by hand below.
-            </p>
-          </div>
+        <Card
+          className="max-w-2xl"
+          title="Bulk apply — which files?"
+          sublabel="Only ticked files are processed (any supported upload—CSV/Excel, PDF, images, etc.). New uploads are ticked automatically; untick any file you want to skip or map by hand below."
+        >
+          <div className="space-y-3">
           <div className="flex flex-wrap gap-2 text-xs font-medium">
             <Button
               type="button"
@@ -632,19 +629,23 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             <Button
               type="button"
               onClick={applySuggestedToAll}
-              disabled={applyingAll || bulkDocIds.size === 0}
+              disabled={bulkDocIds.size === 0}
               isLoading={applyingAll}
             >
-              {applyingAll ? 'Applying…' : 'Apply suggested mapping to selected'}
+              Apply suggested mapping to selected
             </Button>
-            <span className="text-xs text-gray-500 max-w-md">
-              We detect columns from the extracted table and apply mapping per file. For Excel workbooks
-              with several sheets, we automatically use the <strong>best transaction sheet</strong>{' '}
-              (detail rows with date + amount columns). PDFs and scans do not have sheets—open each file
-              below if the preview needs a check. To pick another Excel tab, open that file below.
-            </span>
+            <details className="text-xs text-gray-500 max-w-md">
+              <summary className="cursor-pointer font-medium text-gray-600">How bulk apply picks sheets</summary>
+              <p className="mt-1.5 leading-relaxed">
+                We detect columns from the extracted table and apply mapping per file. For Excel workbooks
+                with several sheets, we automatically use the <strong>best transaction sheet</strong>{' '}
+                (detail rows with date + amount columns). PDFs and scans do not have sheets — open each file
+                below if the preview needs a check. To pick another Excel tab, open that file below.
+              </p>
+            </details>
           </div>
-        </div>
+          </div>
+        </Card>
       )}
 
       <div className="max-w-md">
@@ -676,30 +677,22 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       {selectedDocId && (
         <>
           {previewLoading ? (
-            <p className="text-gray-500">Loading preview...</p>
+            <PageBodySkeleton label="Loading preview" />
           ) : previewQueryFailed && previewError && !isSubscriptionInactiveError(previewError) ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-              <p className="font-medium text-red-900">Could not load document preview</p>
-              <p className="mt-1">
-                {previewError instanceof Error ? previewError.message : 'Something went wrong.'}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-3 border-red-300 text-red-900 hover:bg-red-100"
-                onClick={() =>
-                  queryClient.invalidateQueries({
-                    queryKey: ['document-preview', selectedDocId, previewSheetIndex],
-                  })
-                }
-              >
-                Retry
-              </Button>
-            </div>
+            <Alert
+              tone="error"
+              title="Could not load document preview"
+              onRetry={() =>
+                queryClient.invalidateQueries({
+                  queryKey: ['document-preview', selectedDocId, previewSheetIndex],
+                })
+              }
+            >
+              {previewError instanceof Error ? previewError.message : 'Something went wrong.'}
+            </Alert>
           ) : preview ? (
-            <div className="bg-white shadow-sm rounded-xl p-4 sm:p-6 space-y-4 border border-gray-200">
-              <h3 className="font-medium text-gray-900">{preview.filename}</h3>
+            <Card title={preview.filename}>
+              <div className="space-y-4">
               {preview.sheetNames && preview.sheetNames.length > 1 && (
                 <div className="max-w-md">
                   <Select
@@ -752,53 +745,39 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   </p>
                 )}
               {(preview as { pdfTruncated?: boolean }).pdfTruncated && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                  <strong>PDF truncation:</strong> This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (default limit {DEFAULT_PDF_OCR_MAX_PAGES}; set PDF_OCR_MAX_PAGES to raise). Some transactions may be missing. Split the PDF or increase the limit for full extraction.
-                </div>
+                <Alert tone="warning" title="PDF truncation">
+                  This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first{' '}
+                  {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (default
+                  limit {DEFAULT_PDF_OCR_MAX_PAGES}; set PDF_OCR_MAX_PAGES to raise). Some transactions may be
+                  missing. Split the PDF or increase the limit for full extraction.
+                </Alert>
               )}
               {typeof preview.parseQualityScore === 'number' &&
                 (preview.parseQualityScore < 70 || preview.ocrRetried) && (
-                <div
-                  className={`rounded-xl border px-4 py-2 text-sm ${
-                    preview.parseQualityScore < 55
-                      ? 'border-amber-200 bg-amber-50 text-amber-900'
-                      : 'border-gray-200 bg-gray-50 text-gray-800'
-                  }`}
+                <Alert
+                  tone={preview.parseQualityScore < 55 ? 'warning' : 'info'}
+                  title={`Parse quality: ${preview.parseQualityScore}/100${preview.ocrRetried ? ' (OCR retry used)' : ''}`}
                 >
-                  <strong>Parse quality:</strong> {preview.parseQualityScore}/100
-                  {preview.ocrRetried ? ' (OCR retry used)' : ''}.
                   {preview.parseQualityNotes?.length
-                    ? ` ${preview.parseQualityNotes.slice(0, 2).join(' · ')}`
-                    : ''}
+                    ? preview.parseQualityNotes.slice(0, 2).join(' · ')
+                    : null}
                   {preview.parseQualityScore < 55
                     ? ' Review the preview carefully — consider uploading the Excel export if available.'
                     : ''}
-                </div>
+                </Alert>
               )}
               {preview.layoutMemoryApplied && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-950 flex flex-wrap items-center gap-2 justify-between">
-                  <span>
-                    <strong>Saved layout:</strong>{' '}
-                    {preview.layoutMemoryApplied.exact
-                      ? 'Using your organisation’s column map for this exact header layout'
-                      : `Using a similar saved column map (${Math.round(preview.layoutMemoryApplied.similarity * 100)}% match) to fill missing columns only`}
-                    {preview.layoutMemoryApplied.fields.length
-                      ? ` — ${preview.layoutMemoryApplied.fields.join(', ')}`
-                      : ''}
-                    {preview.layoutMemoryApplied.useCount > 1
-                      ? ` (used ${preview.layoutMemoryApplied.useCount}×)`
-                      : ''}
-                    . Adjust if needed; saving updates the memory for next time.
-                  </span>
-                  {canMap &&
+                <Alert
+                  tone="success"
+                  title="Saved layout applied"
+                  action={
+                    canMap &&
                     isProjectEditable(project?.status) &&
-                    preview.layoutMemoryApplied.id && (
+                    preview.layoutMemoryApplied.id ? (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="shrink-0 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
-                        disabled={forgetLayoutMutation.isPending}
                         isLoading={forgetLayoutMutation.isPending}
                         onClick={async () => {
                           const ok = await confirm({
@@ -811,66 +790,79 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                           if (ok) forgetLayoutMutation.mutate(preview.layoutMemoryApplied!.id!)
                         }}
                       >
-                        {forgetLayoutMutation.isPending ? 'Forgetting…' : 'Forget layout'}
+                        Forget layout
                       </Button>
-                    )}
-                </div>
+                    ) : undefined
+                  }
+                >
+                  {preview.layoutMemoryApplied.exact
+                    ? 'Using your organisation’s column map for this exact header layout'
+                    : `Using a similar saved column map (${Math.round(preview.layoutMemoryApplied.similarity * 100)}% match) to fill missing columns only`}
+                  {preview.layoutMemoryApplied.fields.length
+                    ? ` — ${preview.layoutMemoryApplied.fields.join(', ')}`
+                    : ''}
+                  {preview.layoutMemoryApplied.useCount > 1
+                    ? ` (used ${preview.layoutMemoryApplied.useCount}×)`
+                    : ''}
+                  . Adjust if needed; saving updates the memory for next time.
+                </Alert>
               )}
               {preview.typeInference?.mismatch && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                  <p>
-                    <strong>Document type:</strong> this file looks like a{' '}
-                    {preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'} (
-                    {preview.typeInference.confidence} confidence), but it was uploaded under the other
-                    card.
-                    {preview.typeInference.reasons?.length
-                      ? ` Evidence: ${preview.typeInference.reasons.slice(0, 2).join('; ')}.`
-                      : ''}
-                  </p>
-                  {canMap && isProjectEditable(project?.status) && preview.typeInference.family !== 'unknown' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 border-amber-300 text-amber-950 hover:bg-amber-100"
-                      disabled={changeTypeMutation.isPending}
-                      isLoading={changeTypeMutation.isPending}
-                      onClick={async () => {
-                        const family =
-                          preview.typeInference!.family === 'cash_book' ? 'cash_book' : 'bank_statement'
-                        const label =
-                          family === 'cash_book' ? 'cash book' : 'bank statement'
-                        const ok = await confirm({
-                          title: `Switch to ${label}?`,
-                          description:
-                            'This remaps the document type and clears any mapped transactions for this file. You will need to map columns again.',
-                          confirmLabel: `Switch to ${label}`,
-                          tone: 'warning',
-                        })
-                        if (ok) changeTypeMutation.mutate(family)
-                      }}
-                    >
-                      {changeTypeMutation.isPending
-                        ? 'Switching…'
-                        : `Switch to ${
-                            preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'
-                          }`}
-                    </Button>
-                  )}
-                </div>
+                <Alert
+                  tone="warning"
+                  title="Document type may be wrong"
+                  action={
+                    canMap &&
+                    isProjectEditable(project?.status) &&
+                    preview.typeInference.family !== 'unknown' ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        isLoading={changeTypeMutation.isPending}
+                        onClick={async () => {
+                          const family =
+                            preview.typeInference!.family === 'cash_book' ? 'cash_book' : 'bank_statement'
+                          const label = family === 'cash_book' ? 'cash book' : 'bank statement'
+                          const ok = await confirm({
+                            title: `Switch to ${label}?`,
+                            description:
+                              'This remaps the document type and clears any mapped transactions for this file. You will need to map columns again.',
+                            confirmLabel: `Switch to ${label}`,
+                            tone: 'warning',
+                          })
+                          if (ok) changeTypeMutation.mutate(family)
+                        }}
+                      >
+                        Switch to{' '}
+                        {preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'}
+                      </Button>
+                    ) : undefined
+                  }
+                >
+                  This file looks like a{' '}
+                  {preview.typeInference.family === 'cash_book' ? 'cash book' : 'bank statement'} (
+                  {preview.typeInference.confidence} confidence), but it was uploaded under the other card.
+                  {preview.typeInference.reasons?.length
+                    ? ` Evidence: ${preview.typeInference.reasons.slice(0, 2).join('; ')}.`
+                    : ''}
+                </Alert>
               )}
               {preview.hasForeignCurrencyColumns && (
-                <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-2 text-sm text-primary-950">
-                  <strong>Multi-currency cash book:</strong> columns include cedi equivalents (
-                  <code>AMT RECEIVED</code> / <code>AMT PAID</code>) and foreign amounts (
-                  <code>FC AMT RECEIVED</code> / <code>FC AMT PAID</code>, plus Currency Code / Exch Rate).
-                  For a euro bank account, map amounts to the <strong>FC</strong> columns — not the cedi ones.
+                <Alert tone="info" title="Multi-currency cash book">
+                  Columns include cedi equivalents (amount received / amount paid) and foreign amounts (FC
+                  amount received / FC amount paid, plus currency code / exchange rate). For a euro bank
+                  account, map amounts to the <strong>FC</strong> columns — not the cedi ones.
                   {preview.projectCurrency && preview.projectCurrency.toUpperCase() !== 'GHS' && (
-                    <> Project currency is <strong>{preview.projectCurrency}</strong>, so FC columns are suggested by default.</>
+                    <>
+                      {' '}
+                      Project currency is <strong>{preview.projectCurrency}</strong>, so FC columns are suggested
+                      by default.
+                    </>
                   )}
-                </div>
+                </Alert>
               )}
-              <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHead>
                     <TableRow>
@@ -894,32 +886,54 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   </TableBody>
                 </Table>
               </div>
-              {mappingIssues.length > 0 && (
-                <ul className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
-                  {mappingIssues.map((issue, i) => (
-                    <li
-                      key={i}
-                      className={
-                        issue.severity === 'error'
-                          ? 'text-red-900'
-                          : issue.severity === 'warning'
-                            ? 'text-amber-900'
-                            : 'text-gray-700'
-                      }
-                    >
-                      <span className="font-medium">
-                        {issue.severity === 'error' ? 'Fix required' : issue.severity === 'warning' ? 'Check' : 'Tip'}
-                        {issue.field ? ` (${fieldLabel(issue.field)})` : ''}:{' '}
-                      </span>
-                      {issue.message}
-                      {issue.fix && <span className="block mt-0.5 text-xs opacity-90">→ {issue.fix}</span>}
-                    </li>
-                  ))}
-                </ul>
+              {mappingIssues.some((issue) => issue.severity === 'error') && (
+                <Alert
+                  tone="error"
+                  title="Fix required before matching"
+                >
+                  <ul className="space-y-1">
+                    {mappingIssues
+                      .filter((issue) => issue.severity === 'error')
+                      .map((issue, i) => (
+                        <li key={i}>
+                          {issue.field ? `${fieldLabel(issue.field)}: ` : ''}
+                          {issue.message}
+                          {issue.fix ? ` ${issue.fix}` : ''}
+                        </li>
+                      ))}
+                  </ul>
+                </Alert>
+              )}
+              {mappingIssues.some((issue) => issue.severity !== 'error') && (
+                <Alert
+                  tone={
+                    mappingIssues.some((issue) => issue.severity === 'warning') ? 'warning' : 'info'
+                  }
+                  title={
+                    mappingIssues.some((issue) => issue.severity === 'warning')
+                      ? 'Check these mappings'
+                      : 'Mapping tips'
+                  }
+                >
+                  <ul className="space-y-1">
+                    {mappingIssues
+                      .filter((issue) => issue.severity !== 'error')
+                      .map((issue, i) => (
+                        <li key={i}>
+                          <span className="font-medium">
+                            {issue.severity === 'warning' ? 'Check' : 'Tip'}
+                            {issue.field ? ` (${fieldLabel(issue.field)})` : ''}:{' '}
+                          </span>
+                          {issue.message}
+                          {issue.fix ? ` ${issue.fix}` : ''}
+                        </li>
+                      ))}
+                  </ul>
+                </Alert>
               )}
               <div className="grid gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="font-medium text-gray-900">Map to canonical fields</h4>
+                  <h4 className="font-medium text-gray-900">Match columns</h4>
                   {Object.keys(mapping).length > 0 && (
                     <Badge tone="brand" size="sm">
                       {Object.keys(mapping).length} field
@@ -971,37 +985,36 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               {!mappingDisabled && (
                 <Button
                   onClick={() => mapMutation.mutate(selectedDocId)}
-                  disabled={mapMutation.isPending}
                   isLoading={mapMutation.isPending}
                   className="w-full sm:w-auto"
                 >
-                  {mapMutation.isPending ? 'Applying…' : 'Apply mapping'}
+                  Apply mapping
                 </Button>
               )}
-            </div>
+              </div>
+            </Card>
           ) : null}
         </>
       )}
 
       {documentsWithoutTransactions.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 max-w-2xl">
-          <p className="font-medium">Some files have no extracted transactions yet</p>
-          <p className="mt-1 text-amber-900/90">
-            {documentsWithoutTransactions.length === 1
-              ? `${documentsWithoutTransactions[0]!.filename} is not mapped or produced no rows.`
-              : `${documentsWithoutTransactions.length} files still need a successful map (or contain no data).`}{' '}
-            Select each in the list above, apply mapping, then continue.
-          </p>
-        </div>
+        <Alert tone="warning" title="Some files have no extracted transactions yet" className="max-w-2xl">
+          {documentsWithoutTransactions.length === 1
+            ? `${documentsWithoutTransactions[0]!.filename} is not mapped or produced no rows.`
+            : `${documentsWithoutTransactions.length} files still need a successful map (or contain no data).`}{' '}
+          Select each in the list above, apply mapping, then continue.
+        </Alert>
       )}
 
       {onProceedToReconcile && (
-        <div className="pt-6 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-600">Mapping done? Go to Reconcile to match transactions.</p>
-          <Button type="button" onClick={onProceedToReconcile} className="shadow-sm">
-            Proceed to Reconcile →
+          <Button type="button" onClick={onProceedToReconcile}>
+            Proceed to Reconcile
           </Button>
-        </div>
+          </div>
+        </Card>
       )}
     </div>
   )

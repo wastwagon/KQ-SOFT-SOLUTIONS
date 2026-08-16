@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { Landmark, Upload, Radio } from 'lucide-react'
+import { Landmark } from 'lucide-react'
 import Card from '../ui/Card'
-import Button from '../ui/Button'
+import Button, { buttonClassName } from '../ui/Button'
 import Input from '../ui/Input'
 import { publicApi } from '../../lib/api'
 import { useToast } from '../ui/Toast'
@@ -43,36 +43,19 @@ export default function SettingsConnectionsTab() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <div className="flex items-start gap-3">
-          <Upload className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Statement import (available now)</h2>
-            <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-              Upload cash books and bank statements as CSV, Excel, or PDF. Ghana bank layouts
-              (Ecobank, GCB, Absa, Stanbic, and more) are auto-detected during mapping.
-            </p>
-            <Link
-              to="/projects"
-              className="inline-flex mt-3 text-sm font-semibold text-primary-600 hover:text-primary-700"
-            >
-              Go to projects →
-            </Link>
-          </div>
-        </div>
+      <Card
+        title="Statement import (available now)"
+        sublabel="Upload cash books and bank statements as CSV, Excel, or PDF. Ghana bank layouts (Ecobank, GCB, Absa, Stanbic, and more) are auto-detected during mapping."
+      >
+        <Link to="/projects" className={buttonClassName('outline', 'sm')}>
+          Go to projects
+        </Link>
       </Card>
 
-      <Card>
-        <div className="flex items-start gap-3 mb-4">
-          <Radio className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Live bank feeds</h2>
-            <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-              Direct bank connections for Ghana are limited today. Join the waitlist and we will
-              prioritise your institution when aggregator or bank partnerships go live.
-            </p>
-          </div>
-        </div>
+      <Card
+        title="Live bank feeds"
+        sublabel="Direct bank connections for Ghana are limited today. Join the waitlist and we will prioritise your institution when aggregator or bank partnerships go live."
+      >
         <form
           className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl"
           onSubmit={(e) => {

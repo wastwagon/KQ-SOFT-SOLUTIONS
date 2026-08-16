@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { projects, unlessSubscriptionInactive } from '../../lib/api'
 import { canReopenProject } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
+import Alert from '../ui/Alert'
+import Button from '../ui/Button'
 
 interface ProjectLockedBannerProps {
   projectId: string
@@ -46,34 +48,27 @@ export default function ProjectLockedBanner({
           : status.replace(/_/g, ' ')
 
   return (
-    <div
-      className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm"
-      role="status"
-    >
-      <p>
-        <strong className="font-semibold">Project is locked</strong> — this job is{' '}
-        <strong className="capitalize">{statusLabel}</strong>, so uploads, mapping, and reconciliation cannot be
-        changed.
-      </p>
-      {canReopen ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
+    <Alert
+      tone="warning"
+      title="Project is locked"
+      action={
+        canReopen ? (
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => reopenMutation.mutate()}
-            disabled={reopenMutation.isPending}
-            className="rounded-xl border border-amber-400 bg-white px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+            isLoading={reopenMutation.isPending}
           >
-            {reopenMutation.isPending ? 'Reopening…' : 'Reopen for editing'}
-          </button>
-          <span className="text-xs text-amber-800">
-            Reopening returns the project to the reconciliation stage.
-          </span>
-        </div>
-      ) : (
-        <p className="mt-2 text-xs text-amber-800">
-          Ask an admin or reviewer to reopen this project if changes are needed.
-        </p>
-      )}
-    </div>
+            Reopen for editing
+          </Button>
+        ) : undefined
+      }
+    >
+      This job is {statusLabel}, so uploads, mapping, and reconciliation cannot be changed.
+      {canReopen
+        ? ' Reopening returns the project to the reconciliation stage.'
+        : ' Ask an admin or reviewer to reopen this project if changes are needed.'}
+    </Alert>
   )
 }

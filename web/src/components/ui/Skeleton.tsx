@@ -43,3 +43,13 @@ export function TableRowSkeleton({ cols = 5 }: { cols?: number }) {
     </tr>
   )
 }
+
+/** In-page body placeholder under a PageHeader (admin lists, settings). */
+export function PageBodySkeleton({ label = 'Loading' }: { label?: string }) {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label={label}>
+      <Skeleton className="h-10 w-full max-w-md" />
+      <Skeleton className="h-48 w-full rounded-xl" />
+    </div>
+  )
+}

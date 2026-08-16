@@ -17,8 +17,10 @@ import SettingsConnectionsTab from '../components/settings/SettingsConnectionsTa
 import SettingsTabNav from '../components/settings/SettingsTabNav'
 import { useBrandingSettings } from '../components/settings/useBrandingSettings'
 import Card from '../components/ui/Card'
+import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
 import PageHeader from '../components/layout/PageHeader'
+import { PageBodySkeleton } from '../components/ui/Skeleton'
 
 /**
  * Organisation settings hub (branding, billing, members, API keys, bank rules).
@@ -82,14 +84,8 @@ export default function Settings() {
   if (branding.isLoading) {
     return (
       <div className="space-y-8">
-        <PageHeader
-          eyebrow="Administration"
-          title="Settings"
-          subtitle={<p className="text-gray-500">Loading your organisation preferences…</p>}
-        />
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm max-w-md">
-          Loading settings…
-        </div>
+        <PageHeader eyebrow="Administration" title="Settings" />
+        <PageBodySkeleton label="Loading settings" />
       </div>
     )
   }
@@ -98,21 +94,15 @@ export default function Settings() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Administration" title="Settings" />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          <p className="font-medium text-red-900">Could not load branding</p>
-          <p className="mt-1">
-            {branding.brandingLoadError != null && branding.brandingLoadError instanceof Error
-              ? branding.brandingLoadError.message
-              : 'Something went wrong.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load branding"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })}
+        >
+          {branding.brandingLoadError != null && branding.brandingLoadError instanceof Error
+            ? branding.brandingLoadError.message
+            : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -138,20 +128,17 @@ export default function Settings() {
         }
       />
       {subscriptionSidebarFailed && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 max-w-7xl">
-          <p className="font-medium">Plan or usage information could not be loaded.</p>
-          <p className="mt-1 text-amber-900/90">Billing amounts and feature flags may be incomplete until this succeeds.</p>
-          <button
-            type="button"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
-              void queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
-            }}
-            className="mt-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-amber-400 text-amber-950 hover:bg-amber-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="warning"
+          title="Plan or usage information could not be loaded"
+          className="max-w-7xl"
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
+            void queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
+          }}
+        >
+          Billing amounts and feature flags may be incomplete until this succeeds.
+        </Alert>
       )}
       <SettingsTabNav showApiKeys={!!features.api_access} showBankRules={!!features.bank_rules} />
       <div className="w-full max-w-7xl">
@@ -170,14 +157,14 @@ export default function Settings() {
         )}
 
         {activeTab === 'members' && (
-          <Card className="rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold tracking-tight text-gray-900 mb-2">Team Members</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Add team members by email. They must already have an account. Your plan limits how many
-              members you can have.
-            </p>
+          <Card
+            title="Team Members"
+            sublabel="Add team members by email. They must already have an account. Your plan limits how many members you can have."
+          >
             {!canManageMembers(role) && (
-              <p className="text-sm text-amber-600 mb-4">Only admins can add or remove members.</p>
+              <Alert tone="info" title="View only" className="mb-4">
+                Only admins can add or remove members.
+              </Alert>
             )}
             <MembersSection canManage={canManageMembers(role)} />
           </Card>
@@ -186,39 +173,42 @@ export default function Settings() {
         {activeTab === 'connections' && <SettingsConnectionsTab />}
 
         {activeTab === 'api-keys' && (
-          <Card className="rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold tracking-tight text-gray-900 mb-2">API keys</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Create API keys to access projects, report, and clients programmatically. Use{' '}
-              <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">
-                Authorization: Bearer &lt;key&gt;
-              </code>{' '}
-              or <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">X-API-Key: &lt;key&gt;</code>.
-              Rate limit: 100 req/min.
-            </p>
+          <Card
+            title="API keys"
+            sublabel={
+              <>
+                Create API keys to access projects, report, and clients programmatically. Use{' '}
+                <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">
+                  Authorization: Bearer &lt;key&gt;
+                </code>{' '}
+                or <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">X-API-Key: &lt;key&gt;</code>.
+                Rate limit: 100 req/min.
+              </>
+            }
+          >
             {!features.api_access && (
-              <p className="text-sm text-amber-600 mb-4">
-                API keys require Firm plan. Upgrade to access programmatic API.
-              </p>
+              <Alert tone="warning" title="Firm plan required" className="mb-4">
+                Upgrade to create API keys for programmatic access.
+              </Alert>
             )}
             {!canManageBilling(role) && features.api_access && (
-              <p className="text-sm text-amber-600 mb-4">Only admins can manage API keys.</p>
+              <Alert tone="info" title="View only" className="mb-4">
+                Only admins can manage API keys.
+              </Alert>
             )}
             {canManageBilling(role) && features.api_access && <ApiKeysSection />}
           </Card>
         )}
 
         {activeTab === 'bank-rules' && (
-          <Card className="rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold tracking-tight text-gray-900 mb-2">Bank Rules</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Auto-suggest or flag bank transactions that match your rules (e.g. &quot;Bank charges&quot;
-              when description contains &quot;BANK CHARGES&quot;).
-            </p>
+          <Card
+            title="Bank Rules"
+            sublabel='Auto-suggest or flag bank transactions that match your rules (e.g. "Bank charges" when description contains "BANK CHARGES").'
+          >
             {!features.bank_rules && (
-              <p className="text-sm text-amber-600 mb-4">
-                Bank rules require Standard plan or higher. Upgrade to use auto-suggest and flag rules.
-              </p>
+              <Alert tone="warning" title="Standard plan or higher required" className="mb-4">
+                Upgrade to use auto-suggest and flag rules.
+              </Alert>
             )}
             {features.bank_rules && <BankRulesSection canEdit={canEditBankRules(role)} />}
           </Card>

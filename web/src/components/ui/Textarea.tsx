@@ -27,7 +27,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={areaId}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className={`${fieldBase} ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-200'} ${className}`}
+          className={`${fieldBase} ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-border'} ${className}`}
           {...props}
         />
         {error ? (

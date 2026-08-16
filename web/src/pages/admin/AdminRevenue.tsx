@@ -3,10 +3,13 @@ import { DollarSign, TrendingUp, CreditCard, ArrowUpRight, ArrowDownRight } from
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
+import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
+import Alert from '../../components/ui/Alert'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 
 export default function AdminRevenue() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'analytics', 'revenue'],
     queryFn: () => api('/admin/analytics/revenue') as Promise<{
       totalRevenue: number
@@ -19,6 +22,21 @@ export default function AdminRevenue() {
     }>,
   })
 
+  if (isError) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Revenue analytics"
+          subtitle={<p className="text-gray-500">Platform revenue, MRR, and payment history.</p>}
+        />
+        <Alert tone="error" title="Could not load revenue" onRetry={() => void refetch()}>
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
+      </div>
+    )
+  }
+
   if (isLoading || !data) {
     return (
       <div className="space-y-8">
@@ -27,7 +45,7 @@ export default function AdminRevenue() {
           title="Revenue analytics"
           subtitle={<p className="text-gray-500">Platform revenue, MRR, and payment history.</p>}
         />
-        <p className="text-gray-500 text-sm">Loading revenue…</p>
+        <PageBodySkeleton label="Loading revenue" />
       </div>
     )
   }
@@ -43,49 +61,29 @@ export default function AdminRevenue() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary-100">
-              <DollarSign className="w-5 h-5 text-primary-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Revenue</p>
-              <p className="text-xl font-bold text-gray-900">{fmt(data.totalRevenue)}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 font-medium">MRR (this month)</p>
-              <p className="text-xl font-bold text-gray-900">{fmt(data.mrr)}</p>
-              <p className={`text-xs mt-0.5 flex items-center gap-0.5 ${data.mrrChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {data.mrrChange >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {data.mrrChange >= 0 ? '+' : ''}{data.mrrChange.toFixed(1)}% vs last month
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-100">
-              <CreditCard className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Payments</p>
-              <p className="text-xl font-bold text-gray-900">{data.paymentsCount}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{data.thisMonthCount} this month</p>
-            </div>
-          </div>
-        </Card>
+        <MetricCard label="Total revenue" value={fmt(data.totalRevenue)} icon={<DollarSign />} />
+        <MetricCard
+          label="MRR (this month)"
+          value={fmt(data.mrr)}
+          icon={<TrendingUp />}
+          sublabel={
+            <span className={`inline-flex items-center gap-0.5 ${data.mrrChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {data.mrrChange >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+              {data.mrrChange >= 0 ? '+' : ''}
+              {data.mrrChange.toFixed(1)}% vs last month
+            </span>
+          }
+        />
+        <MetricCard
+          label="Payments"
+          value={data.paymentsCount}
+          icon={<CreditCard />}
+          sublabel={`${data.thisMonthCount} this month`}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">Revenue by plan</h3>
+        <Card title="Revenue by plan">
           <div className="space-y-3">
             {data.byPlan.length === 0 ? (
               <p className="text-sm text-gray-500">No payments yet</p>
@@ -99,8 +97,7 @@ export default function AdminRevenue() {
             )}
           </div>
         </Card>
-        <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">Recent payments</h3>
+        <Card title="Recent payments">
           <div className="space-y-3">
             {data.recentPayments.length === 0 ? (
               <p className="text-sm text-gray-500">No payments yet</p>

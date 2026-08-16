@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { FileSpreadsheet, FileText, Upload, Download } from 'lucide-react'
 import PageHeader from './layout/PageHeader'
 import Card from './ui/Card'
@@ -14,6 +14,8 @@ import {
 import { getStoredDateOrder, setStoredDateOrder, type DateOrder } from '../lib/transactionDateOrder'
 import DateOrderToggle from './DateOrderToggle'
 import { useToast } from './ui/Toast'
+import Alert from './ui/Alert'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from './ui/Table'
 import SubscriptionRenewalPanel from './SubscriptionRenewalPanel'
 
 function money(n: number) {
@@ -32,8 +34,8 @@ function triggerBlobDownload(blob: Blob, filename: string) {
 function quotaLabel(preview: CleanPreviewResult): string | null {
   const q = preview.cleanExportQuota
   if (!q) return null
-  if (q.unlimited) return `${q.used} full clean exports used this month (unlimited)`
-  return `${q.used} / ${q.limit} full clean exports used this month`
+  if (q.unlimited) return `${q.used} full exports this month`
+  return `${q.used} of ${q.limit} full exports this month`
 }
 
 const COPY: Record<
@@ -43,15 +45,13 @@ const COPY: Record<
   'bank-statement': {
     title: 'Clean bank statement',
     eyebrow: 'Tools',
-    blurb:
-      'Upload a bank statement PDF or Excel to validate BRS parsers. Preview is free. Sample Excel/PDF downloads are truncated and watermarked. Full cleaned files use your plan’s monthly clean-export quota.',
+    blurb: 'Same parsers as project uploads. Download a watermarked sample, or a full Excel/PDF on your plan.',
     acceptHint: 'PDF, Excel (.xlsx / .xls / .xlsm), CSV, or image',
   },
   'cash-book': {
     title: 'Clean cash book',
     eyebrow: 'Tools',
-    blurb:
-      'Upload a cash book to validate normalisation. Preview is free. Sample Excel/PDF downloads are truncated and watermarked. Full cleaned files use your plan’s monthly clean-export quota.',
+    blurb: 'Same cash-book parsers as project uploads. Download a watermarked sample, or a full Excel/PDF on your plan.',
     acceptHint: 'Excel (.xlsx / .xls / .xlsm), CSV, PDF, or image',
   },
 }
@@ -61,7 +61,6 @@ type DownloadKey = `${CleanDownloadMode}-${'xlsx' | 'pdf'}`
 export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
   const copy = COPY[kind]
   const inputId = useId()
-  const inputRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<CleanPreviewResult | null>(null)
@@ -168,13 +167,11 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
 
       {paywall && <SubscriptionRenewalPanel />}
 
-      <Card title="Upload file" className="shadow-sm">
+      <Card title="Upload file">
         <p className="text-sm text-gray-600 mb-4">
-          Accepted: {copy.acceptHint}. Parsing uses the same engines as project uploads. Choose
-          date order below before you download — preview and Excel/PDF follow that choice.
+          Accepted: {copy.acceptHint}. Date order below applies to preview and downloads.
         </p>
         <input
-          ref={inputRef}
           id={inputId}
           type="file"
           className="sr-only"
@@ -185,32 +182,44 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
             e.target.value = ''
           }}
         />
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            variant="primary"
-            isLoading={parsing}
-            onClick={() => inputRef.current?.click()}
-          >
-            <Upload className="w-4 h-4 mr-2" aria-hidden />
-            {file ? 'Choose another file' : 'Choose file'}
-          </Button>
-          {file && (
-            <p className="text-sm text-gray-700 truncate max-w-md">
-              <span className="font-medium">{file.name}</span>
-              <span className="text-gray-500"> · {(file.size / 1024).toFixed(1)} KB</span>
+        <label
+          htmlFor={inputId}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'copy'
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            const f = e.dataTransfer.files?.[0]
+            if (f) void runPreview(f)
+          }}
+          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-gray-50/60 px-6 py-10 text-center hover:border-primary-300 hover:bg-primary-50/40 focus-within:border-primary-500"
+        >
+          <Upload className="h-6 w-6 text-gray-400 mb-2" aria-hidden />
+          <p className="text-sm font-medium text-gray-900">
+            {parsing ? 'Parsing…' : file ? 'Drop another file or click to replace' : 'Drop a file here or click to choose'}
+          </p>
+          {file && !parsing && (
+            <p className="mt-1 text-sm text-gray-600 truncate max-w-md">
+              {file.name}
+              <span className="text-gray-400"> · {(file.size / 1024).toFixed(1)} KB</span>
             </p>
           )}
-        </div>
+        </label>
         {error && !paywall && (
-          <p className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <Alert
+            tone="error"
+            title="Could not parse file"
+            className="mt-4"
+            onRetry={file ? () => void runPreview(file) : undefined}
+          >
             {error}
-          </p>
+          </Alert>
         )}
       </Card>
 
       {preview && (
-        <Card title="Parse result" className="shadow-sm">
+        <Card title="Parse result">
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-6">
             <div>
               <dt className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Rows</dt>
@@ -237,23 +246,19 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
           </dl>
 
           {quotaLabel(preview) && (
-            <p className="text-sm text-gray-600 mb-4">
-              {quotaLabel(preview)}
-              {fullBlocked && (
-                <span className="block mt-1 text-amber-800">
-                  Full export quota used for this month — sample downloads remain available. Upgrade
-                  for more full exports.
-                </span>
-              )}
-            </p>
+            <p className="text-sm text-gray-600 mb-4">{quotaLabel(preview)}</p>
+          )}
+          {fullBlocked && (
+            <Alert tone="warning" title="Full export quota used this month" className="mb-4">
+              Sample downloads remain available. Upgrade for more full exports.
+            </Alert>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 rounded-xl border border-border bg-gray-50 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-gray-900">Date order for download</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Applies to preview and Sample/Full Excel &amp; PDF. Default is oldest first (Jan →
-                Dec).
+                Applies to the preview table and both downloads. Oldest first is the default.
               </p>
             </div>
             <DateOrderToggle
@@ -267,7 +272,7 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
           <div className="space-y-3 mb-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                Sample download (watermarked, up to {sampleLimit} rows)
+                Sample (watermarked, up to {sampleLimit} rows)
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -294,7 +299,7 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                Full download (uses plan quota)
+                Full export
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -322,29 +327,29 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
           </div>
 
           {preview.sampleRows.length > 0 && (
-            <div className="w-full rounded-lg border border-border overflow-x-auto md:overflow-visible">
-              <table className="w-full table-fixed text-xs text-left">
-                <thead className="bg-gray-50 text-gray-600">
+            <div className="w-full rounded-lg border border-border overflow-hidden">
+              <Table className="table-fixed text-xs">
+                <TableHead>
                   <tr>
                     {preview.headers.map((h) => {
                       const isDesc = /desc|narration/i.test(h)
                       const isAmount = /debit|credit|balance|amt|amount|payment|receipt/i.test(h)
                       return (
-                        <th
+                        <TableTh
                           key={h}
-                          className={`px-3 py-2 font-semibold ${
+                          className={`normal-case tracking-normal px-3 py-2 ${
                             isDesc ? 'w-[36%]' : isAmount ? 'w-[11%] text-right' : 'w-[10%]'
                           }`}
                         >
                           {h}
-                        </th>
+                        </TableTh>
                       )
                     })}
                   </tr>
-                </thead>
-                <tbody>
+                </TableHead>
+                <TableBody>
                   {preview.sampleRows.map((row, i) => (
-                    <tr key={i} className="border-t border-gray-100 align-top">
+                    <TableRow key={i} className="align-top">
                       {preview.headers.map((h, j) => {
                         const isAmount = /debit|credit|balance|amt|amount|payment|receipt/i.test(h)
                         const isDesc = /desc|narration/i.test(h)
@@ -356,9 +361,9 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
                               ? money(row[j] as number)
                               : String(row[j])
                         return (
-                          <td
+                          <TableTd
                             key={j}
-                            className={`px-3 py-2 text-gray-800 ${
+                            className={`px-3 py-2 text-xs ${
                               isAmount
                                 ? 'text-right whitespace-nowrap tabular-nums'
                                 : isDesc
@@ -367,13 +372,13 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
                             }`}
                           >
                             {content}
-                          </td>
+                          </TableTd>
                         )
                       })}
-                    </tr>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               {preview.rowCount > preview.sampleRows.length && (
                 <p className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100 bg-gray-50">
                   Showing first {preview.sampleRows.length} of {preview.rowCount.toLocaleString()}{' '}

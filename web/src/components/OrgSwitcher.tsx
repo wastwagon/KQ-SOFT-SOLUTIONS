@@ -4,6 +4,9 @@ import { Building2, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { useToast } from './ui/Toast'
+import Button from './ui/Button'
+import Alert from './ui/Alert'
+import Skeleton from './ui/Skeleton'
 
 type OrgSwitcherProps = {
   /** `sidebar` = full-width footer control; `topbar` = compact header (legacy) */
@@ -18,14 +21,14 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
   const user = useAuth((s) => s.user)
   const [open, setOpen] = useState(false)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['auth', 'orgs'],
     queryFn: auth.listOrgs,
     staleTime: 60_000,
   })
 
   const organizations = data?.organizations ?? []
-  const showSwitcher = organizations.length > 1
+  const showSwitcher = organizations.length > 1 || isError
   const isSidebar = variant === 'sidebar'
 
   const switchMutation = useMutation({
@@ -78,7 +81,7 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
     <>
       <div className="fixed inset-0 z-30" aria-hidden onClick={() => setOpen(false)} />
       <div
-        className={`absolute z-40 w-64 rounded-xl border border-gray-200 bg-white py-1 shadow-lg ${
+        className={`absolute z-40 w-64 rounded-xl border border-border bg-white py-1 shadow-lg ${
           isSidebar ? 'left-0 bottom-full mb-1.5' : 'right-0 top-full mt-1'
         }`}
         role="listbox"
@@ -89,29 +92,44 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
           <p className="text-xs text-gray-500 truncate mt-0.5">{user?.email}</p>
         </div>
         {isLoading ? (
-          <p className="px-3 py-4 text-sm text-gray-500">Loading…</p>
+          <div className="px-3 py-3 space-y-2" aria-busy="true" aria-label="Loading workspaces">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : isError ? (
+          <div className="px-2 py-2">
+            <Alert
+              tone="error"
+              title="Could not load workspaces"
+              className="!p-3"
+              onRetry={() => void refetch()}
+            />
+          </div>
         ) : (
           organizations.map((o) => (
-            <button
+            <Button
               key={o.id}
               type="button"
+              variant="ghost"
+              size="sm"
               role="option"
               aria-selected={o.current}
               onClick={() => {
                 if (!o.current) switchMutation.mutate(o.id)
                 else setOpen(false)
               }}
+              isLoading={switchMutation.isPending && switchMutation.variables === o.id}
               disabled={switchMutation.isPending}
-              className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-gray-50 ${
+              className={`w-full !justify-start h-auto rounded-none py-2.5 ${
                 o.current ? 'bg-primary-50/60 text-primary-900' : 'text-gray-800'
               }`}
             >
-              <span className="flex-1 min-w-0">
+              <span className="flex-1 min-w-0 text-left">
                 <span className="block font-medium truncate">{o.name}</span>
-                <span className="block text-xs text-gray-500 capitalize">{o.role}</span>
+                <span className="block text-xs text-gray-500 capitalize font-normal">{o.role}</span>
               </span>
               {o.current && <Check className="w-4 h-4 shrink-0 text-primary-600" aria-hidden />}
-            </button>
+            </Button>
           ))
         )}
       </div>
@@ -121,13 +139,14 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
   if (isSidebar) {
     return (
       <div className="relative w-full">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors text-left"
+          className="w-full !justify-start gap-2.5 px-2 py-1.5 h-auto"
           aria-expanded={open}
           aria-haspopup="listbox"
-          disabled={switchMutation.isPending}
+          isLoading={switchMutation.isPending}
         >
           <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
             <Building2 className="w-4 h-4 text-primary-600" aria-hidden />
@@ -145,7 +164,7 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
           ) : (
             <ChevronDown className="w-4 h-4 shrink-0 text-gray-400" aria-hidden />
           )}
-        </button>
+        </Button>
         {menu}
       </div>
     )
@@ -153,13 +172,14 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
 
   return (
     <div className="relative hidden lg:block mr-1">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex flex-col items-end rounded-lg px-2 py-1 hover:bg-gray-50 transition-colors"
+        className="!flex-col !items-end rounded-lg px-2 py-1 h-auto"
         aria-expanded={open}
         aria-haspopup="listbox"
-        disabled={switchMutation.isPending}
+        isLoading={switchMutation.isPending}
       >
         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">
           Organisation
@@ -171,7 +191,7 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
           </span>
           <ChevronDown className="w-3.5 h-3.5 shrink-0 text-gray-400" aria-hidden />
         </span>
-      </button>
+      </Button>
       {menu}
     </div>
   )

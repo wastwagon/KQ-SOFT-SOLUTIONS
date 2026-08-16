@@ -4,9 +4,10 @@ import { Mail } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
-import AuthLayout, { authAlertErrorClass, authAlertWarnClass } from '../components/AuthLayout'
+import AuthLayout from '../components/AuthLayout'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
 
 export default function Login() {
@@ -81,14 +82,14 @@ export default function Login() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {sessionExpired && (
-          <div className={authAlertWarnClass} role="alert">
-            Your session expired. Please sign in again.
-          </div>
+          <Alert tone="warning" title="Your session expired">
+            Please sign in again.
+          </Alert>
         )}
         {error && (
-          <div className={authAlertErrorClass} role="alert">
+          <Alert tone="error" title="Could not sign in">
             {error}
-          </div>
+          </Alert>
         )}
 
         <Input
@@ -124,8 +125,8 @@ export default function Login() {
           />
         </div>
 
-        <Button type="submit" size="lg" className="w-full font-semibold shadow-lg shadow-primary-600/25" isLoading={loading} disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
+        <Button type="submit" size="lg" className="w-full font-semibold shadow-lg shadow-primary-600/25" isLoading={loading}>
+          Sign in
         </Button>
 
         <p className="border-t border-gray-100 pt-5 text-center text-sm text-gray-600">

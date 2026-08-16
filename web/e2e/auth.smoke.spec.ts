@@ -38,7 +38,7 @@ test.describe('authenticated smoke', () => {
     await page.getByRole('link', { name: /^Clients$/i }).first().click()
     await expect(page).toHaveURL(/\/clients/, { timeout: 15_000 })
 
-    await page.getByRole('link', { name: /Firm branding|Connections|Billing/i }).first().click()
+    await page.getByRole('link', { name: /^Settings$/i }).first().click()
     await expect(page).toHaveURL(/\/settings/, { timeout: 15_000 })
   })
 })

@@ -6,10 +6,17 @@ import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import Select from '../../components/ui/Select'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import PageHeader from '../../components/layout/PageHeader'
 import { useAuth } from '../../store/auth'
 import { useToast } from '../../components/ui/Toast'
+import Alert from '../../components/ui/Alert'
+import Badge from '../../components/ui/Badge'
+import MetricCard from '../../components/ui/MetricCard'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { useNavigate } from 'react-router-dom'
 
 const ROLES = ['admin', 'reviewer', 'preparer', 'viewer'] as const
@@ -34,7 +41,7 @@ export default function AdminOrgDetail() {
   const [clearTrialReason, setClearTrialReason] = useState('')
   const [clearStatusReason, setClearStatusReason] = useState('')
 
-  const { data: org, isLoading } = useQuery({
+  const { data: org, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'organization', slug],
     queryFn: () => api(`/admin/organizations/${slug}`) as Promise<{
       id: string
@@ -263,7 +270,7 @@ export default function AdminOrgDetail() {
     )
   }
 
-  if (isLoading || !org) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <Link
@@ -273,11 +280,34 @@ export default function AdminOrgDetail() {
           <ArrowLeft className="w-4 h-4" />
           Back to Organizations
         </Link>
-        <PageHeader
-          eyebrow="Platform admin"
-          title="Organization"
-          subtitle={<p className="text-gray-500">{isLoading ? 'Loading organization…' : 'Organization not found.'}</p>}
-        />
+        <PageHeader eyebrow="Platform admin" title="Organization" />
+        <PageBodySkeleton label="Loading organization" />
+      </div>
+    )
+  }
+
+  if (isError || !org) {
+    return (
+      <div className="space-y-8">
+        <Link
+          to="/platform-admin/organizations"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Organizations
+        </Link>
+        <PageHeader eyebrow="Platform admin" title="Organization" />
+        <Alert
+          tone="error"
+          title={isError ? 'Could not load organization' : 'Organization not found'}
+          onRetry={isError ? () => void refetch() : undefined}
+        >
+          {isError
+            ? error instanceof Error
+              ? error.message
+              : 'Something went wrong.'
+            : 'Check the URL or return to the organizations list.'}
+        </Alert>
       </div>
     )
   }
@@ -289,16 +319,14 @@ export default function AdminOrgDetail() {
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      {suspended && (
-        <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">Suspended</span>
-      )}
-      <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 capitalize">
+      {suspended && <Badge tone="danger">Suspended</Badge>}
+      <Badge tone="brand" className="capitalize">
         {org.plan}
-      </span>
+      </Badge>
       <Button
         variant="primary"
         size="sm"
-        disabled={impersonateMutation.isPending}
+        isLoading={impersonateMutation.isPending}
         onClick={async () => {
           const ok = await confirm({
             title: `Enter workspace “${org.name}”?`,
@@ -310,28 +338,28 @@ export default function AdminOrgDetail() {
         }}
       >
         <LogIn className="w-4 h-4 mr-1" />
-        {impersonateMutation.isPending ? 'Entering…' : 'Enter workspace'}
+        Enter workspace
       </Button>
       {suspended ? (
         <Button
           variant="outline"
           size="sm"
           onClick={() => suspendOrgMutation.mutate(null)}
-          disabled={suspendOrgMutation.isPending}
+          isLoading={suspendOrgMutation.isPending}
         >
           <Building2 className="w-4 h-4 mr-1" />
-          {suspendOrgMutation.isPending ? 'Restoring...' : 'Restore org'}
+          Restore org
         </Button>
       ) : (
         <Button
           variant="outline"
           size="sm"
           onClick={() => suspendOrgMutation.mutate(new Date().toISOString())}
-          disabled={suspendOrgMutation.isPending}
+          isLoading={suspendOrgMutation.isPending}
           className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
         >
           <Ban className="w-4 h-4 mr-1" />
-          {suspendOrgMutation.isPending ? 'Suspending...' : 'Suspend org'}
+          Suspend org
         </Button>
       )}
     </div>
@@ -353,27 +381,28 @@ export default function AdminOrgDetail() {
         subtitle={
           editingName ? (
             <div className="space-y-3 max-w-xl">
-              <input
+              <Input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="w-full max-w-md px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 text-base font-semibold shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[44px]"
                 placeholder="Organization name"
                 aria-label="Organization name"
+                className="max-w-md font-semibold"
               />
-              <input
+              <Input
                 value={editSlug}
                 onChange={(e) => setEditSlug(e.target.value)}
-                className="w-full max-w-md px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 font-mono text-sm shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-h-[44px]"
                 placeholder="url-slug"
                 aria-label="URL slug"
+                className="max-w-md font-mono"
               />
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   onClick={() => updateOrgMutation.mutate({ name: editName, slug: editSlug })}
-                  disabled={updateOrgMutation.isPending || !editName.trim() || !editSlug.trim()}
+                  disabled={!editName.trim() || !editSlug.trim()}
+                  isLoading={updateOrgMutation.isPending}
                 >
-                  {updateOrgMutation.isPending ? 'Saving...' : 'Save'}
+                  Save
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditingName(false)}>
                   Cancel
@@ -383,18 +412,20 @@ export default function AdminOrgDetail() {
           ) : (
             <>
               <p className="font-mono text-sm text-gray-700">{org.slug}</p>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={() => {
                   setEditingName(true)
                   setEditName(org.name)
                   setEditSlug(org.slug)
                 }}
-                className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg"
+                className="mt-2 text-primary-600 hover:text-primary-700"
               >
-                <Pencil className="w-4 h-4" aria-hidden />
+                <Pencil className="w-4 h-4 mr-1.5" aria-hidden />
                 Edit name & slug
-              </button>
+              </Button>
             </>
           )
         }
@@ -402,101 +433,112 @@ export default function AdminOrgDetail() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
-        <Card className="p-4 shadow-sm">
-          <p className="text-sm text-gray-500 font-medium">Usage</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">
-            {org.usage.projectsUnlimited
-              ? `${org.usage.projectsUsed} projects (unlimited)`
-              : `${org.usage.projectsUsed} / ${org.usage.projectsLimit} projects`}
-          </p>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {org.usage.transactionsUnlimited
-              ? `${org.usage.transactionsUsed} tx (unlimited)`
-              : `${org.usage.transactionsUsed} / ${org.usage.transactionsLimit} tx`}
-          </p>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {org.usage.bankAccountsUnlimited
-              ? `${org.usage.bankAccountsUsed ?? 0} banks (unlimited)`
-              : `${org.usage.bankAccountsUsed ?? 0} / ${org.usage.bankAccountsLimit ?? '—'} banks`}
-          </p>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {org.usage.cleanExportsUnlimited
-              ? `${org.usage.cleanExportsUsed ?? 0} full cleans (unlimited)`
-              : `${org.usage.cleanExportsUsed ?? 0} / ${org.usage.cleanExportsLimit ?? '—'} full cleans`}
-          </p>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <p className="text-sm text-gray-500 font-medium">Total paid</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">{fmt(org.totalPaid)}</p>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <p className="text-sm text-gray-500 font-medium">Joined</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">
-            {formatDate(org.createdAt)}
-          </p>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <p className="text-sm text-gray-500 font-medium">Subscription</p>
-          <p className="text-lg font-bold text-gray-900 mt-1 capitalize">{org.subscription?.status || '—'}</p>
-          {org.subscriptionMeta?.statusOverride && (
-            <p className="text-xs text-amber-800 mt-1">
-              Status override active
-              {org.subscriptionMeta.computedStatus !== org.subscription?.status && (
-                <> (computed: <span className="capitalize">{org.subscriptionMeta.computedStatus}</span>)</>
+        <MetricCard
+          label="Usage"
+          value={
+            org.usage.projectsUnlimited
+              ? `${org.usage.projectsUsed} projects`
+              : `${org.usage.projectsUsed} / ${org.usage.projectsLimit}`
+          }
+          sublabel={
+            <>
+              <p>
+                {org.usage.transactionsUnlimited
+                  ? `${org.usage.transactionsUsed} tx (unlimited)`
+                  : `${org.usage.transactionsUsed} / ${org.usage.transactionsLimit} tx`}
+              </p>
+              <p>
+                {org.usage.bankAccountsUnlimited
+                  ? `${org.usage.bankAccountsUsed ?? 0} banks (unlimited)`
+                  : `${org.usage.bankAccountsUsed ?? 0} / ${org.usage.bankAccountsLimit ?? '—'} banks`}
+              </p>
+              <p>
+                {org.usage.cleanExportsUnlimited
+                  ? `${org.usage.cleanExportsUsed ?? 0} full cleans (unlimited)`
+                  : `${org.usage.cleanExportsUsed ?? 0} / ${org.usage.cleanExportsLimit ?? '—'} full cleans`}
+              </p>
+            </>
+          }
+        />
+        <MetricCard label="Total paid" value={fmt(org.totalPaid)} />
+        <MetricCard label="Joined" value={formatDate(org.createdAt)} />
+        <MetricCard
+          label="Subscription"
+          value={<span className="capitalize">{org.subscription?.status || '—'}</span>}
+          sublabel={
+            <>
+              {org.subscriptionMeta?.statusOverride && (
+                <Badge tone="warning" size="sm">
+                  Status override
+                  {org.subscriptionMeta.computedStatus !== org.subscription?.status
+                    ? ` (computed: ${org.subscriptionMeta.computedStatus})`
+                    : ''}
+                </Badge>
               )}
-            </p>
-          )}
-          {org.subscriptionMeta?.trialOverrideEndsAt && (
-            <p className="text-xs text-amber-800 mt-1">
-              Trial end override:{' '}
-              {formatDate(org.subscriptionMeta.trialOverrideEndsAt, {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-          )}
-          {org.subscription?.trialEndsAt && !org.subscriptionMeta?.statusOverride && (
-            <p className="text-xs text-gray-500 mt-1">
-              Trial ends:{' '}
-              {formatDate(org.subscription.trialEndsAt, {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-          )}
-          {org.subscription?.currentPeriodEnd && (
-            <p className="text-xs text-gray-500 mt-1">Period ends: {formatDate(org.subscription.currentPeriodEnd, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-          )}
-        </Card>
+              {org.subscriptionMeta?.trialOverrideEndsAt && (
+                <Badge tone="warning" size="sm">
+                  Trial end override:{' '}
+                  {formatDate(org.subscriptionMeta.trialOverrideEndsAt, {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Badge>
+              )}
+              {org.subscription?.trialEndsAt && !org.subscriptionMeta?.statusOverride && (
+                <p>
+                  Trial ends:{' '}
+                  {formatDate(org.subscription.trialEndsAt, {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              )}
+              {org.subscription?.currentPeriodEnd && (
+                <p>
+                  Period ends:{' '}
+                  {formatDate(org.subscription.currentPeriodEnd, {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              )}
+            </>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-4">Change plan</h3>
-          <div className="flex gap-3 flex-wrap">
-            <select
-              value={overridePlan || newPlan || org.plan}
-              onChange={(e) => { setOverridePlan(e.target.value); setNewPlan(e.target.value) }}
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500"
-            >
-              {plans.map((p) => (
-                <option key={p.slug} value={p.slug}>{p.name}</option>
-              ))}
-            </select>
+        <Card title="Change plan">
+          <div className="flex gap-3 flex-wrap items-end">
+            <div className="w-48">
+              <Select
+                aria-label="Plan"
+                value={overridePlan || newPlan || org.plan}
+                onChange={(e) => { setOverridePlan(e.target.value); setNewPlan(e.target.value) }}
+              >
+                {plans.map((p) => (
+                  <option key={p.slug} value={p.slug}>{p.name}</option>
+                ))}
+              </Select>
+            </div>
             <Button
               onClick={() => {
                 const plan = overridePlan || newPlan || org.plan
                 if (plan !== org.plan) updateMutation.mutate(plan)
               }}
-              disabled={updateMutation.isPending || (overridePlan || newPlan || org.plan) === org.plan}
+              disabled={(overridePlan || newPlan || org.plan) === org.plan}
+              isLoading={updateMutation.isPending}
             >
-              {updateMutation.isPending ? 'Saving...' : 'Update plan'}
+              Update plan
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
@@ -504,8 +546,7 @@ export default function AdminOrgDetail() {
           </p>
         </Card>
 
-        <Card className="shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-4">Members</h3>
+        <Card title="Members">
           <ul className="space-y-3">
             {org.members.map((m) => (
               <li key={m.user.id} className="flex justify-between items-center gap-4 text-sm">
@@ -516,26 +557,30 @@ export default function AdminOrgDetail() {
                   {m.user.email}
                 </Link>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <select
-                    value={m.role === 'member' ? 'preparer' : m.role}
-                    onChange={(e) => updateRoleMutation.mutate({ userId: m.user.id, role: e.target.value })}
-                    disabled={updateRoleMutation.isPending}
-                    className="px-2 py-1 border border-border rounded bg-white text-gray-900 text-xs capitalize focus:ring-2 focus:ring-primary-500"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
+                  <div className="w-32">
+                    <Select
+                      aria-label={`Role for ${m.user.email}`}
+                      value={m.role === 'member' ? 'preparer' : m.role}
+                      onChange={(e) => updateRoleMutation.mutate({ userId: m.user.id, role: e.target.value })}
+                      disabled={updateRoleMutation.isPending}
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </Select>
+                  </div>
                   {org.members.length > 1 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => removeMemberMutation.mutate(m.user.id)}
                       disabled={removeMemberMutation.isPending}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       title="Remove member"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </li>
@@ -544,58 +589,55 @@ export default function AdminOrgDetail() {
         </Card>
       </div>
 
-      <Card className="shadow-sm border-primary-100 bg-primary-50/30">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="font-semibold text-gray-900">Complimentary access</h3>
-            <p className="text-sm text-gray-600 mt-1 max-w-2xl">
-              One-click setup for internal or partner orgs: sets plan to <strong>Premium</strong> and subscription
-              status to <strong>Active</strong> without payment. Removes inactive banners in the app immediately.
-            </p>
-            {hasComplimentaryAccess && (
-              <p className="text-xs text-green-800 mt-2 font-medium">
-                This org already has Premium plan and Active subscription.
-              </p>
-            )}
-          </div>
-          <Button
-            className="shrink-0"
-            onClick={async () => {
-              const planChange = org.plan !== 'premium' ? ` Plan will change from ${org.plan} to premium.` : ''
-              const ok = await confirm({
-                title: 'Grant complimentary access?',
-                description: `Subscription will be set to active without payment.${planChange} Reason: "${COMPLIMENTARY_ACCESS_REASON}".`,
-                confirmLabel: 'Grant access',
-                tone: 'warning',
-              })
-              if (!ok) return
-              grantComplimentaryMutation.mutate({ plan: org.plan })
-            }}
-            disabled={grantComplimentaryMutation.isPending || hasComplimentaryAccess || suspended}
-          >
-            <BadgeCheck className="w-4 h-4 mr-1.5" aria-hidden />
-            {grantComplimentaryMutation.isPending ? 'Granting...' : 'Grant complimentary access'}
-          </Button>
-        </div>
-      </Card>
+      <Alert
+        tone={hasComplimentaryAccess ? 'success' : 'info'}
+        title="Complimentary access"
+        action={
+          hasComplimentaryAccess ? undefined : (
+            <Button
+              className="shrink-0"
+              onClick={async () => {
+                const planChange = org.plan !== 'premium' ? ` Plan will change from ${org.plan} to premium.` : ''
+                const ok = await confirm({
+                  title: 'Grant complimentary access?',
+                  description: `Subscription will be set to active without payment.${planChange} Reason: "${COMPLIMENTARY_ACCESS_REASON}".`,
+                  confirmLabel: 'Grant access',
+                  tone: 'warning',
+                })
+                if (!ok) return
+                grantComplimentaryMutation.mutate({ plan: org.plan })
+              }}
+              disabled={suspended}
+              isLoading={grantComplimentaryMutation.isPending}
+            >
+              <BadgeCheck className="w-4 h-4 mr-1.5" aria-hidden />
+              Grant complimentary access
+            </Button>
+          )
+        }
+      >
+        One-click setup for internal or partner orgs: sets plan to <strong>Premium</strong> and subscription
+        status to <strong>Active</strong> without payment. Removes inactive banners in the app immediately.
+        {hasComplimentaryAccess ? (
+          <p className="mt-1">This org already has Premium plan and Active subscription.</p>
+        ) : null}
+      </Alert>
 
-      <Card className="shadow-sm">
-        <h3 className="font-semibold text-gray-900 mb-4">Subscription controls (admin)</h3>
+      <Card title="Subscription controls (admin)">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-2">
             <p className="text-sm font-medium text-gray-800">Set trial end</p>
-            <input
+            <Input
               type="datetime-local"
               value={trialEndsAt}
               onChange={(e) => setTrialEndsAt(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm w-full"
+              aria-label="Trial end"
             />
-            <input
+            <Input
               type="text"
               value={trialReason}
               onChange={(e) => setTrialReason(e.target.value)}
               placeholder="Reason (required)"
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm w-full"
             />
             <Button
               size="sm"
@@ -610,16 +652,16 @@ export default function AdminOrgDetail() {
                 if (!ok) return
                 setTrialMutation.mutate({ trialEndsAt: new Date(trialEndsAt).toISOString(), reason: trialReason.trim() })
               }}
-              disabled={setTrialMutation.isPending}
+              disabled={!trialEndsAt || trialReason.trim().length < 3}
+              isLoading={setTrialMutation.isPending}
             >
-              {setTrialMutation.isPending ? 'Updating...' : 'Update trial end'}
+              Update trial end
             </Button>
-            <input
+            <Input
               type="text"
               value={clearTrialReason}
               onChange={(e) => setClearTrialReason(e.target.value)}
               placeholder="Reason to clear trial override"
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm w-full"
             />
             <Button
               size="sm"
@@ -635,41 +677,41 @@ export default function AdminOrgDetail() {
                 if (!ok) return
                 clearTrialMutation.mutate({ reason: clearTrialReason.trim() })
               }}
-              disabled={clearTrialMutation.isPending}
+              disabled={clearTrialReason.trim().length < 3}
+              isLoading={clearTrialMutation.isPending}
             >
-              {clearTrialMutation.isPending ? 'Clearing...' : 'Clear trial override'}
+              Clear trial override
             </Button>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium text-gray-800">Override subscription status</p>
             {org.subscriptionMeta?.statusOverride ? (
-              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                Override applied: <span className="font-semibold capitalize">{org.subscriptionMeta.statusOverride}</span>
+              <Alert tone="warning" title="Override applied">
+                <span className="capitalize">{org.subscriptionMeta.statusOverride}</span>
                 {org.subscriptionMeta.statusOverrideReason && (
                   <> — {org.subscriptionMeta.statusOverrideReason}</>
                 )}
-              </p>
+              </Alert>
             ) : (
               <p className="text-xs text-gray-500">
                 Effective status is computed from payments and trial window. Select a value below and apply to override.
               </p>
             )}
-            <select
+            <Select
+              aria-label="Subscription status"
               value={manualStatus}
               onChange={(e) => setManualStatus(e.target.value as 'trial' | 'active' | 'expired' | 'free')}
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm w-full"
             >
               <option value="trial">trial</option>
               <option value="active">active</option>
               <option value="expired">expired</option>
               <option value="free">free</option>
-            </select>
-            <input
+            </Select>
+            <Input
               type="text"
               value={statusReason}
               onChange={(e) => setStatusReason(e.target.value)}
               placeholder="Reason (required)"
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm w-full"
             />
             <Button
               size="sm"
@@ -684,16 +726,16 @@ export default function AdminOrgDetail() {
                 if (!ok) return
                 setStatusMutation.mutate({ status: manualStatus, reason: statusReason.trim() })
               }}
-              disabled={setStatusMutation.isPending}
+              disabled={statusReason.trim().length < 3}
+              isLoading={setStatusMutation.isPending}
             >
-              {setStatusMutation.isPending ? 'Updating...' : 'Apply status override'}
+              Apply status override
             </Button>
-            <input
+            <Input
               type="text"
               value={clearStatusReason}
               onChange={(e) => setClearStatusReason(e.target.value)}
               placeholder="Reason to clear status override"
-              className="px-3 py-2 border border-border rounded-lg bg-white text-gray-900 text-sm w-full"
             />
             <Button
               size="sm"
@@ -709,47 +751,45 @@ export default function AdminOrgDetail() {
                 if (!ok) return
                 clearStatusMutation.mutate({ reason: clearStatusReason.trim() })
               }}
-              disabled={clearStatusMutation.isPending}
+              disabled={clearStatusReason.trim().length < 3}
+              isLoading={clearStatusMutation.isPending}
             >
-              {clearStatusMutation.isPending ? 'Clearing...' : 'Clear status override'}
+              Clear status override
             </Button>
           </div>
         </div>
       </Card>
 
-      <Card className="shadow-sm">
-        <h3 className="font-semibold text-gray-900 mb-4">Payment history</h3>
+      <Card title="Payment history" noPadding={org.payments.length > 0}>
         {org.payments.length === 0 ? (
           <p className="text-sm text-gray-500">No payments yet</p>
         ) : (
-          <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="border-b border-border">
+          <Table>
+            <TableHead>
               <tr>
-                <th className="text-left py-2 text-gray-500 font-medium">Date</th>
-                <th className="text-left py-2 text-gray-500 font-medium">Plan</th>
-                <th className="text-left py-2 text-gray-500 font-medium">Period</th>
-                <th className="text-right py-2 text-gray-500 font-medium">Amount</th>
-                <th className="text-left py-2 text-gray-500 font-medium">Reference</th>
+                <TableTh>Date</TableTh>
+                <TableTh>Plan</TableTh>
+                <TableTh>Period</TableTh>
+                <TableTh className="text-right">Amount</TableTh>
+                <TableTh>Reference</TableTh>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted">
+            </TableHead>
+            <TableBody>
               {org.payments.map((p) => (
-                <tr key={p.id}>
-                  <td className="py-2 text-gray-900">
+                <TableRow key={p.id}>
+                  <TableTd>
                     {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="py-2 text-gray-600 capitalize">{p.plan}</td>
-                  <td className="py-2 text-gray-600">{p.period}</td>
-                  <td className="py-2 text-right font-medium text-gray-900">
+                  </TableTd>
+                  <TableTd className="capitalize">{p.plan}</TableTd>
+                  <TableTd>{p.period}</TableTd>
+                  <TableTd className="text-right font-medium text-gray-900">
                     {fmt(Number(p.amount))}
-                  </td>
-                  <td className="py-2 text-gray-500 font-mono text-xs">{p.reference || '—'}</td>
-                </tr>
+                  </TableTd>
+                  <TableTd className="font-mono text-xs text-gray-500">{p.reference || '—'}</TableTd>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-          </div>
+            </TableBody>
+          </Table>
         )}
       </Card>
     </div>

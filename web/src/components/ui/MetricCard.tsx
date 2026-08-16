@@ -6,22 +6,22 @@ interface MetricCardProps {
   sublabel?: ReactNode
   /** Optional icon or trend (e.g. Lucide icon) */
   icon?: ReactNode
-  /** Left accent bar colour. Default: primary */
+  /** Left accent bar. Default is none — dashboard and admin cards stay flat. */
   accent?: 'primary' | 'muted' | 'amber' | 'green' | 'brand' | 'none'
   className?: string
 }
 
-export default function MetricCard({ label, value, sublabel, icon, accent = 'primary', className = '' }: MetricCardProps) {
+export default function MetricCard({ label, value, sublabel, icon, accent = 'none', className = '' }: MetricCardProps) {
   const accentBorder =
-    accent === 'primary' || accent === 'brand'
-      ? 'border-l-4 border-l-primary-500'
-      : accent === 'muted'
-        ? 'border-l-4 border-l-gray-300'
-        : accent === 'amber'
-          ? 'border-l-4 border-l-amber-500'
-          : accent === 'green'
-            ? 'border-l-4 border-l-green-500'
-            : ''
+    accent === 'none'
+      ? ''
+      : accent === 'primary' || accent === 'brand'
+        ? 'border-l-4 border-l-primary-500'
+        : accent === 'muted'
+          ? 'border-l-4 border-l-gray-300'
+          : accent === 'amber'
+            ? 'border-l-4 border-l-amber-500'
+            : 'border-l-4 border-l-green-500'
 
   const iconWrap =
     accent === 'primary' || accent === 'brand'

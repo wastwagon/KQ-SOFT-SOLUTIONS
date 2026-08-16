@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { report } from '../../lib/api'
 import { formatAmount } from '../../lib/format'
 import { brsTieOutVariance, brsVarianceLabel } from '../../lib/brsVariance'
+import Badge from '../ui/Badge'
 
 export default function BrsVarianceBadge({
   projectId,
@@ -31,24 +32,21 @@ export default function BrsVarianceBadge({
   }
   if (label === 'Tied out') {
     return (
-      <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-800 ring-1 ring-inset ring-green-600/15">
+      <Badge tone="success" size="sm">
         Tied out
-      </span>
+      </Badge>
     )
   }
 
+  const tone = Math.abs(variance) < 0.01 ? 'success' : variance > 0 ? 'warning' : 'danger'
+
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
-        Math.abs(variance) < 0.01
-          ? 'bg-green-50 text-green-800 ring-green-600/15'
-          : variance > 0
-            ? 'bg-amber-50 text-amber-900 ring-amber-600/15'
-            : 'bg-red-50 text-red-800 ring-red-600/15'
-      }`}
+    <Badge
+      tone={tone}
+      size="sm"
       title={`BRS variance: ${formatAmount(variance, resolvedCurrency)}`}
     >
       {label} {formatAmount(Math.abs(variance), resolvedCurrency)}
-    </span>
+    </Badge>
   )
 }

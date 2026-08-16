@@ -7,6 +7,12 @@ import { normalizeClientsPayload } from '../lib/clientsPayload'
 import { useAuth } from '../store/auth'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
+import Modal from '../components/ui/Modal'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
+import { TableRowSkeleton } from '../components/ui/Skeleton'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
@@ -17,6 +23,7 @@ export default function Clients() {
   const org = useAuth((s) => s.org)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
 
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -32,13 +39,18 @@ export default function Clients() {
   const { clients: list, unassignedProjectCount, totalProjectCount } = normalizeClientsPayload(clientsRaw)
   const paywallBlocked = isSubscriptionInactiveError(clientsQuery.error)
 
+  const closeAdd = () => {
+    setAddOpen(false)
+    setName('')
+    setError('')
+  }
+
   const createMutation = useMutation({
     mutationFn: clients.create,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
-      setName('')
-      setError('')
       toast.success('Client added', `"${variables.name}" is ready to be assigned to a project.`)
+      closeAdd()
     },
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) => {
@@ -68,19 +80,13 @@ export default function Clients() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Work" title="Clients" />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          <p className="font-medium text-red-900">Could not load clients</p>
-          <p className="mt-1">
-            {clientsListError instanceof Error ? clientsListError.message : 'Something went wrong.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load clients"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}
+        >
+          {clientsListError instanceof Error ? clientsListError.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -93,113 +99,131 @@ export default function Clients() {
         subtitle={
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
-            <p>
-              <strong className="text-gray-800">Clients</strong> are labels inside this firm workspace for
-              the entities you reconcile for. This is not the same as Platform admin → Organizations
-              (subscriber accounts). Team employees are under{' '}
-              <Link to="/settings/members" className="font-medium text-primary-600 hover:underline">
-                Settings → Team members
-              </Link>
-              .
-            </p>
-            <p className="text-xs text-gray-500">
-              Project counts only include projects assigned to that client. Assign a client when creating
-              or editing a project.
+            <p className="text-gray-500">
+              Entities you reconcile for.
               {!features.multi_client && (
-                <span className="text-amber-700 font-medium">
-                  {' '}
-                  Filtering the project list by client requires the Firm plan.
-                </span>
+                <span> Filtering projects by client requires the Firm plan.</span>
               )}
             </p>
           </>
         }
+        actions={
+          <Button type="button" onClick={() => setAddOpen(true)}>
+            Add client
+          </Button>
+        }
       />
 
       {unassignedProjectCount > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 max-w-2xl">
-          <p className="font-medium">
-            {unassignedProjectCount} project{unassignedProjectCount === 1 ? '' : 's'} in this workspace{' '}
-            {unassignedProjectCount === 1 ? 'is' : 'are'} not assigned to a client
-            {totalProjectCount > 0 ? ` (${totalProjectCount} total)` : ''}.
-          </p>
-          <p className="mt-1 text-amber-900/90">
-            Those projects still appear under{' '}
-            <Link to="/projects" className="font-semibold underline hover:text-amber-950">
-              Projects
-            </Link>
-            . Edit a project (or create new ones with a client selected) to link them here.
-          </p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-xl">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Client name"
-          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
-        />
-        <button
-          type="submit"
-          disabled={createMutation.isPending || !name.trim()}
-          className="px-4 py-2.5 font-medium text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 shadow-sm hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 transition-all"
+        <Alert
+          tone="warning"
+          title={`${unassignedProjectCount} project${unassignedProjectCount === 1 ? '' : 's'} not assigned to a client`}
+          className="max-w-2xl"
         >
-          {createMutation.isPending ? 'Adding...' : 'Add client'}
-        </button>
-      </form>
-      {error && (
-        <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm max-w-xl border border-red-100">{error}</div>
+          Those jobs still appear under{' '}
+          <Link to="/projects" className="font-semibold underline hover:text-amber-950">
+            Projects
+          </Link>
+          {totalProjectCount > 0 ? ` (${totalProjectCount} total)` : ''}. Assign a client when creating or
+          editing a project.
+        </Alert>
       )}
 
-      <Card noPadding className="overflow-hidden border-l-4 border-l-primary-500 shadow-sm">
+      <Card noPadding>
         {isLoading ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">Loading clients…</div>
+          <Table>
+            <TableHead>
+              <tr>
+                <TableTh>Client</TableTh>
+                <TableTh>Assigned projects</TableTh>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {[1, 2, 3, 4].map((i) => (
+                <TableRowSkeleton key={i} cols={2} />
+              ))}
+            </TableBody>
+          </Table>
         ) : list.length === 0 ? (
           <div className="py-14 px-6">
             <EmptyState
               icon={<Building2 className="w-7 h-7" />}
               title="No clients yet"
-              description="Add a client above, then attach them when you create a reconciliation project."
+              description="Add a client, then attach them when you create a reconciliation project."
+              action={
+                <Button type="button" onClick={() => setAddOpen(true)}>
+                  Add client
+                </Button>
+              }
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-surface border-b border-border">
-                <tr>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Assigned projects
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-muted bg-white">
-                {list.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50/90 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <Link
-                        to={`/projects?clientId=${c.id}`}
-                        className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg group/row"
-                      >
-                        {c._count?.projects ?? 0} project{(c._count?.projects ?? 0) === 1 ? '' : 's'}
-                        <ChevronRight
-                          className="w-4 h-4 opacity-70 group-hover/row:translate-x-0.5 transition-transform"
-                          aria-hidden
-                        />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHead>
+              <tr>
+                <TableTh>Client</TableTh>
+                <TableTh>Assigned projects</TableTh>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {list.map((c) => (
+                <TableRow key={c.id}>
+                  <TableTd className="font-medium text-gray-900">{c.name}</TableTd>
+                  <TableTd>
+                    <Link
+                      to={`/projects?clientId=${c.id}`}
+                      className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg group/row"
+                    >
+                      {c._count?.projects ?? 0} project{(c._count?.projects ?? 0) === 1 ? '' : 's'}
+                      <ChevronRight
+                        className="w-4 h-4 opacity-70 group-hover/row:translate-x-0.5 transition-transform"
+                        aria-hidden
+                      />
+                    </Link>
+                  </TableTd>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Card>
+
+      <Modal
+        open={addOpen}
+        title="Add client"
+        onClose={closeAdd}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={closeAdd}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="add-client-form"
+              disabled={createMutation.isPending || !name.trim()}
+              isLoading={createMutation.isPending}
+            >
+              Add client
+            </Button>
+          </>
+        }
+      >
+        <form id="add-client-form" onSubmit={handleSubmit} className="space-y-3">
+          {error && (
+            <Alert tone="error" title="Could not add client">
+              {error}
+            </Alert>
+          )}
+          <Input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Ghana Cocoa Board"
+            label="Client name"
+            autoFocus
+          />
+        </form>
+      </Modal>
     </div>
   )
 }

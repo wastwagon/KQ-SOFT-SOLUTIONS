@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown } from 'lucide-react'
 import {
   projects,
   clients,
@@ -14,18 +13,14 @@ import { normalizeClientsList } from '../lib/clientsPayload'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import Alert from '../components/ui/Alert'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import { useAuth } from '../store/auth'
 import { COMMON_PROJECT_CURRENCIES, getCurrencySymbol } from '../lib/currency'
 import { composeProjectDisplayName } from '../lib/projectIdentity'
-
-function SelectWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative">
-      {children}
-      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" aria-hidden />
-    </div>
-  )
-}
 
 export default function ProjectNew() {
   const org = useAuth((s) => s.org)
@@ -141,13 +136,6 @@ export default function ProjectNew() {
     })
   }
 
-  const inputClass =
-    'w-full min-h-[44px] pl-4 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50/80 text-gray-900 text-sm placeholder:text-gray-400 shadow-sm hover:border-gray-300 hover:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:bg-white focus:outline-none transition-all duration-200'
-  const selectClass =
-    'w-full min-h-[44px] pl-4 pr-11 py-3 border border-gray-200 rounded-xl bg-gray-50/80 text-gray-900 text-sm shadow-sm hover:border-gray-300 hover:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:bg-white focus:outline-none transition-all duration-200 appearance-none cursor-pointer'
-  const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5'
-  const hintClass = 'text-sm text-gray-600 mt-1.5'
-
   if (paywallBlocked) {
     return (
       <div className="space-y-8">
@@ -174,20 +162,16 @@ export default function ProjectNew() {
           title="New reconciliation project"
           subtitle={<p className="text-gray-500">Create a project as soon as data loads. Copy settings from an older job or start clean.</p>}
         />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          <p className="font-medium text-red-900">Could not load data for new project</p>
-          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: ['projects'] })
-              void queryClient.invalidateQueries({ queryKey: ['clients'] })
-            }}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load data for new project"
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: ['projects'] })
+            void queryClient.invalidateQueries({ queryKey: ['clients'] })
+          }}
+        >
+          {err instanceof Error ? err.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -208,72 +192,60 @@ export default function ProjectNew() {
         }
       />
       {platformDefaultsFailed && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 max-w-2xl">
-          <span>Workspace defaults could not be loaded; new projects use GHS until this succeeds. </span>
-          <button
-            type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['settings', 'platform-defaults'] })}
-            className="font-semibold text-amber-900 underline hover:no-underline"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="warning"
+          title="Workspace defaults could not be loaded"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'platform-defaults'] })}
+          className="max-w-2xl"
+        >
+          New projects use GHS until this succeeds.
+        </Alert>
       )}
+      <Card className="max-w-2xl">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-primary-500 shadow-sm p-6 sm:p-8 max-w-2xl space-y-5"
+        className="space-y-5"
       >
         {error && (
-          <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100">
+          <Alert tone="error" title="Could not create project">
             {error}
-          </div>
+          </Alert>
         )}
-        {/* Phase 11: Copy from previous — templates for multi-project-per-client UX */}
-        <div>
-          <label className={labelClass}>Copy settings from (optional)</label>
-          <SelectWrapper>
-            <select
-              value=""
-              onChange={(e) => {
-                const slug = e.target.value
-                if (!slug) return
-                const p = templateProjects.find((x) => x.slug === slug)
-                if (p) {
-                  setClientId(p.clientId || '')
-                  setCurrencyOverride((p.currency as 'GHS' | 'USD' | 'EUR') || 'GHS')
-                  if (!name && p.name) {
-                    setNameManuallyEdited(true)
-                    setName(`${p.name} (copy)`)
-                  }
-                }
-                e.target.value = ''
-              }}
-              className={selectClass}
-            >
-              <option value="">— None —</option>
-              {templateProjects.map((p) => (
-                <option key={p.id} value={p.slug}>{p.name} {p.client ? `(${p.client.name})` : ''}</option>
-              ))}
-            </select>
-          </SelectWrapper>
-          <p className={hintClass}>Copy client and currency from a previous project.</p>
-        </div>
-        <div>
-          <label className={labelClass}>Client (optional)</label>
-          <SelectWrapper>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className={selectClass}
-            >
-              <option value="">— None —</option>
-              {clientsList.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </SelectWrapper>
-        </div>
-        <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50/90 to-white p-5 space-y-4 ring-1 ring-gray-100">
+        <Select
+          label="Copy settings from (optional)"
+          hint="Copy client and currency from a previous project."
+          value=""
+          onChange={(e) => {
+            const slug = e.target.value
+            if (!slug) return
+            const p = templateProjects.find((x) => x.slug === slug)
+            if (p) {
+              setClientId(p.clientId || '')
+              setCurrencyOverride((p.currency as 'GHS' | 'USD' | 'EUR') || 'GHS')
+              if (!name && p.name) {
+                setNameManuallyEdited(true)
+                setName(`${p.name} (copy)`)
+              }
+            }
+            e.target.value = ''
+          }}
+        >
+          <option value="">— None —</option>
+          {templateProjects.map((p) => (
+            <option key={p.id} value={p.slug}>{p.name} {p.client ? `(${p.client.name})` : ''}</option>
+          ))}
+        </Select>
+        <Select
+          label="Client (optional)"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+        >
+          <option value="">— None —</option>
+          {clientsList.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </Select>
+        <div className="rounded-xl border border-border bg-gray-50/40 p-5 space-y-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-primary-600">
               Tracking &amp; printed BRS identity
@@ -284,122 +256,89 @@ export default function ProjectNew() {
               footer still come from organization branding.
             </p>
           </div>
-          <div>
-            <label htmlFor="statement-business-name" className={labelClass}>
-              Business name as on bank statement
-            </label>
-            <input
-              id="statement-business-name"
-              type="text"
-              value={statementBusinessName}
-              onChange={(e) => setStatementBusinessName(e.target.value)}
-              placeholder="e.g. GHANA COCOA BOARD"
-              autoComplete="organization"
-              className={inputClass}
-            />
-            <p className={hintClass}>Use the exact account-holder name shown on the statement.</p>
-          </div>
+          <Input
+            id="statement-business-name"
+            type="text"
+            label="Business name as on bank statement"
+            value={statementBusinessName}
+            onChange={(e) => setStatementBusinessName(e.target.value)}
+            placeholder="e.g. GHANA COCOA BOARD"
+            autoComplete="organization"
+            hint="Use the exact account-holder name shown on the statement."
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="primary-account-name" className={labelClass}>
-                Bank account name
-              </label>
-              <input
-                id="primary-account-name"
-                type="text"
-                value={primaryAccountName}
-                onChange={(e) => setPrimaryAccountName(e.target.value)}
-                placeholder="e.g. Current / Operating"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="primary-bank-name" className={labelClass}>
-                Bank name
-              </label>
-              <input
-                id="primary-bank-name"
-                type="text"
-                value={primaryBankName}
-                onChange={(e) => setPrimaryBankName(e.target.value)}
-                placeholder="e.g. Ecobank Ghana PLC"
-                autoComplete="organization"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="primary-account-no" className={labelClass}>
-                Bank account number
-              </label>
-              <input
-                id="primary-account-no"
-                type="text"
-                value={primaryAccountNo}
-                onChange={(e) => setPrimaryAccountNo(e.target.value)}
-                placeholder="e.g. 0150123456789"
-                autoComplete="off"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="reconciliation-date" className={labelClass}>
-                Closing date of BRS
-              </label>
-              <input
-                id="reconciliation-date"
-                type="date"
-                value={reconciliationDate}
-                onChange={(e) => setReconciliationDate(e.target.value)}
-                className={inputClass}
-              />
-              <p className={hintClass}>As-at date for the reconciliation report.</p>
-            </div>
+            <Input
+              id="primary-account-name"
+              type="text"
+              label="Bank account name"
+              value={primaryAccountName}
+              onChange={(e) => setPrimaryAccountName(e.target.value)}
+              placeholder="e.g. Current / Operating"
+            />
+            <Input
+              id="primary-bank-name"
+              type="text"
+              label="Bank name"
+              value={primaryBankName}
+              onChange={(e) => setPrimaryBankName(e.target.value)}
+              placeholder="e.g. Ecobank Ghana PLC"
+              autoComplete="organization"
+            />
+            <Input
+              id="primary-account-no"
+              type="text"
+              label="Bank account number"
+              value={primaryAccountNo}
+              onChange={(e) => setPrimaryAccountNo(e.target.value)}
+              placeholder="e.g. 0150123456789"
+              autoComplete="off"
+            />
+            <Input
+              id="reconciliation-date"
+              type="date"
+              label="Closing date of BRS"
+              value={reconciliationDate}
+              onChange={(e) => setReconciliationDate(e.target.value)}
+              hint="As-at date for the reconciliation report."
+            />
           </div>
         </div>
         {features.roll_forward && (
-          <div>
-            <label className={labelClass}>Previous period BRS / Roll forward from (optional)</label>
-            <SelectWrapper>
-              <select
-                value={rollForwardFromProjectId}
-                onChange={(e) => setRollForwardFromProjectId(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">— None —</option>
-                {completedProjects.map((p) => (
-                  <option key={p.id} value={p.slug}>{p.name}</option>
-                ))}
-              </select>
-            </SelectWrapper>
-            <p className={hintClass}>Select a completed project to use as previous period BRS; unpresented cheques will be carried forward. Requires Premium plan.</p>
-          </div>
+          <Select
+            label="Previous period BRS / Roll forward from (optional)"
+            hint="Select a completed project to use as previous period BRS; unpresented cheques will be carried forward. Requires Premium plan."
+            value={rollForwardFromProjectId}
+            onChange={(e) => setRollForwardFromProjectId(e.target.value)}
+          >
+            <option value="">— None —</option>
+            {completedProjects.map((p) => (
+              <option key={p.id} value={p.slug}>{p.name}</option>
+            ))}
+          </Select>
         )}
-        <div>
-          <label className={labelClass}>Currency</label>
-          <SelectWrapper>
-            <select
-              value={COMMON_PROJECT_CURRENCIES.includes(currency as (typeof COMMON_PROJECT_CURRENCIES)[number]) ? currency : 'OTHER'}
-              onChange={(e) => {
-                const v = e.target.value
-                if (v === 'OTHER') {
-                  setCurrencyOverride((customCurrencyCode || 'GHS').toUpperCase())
-                } else {
-                  setCurrencyOverride(v)
-                  setCustomCurrencyCode('')
-                }
-              }}
-              className={selectClass}
-            >
-              {COMMON_PROJECT_CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c} ({getCurrencySymbol(c)})
-                </option>
-              ))}
-              <option value="OTHER">Other (enter code below)</option>
-            </select>
-          </SelectWrapper>
+        <div className="space-y-4">
+          <Select
+            label="Currency"
+            value={COMMON_PROJECT_CURRENCIES.includes(currency as (typeof COMMON_PROJECT_CURRENCIES)[number]) ? currency : 'OTHER'}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'OTHER') {
+                setCurrencyOverride((customCurrencyCode || 'GHS').toUpperCase())
+              } else {
+                setCurrencyOverride(v)
+                setCustomCurrencyCode('')
+              }
+            }}
+          >
+            {COMMON_PROJECT_CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c} ({getCurrencySymbol(c)})
+              </option>
+            ))}
+            <option value="OTHER">Other (enter code below)</option>
+          </Select>
           {!COMMON_PROJECT_CURRENCIES.includes(currency as (typeof COMMON_PROJECT_CURRENCIES)[number]) && (
-            <input
+            <Input
               type="text"
               value={customCurrencyCode || currency}
               onChange={(e) => {
@@ -408,20 +347,20 @@ export default function ProjectNew() {
                 setCurrencyOverride(v || 'GHS')
               }}
               placeholder="e.g. NGN"
-              className={`${inputClass} mt-2 max-w-xs`}
+              className="max-w-xs"
               maxLength={8}
             />
           )}
-          <label className={`${labelClass} mt-3`}>Currency symbol (optional)</label>
-          <input
+          <Input
             type="text"
+            label="Currency symbol (optional)"
             value={currencySymbolOverride}
             onChange={(e) => setCurrencySymbolOverride(e.target.value.slice(0, 8))}
             placeholder={`Default: ${getCurrencySymbol(currency)}`}
-            className={`${inputClass} max-w-xs`}
+            className="max-w-xs"
             maxLength={8}
           />
-          <p className={hintClass}>
+          <p className="text-sm text-gray-500">
             Reporting currency for matching and exports. On the Report step you can preview totals in
             USD/EUR (display only). Subscription is billed in <strong>GHS</strong> via
             Paystack — see{' '}
@@ -432,9 +371,9 @@ export default function ProjectNew() {
           </p>
         </div>
         <div>
-          <label className={labelClass}>Project name</label>
-          <input
+          <Input
             type="text"
+            label="Project name"
             value={name}
             onChange={(e) => {
               setNameManuallyEdited(true)
@@ -442,46 +381,40 @@ export default function ProjectNew() {
             }}
             required={!composedName}
             placeholder="Auto-filled from the fields above — edit anytime"
-            className={inputClass}
           />
-          <p className={hintClass}>
+          <p className="mt-1.5 text-sm text-gray-500">
             Auto-composed for tracking as{' '}
             <em>Business — Account (number) — as at date</em>. Edit freely if you prefer a shorter
             name.
             {nameManuallyEdited && composedName ? (
               <>
                 {' '}
-                <button
+                <Button
                   type="button"
-                  className="font-medium text-primary-600 hover:underline"
+                  variant="ghost"
+                  size="xs"
+                  className="text-primary-600"
                   onClick={() => {
                     setNameManuallyEdited(false)
                     setName(composedName)
                   }}
                 >
                   Reset to auto name
-                </button>
+                </Button>
               </>
             ) : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 hover:shadow disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 transition-all"
-          >
-            {mutation.isPending ? 'Creating...' : 'Create'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-5 py-2.5 border border-gray-200 rounded-xl font-medium text-gray-700 bg-white shadow-sm hover:bg-gray-50 hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 transition-all"
-          >
+          <Button type="submit" isLoading={mutation.isPending}>
+            Create
+          </Button>
+          <Button type="button" variant="outline" onClick={() => navigate(-1)}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
+      </Card>
     </div>
   )
 }

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
-import AuthLayout, { authAlertErrorClass } from '../components/AuthLayout'
+import AuthLayout from '../components/AuthLayout'
 import Button from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
 
 export default function ResetPassword() {
@@ -62,9 +63,9 @@ export default function ResetPassword() {
           </div>
         ) : !token ? (
           <div className="space-y-4 text-center">
-            <p className="text-sm text-red-700">
-              This reset link is invalid or expired. Request a new one from the forgot password page.
-            </p>
+          <Alert tone="error" title="This reset link is invalid or expired">
+            Request a new one from the forgot password page.
+          </Alert>
             <Link
               to="/forgot-password"
               className="inline-flex font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
@@ -75,9 +76,9 @@ export default function ResetPassword() {
         ) : (
           <>
             {error && (
-              <div className={authAlertErrorClass} role="alert">
+              <Alert tone="error" title="Could not reset password">
                 {error}
-              </div>
+              </Alert>
             )}
             <PasswordInput
               id="reset-password"
@@ -102,9 +103,8 @@ export default function ResetPassword() {
               size="lg"
               className="w-full font-semibold shadow-lg shadow-primary-600/25"
               isLoading={loading}
-              disabled={loading}
             >
-              {loading ? 'Updating…' : 'Update password'}
+              Update password
             </Button>
           </>
         )}

@@ -45,7 +45,7 @@ export const TableTh = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTab
   ({ className = '', ...props }, ref) => (
     <th
       ref={ref}
-      className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 ${className}`}
+      className={`sticky top-0 z-10 bg-surface px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 ${className}`}
       {...props}
     />
   )
@@ -54,7 +54,7 @@ TableTh.displayName = 'TableTh'
 
 export const TableTd = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className = '', ...props }, ref) => (
-    <td ref={ref} className={`px-6 py-4 text-sm text-gray-700 ${className}`} {...props} />
+    <td ref={ref} className={`px-4 py-2.5 text-sm text-gray-700 ${className}`} {...props} />
   )
 )
 TableTd.displayName = 'TableTd'

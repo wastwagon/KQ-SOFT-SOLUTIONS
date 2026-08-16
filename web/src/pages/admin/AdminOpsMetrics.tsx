@@ -1,8 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Activity, RefreshCw, BellRing } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import Alert from '../../components/ui/Alert'
 import Button from '../../components/ui/Button'
+import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { api, platformAdminOps } from '../../lib/api'
 import { useToast } from '../../components/ui/Toast'
 
@@ -54,7 +58,7 @@ export default function AdminOpsMetrics() {
               variant="outline"
               size="sm"
               onClick={() => testAlert.mutate()}
-              disabled={testAlert.isPending}
+              isLoading={testAlert.isPending}
             >
               <BellRing className="w-4 h-4 mr-1.5" />
               Test alert
@@ -74,54 +78,42 @@ export default function AdminOpsMetrics() {
       />
 
       {data && webhookConfigured === false && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 max-w-2xl">
-          Alert webhook not configured. Set <code className="text-xs">ALERT_WEBHOOK_URL</code> (or{' '}
+        <Alert tone="warning" title="Alert webhook not configured" className="max-w-2xl">
+          Set <code className="text-xs">ALERT_WEBHOOK_URL</code> (or{' '}
           <code className="text-xs">SLACK_WEBHOOK_URL</code>) on the API to receive parse-lag and lead
           alerts.
-        </div>
+        </Alert>
       )}
 
-      {isLoading && (
-        <Card>
-          <p className="text-sm text-gray-500">Loading metrics…</p>
-        </Card>
-      )}
+      {isLoading && <PageBodySkeleton label="Loading metrics" />}
 
       {isError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          {error instanceof Error ? error.message : 'Could not load ops metrics.'}
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load ops metrics"
+          onRetry={() => void refetch()}
+        >
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
       )}
 
       {data && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card>
-              <div className="flex items-start gap-3">
-                <Activity className="w-5 h-5 text-primary-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Uptime</p>
-                  <p className="text-xl font-semibold text-gray-900 mt-1">
-                    {formatUptime(data.uptimeSec)}
-                  </p>
-                </div>
-              </div>
-            </Card>
-            <Card>
-              <p className="text-sm text-gray-500 font-medium">Process started</p>
-              <p className="text-sm font-medium text-gray-900 mt-1">
-                {new Date(data.startedAt).toLocaleString()}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-gray-500 font-medium">Counter keys</p>
-              <p className="text-xl font-semibold text-gray-900 mt-1">{counterEntries.length}</p>
-            </Card>
+            <MetricCard
+              label="Uptime"
+              value={formatUptime(data.uptimeSec)}
+              icon={<Activity />}
+            />
+            <MetricCard
+              label="Process started"
+              value={new Date(data.startedAt).toLocaleString()}
+            />
+            <MetricCard label="Counter keys" value={counterEntries.length} />
           </div>
 
           {derivedEntries.length > 0 && (
-            <Card>
-              <h2 className="text-sm font-semibold text-gray-900 mb-3">Derived</h2>
+            <Card title="Derived">
               <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {derivedEntries.map(([key, value]) => (
                   <div key={key} className="rounded-lg bg-gray-50 px-3 py-2">
@@ -138,51 +130,47 @@ export default function AdminOpsMetrics() {
           )}
 
           {gaugeEntries.length > 0 && (
-            <Card>
-              <h2 className="text-sm font-semibold text-gray-900 mb-3">Gauges</h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                      <th className="py-2 pr-4 font-semibold">Metric</th>
-                      <th className="py-2 font-semibold">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gaugeEntries.map(([key, value]) => (
-                      <tr key={key} className="border-b border-gray-50">
-                        <td className="py-2 pr-4 font-mono text-xs text-gray-700">{key}</td>
-                        <td className="py-2 font-medium text-gray-900">{value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <Card title="Gauges">
+              <Table>
+                <TableHead>
+                  <tr>
+                    <TableTh>Metric</TableTh>
+                    <TableTh>Value</TableTh>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {gaugeEntries.map(([key, value]) => (
+                    <TableRow key={key}>
+                      <TableTd className="font-mono text-xs">{key}</TableTd>
+                      <TableTd className="font-medium text-gray-900">{value}</TableTd>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
           )}
 
-          <Card>
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Counters</h2>
+          <Card title="Counters">
             {counterEntries.length === 0 ? (
               <p className="text-sm text-gray-500">No counters recorded yet in this process.</p>
             ) : (
-              <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="sticky top-0 bg-white">
-                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                      <th className="py-2 pr-4 font-semibold">Metric</th>
-                      <th className="py-2 font-semibold">Count</th>
+              <div className="max-h-[480px] overflow-y-auto">
+                <Table>
+                  <TableHead>
+                    <tr>
+                      <TableTh>Metric</TableTh>
+                      <TableTh>Count</TableTh>
                     </tr>
-                  </thead>
-                  <tbody>
+                  </TableHead>
+                  <TableBody>
                     {counterEntries.map(([key, value]) => (
-                      <tr key={key} className="border-b border-gray-50">
-                        <td className="py-2 pr-4 font-mono text-xs text-gray-700">{key}</td>
-                        <td className="py-2 font-medium text-gray-900">{value}</td>
-                      </tr>
+                      <TableRow key={key}>
+                        <TableTd className="font-mono text-xs">{key}</TableTd>
+                        <TableTd className="font-medium text-gray-900">{value}</TableTd>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </Card>

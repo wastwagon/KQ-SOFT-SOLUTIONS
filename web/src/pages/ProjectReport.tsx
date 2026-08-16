@@ -18,7 +18,13 @@ import { formatDate, formatBrsAsAtLine, formatBrsFormalDate, formatPrintDateAccr
 import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
-import Button from '../components/ui/Button'
+import Button, { buttonClassName } from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
+import Badge from '../components/ui/Badge'
+import Modal from '../components/ui/Modal'
+import Input from '../components/ui/Input'
+import Textarea from '../components/ui/Textarea'
+import Select from '../components/ui/Select'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
@@ -83,7 +89,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const [reportLogoLoadFailed, setReportLogoLoadFailed] = useState(false)
   const [displayCurrency, setDisplayCurrency] = useState<'GHS' | 'USD' | 'EUR' | ''>('')
   const [signedAmountMode, setSignedAmountMode] = useState(false)
-  const [showDiagnostics, setShowDiagnostics] = useState(false)
   const [exportMenu, setExportMenu] = useState('')
   /** Stable “print moment” for footer line while this view is open. */
   const [reportPrintAt] = useState(() => new Date())
@@ -408,16 +413,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     setEditingComments(true)
   }
 
-  const preHasSignAnomaly = !!data?.sourceFilterLogic && [
-    data.sourceFilterLogic.cashBookReceipts,
-    data.sourceFilterLogic.cashBookPayments,
-    data.sourceFilterLogic.bankStatementDebits,
-    data.sourceFilterLogic.bankStatementCredits,
-  ].some((s) => (s?.cross_reference ?? 0) > 0 || (s?.zero ?? 0) > 0 || (s?.empty ?? 0) > 0)
-  useEffect(() => {
-    if (preHasSignAnomaly) setShowDiagnostics(true)
-  }, [preHasSignAnomaly])
-
   const reportPaywallBlocked =
     isSubscriptionInactiveError(reportQuery.error) ||
     isSubscriptionInactiveError(attachmentsQuery.error) ||
@@ -439,21 +434,17 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const err = reportQuery.error ?? attachmentsQuery.error ?? ratesQueryError
     return (
       <div className="py-8 space-y-4">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl shadow-sm">
-          <p className="font-medium text-red-900">Could not load report</p>
-          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: ['report', projectId] })
-              void queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
-              void queryClient.invalidateQueries({ queryKey: ['currency', 'rates'] })
-            }}
-            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load report"
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: ['report', projectId] })
+            void queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
+            void queryClient.invalidateQueries({ queryKey: ['currency', 'rates'] })
+          }}
+        >
+          {err instanceof Error ? err.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -581,7 +572,6 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       profileLabels?.workbookCompositionBankCreditsPrior || 'Thereof — brought-forward bank-only credits (prior period)',
   }
 
-  const showExtendedSections = false
   const projectStatus = data?.project?.status ?? ''
   const reopenableStatuses = ['completed', 'approved', 'submitted_for_review'] as const
   const isReopenedForEditing = projectStatus === 'reconciling'
@@ -594,39 +584,40 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         subtitle="Live preview of balances, narratives, and attachments. Use Export & download for Excel/PDF and attachments; adjust bank account and display currency below."
       />
       {isReopenedForEditing && (
-        <div
-          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm print:hidden"
-          role="status"
-        >
-          <strong className="font-semibold">Reopened for editing.</strong> This BRS is a working draft until you
-          submit for review and approve again. Prior sign-off is not valid for export as a final report.
-        </div>
+        <Alert tone="warning" title="Reopened for editing" className="print:hidden">
+          This BRS is a working draft until you submit for review and approve again. Prior sign-off is
+          not valid for export as a final report.
+        </Alert>
       )}
       <div className="flex flex-wrap items-center justify-end gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           {bankAccounts.length > 0 && (
-            <select
-              value={bankAccountId}
-              onChange={(e) => setBankAccountId(e.target.value)}
-              className="min-h-[40px] rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium text-gray-900 outline-none transition-all focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">All bank accounts</option>
-              {bankAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            <div className="w-52">
+              <Select
+                value={bankAccountId}
+                onChange={(e) => setBankAccountId(e.target.value)}
+                aria-label="Bank account"
+              >
+                <option value="">All bank accounts</option>
+                {bankAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </Select>
+            </div>
           )}
-          <select
-            value={displayCurrency}
-            onChange={(e) => setDisplayCurrency(e.target.value as 'GHS' | 'USD' | 'EUR' | '')}
-            className="min-h-[40px] rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium text-gray-900 outline-none transition-all focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500"
-            title="Preview amounts in another currency. Matching and Excel/PDF exports stay in the project currency."
-          >
-            <option value="">Display: {currency}</option>
-            {currency !== 'GHS' && <option value="GHS">Display: GHS</option>}
-            {currency !== 'USD' && <option value="USD">Display: USD</option>}
-            {currency !== 'EUR' && <option value="EUR">Display: EUR</option>}
-          </select>
+          <div className="w-40">
+            <Select
+              value={displayCurrency}
+              onChange={(e) => setDisplayCurrency(e.target.value as 'GHS' | 'USD' | 'EUR' | '')}
+              title="Preview amounts in another currency. Matching and Excel/PDF exports stay in the project currency."
+              aria-label="Display currency"
+            >
+              <option value="">Display: {currency}</option>
+              {currency !== 'GHS' && <option value="GHS">Display: GHS</option>}
+              {currency !== 'USD' && <option value="USD">Display: USD</option>}
+              {currency !== 'EUR' && <option value="EUR">Display: EUR</option>}
+            </Select>
+          </div>
           {effectiveDisplayCurrency !== currency && (
             <span className="text-xs text-gray-500 max-w-[14rem]">
               Preview only · exports stay in {currency}
@@ -656,14 +647,17 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   {workbookNettingMode !== 'inherit' && (
                     <>
                       {' · '}
-                      <button
+                      <Button
                         type="button"
-                        className="underline hover:no-underline"
+                        variant="ghost"
+                        size="xs"
+                        className="text-xs"
                         disabled={updateBrsSettingsMutation.isPending}
+                        isLoading={updateBrsSettingsMutation.isPending}
                         onClick={() => updateBrsSettingsMutation.mutate('inherit')}
                       >
                         Use organisation default
-                      </button>
+                      </Button>
                     </>
                   )}
                 </span>
@@ -679,24 +673,21 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             Show +/- amounts
           </label>
           <div className="flex flex-col gap-0.5">
-            <label htmlFor="report-export-menu" className="sr-only">
-              Export and download options
-            </label>
-            <select
-              id="report-export-menu"
-              value={exportMenu}
-              disabled={exporting}
-              onChange={(e) => {
-                const v = e.target.value
-                setExportMenu('')
-                if (!v) return
-                void runExportMenuChoice(v)
-              }}
-              className="min-h-[40px] min-w-[14rem] sm:min-w-[17rem] rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm outline-none transition-all hover:border-primary-300 hover:bg-primary-50/40 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
-            >
-              <option value="">
-                {exporting ? 'Working…' : 'Export & download…'}
-              </option>
+            <div className="min-w-[14rem] sm:min-w-[17rem]">
+              <Select
+                id="report-export-menu"
+                value={exportMenu}
+                disabled={exporting}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setExportMenu('')
+                  if (!v) return
+                  void runExportMenuChoice(v)
+                }}
+                aria-label="Export and download options"
+                className="border-primary-200 font-medium"
+              >
+              <option value="">Export & download…</option>
               {canExport && (
                 <>
                   <optgroup label="Microsoft Excel">
@@ -719,27 +710,28 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <optgroup label="Attachments">
                 <option value="attachments">All supporting documents</option>
               </optgroup>
-            </select>
+            </Select>
+            </div>
           </div>
           {canSubmitForReview(role) && data?.project?.status === 'reconciling' && (
             <Button
               type="button"
               variant="outline"
               onClick={() => submitMutation.mutate()}
-              disabled={submitMutation.isPending}
+              isLoading={submitMutation.isPending}
               title="Submit for review (locks editing)"
             >
-              {submitMutation.isPending ? 'Submitting...' : 'Submit for review'}
+              Submit for review
             </Button>
           )}
           {canApprove(role) && data?.project?.status === 'submitted_for_review' && (
             <Button
               type="button"
               onClick={() => approveMutation.mutate()}
-              disabled={approveMutation.isPending}
-              title="Approve BRS"
-            >
-              {approveMutation.isPending ? 'Approving...' : 'Approve'}
+                isLoading={approveMutation.isPending}
+                title="Approve BRS"
+              >
+                Approve
             </Button>
           )}
           {onGoToReview && (
@@ -753,11 +745,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 type="button"
                 variant="outline"
                 onClick={() => rollForwardMutation.mutate()}
-                disabled={rollForwardMutation.isPending}
+                isLoading={rollForwardMutation.isPending}
                 title="Uses this report as the previous period BRS; new project will carry forward unpresented cheques"
                 className="w-fit"
               >
-                {rollForwardMutation.isPending ? 'Creating...' : 'Create next period (roll forward)'}
+                Create next period (roll forward)
               </Button>
               <p className="text-xs text-gray-500 max-w-sm">Uses this report as the <strong>previous period BRS</strong>; unpresented cheques are carried forward to the new project.</p>
             </div>
@@ -767,92 +759,99 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             canReopenProject(role) &&
             reopenableStatuses.includes(projectStatus as (typeof reopenableStatuses)[number]) && (
             <>
-              <button
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => reopenMutation.mutate()}
                 disabled={reopenMutation.isPending}
-                className="rounded-xl border border-amber-300 px-4 py-2 text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                isLoading={reopenMutation.isPending}
                 title="Reopen to edit matches and clear sign-off"
               >
-                {reopenMutation.isPending ? 'Reopening...' : 'Reopen for editing'}
-              </button>
+                Reopen for editing
+              </Button>
               {(data?.summary?.matchedCount || 0) > 0 && (
-                <button
+                <Button
+                  type="button"
+                  variant="danger"
                   onClick={() => setShowUndoConfirm(true)}
                   disabled={undoReconciliationMutation.isPending}
-                  className="rounded-xl border border-red-300 px-4 py-2 text-red-800 hover:bg-red-50 disabled:opacity-50"
                   title="Undo reconciliation — clear all matches and reset sign-off"
                 >
-                  {undoReconciliationMutation.isPending ? 'Undoing...' : 'Undo reconciliation'}
-                </button>
+                  Undo reconciliation
+                </Button>
               )}
             </>
           )}
         </div>
       </div>
       {exportError && (
-        <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600 shadow-sm print:hidden">{exportError}</div>
+        <Alert tone="error" title="Export failed" className="print:hidden">
+          {exportError}
+        </Alert>
       )}
 
-      {/* Phase 8: Undo reconciliation confirmation */}
-      {showUndoConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 print:hidden">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Undo reconciliation</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              This will clear all matches and reset sign-off. You will need to re-match transactions. This action cannot be undone.
-            </p>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-            <input
-              type="text"
-              value={undoReason}
-              onChange={(e) => setUndoReason(e.target.value)}
-              placeholder="e.g. Data correction required"
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-gray-900 mb-4"
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => { setShowUndoConfirm(false); setUndoReason('') }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-xl"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => undoReconciliationMutation.mutate(undoReason.trim() || undefined)}
-                disabled={undoReconciliationMutation.isPending}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50"
-              >
-                {undoReconciliationMutation.isPending ? 'Undoing...' : 'Confirm undo'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showUndoConfirm}
+        title="Undo reconciliation"
+        onClose={() => {
+          setShowUndoConfirm(false)
+          setUndoReason('')
+        }}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowUndoConfirm(false)
+                setUndoReason('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => undoReconciliationMutation.mutate(undoReason.trim() || undefined)}
+              disabled={undoReconciliationMutation.isPending}
+              isLoading={undoReconciliationMutation.isPending}
+            >
+              Confirm undo
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 mb-4">
+          This will clear all matches and reset sign-off. You will need to re-match transactions. This
+          action cannot be undone.
+        </p>
+        <Input
+          type="text"
+          label="Reason (optional)"
+          value={undoReason}
+          onChange={(e) => setUndoReason(e.target.value)}
+          placeholder="e.g. Data correction required"
+        />
+      </Modal>
 
       <div className="print:hidden">
         <BrsHelp variant="report" />
       </div>
-      {/* Five reports: explicit list for audit / presentation */}
-      <p className="text-sm text-slate-600 print:hidden mb-2">
-        This report contains: <strong>1.</strong> BRS Statement · <strong>2.</strong> Summary · <strong>3.</strong> Missing Cheques · <strong>4.</strong> Discrepancy · <strong>5.</strong> Supporting Documents
-      </p>
-      {/* Quick links to dedicated reports */}
-      <nav className="flex flex-wrap gap-2 print:hidden">
-        <a href="#brs-statement" className="px-3 py-1.5 text-sm rounded-xl bg-primary-100 text-primary-800 hover:bg-primary-200 font-medium">
-          BRS Statement
+      <nav className="flex flex-wrap gap-2 print:hidden" aria-label="Report sections">
+        <a href="#brs-statement" className={buttonClassName('outline', 'xs')}>
+          BRS statement
         </a>
-        <a href="#brs-summary" className="px-3 py-1.5 text-sm rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200">
-          BRS Summary
+        <a href="#brs-summary" className={buttonClassName('outline', 'xs')}>
+          BRS summary
         </a>
-        <a href="#missing-cheques-report" className="px-3 py-1.5 text-sm rounded-xl bg-blue-50 text-blue-800 hover:bg-blue-100">
-          Missing Cheques Report
+        <a href="#missing-cheques-report" className={buttonClassName('outline', 'xs')}>
+          Missing cheques
         </a>
-        <a href="#discrepancy-report" className="px-3 py-1.5 text-sm rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100">
-          Discrepancy Report
+        <a href="#discrepancy-report" className={buttonClassName('outline', 'xs')}>
+          Discrepancy report
         </a>
-        <a href="#supporting-documents" className="px-3 py-1.5 text-sm rounded-xl bg-slate-50 text-slate-800 hover:bg-slate-100">
-          Supporting Documents
+        <a href="#supporting-documents" className={buttonClassName('outline', 'xs')}>
+          Supporting documents
         </a>
       </nav>
 
@@ -897,12 +896,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </p>
             ) : null}
             {data?.project?.bankStatementClosingBalance == null && (
-              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 print:border-amber-400 print:bg-amber-50">
-                <strong>Bank statement closing balance not entered.</strong> The &quot;Closing balance per bank
-                statement&quot; line is calculated from your reconciling items until you enter the figure from your bank
-                statement (Notes → As per bank statement). Mapped bank lines are in{' '}
-                <strong>Export & download → Full workbook</strong> (BANK CREDITS/DEBITS MAPPED sheets).
-              </div>
+              <Alert tone="warning" title="Bank statement closing balance not entered" className="mb-4 print:hidden">
+                The “Closing balance per bank statement” line is calculated from reconciling items until
+                you enter the figure from your statement (Notes → As per bank statement). Mapped bank
+                lines are in Export & download → Full workbook.
+              </Alert>
             )}
             <div className="mt-8 w-full overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm text-slate-900">
@@ -1058,11 +1056,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           <div id="report-narrative" className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
             <h3 className={`text-sm font-semibold mb-2 ${hasBranding ? '' : 'text-slate-700'}`} style={secondaryColor ? { color: secondaryColor } : undefined}>Summary</h3>
             {editingComments ? (
-              <textarea
+              <Textarea
                 value={editNarrative}
                 onChange={(e) => setEditNarrative(e.target.value)}
                 placeholder="Optional executive summary (e.g. This reconciliation shows…)"
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-primary-500 min-h-[80px]"
                 rows={3}
               />
             ) : (
@@ -1077,58 +1074,52 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <h3 className={`text-sm font-semibold mb-2 ${hasBranding ? '' : 'text-slate-700'}`} style={secondaryColor ? { color: secondaryColor } : undefined}>Notes</h3>
             {editingComments ? (
               <>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-0.5">As per bank statement (optional) — for audit comparison</label>
-                  <input
+                <div className="max-w-xs">
+                  <Input
                     type="number"
                     step="0.01"
+                    label="As per bank statement (optional) — for audit comparison"
                     value={editBankStatementClosingBalance}
                     onChange={(e) => setEditBankStatementClosingBalance(e.target.value)}
                     placeholder="e.g. 3950.50"
-                    className="w-full max-w-xs px-3 py-2 border border-border rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-0.5">Preparer note (optional)</label>
-                  <textarea
-                    value={editPreparerComment}
-                    onChange={(e) => setEditPreparerComment(e.target.value)}
-                    placeholder="Preparer notes…"
-                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 min-h-[60px]"
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-0.5">Reviewer note (optional)</label>
-                  <textarea
-                    value={editReviewerComment}
-                    onChange={(e) => setEditReviewerComment(e.target.value)}
-                    placeholder="Reviewer notes…"
-                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 min-h-[60px]"
-                    rows={2}
-                  />
-                </div>
+                <Textarea
+                  label="Preparer note (optional)"
+                  value={editPreparerComment}
+                  onChange={(e) => setEditPreparerComment(e.target.value)}
+                  placeholder="Preparer notes…"
+                  rows={2}
+                />
+                <Textarea
+                  label="Reviewer note (optional)"
+                  value={editReviewerComment}
+                  onChange={(e) => setEditReviewerComment(e.target.value)}
+                  placeholder="Reviewer notes…"
+                  rows={2}
+                />
                 <div className="flex gap-2 print:hidden">
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={() => updateCommentsMutation.mutate({
                       reportNarrative: editNarrative || undefined,
                       preparerComment: editPreparerComment || undefined,
                       reviewerComment: editReviewerComment || undefined,
                       bankStatementClosingBalance: editBankStatementClosingBalance.trim() === '' ? null : (Number.isFinite(parseFloat(editBankStatementClosingBalance)) ? parseFloat(editBankStatementClosingBalance) : null),
                     })}
-                    disabled={updateCommentsMutation.isPending}
-                    className="px-3 py-1.5 text-sm font-medium rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+                    isLoading={updateCommentsMutation.isPending}
                   >
-                    {updateCommentsMutation.isPending ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
+                    Save
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setEditingComments(false)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-xl border border-border text-gray-700 hover:bg-surface"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
@@ -1142,65 +1133,55 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
         {canExportReport(role) && !editingComments && (
           <div className="mb-6 print:hidden">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={startEditingComments}
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
             >
               Edit summary & notes
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* Summary */}
-        {showExtendedSections && <div id="brs-summary" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 scroll-mt-4">
-          <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-            <p className="text-sm text-green-700 font-medium">Matched</p>
-            <p className="text-lg font-bold text-green-800">{data.summary?.matchedCount || 0}</p>
-          </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <p className="text-sm text-amber-700 font-medium">Unmatched receipts</p>
-            <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedReceipts || 0}</p>
-          </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <p className="text-sm text-amber-700 font-medium">Unmatched payments</p>
-            <p className="text-lg font-bold text-amber-800">{data.summary?.unmatchedPayments || 0}</p>
-          </div>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-            <p className="text-sm text-slate-700 font-medium">Currency</p>
-            <p className="text-lg font-bold text-slate-800">{effectiveDisplayCurrency}</p>
-          </div>
-        </div>}
-        {showExtendedSections && !!sourceFilterLogic && canViewDiagnostics && (
-          <div className="mb-6 rounded-xl border border-slate-200 p-4 bg-slate-50/60">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-medium text-slate-800">Source filter logic (sign diagnostics)</h3>
-              <button
-                type="button"
-                onClick={() => setShowDiagnostics((v) => !v)}
-                className="text-xs px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              >
-                {showDiagnostics ? 'Hide diagnostics' : 'Show diagnostics'}
-              </button>
+        <div id="brs-summary" className="mb-6 scroll-mt-4 text-sm text-slate-600">
+          <span className="font-medium text-slate-900">{data.summary?.matchedCount || 0} matched</span>
+          {' · '}
+          {data.summary?.unmatchedReceipts || 0} unmatched receipts
+          {' · '}
+          {data.summary?.unmatchedPayments || 0} unmatched payments
+          {' · '}
+          {effectiveDisplayCurrency}
+        </div>
+        {!!sourceFilterLogic && canViewDiagnostics && (
+          <details
+            className="mb-6 rounded-xl border border-slate-200 bg-slate-50/60 p-4 print:border-slate-300 print:bg-white"
+            defaultOpen={hasSignAnomaly}
+          >
+            <summary className="cursor-pointer text-sm font-medium text-slate-800 print:hidden">
+              Sign diagnostics
+              <span className="ml-2 font-normal text-slate-500">
+                {hasSignAnomaly ? 'Review cross-ref / zero / empty buckets' : 'Hidden for a cleaner view — expand to inspect'}
+              </span>
+            </summary>
+            <h3 className="mb-3 hidden font-medium text-slate-800 print:block">Source filter logic (sign diagnostics)</h3>
+            <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+              {[
+                { label: 'Cash book receipts', stats: sourceFilterLogic.cashBookReceipts },
+                { label: 'Cash book payments', stats: sourceFilterLogic.cashBookPayments },
+                { label: 'Bank statement debits', stats: sourceFilterLogic.bankStatementDebits },
+                { label: 'Bank statement credits', stats: sourceFilterLogic.bankStatementCredits },
+              ].map(({ label, stats }, i) => (
+                <div key={i} className="rounded border border-slate-200 bg-white p-3">
+                  <p className="font-medium text-slate-700 mb-1">{label}</p>
+                  <p className="text-xs text-slate-600">
+                    Primary: {stats?.primary ?? 0} · Cross-ref: {stats?.cross_reference ?? 0} · Zero:{' '}
+                    {stats?.zero ?? 0} · Empty: {stats?.empty ?? 0}
+                  </p>
+                </div>
+              ))}
             </div>
-            {!showDiagnostics ? (
-              <p className="text-xs text-slate-600 mt-2">Hidden for cleaner report view. Expand to inspect sign/data quality diagnostics.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mt-3">
-                {[
-                  { label: 'Cash book receipts', stats: sourceFilterLogic.cashBookReceipts },
-                  { label: 'Cash book payments', stats: sourceFilterLogic.cashBookPayments },
-                  { label: 'Bank statement debits', stats: sourceFilterLogic.bankStatementDebits },
-                  { label: 'Bank statement credits', stats: sourceFilterLogic.bankStatementCredits },
-                ].map(({ label, stats }, i) => (
-                  <div key={i} className="rounded border border-slate-200 bg-white p-3">
-                    <p className="font-medium text-slate-700 mb-1">{label}</p>
-                    <p className="text-xs text-slate-600">Primary: {stats?.primary ?? 0} · Cross-ref: {stats?.cross_reference ?? 0} · Zero: {stats?.zero ?? 0} · Empty: {stats?.empty ?? 0}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          </details>
         )}
         <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50/40 p-4 print:bg-white print:border-slate-300">
           <h3 className="font-semibold text-primary-900 mb-2 text-left">{labels.additionalInformationTitle}</h3>
@@ -1311,12 +1292,20 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                             <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
                             <td className="px-2 py-1.5 text-right">{t.daysOutstanding}</td>
                             <td className="px-2 py-1.5 text-center">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                t.ageingBand === '0–30' ? 'bg-green-100 text-green-800' :
-                                t.ageingBand === '31–60' ? 'bg-amber-100 text-amber-800' :
-                                t.ageingBand === '61–90' ? 'bg-primary-100 text-primary-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>{t.ageingBand} days</span>
+                              <Badge
+                                tone={
+                                  t.ageingBand === '0–30'
+                                    ? 'success'
+                                    : t.ageingBand === '31–60'
+                                      ? 'warning'
+                                      : t.ageingBand === '61–90'
+                                        ? 'brand'
+                                        : 'danger'
+                                }
+                                size="sm"
+                              >
+                                {t.ageingBand} days
+                              </Badge>
                             </td>
                           </tr>
                         ))}
@@ -1331,7 +1320,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           ) : (
             <>
               <h3 className="text-base font-semibold mb-3 text-blue-900">Missing Cheques Report</h3>
-              <p className="text-sm text-amber-600">Missing cheques report requires Standard plan or higher. Upgrade to see unpresented cheques with ageing bands.</p>
+              <Alert tone="warning" title="Standard plan or higher required">
+                Upgrade to see unpresented cheques with ageing bands.
+              </Alert>
             </>
           )}
         </div>
@@ -1552,16 +1543,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {canUploadDocuments(role) && (
             <div className="mb-4 print:hidden">
               <label className="block text-sm font-medium text-gray-700 mb-1">Upload attachment</label>
-              <div className="flex flex-wrap gap-2 items-center">
-                <select
-                  value={attachmentType}
-                  onChange={(e) => setAttachmentType(e.target.value as 'bank_statement' | 'approval' | 'other')}
-                  className="px-3 py-2 border border-border rounded-xl bg-white text-gray-900 text-sm focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="other">Type: Other</option>
-                  <option value="bank_statement">Type: Bank statement</option>
-                  <option value="approval">Type: Approval</option>
-                </select>
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="w-52">
+                  <Select
+                    aria-label="Attachment type"
+                    value={attachmentType}
+                    onChange={(e) => setAttachmentType(e.target.value as 'bank_statement' | 'approval' | 'other')}
+                  >
+                    <option value="other">Type: Other</option>
+                    <option value="bank_statement">Type: Bank statement</option>
+                    <option value="approval">Type: Approval</option>
+                  </Select>
+                </div>
                 <input
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg,.tiff"
@@ -1574,7 +1567,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   }}
                   disabled={attachmentUploadMutation.isPending}
                 />
-                {attachmentUploadMutation.isPending && <span className="text-sm text-gray-500">Uploading...</span>}
+                {attachmentUploadMutation.isPending && <span className="text-sm text-gray-500">Uploading…</span>}
               </div>
             </div>
           )}
@@ -1598,8 +1591,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       <td className="px-3 py-2 capitalize">{a.type.replace('_', ' ')}</td>
                       <td className="px-3 py-2 text-slate-600">{fmt(a.createdAt)}</td>
                       <td className="px-3 py-2 text-right print:hidden">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() =>
                             attachments.download(a.id, a.filename).catch((err) =>
                               unlessSubscriptionInactive(err, (e) =>
@@ -1607,22 +1602,20 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                               )
                             )
                           }
-                          className="text-primary-600 hover:text-primary-700 font-medium"
                         >
                           Download
-                        </button>
+                        </Button>
                         {canDeleteAttachment(role) && (
-                          <>
-                            <span className="mx-2 text-gray-300">|</span>
-                            <button
-                              type="button"
-                              onClick={() => attachmentDeleteMutation.mutate(a.id)}
-                              disabled={attachmentDeleteMutation.isPending}
-                              className="text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
-                            >
-                              Delete
-                            </button>
-                          </>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => attachmentDeleteMutation.mutate(a.id)}
+                            disabled={attachmentDeleteMutation.isPending}
+                            className="ml-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -1694,9 +1687,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             </div>
           </div>
 
-          {/* Phase 6: Reconciliation Discrepancy Report */}
-          <div id="discrepancy-report-audit" className="mb-8 scroll-mt-4">
-            <h3 className="text-base font-semibold mb-3 text-amber-900">Reconciliation Discrepancy Report</h3>
+          <details id="discrepancy-report" className="mb-8 scroll-mt-4">
+            <summary className="mb-3 cursor-pointer text-base font-semibold text-amber-900 print:hidden">
+              Reconciliation Discrepancy Report
+              <span className="ml-2 font-normal text-sm text-gray-500">
+                {features.discrepancy_report
+                  ? `${(data?.discrepancies || []).length} pair${(data?.discrepancies || []).length === 1 ? '' : 's'}`
+                  : 'plan-gated'}
+              </span>
+            </summary>
+            <h3 className="mb-3 hidden text-base font-semibold text-amber-900 print:block">
+              Reconciliation Discrepancy Report
+            </h3>
             {features.discrepancy_report ? (
               (data?.discrepancies || []).length > 0 ? (
                 <>
@@ -1732,13 +1734,20 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <p className="text-sm text-gray-500 italic">No amount or date variances in matched pairs.</p>
               )
             ) : (
-              <p className="text-sm text-amber-600 italic">Discrepancy report requires Standard plan or higher.</p>
+              <Alert tone="warning" title="Standard plan or higher required">
+                Upgrade to see the discrepancy report.
+              </Alert>
             )}
-          </div>
+          </details>
 
-          {/* Reversal candidates */}
-          <div className="mb-6">
-            <h3 className="text-base font-semibold mb-3 text-primary-900">Reversal candidates</h3>
+          <details className="mb-6">
+            <summary className="mb-3 cursor-pointer text-base font-semibold text-primary-900 print:hidden">
+              Reversal candidates
+              <span className="ml-2 font-normal text-sm text-gray-500">
+                {(data.reversalCandidates || []).length} found
+              </span>
+            </summary>
+            <h3 className="mb-3 hidden text-base font-semibold text-primary-900 print:block">Reversal candidates</h3>
             {(data.reversalCandidates || []).length > 0 ? (
               <div className="border border-primary-100 rounded-xl overflow-auto max-h-48 shadow-sm bg-white">
                 <table className="min-w-full text-sm text-slate-900">
@@ -1769,7 +1778,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             ) : (
               <p className="text-sm text-gray-500 italic">No reversal candidates detected.</p>
             )}
-          </div>
+          </details>
         </div>
 
         {/* Footer band — matches PDF: prepared trail + print date + branding footer */}

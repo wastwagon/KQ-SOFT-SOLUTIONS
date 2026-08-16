@@ -4,9 +4,10 @@ import { Building2, Mail, User } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
 import { useAuth } from '../store/auth'
-import AuthLayout, { authAlertErrorClass } from '../components/AuthLayout'
+import AuthLayout from '../components/AuthLayout'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
 
 export default function Register() {
@@ -97,9 +98,9 @@ export default function Register() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className={authAlertErrorClass} role="alert">
+          <Alert tone="error" title={joiningOrg ? 'Could not join organisation' : 'Could not create workspace'}>
             {error}
-          </div>
+          </Alert>
         )}
 
         {!joiningOrg && (
@@ -160,18 +161,10 @@ export default function Register() {
           type="submit"
           size="lg"
           className="w-full font-semibold shadow-lg shadow-primary-600/25"
-          isLoading={loading}
-          disabled={loading || inviteLoading || (joiningOrg && !inviteOrgName)}
+          isLoading={loading || inviteLoading}
+          disabled={joiningOrg && !inviteOrgName}
         >
-          {loading
-            ? joiningOrg
-              ? 'Joining…'
-              : 'Creating workspace…'
-            : inviteLoading
-              ? 'Loading invite…'
-              : joiningOrg
-                ? 'Join organisation'
-                : 'Create workspace'}
+          {joiningOrg ? 'Join organisation' : 'Create workspace'}
         </Button>
 
         <p className="text-center text-xs leading-relaxed text-gray-500">

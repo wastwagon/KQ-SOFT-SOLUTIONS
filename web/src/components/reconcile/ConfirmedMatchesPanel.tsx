@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { formatAmount } from '../../lib/format'
 import { useConfirm } from '../ui/ConfirmDialog'
+import Button from '../ui/Button'
+import Card from '../ui/Card'
 import type { MatchedPair } from './types'
 
 /**
@@ -47,17 +49,15 @@ export default function ConfirmedMatchesPanel({
   }
 
   return (
-    <section className="rounded-xl border border-green-200/80 bg-green-50/80 p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <h3 className="text-base font-bold text-green-900 tracking-tight mb-1">Confirmed matches</h3>
-          <p className="text-sm text-green-800/90">
-            {canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}
-          </p>
-        </div>
-        {canReconcile && matches.length > 0 && onClearAll && (
-          <button
+    <Card
+      title="Confirmed matches"
+      sublabel={canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}
+      actions={
+        canReconcile && matches.length > 0 && onClearAll ? (
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={async () => {
               const ok = await confirm({
                 title: 'Clear all matches?',
@@ -68,18 +68,20 @@ export default function ConfirmedMatchesPanel({
               })
               if (ok) onClearAll()
             }}
-            disabled={isClearingAll || isUnmatching}
-            className="shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium text-red-700 border border-red-200 bg-white transition-colors hover:bg-red-50 disabled:opacity-50"
+            isLoading={isClearingAll}
+            disabled={isUnmatching}
+            className="shrink-0 text-red-700 border-red-200 hover:bg-red-50"
           >
-            {isClearingAll ? 'Clearing…' : 'Clear all'}
-          </button>
-        )}
-      </div>
+            Clear all
+          </Button>
+        ) : undefined
+      }
+    >
       <ul className="space-y-2 max-h-40 overflow-y-auto pr-1">
         {matches.map((m) => (
           <li
             key={m.matchId}
-            className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-green-200/70 bg-white shadow-sm"
+            className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-border bg-white shadow-card"
           >
             <span className="flex-1 text-sm truncate text-gray-900">
               <span className="font-semibold">{m.cbTx.name || m.cbTx.details || '—'}</span>
@@ -100,16 +102,21 @@ export default function ConfirmedMatchesPanel({
             </span>
             {canReconcile && (
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => triggerEvidence(m.matchId)}
-                  disabled={isUploading}
-                  className="rounded-xl px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-50 disabled:opacity-50"
+                  disabled={isUploading && uploadingMatchId !== m.matchId}
+                  isLoading={isUploading && uploadingMatchId === m.matchId}
+                  className="text-primary-600 hover:bg-primary-50"
                 >
-                  {isUploading && uploadingMatchId === m.matchId ? 'Uploading…' : 'Evidence'}
-                </button>
-                <button
+                  Evidence
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={async () => {
                     const ok = await confirm({
                       title: 'Remove this match?',
@@ -121,10 +128,10 @@ export default function ConfirmedMatchesPanel({
                     if (ok) onUnmatch(m.matchId)
                   }}
                   disabled={isUnmatching}
-                  className="rounded-xl px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                  className="text-red-600 hover:bg-red-50"
                 >
                   Unmatch
-                </button>
+                </Button>
               </div>
             )}
           </li>
@@ -143,6 +150,6 @@ export default function ConfirmedMatchesPanel({
           e.target.value = ''
         }}
       />
-    </section>
+    </Card>
   )
 }

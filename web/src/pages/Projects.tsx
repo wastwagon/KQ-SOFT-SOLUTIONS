@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { X, FolderKanban, ChevronRight } from 'lucide-react'
+import { FolderKanban, ChevronRight } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { projects, clients, subscription, isSubscriptionInactiveError } from '../lib/api'
 import { normalizeClientsList } from '../lib/clientsPayload'
@@ -9,7 +9,7 @@ import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
-import Button from '../components/ui/Button'
+import Button, { buttonClassName } from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
@@ -18,6 +18,7 @@ import ProjectStatusPill from '../components/project/ProjectStatusPill'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
+import Alert from '../components/ui/Alert'
 
 const preloadProjectDetailPage = () => import('./ProjectDetail')
 
@@ -127,20 +128,16 @@ export default function Projects({ initialStatus }: ProjectsProps) {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Work" title={isReportsView ? 'Reports' : 'Projects'} />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          <p className="font-medium text-red-900">Could not load projects</p>
-          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: ['projects'] })
-              void queryClient.invalidateQueries({ queryKey: ['clients'] })
-            }}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load projects"
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: ['projects'] })
+            void queryClient.invalidateQueries({ queryKey: ['clients'] })
+          }}
+        >
+          {err instanceof Error ? err.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -155,62 +152,61 @@ export default function Projects({ initialStatus }: ProjectsProps) {
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
             <p className="text-gray-500">
               {isReportsView
-                ? 'Finished jobs — open a project to review files and download BRS exports. The list defaults to completed; use chips or search to widen the view.'
-                : 'Open, filter, and resume reconciliation jobs. Status chips below match your workflow stages.'}
+                ? 'Completed jobs — open a report to download Excel or PDF, check BRS tie-out, and roll the period forward.'
+                : 'Open and resume reconciliation jobs.'}
             </p>
           </>
         }
         actions={
           canCreateProject(role) ? (
             <Button type="button" onClick={() => navigate('/projects/new')}>
-              + New project
+              New project
             </Button>
           ) : undefined
         }
       />
 
       {features.multi_client && clientFilter && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 border border-primary-200 text-sm text-gray-700 shadow-sm">
-            Filtering by: <strong className="text-gray-900">{clientName || '…'}</strong>
-            <button
-              type="button"
-              onClick={clearClientFilter}
-              className="p-0.5 rounded-lg hover:bg-primary-200/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              aria-label="Clear client filter"
-              title="Clear client filter"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </span>
+        <Alert
+          tone="info"
+          title={`Filtering by ${clientName || 'client'}`}
+          className="!p-3"
+          action={
+            <Button type="button" variant="outline" size="xs" onClick={clearClientFilter}>
+              Clear
+            </Button>
+          }
+        />
+      )}
+
+      {!isReportsView && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+          {STATUS_OPTIONS.map(({ value, label }) => {
+            const count = value ? (counts as Record<string, number>)[value] ?? 0 : counts.all
+            const isActive = statusFilter === value
+            return (
+              <Button
+                key={value || 'all'}
+                type="button"
+                size="xs"
+                variant={isActive ? 'primary' : 'outline'}
+                aria-pressed={isActive}
+                onClick={() => setStatusFilter(value)}
+                className="rounded-full gap-1.5"
+              >
+                {label}
+                <span className={`tabular-nums text-xs ${isActive ? 'text-primary-100' : 'text-gray-500'}`}>
+                  {count}
+                </span>
+              </Button>
+            )
+          })}
         </div>
       )}
 
-      {/* Status KPI cards — consistent with Dashboard */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
-        {STATUS_OPTIONS.map(({ value, label }) => {
-          const count = value ? (counts as Record<string, number>)[value] ?? 0 : counts.all
-          const isActive = statusFilter === value
-          return (
-            <button
-              key={value || 'all'}
-              type="button"
-              onClick={() => setStatusFilter(value)}
-              className={`text-left rounded-xl border border-l-4 border-l-primary-500 p-4 sm:p-5 min-h-[4.5rem] transition-all duration-200 ${
-                isActive
-                  ? 'border-primary-500 bg-primary-50/80 shadow-md'
-                  : 'border-gray-200/80 bg-white shadow-sm hover:shadow-md hover:border-primary-100'
-              }`}
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-              <p className="mt-2 text-lg sm:text-xl font-bold text-gray-900 tabular-nums">{count}</p>
-            </button>
-          )
-        })}
-      </div>
-
       {/* Search & filter bar */}
-      <div className="flex flex-wrap gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
+      <Card>
+        <div className="flex flex-wrap gap-4">
         <div className="flex-1 min-w-0 sm:min-w-[200px]">
           <Input
             type="search"
@@ -243,14 +239,20 @@ export default function Projects({ initialStatus }: ProjectsProps) {
             </Select>
           </div>
         ) : (
-          <span className="px-4 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-lg bg-gray-50" title="Filter by client requires Firm plan">
+          <Button
+            type="button"
+            variant="outline"
+            disabled
+            title="Filter by client requires Firm plan"
+          >
             Filter by client (Firm)
-          </span>
+          </Button>
         )}
-      </div>
+        </div>
+      </Card>
 
       {/* Projects table */}
-      <Card noPadding className="overflow-hidden rounded-xl border-gray-200 shadow-sm">
+      <Card noPadding>
         {isLoading ? (
           <Table>
             <TableHead>
@@ -277,11 +279,8 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                 title="No projects yet"
                 description="Create your first reconciliation project to get started."
                 action={
-                  <Link
-                    to="/projects/new"
-                    className="inline-flex items-center justify-center font-medium px-4 py-2.5 text-sm rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-sm focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all"
-                  >
-                    + New Project
+                  <Link to="/projects/new" className={buttonClassName('primary', 'md')}>
+                    New project
                   </Link>
                 }
               />
@@ -341,14 +340,20 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                   <TableTd className="text-gray-500">{formatDate(p.createdAt)}</TableTd>
                   <TableTd className="text-right">
                     <Link
-                      to={`/projects/${p.slug ?? p.id}`}
+                      to={
+                        isReportsView || p.status === 'completed' || p.status === 'approved'
+                          ? `/projects/${p.slug ?? p.id}#report`
+                          : `/projects/${p.slug ?? p.id}`
+                      }
                       onMouseEnter={preloadProjectDetailPage}
                       onFocus={preloadProjectDetailPage}
                       className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg group/link"
                     >
-                      {(p.status === 'completed' || p.status === 'approved' || p.status === 'submitted_for_review')
-                        ? 'View'
-                        : 'Resume'}
+                      {isReportsView || p.status === 'completed' || p.status === 'approved'
+                        ? 'Open report'
+                        : p.status === 'submitted_for_review'
+                          ? 'Review'
+                          : 'Resume'}
                       <ChevronRight className="w-4 h-4 opacity-70 group-hover/link:translate-x-0.5 transition-transform" aria-hidden />
                     </Link>
                   </TableTd>
@@ -360,7 +365,8 @@ export default function Projects({ initialStatus }: ProjectsProps) {
       </Card>
 
       {totalProjects > limit && (
-        <div className="flex items-center justify-between gap-4 py-4 px-4 rounded-xl border border-gray-200 bg-white shadow-sm">
+        <Card>
+          <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-gray-500">
             Showing <span className="font-medium">{offset + 1}</span> to <span className="font-medium">{Math.min(offset + limit, totalProjects)}</span> of <span className="font-medium">{totalProjects}</span> projects
           </p>
@@ -382,7 +388,8 @@ export default function Projects({ initialStatus }: ProjectsProps) {
               Next
             </Button>
           </div>
-        </div>
+          </div>
+        </Card>
       )}
     </div>
   )

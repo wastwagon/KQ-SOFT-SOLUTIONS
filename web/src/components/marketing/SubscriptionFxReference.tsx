@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Globe2, Loader2 } from 'lucide-react'
 import { formatGhs, planAmountForPeriod, type BillingPeriod, type MarketingPlan } from '../../lib/plans'
+import Select from '../ui/Select'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/Table'
 
 type FxCode = 'USD' | 'EUR' | 'GBP'
 
@@ -102,44 +104,43 @@ export default function SubscriptionFxReference({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <label htmlFor="fx-currency" className="sr-only">
-            Reference currency
-          </label>
-          <select
-            id="fx-currency"
-            value={code}
-            onChange={(e) => setCode(e.target.value as FxCode)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-          >
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-          </select>
+          <div className="w-28">
+            <Select
+              id="fx-currency"
+              value={code}
+              onChange={(e) => setCode(e.target.value as FxCode)}
+              aria-label="Reference currency"
+            >
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </Select>
+          </div>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" aria-label="Loading rates" />}
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-xl border border-gray-100">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">
-              <th className="px-4 py-2.5">Plan</th>
-              <th className="px-4 py-2.5 tabular-nums">Billed (GHS)</th>
-              <th className="px-4 py-2.5 tabular-nums">≈ {code}</th>
+      <div className="mt-4 overflow-hidden rounded-xl border border-gray-100">
+        <Table>
+          <TableHead>
+            <tr>
+              <TableTh>Plan</TableTh>
+              <TableTh className="tabular-nums">Billed (GHS)</TableTh>
+              <TableTh className="tabular-nums">≈ {code}</TableTh>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+          </TableHead>
+          <TableBody>
             {rows.map((row) => (
-              <tr key={row.slug} className="bg-white">
-                <td className="px-4 py-2.5 font-medium text-gray-900">{row.name}</td>
-                <td className="px-4 py-2.5 tabular-nums text-gray-700">{formatGhs(row.ghs)}</td>
-                <td className="px-4 py-2.5 tabular-nums font-semibold text-gray-900">
+              <TableRow key={row.slug}>
+                <TableTd className="font-medium text-gray-900">{row.name}</TableTd>
+                <TableTd className="tabular-nums">{formatGhs(row.ghs)}</TableTd>
+                <TableTd className="tabular-nums font-semibold text-gray-900">
                   {formatForeign(row.foreign, code)}
-                </td>
-              </tr>
+                </TableTd>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
       <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
         {live

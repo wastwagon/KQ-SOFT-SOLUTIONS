@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -10,7 +10,6 @@ import {
   Settings,
   Server,
   ArrowLeft,
-  LogOut,
   Activity,
   Archive,
   Inbox,
@@ -19,13 +18,17 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import BrandLogo from './BrandLogo'
+import AccountMenu from './AccountMenu'
+import CommandPalette from './CommandPalette'
 import SidebarShell, { SidebarHeader, SidebarNavSection } from './layout/SidebarShell'
 import { sidebarNavLinkClass } from './layout/sidebarStyles'
+import TopBarCrumbs from './layout/TopBarCrumbs'
+import RouteFallback from './layout/RouteFallback'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout, isPlatformAdmin } = useAuth()
+  const { isPlatformAdmin } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const path = location.pathname
 
@@ -38,12 +41,6 @@ export default function AdminLayout() {
   }
 
   const closeSidebar = () => setSidebarOpen(false)
-
-  function handleLogout() {
-    closeSidebar()
-    logout()
-    navigate('/login')
-  }
 
   const overviewActive = path === '/platform-admin'
   const tenantsActive =
@@ -169,7 +166,7 @@ export default function AdminLayout() {
         </SidebarNavSection>
       </nav>
 
-      <div className="shrink-0 border-t border-border-muted p-3 space-y-2">
+      <div className="shrink-0 border-t border-border-muted p-3">
         <Link
           to="/dashboard"
           onClick={closeSidebar}
@@ -178,23 +175,6 @@ export default function AdminLayout() {
           <ArrowLeft className="w-4 h-4" />
           Back to workspace
         </Link>
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 font-semibold text-sm shrink-0">
-            {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'A'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'Admin'}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign out
-        </button>
       </div>
     </>
   )
@@ -206,13 +186,17 @@ export default function AdminLayout() {
       onClose={closeSidebar}
       sidebar={sidebar}
       sidebarLabel="Admin navigation"
+      topBarStart={<TopBarCrumbs />}
       topBarEnd={
-        <span className="hidden sm:inline text-sm text-gray-500 truncate max-w-[220px]">
-          {user?.email}
-        </span>
+        <>
+          <CommandPalette variant="admin" />
+          <AccountMenu extraItems={[{ to: '/dashboard', label: 'Back to workspace', icon: ArrowLeft }]} />
+        </>
       }
     >
-      <Outlet />
+      <Suspense fallback={<RouteFallback />}>
+        <Outlet />
+      </Suspense>
     </SidebarShell>
   )
 }

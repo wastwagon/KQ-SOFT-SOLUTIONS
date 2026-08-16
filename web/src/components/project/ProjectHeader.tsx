@@ -4,6 +4,9 @@ import { ChevronRight, Pencil, Trash2, X } from 'lucide-react'
 import ProjectStatusPill, { type ProjectStatus } from './ProjectStatusPill'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import Button from '../ui/Button'
+import Input from '../ui/Input'
+import Select from '../ui/Select'
 
 /**
  * Project context bar used at the top of <ProjectDetail>.  Responsibilities:
@@ -109,7 +112,7 @@ export default function ProjectHeader({
   }
 
   return (
-    <header className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white shadow-sm px-5 py-5 sm:px-7 sm:py-6 space-y-4">
+    <header className="rounded-xl border border-border bg-white shadow-card px-5 py-5 sm:px-7 sm:py-6 space-y-4">
       <nav aria-label="Breadcrumb" className="text-sm">
         <ol className="flex items-center gap-1 text-gray-500">
           <li>
@@ -137,61 +140,52 @@ export default function ProjectHeader({
         <div className="min-w-0 flex-1">
           {editing && canEdit ? (
             <div className="flex w-full max-w-2xl flex-col gap-3">
-              <input
+              <Input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 placeholder="Project name"
                 aria-label="Project name"
-                className="min-h-[44px] w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               />
-              <input
+              <Input
                 value={editStatementBusinessName}
                 onChange={(e) => setEditStatementBusinessName(e.target.value)}
                 placeholder="Business name as on bank statement (printed BRS)"
                 aria-label="Business name as on bank statement"
-                className="min-h-[44px] w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               />
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                <select
-                  value={editClientId}
-                  onChange={(e) => setEditClientId(e.target.value)}
-                  aria-label="Client"
-                  className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                >
-                  <option value="">— No client —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={editCurrency}
-                  onChange={(e) => setEditCurrency(e.target.value as Currency)}
-                  aria-label="Currency"
-                  className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                >
-                  <option value="GHS">GHS</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                </select>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="sm:min-w-[180px] sm:flex-1">
+                  <Select
+                    value={editClientId}
+                    onChange={(e) => setEditClientId(e.target.value)}
+                    aria-label="Client"
+                  >
+                    <option value="">— No client —</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="sm:w-32">
+                  <Select
+                    value={editCurrency}
+                    onChange={(e) => setEditCurrency(e.target.value as Currency)}
+                    aria-label="Currency"
+                  >
+                    <option value="GHS">GHS</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                  </Select>
+                </div>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={submitEdit}
-                    disabled={isUpdating}
-                    className="inline-flex items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary-600/20 transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50"
-                  >
-                    {isUpdating ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
+                  <Button type="button" onClick={submitEdit} isLoading={isUpdating}>
+                    Save
+                  </Button>
+                  <Button type="button" variant="outline" onClick={cancelEdit}>
+                    <X className="h-4 w-4 mr-1.5" aria-hidden="true" />
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -223,14 +217,16 @@ export default function ProjectHeader({
                   </span>
                 )}
                 {canEdit && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={startEdit}
-                    className="inline-flex items-center gap-1 rounded font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    className="text-primary-600 hover:text-primary-700"
                   >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Pencil className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
                     Edit details
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -238,15 +234,16 @@ export default function ProjectHeader({
         </div>
 
         {canDelete && !editing && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={handleDelete}
-            disabled={isDeleting}
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
+            isLoading={isDeleting}
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
           >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-            {isDeleting ? 'Deleting…' : 'Delete'}
-          </button>
+            <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
+            Delete
+          </Button>
         )}
       </div>
     </header>

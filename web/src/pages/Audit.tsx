@@ -8,10 +8,14 @@ import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
+import Select from '../components/ui/Select'
 import { useToast } from '../components/ui/Toast'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import Alert from '../components/ui/Alert'
+import Badge from '../components/ui/Badge'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
 
 const PAGE_SIZE = 20
 
@@ -88,20 +92,16 @@ export default function Audit() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Administration" title="Audit log" />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          <p className="font-medium text-red-900">Could not load audit log</p>
-          <p className="mt-1">{err instanceof Error ? err.message : 'Something went wrong.'}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void queryClient.invalidateQueries({ queryKey: ['audit'] })
-              void queryClient.invalidateQueries({ queryKey: ['projects'] })
-            }}
-            className="mt-3 px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-red-300 text-red-900 hover:bg-red-100"
-          >
-            Retry
-          </button>
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load audit log"
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: ['audit'] })
+            void queryClient.invalidateQueries({ queryKey: ['projects'] })
+          }}
+        >
+          {err instanceof Error ? err.message : 'Something went wrong.'}
+        </Alert>
       </div>
     )
   }
@@ -121,23 +121,24 @@ export default function Audit() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm">
-        <label className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm min-w-0 flex-1">
-          <span className="font-semibold text-gray-700 shrink-0">Project</span>
-          <select
+      <Card>
+        <div className="flex flex-wrap items-center gap-4">
+        <div className="w-full sm:w-64">
+          <Select
+            label="Project"
             value={projectFilter}
             onChange={(e) => {
               setProjectFilter(e.target.value)
               setPage(0)
             }}
-            className="w-full sm:w-auto sm:min-w-[220px] px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50/50 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors min-h-[44px]"
+            aria-label="Filter by project"
           >
             <option value="">All projects</option>
             {projectsList.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
         <Button
           variant="outline"
           onClick={async () => {
@@ -152,32 +153,31 @@ export default function Audit() {
               setExporting(false)
             }
           }}
-          disabled={exporting}
+          isLoading={exporting}
         >
           <Download className="w-4 h-4 mr-2" />
-          {exporting ? 'Exporting...' : 'Export CSV'}
+          Export CSV
         </Button>
-      </div>
+        </div>
+      </Card>
 
-      <Card noPadding className="overflow-hidden rounded-xl border-l-4 border-l-primary-500 border-gray-200 shadow-sm">
+      <Card noPadding>
         {isLoading ? (
-          <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-surface border-b border-border">
+          <Table>
+            <TableHead>
               <tr>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</th>
+                <TableTh>Time</TableTh>
+                <TableTh>Action</TableTh>
+                <TableTh>Project</TableTh>
+                <TableTh>Details</TableTh>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted bg-white">
+            </TableHead>
+            <TableBody>
               {[1, 2, 3, 4, 5].map((i) => (
                 <TableRowSkeleton key={i} cols={4} />
               ))}
-            </tbody>
-          </table>
-          </div>
+            </TableBody>
+          </Table>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<FileCheck className="w-6 h-6" />}
@@ -187,22 +187,21 @@ export default function Audit() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-surface border-b border-border">
+            <Table>
+              <TableHead>
                 <tr>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</th>
+                  <TableTh>Time</TableTh>
+                  <TableTh>Action</TableTh>
+                  <TableTh>Project</TableTh>
+                  <TableTh>Details</TableTh>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border-muted bg-white">
+              </TableHead>
+              <TableBody>
                 {paginated.map((l) => (
-                  <tr key={l.id} className="hover:bg-gray-50/90 transition-colors">
-                    <td className="px-6 py-3 text-gray-500 whitespace-nowrap">{formatDate(l.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                    <td className="px-6 py-3 font-medium text-gray-900">{l.actionLabel}</td>
-                    <td className="px-6 py-3 text-gray-600">
+                  <TableRow key={l.id}>
+                    <TableTd className="text-gray-500 whitespace-nowrap">{formatDate(l.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</TableTd>
+                    <TableTd className="font-medium text-gray-900">{l.actionLabel}</TableTd>
+                    <TableTd>
                       {l.projectId && projectSlugMap[l.projectId] ? (
                         <Link
                           to={`/projects/${projectSlugMap[l.projectId]}`}
@@ -211,26 +210,25 @@ export default function Audit() {
                           {projectMap[l.projectId] || l.projectId}
                         </Link>
                       ) : l.projectId ? projectMap[l.projectId] || l.projectId : '—'}
-                    </td>
-                    <td className="px-6 py-3 text-gray-600">
+                    </TableTd>
+                    <TableTd>
                       {l.details && Object.keys(l.details).length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
                           {Object.entries(l.details).map(([k, v]) => (
-                            <span key={k} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                              <span className="opacity-60 mr-1">{k}:</span>
+                            <Badge key={k} tone="neutral" size="sm">
+                              <span className="opacity-60">{k}:</span>
                               <span className="truncate max-w-[120px]">{String(v)}</span>
-                            </span>
+                            </Badge>
                           ))}
                         </div>
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}
-                    </td>
-                  </tr>
+                    </TableTd>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-            </div>
+              </TableBody>
+            </Table>
             {totalPages > 1 && (
               <div className="px-6 py-3 border-t border-border flex items-center justify-between gap-4 flex-wrap">
                 <p className="text-sm text-gray-500">

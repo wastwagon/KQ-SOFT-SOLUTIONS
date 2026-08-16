@@ -111,4 +111,11 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+  /* Collapsed on-screen sections still print in full */
+  #brs-report details > *:not(summary) {
+    display: block !important;
+  }
+  #brs-report details summary {
+    display: none !important;
+  }
 }

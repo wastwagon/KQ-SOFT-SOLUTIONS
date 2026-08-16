@@ -5,6 +5,8 @@ import { Bell } from 'lucide-react'
 import { audit, projects, subscription, isSubscriptionInactiveError } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { formatDate } from '../lib/format'
+import Button from './ui/Button'
+import Alert from './ui/Alert'
 
 const LAST_SEEN_KEY = 'brs_notifications_last_seen'
 
@@ -157,6 +159,8 @@ export default function NotificationsBell() {
     lastSeen,
   ])
 
+  const loadFailed = projectsQuery.isError || usageQuery.isError
+
   const unreadCount = items.filter((i) => i.unread).length
 
   function markAllRead() {
@@ -175,10 +179,12 @@ export default function NotificationsBell() {
 
   return (
     <div className="relative">
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         onClick={handleOpenToggle}
-        className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        className="relative p-2 text-gray-500"
         title="Notifications"
         aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         aria-expanded={open}
@@ -188,7 +194,7 @@ export default function NotificationsBell() {
         {unreadCount > 0 && (
           <span className="absolute top-1.5 right-1.5 min-w-[0.5rem] h-2 px-0.5 rounded-full bg-primary-600 ring-2 ring-white" />
         )}
-      </button>
+      </Button>
 
       {open && (
         <>
@@ -196,7 +202,7 @@ export default function NotificationsBell() {
           <div
             role="dialog"
             aria-label="Notifications"
-            className="absolute right-0 top-full mt-1 z-50 w-80 sm:w-96 rounded-xl border border-gray-200 bg-white py-2 shadow-lg"
+            className="absolute right-0 top-full mt-1 z-50 w-80 sm:w-96 rounded-xl border border-border bg-white py-2 shadow-lg"
           >
             <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-gray-900">Notifications</p>
@@ -209,7 +215,20 @@ export default function NotificationsBell() {
               </Link>
             </div>
 
-            {items.length === 0 ? (
+            {loadFailed ? (
+              <div className="px-3 py-3">
+                <Alert
+                  tone="error"
+                  title="Could not load notifications"
+                  className="!p-3"
+                  onRetry={() => {
+                    void usageQuery.refetch()
+                    void projectsQuery.refetch()
+                    if (hasAudit) void auditQuery.refetch()
+                  }}
+                />
+              </div>
+            ) : items.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-500">
                 You&apos;re all caught up.
               </div>

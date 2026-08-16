@@ -5,7 +5,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
+import Input from '../../components/ui/Input'
+import Button from '../../components/ui/Button'
 import PageHeader from '../../components/layout/PageHeader'
+import Alert from '../../components/ui/Alert'
+import Badge from '../../components/ui/Badge'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 
 type Payment = {
   id: string
@@ -24,7 +30,7 @@ export default function AdminPayments() {
   const [page, setPage] = useState(1)
   const [orgId, setOrgId] = useState('')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'payments', page, orgId],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: '20' })
@@ -39,6 +45,21 @@ export default function AdminPayments() {
   const fmt = (n: number, currency = 'GHS') =>
     new Intl.NumberFormat('en-GH', { style: 'currency', currency, minimumFractionDigits: 2 }).format(n)
 
+  if (isError) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Platform admin"
+          title="Payments"
+          subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
+        />
+        <Alert tone="error" title="Could not load payments" onRetry={() => void refetch()}>
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
+      </div>
+    )
+  }
+
   if (isLoading || !data) {
     return (
       <div className="space-y-8">
@@ -47,7 +68,7 @@ export default function AdminPayments() {
           title="Payments"
           subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
         />
-        <p className="text-gray-500 text-sm">Loading payments…</p>
+        <PageBodySkeleton label="Loading payments" />
       </div>
     )
   }
@@ -63,82 +84,80 @@ export default function AdminPayments() {
         subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
       />
 
-      <Card className="shadow-sm">
+      <Card>
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <input
-            type="text"
-            placeholder="Filter by org ID"
-            value={orgId}
-            onChange={(e) => setOrgId(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
-            className="px-3 py-2 border border-border rounded-lg text-sm bg-white text-gray-900 w-64 focus:ring-2 focus:ring-primary-500"
-          />
-          <button
-            type="button"
-            onClick={() => setPage(1)}
-            className="px-3 py-2 text-sm font-medium rounded-lg border border-border text-gray-700 hover:bg-surface"
-          >
+          <div className="w-64">
+            <Input
+              type="text"
+              placeholder="Filter by org ID"
+              value={orgId}
+              onChange={(e) => setOrgId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
+              aria-label="Filter by org ID"
+            />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setPage(1)}>
             Apply
-          </button>
+          </Button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-3 py-2 text-left text-gray-600 font-medium">Date</th>
-                <th className="px-3 py-2 text-left text-gray-600 font-medium">Organization</th>
-                <th className="px-3 py-2 text-left text-gray-600 font-medium">Plan</th>
-                <th className="px-3 py-2 text-left text-gray-600 font-medium">Period</th>
-                <th className="px-3 py-2 text-right text-gray-600 font-medium">Amount</th>
-                <th className="px-3 py-2 text-left text-gray-600 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-gray-500">
-                    No payments found.
-                  </td>
-                </tr>
-              ) : (
-                payments.map((pay) => (
-                  <tr key={pay.id} className="border-b border-border-muted hover:bg-surface/50">
-                    <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
-                      {formatDate(pay.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link
-                        to={`/platform-admin/organizations/${pay.organization.id}`}
-                        className="text-primary-600 hover:underline"
-                      >
-                        {pay.organization.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-gray-900 capitalize">{pay.plan}</td>
-                    <td className="px-3 py-2 text-gray-600 capitalize">{pay.period}</td>
-                    <td className="px-3 py-2 text-right font-medium text-gray-900">
-                      {fmt(Number(pay.amount), pay.currency)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                          pay.status === 'success'
-                            ? 'bg-green-100 text-green-800'
-                            : pay.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {pay.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHead>
+            <tr>
+              <TableTh>Date</TableTh>
+              <TableTh>Organization</TableTh>
+              <TableTh>Plan</TableTh>
+              <TableTh>Period</TableTh>
+              <TableTh className="text-right">Amount</TableTh>
+              <TableTh>Status</TableTh>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {payments.length === 0 ? (
+              <TableRow>
+                <TableTd colSpan={6} className="text-center text-gray-500">
+                  No payments found.
+                </TableTd>
+              </TableRow>
+            ) : (
+              payments.map((pay) => (
+                <TableRow key={pay.id}>
+                  <TableTd className="whitespace-nowrap">
+                    {formatDate(pay.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </TableTd>
+                  <TableTd>
+                    <Link
+                      to={`/platform-admin/organizations/${pay.organization.id}`}
+                      className="text-primary-600 hover:underline"
+                    >
+                      {pay.organization.name}
+                    </Link>
+                  </TableTd>
+                  <TableTd className="capitalize">{pay.plan}</TableTd>
+                  <TableTd className="capitalize">{pay.period}</TableTd>
+                  <TableTd className="text-right font-medium text-gray-900">
+                    {fmt(Number(pay.amount), pay.currency)}
+                  </TableTd>
+                  <TableTd>
+                    <Badge
+                      tone={
+                        pay.status === 'success'
+                          ? 'success'
+                          : pay.status === 'failed'
+                            ? 'danger'
+                            : 'neutral'
+                      }
+                      size="sm"
+                      className="capitalize"
+                    >
+                      {pay.status}
+                    </Badge>
+                  </TableTd>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
@@ -146,22 +165,24 @@ export default function AdminPayments() {
               Page {p} of {totalPages} • {total} total
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                 disabled={p <= 1}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface"
               >
-                <ChevronLeft className="w-4 h-4" /> Previous
-              </button>
-              <button
+                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
                 disabled={p >= totalPages}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface"
               >
-                Next <ChevronRight className="w-4 h-4" />
-              </button>
+                Next <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
           </div>
         )}

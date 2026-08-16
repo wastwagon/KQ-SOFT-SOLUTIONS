@@ -1,61 +1,54 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import Alert from '../../components/ui/Alert'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
 import { platformAdminOps, type RetentionPruneResult } from '../../lib/api'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import { useToast } from '../../components/ui/Toast'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import ProjectStatusPill from '../../components/project/ProjectStatusPill'
 
 function ResultSummary({ result }: { result: RetentionPruneResult }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-lg bg-gray-50 px-3 py-2">
-          <p className="text-xs text-gray-500">Mode</p>
-          <p className="text-sm font-semibold text-gray-900">
-            {result.dryRun ? 'Dry run' : 'Deleted'}
-          </p>
-        </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2">
-          <p className="text-xs text-gray-500">Retention years</p>
-          <p className="text-sm font-semibold text-gray-900">{result.retentionYears}</p>
-        </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2">
-          <p className="text-xs text-gray-500">Eligible</p>
-          <p className="text-sm font-semibold text-gray-900">{result.eligibleProjects}</p>
-        </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2">
-          <p className="text-xs text-gray-500">Files removed</p>
-          <p className="text-sm font-semibold text-gray-900">{result.filesRemoved}</p>
-        </div>
+        <MetricCard className="!p-4" label="Mode" value={result.dryRun ? 'Dry run' : 'Deleted'} />
+        <MetricCard className="!p-4" label="Retention years" value={result.retentionYears} />
+        <MetricCard className="!p-4" label="Eligible" value={result.eligibleProjects} />
+        <MetricCard className="!p-4" label="Files removed" value={result.filesRemoved} />
       </div>
       <p className="text-xs text-gray-500">
         Cutoff: {new Date(result.cutoffIso).toLocaleString()} · Deleted projects:{' '}
         {result.deletedProjects}
       </p>
       {result.projects.length > 0 && (
-        <div className="overflow-x-auto max-h-72 overflow-y-auto border border-gray-100 rounded-lg">
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 bg-white">
-              <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                <th className="px-3 py-2 font-semibold">Project</th>
-                <th className="px-3 py-2 font-semibold">Status</th>
-                <th className="px-3 py-2 font-semibold">Org</th>
+        <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-100">
+          <Table>
+            <TableHead>
+              <tr>
+                <TableTh>Project</TableTh>
+                <TableTh>Status</TableTh>
+                <TableTh>Org</TableTh>
               </tr>
-            </thead>
-            <tbody>
+            </TableHead>
+            <TableBody>
               {result.projects.map((p) => (
-                <tr key={p.id} className="border-b border-gray-50">
-                  <td className="px-3 py-2 text-gray-900">{p.name}</td>
-                  <td className="px-3 py-2 text-gray-600">{p.status}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-500">{p.organizationId}</td>
-                </tr>
+                <TableRow key={p.id}>
+                  <TableTd className="text-gray-900">{p.name}</TableTd>
+                  <TableTd>
+                    <ProjectStatusPill status={p.status} size="sm" />
+                  </TableTd>
+                  <TableTd className="font-mono text-xs text-gray-500">{p.organizationId}</TableTd>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
@@ -136,48 +129,35 @@ export default function AdminRetention() {
         }
       />
 
-      <Card>
-        <div className="flex items-start gap-3 mb-4">
-          <Archive className="w-5 h-5 text-primary-600 shrink-0 mt-0.5" />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Optional overrides for the dry-run preview and delete action.
-            </p>
-          </div>
-        </div>
+      <Card
+        title="Filters"
+        sublabel="Optional overrides for the dry-run preview and delete action."
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-          <div>
-            <label htmlFor="retention-years" className="block text-sm font-medium text-gray-700 mb-1">
-              Retention years
-            </label>
-            <Input
-              id="retention-years"
-              type="number"
-              min={1}
-              max={30}
-              placeholder="Platform default"
-              value={years}
-              onChange={(e) => setYears(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="retention-org" className="block text-sm font-medium text-gray-700 mb-1">
-              Organization ID
-            </label>
-            <Input
-              id="retention-org"
-              placeholder="All organizations"
-              value={organizationId}
-              onChange={(e) => setOrganizationId(e.target.value)}
-            />
-          </div>
+          <Input
+            id="retention-years"
+            label="Retention years"
+            type="number"
+            min={1}
+            max={30}
+            placeholder="Platform default"
+            value={years}
+            onChange={(e) => setYears(e.target.value)}
+          />
+          <Input
+            id="retention-org"
+            label="Organization ID"
+            placeholder="All organizations"
+            value={organizationId}
+            onChange={(e) => setOrganizationId(e.target.value)}
+          />
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
           <Button
             type="button"
             variant="secondary"
             onClick={() => runMutation.mutate(false)}
+            isLoading={runMutation.isPending && runMutation.variables === false}
             disabled={runMutation.isPending}
           >
             Run dry-run
@@ -186,6 +166,7 @@ export default function AdminRetention() {
             type="button"
             variant="danger"
             onClick={handleDelete}
+            isLoading={runMutation.isPending && runMutation.variables === true}
             disabled={runMutation.isPending}
           >
             Delete eligible projects
@@ -193,30 +174,28 @@ export default function AdminRetention() {
         </div>
       </Card>
 
-      {previewQuery.isLoading && (
-        <Card>
-          <p className="text-sm text-gray-500">Loading retention preview…</p>
-        </Card>
-      )}
+      {previewQuery.isLoading && <PageBodySkeleton label="Loading retention preview" />}
 
       {previewQuery.isError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
+        <Alert
+          tone="error"
+          title="Could not load retention preview"
+          onRetry={() => void previewQuery.refetch()}
+        >
           {previewQuery.error instanceof Error
             ? previewQuery.error.message
-            : 'Could not load retention preview.'}
-        </div>
+            : 'Something went wrong.'}
+        </Alert>
       )}
 
       {previewQuery.data && (
-        <Card>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Current preview</h2>
+        <Card title="Current preview">
           <ResultSummary result={previewQuery.data} />
         </Card>
       )}
 
       {runMutation.data && (
-        <Card>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Last run result</h2>
+        <Card title="Last run result">
           <ResultSummary result={runMutation.data} />
         </Card>
       )}

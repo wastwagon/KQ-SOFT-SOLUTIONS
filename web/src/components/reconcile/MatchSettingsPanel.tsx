@@ -1,4 +1,5 @@
 import type { MatchParams } from './types'
+import Button from '../ui/Button'
 
 /**
  * Collapsible matching-parameters panel.  Lets the user pick a preset
@@ -40,8 +41,8 @@ export default function MatchSettingsPanel({ value, onChange }: MatchSettingsPan
   const isAmountOnly = isPreset(value, PRESETS.amountOnly)
 
   return (
-    <div className="mb-4 rounded-xl border border-amber-200 bg-white/70 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
-      <p className="text-xs font-bold uppercase tracking-widest text-amber-900 mb-3">
+    <div className="mb-4 rounded-xl border border-border bg-surface p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+      <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
         Matching parameters
       </p>
       <div className="flex flex-wrap gap-2 mb-4">
@@ -55,13 +56,13 @@ export default function MatchSettingsPanel({ value, onChange }: MatchSettingsPan
           Amount-only
         </PresetButton>
       </div>
-      <div className="flex flex-wrap gap-5 text-sm text-amber-900 font-medium">
+      <div className="flex flex-wrap gap-5 text-sm text-gray-800 font-medium">
         <label className="inline-flex items-center gap-2 cursor-not-allowed">
           <input
             type="checkbox"
             checked
             disabled
-            className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           />
           Amount
         </label>
@@ -81,7 +82,7 @@ export default function MatchSettingsPanel({ value, onChange }: MatchSettingsPan
           onChange={(useChequeNo) => onChange({ ...value, useChequeNo })}
         />
       </div>
-      <p className="mt-3 text-[11px] text-amber-700 leading-relaxed italic">
+      <p className="mt-3 text-[11px] text-gray-500 leading-relaxed italic">
         Active mode: <strong>{activeModeLabel(value)}</strong>. Settings apply to suggestions and
         automated matching.
       </p>
@@ -99,18 +100,15 @@ function PresetButton({
   children: React.ReactNode
 }) {
   return (
-    <button
+    <Button
       type="button"
+      size="xs"
+      variant={active ? 'primary' : 'outline'}
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
-        active
-          ? 'border-amber-500 bg-amber-200 text-amber-950'
-          : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
-      }`}
     >
       {children}
-    </button>
+    </Button>
   )
 }
 
@@ -129,7 +127,7 @@ function ParamCheckbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
       />
       {label}
     </label>

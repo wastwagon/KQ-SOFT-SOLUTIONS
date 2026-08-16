@@ -5,13 +5,17 @@ import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Alert from '../../components/ui/Alert'
+import Badge from '../../components/ui/Badge'
+import MetricCard from '../../components/ui/MetricCard'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import PageHeader from '../../components/layout/PageHeader'
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading, isError, error } = useQuery({
     queryKey: ['admin', 'user', id],
     queryFn: () =>
       api(`/admin/users/${id}`) as Promise<{
@@ -42,17 +46,54 @@ export default function AdminUserDetail() {
     },
   })
 
-  if (!id || isLoading || !user) {
+  if (!id) {
     return (
-      <div>
+      <div className="space-y-8">
         <Link
           to="/platform-admin/users"
-          className="inline-flex gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Users
         </Link>
-        <p className="text-gray-500">{isLoading ? 'Loading...' : 'User not found'}</p>
+        <Alert tone="error" title="Missing user identifier" />
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <Link
+          to="/platform-admin/users"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Users
+        </Link>
+        <PageHeader eyebrow="Platform admin" title="User" />
+        <PageBodySkeleton label="Loading user" />
+      </div>
+    )
+  }
+
+  if (isError || !user) {
+    return (
+      <div className="space-y-8">
+        <Link
+          to="/platform-admin/users"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Users
+        </Link>
+        <Alert
+          tone="error"
+          title="Could not load user"
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['admin', 'user', id] })}
+        >
+          {error instanceof Error ? error.message : 'User not found.'}
+        </Alert>
       </div>
     )
   }
@@ -76,34 +117,30 @@ export default function AdminUserDetail() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
           {suspended ? (
-            <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">
-              Suspended
-            </span>
+            <Badge tone="danger">Suspended</Badge>
           ) : (
-            <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-              Active
-            </span>
+            <Badge tone="success">Active</Badge>
           )}
           {suspended ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => updateMutation.mutate(null)}
-              disabled={updateMutation.isPending}
+              isLoading={updateMutation.isPending}
             >
               <UserCheck className="w-4 h-4 mr-1" />
-              {updateMutation.isPending ? 'Restoring...' : 'Restore'}
+              Restore
             </Button>
           ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={() => updateMutation.mutate(new Date().toISOString())}
-              disabled={updateMutation.isPending}
+              isLoading={updateMutation.isPending}
               className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
             >
               <UserX className="w-4 h-4 mr-1" />
-              {updateMutation.isPending ? 'Suspending...' : 'Suspend'}
+              Suspend
             </Button>
           )}
           </div>
@@ -111,33 +148,16 @@ export default function AdminUserDetail() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card className="p-4">
-          <p className="text-sm text-gray-500 font-medium">Status</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">
-            {suspended ? 'Suspended' : 'Active'}
-          </p>
-          {suspended && user.suspendedAt && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              Since {formatDate(user.suspendedAt)}
-            </p>
-          )}
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-gray-500 font-medium">Joined</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">
-            {formatDate(user.createdAt)}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-gray-500 font-medium">Organizations</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">
-            {user.memberships.length}
-          </p>
-        </Card>
+        <MetricCard
+          label="Status"
+          value={suspended ? 'Suspended' : 'Active'}
+          sublabel={suspended && user.suspendedAt ? `Since ${formatDate(user.suspendedAt)}` : undefined}
+        />
+        <MetricCard label="Joined" value={formatDate(user.createdAt)} />
+        <MetricCard label="Organizations" value={user.memberships.length} />
       </div>
 
-      <Card>
-        <h3 className="font-semibold text-gray-900 mb-4">Organizations</h3>
+      <Card title="Organizations">
         {user.memberships.length === 0 ? (
           <p className="text-sm text-gray-500">No organizations</p>
         ) : (
@@ -150,9 +170,9 @@ export default function AdminUserDetail() {
                 >
                   {m.organization.name}
                 </Link>
-                <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 capitalize">
+                <Badge tone="neutral" size="sm" className="capitalize">
                   {m.role}
-                </span>
+                </Badge>
               </li>
             ))}
           </ul>

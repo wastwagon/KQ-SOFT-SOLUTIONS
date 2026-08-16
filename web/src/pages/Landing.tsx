@@ -1548,6 +1548,75 @@ function FinalCta() {
  * Section 12: Footer (dark, premium, multi-column)
  * ------------------------------------------------------------------------- */
 
+function NewsletterForm() {
+  const [pending, setPending] = useState(false)
+  const [status, setStatus] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        const form = e.currentTarget
+        const emailInput = form.elements.namedItem('email') as HTMLInputElement | null
+        const email = emailInput?.value?.trim()
+        if (!email) return
+        setPending(true)
+        setStatus(null)
+        try {
+          const res = await publicApi.createLead({ email, source: 'newsletter' })
+          if (emailInput) emailInput.value = ''
+          setStatus({
+            tone: 'success',
+            message: res.duplicate
+              ? 'You are already subscribed with this email.'
+              : 'Thanks — you are on the product updates list.',
+          })
+        } catch (err) {
+          setStatus({
+            tone: 'error',
+            message: err instanceof Error ? err.message : 'Could not subscribe. Try again.',
+          })
+        } finally {
+          setPending(false)
+        }
+      }}
+      aria-label="Subscribe to updates"
+    >
+      <div className="flex flex-col sm:flex-row gap-2">
+        <label htmlFor="newsletter-email" className="sr-only">
+          Email address
+        </label>
+        <input
+          id="newsletter-email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          placeholder="you@firm.com"
+          className="flex-1 min-w-0 px-4 py-2.5 text-sm rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        />
+        <Button
+          type="submit"
+          isLoading={pending}
+          className="whitespace-nowrap shadow-md shadow-primary-600/30"
+        >
+          Subscribe
+          <Send className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+      {status && (
+        <p
+          role={status.tone === 'error' ? 'alert' : 'status'}
+          className={`text-sm ${status.tone === 'error' ? 'text-red-300' : 'text-green-300'}`}
+        >
+          {status.message}
+        </p>
+      )}
+    </form>
+  )
+}
+
 function Footer() {
   const isAuthed = useAuth((s) => !!s.token)
   const accountLinks = isAuthed
@@ -1582,50 +1651,7 @@ function Footer() {
               concise, optional, one-click unsubscribe.
             </p>
           </div>
-          <form
-            className="flex flex-col sm:flex-row gap-2"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              const form = e.currentTarget
-              const emailInput = form.elements.namedItem('email') as HTMLInputElement | null
-              const email = emailInput?.value?.trim()
-              if (!email) return
-              const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
-              if (btn) btn.disabled = true
-              try {
-                const res = await publicApi.createLead({ email, source: 'newsletter' })
-                if (emailInput) emailInput.value = ''
-                window.alert(
-                  res.duplicate
-                    ? 'You are already subscribed with this email.'
-                    : 'Thanks — you are on the product updates list.'
-                )
-              } catch (err) {
-                window.alert(err instanceof Error ? err.message : 'Could not subscribe. Try again.')
-              } finally {
-                if (btn) btn.disabled = false
-              }
-            }}
-            aria-label="Subscribe to updates"
-          >
-            <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-            <input
-              id="newsletter-email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@firm.com"
-              className="flex-1 px-4 py-2.5 text-sm rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              className="inline-flex justify-center items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-primary-600 hover:bg-primary-500 rounded-lg shadow-md shadow-primary-600/30 transition-colors whitespace-nowrap"
-            >
-              Subscribe
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+          <NewsletterForm />
         </div>
       </div>
 

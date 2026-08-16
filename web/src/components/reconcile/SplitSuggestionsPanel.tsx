@@ -1,4 +1,7 @@
 import { formatAmount } from '../../lib/format'
+import Button from '../ui/Button'
+import Badge from '../ui/Badge'
+import Card from '../ui/Card'
 import type { SuggestedSplitMatch, Tx } from './types'
 
 /**
@@ -29,45 +32,41 @@ export default function SplitSuggestionsPanel({
   isForgettingMemory = false,
 }: SplitSuggestionsPanelProps) {
   return (
-    <section className="rounded-xl border border-primary-200/80 bg-primary-50/50 p-5 shadow-sm">
-      <header className="flex items-center gap-2 mb-3">
-        <span className="px-2 py-0.5 bg-primary-600 text-white text-[10px] font-bold rounded uppercase tracking-wider">
-          Premium
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          <Badge tone="brand" size="sm">
+            Premium
+          </Badge>
+          Split suggestions
         </span>
-        <h3 className="text-base font-bold text-primary-900 tracking-tight">Split suggestions</h3>
-      </header>
-      <p className="text-sm text-primary-800/90 mb-4">
-        These items appear to be bulk deposits or multi-item payments. Click to select the group.
-      </p>
+      }
+      sublabel="These items appear to be bulk deposits or multi-item payments. Click to select the group."
+    >
       <div className="grid gap-2 sm:grid-cols-2">
         {suggestions.map((s, i) => {
           const allSelected =
             s.cashBookTxs.every((t: Tx) => selectedCbIds.has(t.id)) &&
             s.bankTxs.every((t: Tx) => selectedBankIds.has(t.id))
           return (
-            <button
+            <div
               key={i}
-              type="button"
-              onClick={() =>
-                onSelectGroup(
-                  s.cashBookTxs.map((t) => t.id),
-                  s.bankTxs.map((t) => t.id)
-                )
-              }
-              className={`flex flex-col gap-1 w-full text-left px-4 py-3 rounded-xl border transition-all ${
+              className={`flex flex-col gap-1 w-full rounded-xl border transition-all ${
                 allSelected
-                  ? 'border-primary-400 bg-primary-100 shadow-sm'
-                  : 'border-primary-200/50 bg-white hover:bg-primary-50'
+                  ? 'border-primary-400 bg-primary-50 shadow-sm'
+                  : 'border-border bg-white hover:bg-gray-50'
               }`}
             >
-              <div className="flex justify-between items-start mb-1 gap-2">
+              <div className="flex justify-between items-start gap-2 px-4 pt-3">
                 <span className="text-[10px] font-bold text-primary-700 uppercase">{s.reason}</span>
                 <span className="flex items-center gap-1 shrink-0">
                   {features?.ai_suggestions &&
                     (s.orgMemoryBoosted || /org memory/i.test(s.reason)) && (
                     <span className="inline-flex items-center gap-1">
-                      <span
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 normal-case tracking-normal"
+                      <Badge
+                        size="sm"
+                        tone="success"
+                        className="normal-case tracking-normal"
                         title={
                           s.orgMemoryConfirmations
                             ? `Boosted from ${s.orgMemoryConfirmations} prior confirmation(s) of a similar split group`
@@ -78,20 +77,19 @@ export default function SplitSuggestionsPanel({
                         {s.orgMemoryConfirmations != null && s.orgMemoryConfirmations > 0
                           ? ` · ${s.orgMemoryConfirmations}×`
                           : ''}
-                      </span>
+                      </Badge>
                       {onForgetMemory && s.orgMemoryId && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
+                          className="normal-case tracking-normal"
                           disabled={isForgettingMemory}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onForgetMemory(s.orgMemoryId!)
-                          }}
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-emerald-800/80 hover:bg-emerald-200/80 normal-case tracking-normal disabled:opacity-50"
+                          onClick={() => onForgetMemory(s.orgMemoryId!)}
                           title="Stop boosting suggestions from this learned pattern"
                         >
                           Forget
-                        </button>
+                        </Button>
                       )}
                     </span>
                   )}
@@ -100,25 +98,36 @@ export default function SplitSuggestionsPanel({
                   </span>
                 </span>
               </div>
-              <div className="text-xs text-gray-900">
-                <div className="font-semibold mb-0.5">Book: {s.cashBookTxs.length} item(s)</div>
-                <div className="font-semibold">Bank: {s.bankTxs.length} item(s)</div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-primary-100 flex justify-between items-center">
-                <span className="text-xs font-bold text-primary-900">
-                  {formatAmount(
-                    s.cashBookTxs.reduce((sum: number, t: Tx) => sum + t.amount, 0),
-                    currency
-                  )}
-                </span>
-                <span className="text-[10px] text-primary-600 font-medium italic">
-                  Click to match group
-                </span>
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onSelectGroup(
+                    s.cashBookTxs.map((t) => t.id),
+                    s.bankTxs.map((t) => t.id)
+                  )
+                }
+                className="flex flex-col gap-1 w-full text-left px-4 pb-3"
+              >
+                <div className="text-xs text-gray-900">
+                  <div className="font-semibold mb-0.5">Book: {s.cashBookTxs.length} item(s)</div>
+                  <div className="font-semibold">Bank: {s.bankTxs.length} item(s)</div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-primary-100 flex justify-between items-center">
+                  <span className="text-xs font-bold text-primary-900">
+                    {formatAmount(
+                      s.cashBookTxs.reduce((sum: number, t: Tx) => sum + t.amount, 0),
+                      currency
+                    )}
+                  </span>
+                  <span className="text-[10px] text-primary-600 font-medium italic">
+                    Click to match group
+                  </span>
+                </div>
+              </button>
+            </div>
           )
         })}
       </div>
-    </section>
+    </Card>
   )
 }

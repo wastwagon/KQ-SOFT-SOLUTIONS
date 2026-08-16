@@ -3,6 +3,9 @@
  * Used on Reconcile and Report pages.
  */
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
+import Button from './ui/Button'
+import Card from './ui/Card'
 
 const HELP_CONTENT = {
   cashBookVsBank: {
@@ -72,26 +75,30 @@ const HELP_CONTENT = {
   },
 }
 
-export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 'report' | 'full' }) {
+export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 'report' | 'review' | 'full' }) {
   const [open, setOpen] = useState(false)
   const showCashBook = variant === 'reconcile' || variant === 'full'
   const showReportTerms = variant === 'report' || variant === 'full'
   const showDataVsAttachments = variant === 'report' || variant === 'full'
-  const showUnmatchedHints = variant === 'reconcile' || variant === 'full'
+  const showUnmatchedHints = variant === 'reconcile' || variant === 'review' || variant === 'full'
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50/60 text-sm shadow-sm">
-      <button
+    <Card noPadding className="text-sm">
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-gray-800 hover:bg-gray-100/80 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
+        className="w-full !justify-between px-4 py-3 h-auto rounded-xl font-semibold text-gray-800"
         aria-expanded={open}
       >
         <span className="text-primary-600">What do these terms mean?</span>
-        <span className="text-gray-400 text-xs">{open ? '▼' : '▶'}</span>
-      </button>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      </Button>
       {open && (
-        <div className="px-4 pb-4 pt-0 space-y-4 border-t border-gray-200 mt-0 pt-3">
+        <div className="px-4 pb-4 pt-0 space-y-4 border-t border-border mt-0 pt-3">
           {showCashBook && (
             <section>
               <h4 className="font-medium text-gray-800 mb-2">{HELP_CONTENT.cashBookVsBank.title}</h4>
@@ -145,6 +152,6 @@ export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

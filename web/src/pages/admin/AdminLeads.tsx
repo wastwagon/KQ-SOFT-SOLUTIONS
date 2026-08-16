@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Inbox, Mail } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import Alert from '../../components/ui/Alert'
 import Button from '../../components/ui/Button'
+import Badge from '../../components/ui/Badge'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import PageHeader from '../../components/layout/PageHeader'
+import EmptyState from '../../components/ui/EmptyState'
+import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { useToast } from '../../components/ui/Toast'
@@ -60,99 +65,104 @@ export default function AdminLeads() {
         }
       />
 
-      {isLoading && (
-        <Card>
-          <p className="text-sm text-gray-500">Loading leads…</p>
-        </Card>
-      )}
+      {isLoading && <PageBodySkeleton label="Loading leads" />}
 
       {isError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 max-w-xl">
-          {error instanceof Error ? error.message : 'Could not load leads.'}
-        </div>
+        <Alert
+          tone="error"
+          title="Could not load leads"
+          onRetry={() => void refetch()}
+        >
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </Alert>
       )}
 
       {!isLoading && !isError && leads.length === 0 && (
         <Card>
-          <div className="flex items-start gap-3">
-            <Inbox className="w-5 h-5 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">No leads yet</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Subscriptions from the landing page and bank-feed waitlist will appear here.
-              </p>
-            </div>
-          </div>
+          <EmptyState
+            icon={<Inbox className="w-6 h-6" />}
+            title="No leads yet"
+            description="Subscriptions from the landing page and bank-feed waitlist will appear here."
+          />
         </Card>
       )}
 
       {leads.length > 0 && (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                  <th className="py-2 pr-3 font-semibold">When</th>
-                  <th className="py-2 pr-3 font-semibold">Source</th>
-                  <th className="py-2 pr-3 font-semibold">Email</th>
-                  <th className="py-2 pr-3 font-semibold">Details</th>
-                  <th className="py-2 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-gray-50 align-top">
-                    <td className="py-3 pr-3 text-gray-600 whitespace-nowrap">
-                      {formatDate(lead.createdAt)}
-                    </td>
-                    <td className="py-3 pr-3">
-                      <span className="inline-flex px-2 py-0.5 rounded-md bg-gray-100 text-xs font-medium text-gray-700">
-                        {lead.source}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-3">
-                      <a
-                        href={`mailto:${lead.email}`}
-                        className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-700 font-medium"
+        <Card noPadding>
+          <Table>
+            <TableHead>
+              <tr>
+                <TableTh>When</TableTh>
+                <TableTh>Source</TableTh>
+                <TableTh>Email</TableTh>
+                <TableTh>Details</TableTh>
+                <TableTh>Status</TableTh>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {leads.map((lead) => (
+                <TableRow key={lead.id} className="align-top">
+                  <TableTd className="whitespace-nowrap">
+                    {formatDate(lead.createdAt)}
+                  </TableTd>
+                  <TableTd>
+                    <Badge tone="neutral" size="sm">
+                      {lead.source}
+                    </Badge>
+                  </TableTd>
+                  <TableTd>
+                    <a
+                      href={`mailto:${lead.email}`}
+                      className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      {lead.email}
+                    </a>
+                    {(lead.name || lead.company) && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[lead.name, lead.company].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </TableTd>
+                  <TableTd className="max-w-xs">
+                    {lead.message || '—'}
+                  </TableTd>
+                  <TableTd>
+                    {lead.contactedAt ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        className="text-green-700"
+                        onClick={() => markMutation.mutate({ id: lead.id, contacted: false })}
+                        isLoading={
+                          markMutation.isPending &&
+                          markMutation.variables?.id === lead.id &&
+                          markMutation.variables?.contacted === false
+                        }
                       >
-                        <Mail className="w-3.5 h-3.5" />
-                        {lead.email}
-                      </a>
-                      {(lead.name || lead.company) && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {[lead.name, lead.company].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-3 pr-3 text-gray-600 max-w-xs">
-                      {lead.message || '—'}
-                    </td>
-                    <td className="py-3">
-                      {lead.contactedAt ? (
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-green-700 hover:underline"
-                          onClick={() => markMutation.mutate({ id: lead.id, contacted: false })}
-                        >
-                          Contacted · undo
-                        </button>
-                      ) : (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => markMutation.mutate({ id: lead.id, contacted: true })}
-                          disabled={markMutation.isPending}
-                        >
-                          Mark contacted
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        Contacted · undo
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => markMutation.mutate({ id: lead.id, contacted: true })}
+                        isLoading={
+                          markMutation.isPending &&
+                          markMutation.variables?.id === lead.id &&
+                          markMutation.variables?.contacted === true
+                        }
+                      >
+                        Mark contacted
+                      </Button>
+                    )}
+                  </TableTd>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       )}
     </div>
