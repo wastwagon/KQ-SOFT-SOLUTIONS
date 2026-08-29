@@ -1,21 +1,20 @@
 /**
- * Ghana manual BRS workbook netting (Groups 2–3).
+ * Ghana manual BRS workbook netting (Groups 2–3) and Working (??) schedule.
  *
- * Mirrors preparer draft schedules:
- * - Section A: true unpresented (no bank movement yet)
- * - Section B: timing unmatched payments (bank movement exists but not matched)
- * - Section C: bank offsets paired to section B (subtract from Group 2)
- * - Group 3: second-round payment ↔ bank pairs (net offset reduces Group 2 intermediate)
+ * Payment groupings (see ghanaBrsPaymentGroups.ts) are permanent product rules:
+ * - section_a: true unpresented
+ * - timing_open: open B₁ → Working (??) unpresented
+ * - timing_bank_linked: preparer ** (cheque already on bank)
+ * - round2_contra / judgment: kept off Working unpresented
  *
- * Opt-in via Ecobank profile `workbookNetting`. When disabled, callers keep legacy behaviour.
- * When enabled, accounts where Group 3 offset exceeds Group 2 still resolve to section A (max guard).
+ * Face (√): Groups 2–3 netting. Working (??): A + open timing, BOD shifted by same delta.
+ * Opt-in via Ecobank profile workbookNetting / project mode on|working|off.
  */
 import {
   type ClearingTxLike,
   chequeOrRefLink,
   isEcobankClearingCredit,
   isEcobankHseStatutoryDepositLine,
-  paymentHasBankCounterpart,
   paymentHasCrossChqWithdrawalCounterpart,
   paymentHasNamedWithdrawalCounterpart,
   paymentChqMentionedOnBankStatement,
@@ -23,37 +22,25 @@ import {
   paymentHasTransferCounterpart,
 } from './ecobankClearingMatcher.js'
 import {
+  classifyGhanaBrsPayment,
+  isManualB1TimingPayment,
+  isManualSectionAPayment,
+  isRound2ContraPayment,
+} from './ghanaBrsPaymentGroups.js'
+import {
   WORKBOOK_B1_FUEL_AMOUNT,
   WORKBOOK_B1_FUEL_PAYEE_RE,
-  WORKBOOK_B1_SMALL_AMOUNTS,
-  WORKBOOK_B1_TIMING_CHQ_NOS,
-  WORKBOOK_JUDGMENT_PAYEE_RE,
   WORKBOOK_ROUND2_CONTRA_AMOUNTS,
 } from './ghanaBrsWorkbookNettingConfig.js'
 
-/** True unpresented (section A): aligns with legacy Ecobank unpresented row rules. */
-function isTrueUnpresentedPayment(
-  payment: ClearingTxLike,
-  bankDebits: ClearingTxLike[],
-  bankCredits: ClearingTxLike[],
-  amountTolerance = 0.01
-): boolean {
-  return !paymentHasBankCounterpart(payment, bankDebits, bankCredits, amountTolerance)
-}
-
-/** Manual block B₁: allowances, fuel timing, and other preparer-listed timing cheques. */
-function isManualB1TimingPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
-  if (isB1SmallTimingPayment(payment, amountTolerance)) return true
-  const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
-  if (
-    Math.abs(payment.amount - WORKBOOK_B1_FUEL_AMOUNT) <= amountTolerance &&
-    WORKBOOK_B1_FUEL_PAYEE_RE.test(text)
-  ) {
-    return true
-  }
-  if (payment.chqNo?.trim() && WORKBOOK_B1_TIMING_CHQ_NOS.has(payment.chqNo.trim())) return true
-  return false
-}
+export {
+  classifyGhanaBrsPayment,
+  computeWorkingPaperFromClearingOffsets,
+  isManualB1TimingPayment,
+  isManualSectionAPayment,
+  summarizeGhanaBrsPaymentGroups,
+} from './ghanaBrsPaymentGroups.js'
+export type { GhanaBrsPaymentGroup, GhanaBrsPaymentGroupsSummary } from './ghanaBrsPaymentGroups.js'
 
 function isManualFuelB1Payment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
   const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
@@ -61,36 +48,6 @@ function isManualFuelB1Payment(payment: ClearingTxLike, amountTolerance = 0.01):
     Math.abs(payment.amount - WORKBOOK_B1_FUEL_AMOUNT) <= amountTolerance &&
     WORKBOOK_B1_FUEL_PAYEE_RE.test(text)
   )
-}
-
-/** Preparer judgment lines kept off the manual Groups 2–3 netting blocks. */
-function isPreparerJudgmentPayment(payment: ClearingTxLike): boolean {
-  const text = [payment.name, payment.details].filter(Boolean).join(' ').toUpperCase()
-  return WORKBOOK_JUDGMENT_PAYEE_RE.test(text)
-}
-
-/**
- * Manual section A (4-row block): no chq mention on bank yet; excludes B₁ timing list.
- */
-function isManualSectionAPayment(
-  payment: ClearingTxLike,
-  bankDebits: ClearingTxLike[],
-  bankCredits: ClearingTxLike[],
-  amountTolerance = 0.01
-): boolean {
-  if (isPreparerJudgmentPayment(payment)) return false
-  if (isManualB1TimingPayment(payment, amountTolerance)) return false
-  if (paymentChqMentionedOnBankStatement(payment, bankDebits, bankCredits)) return false
-  return isTrueUnpresentedPayment(payment, bankDebits, bankCredits, amountTolerance)
-}
-
-/**
- * Manual B₁ often lists small allowance/utility cheques separately from the 4-row unpresented block.
- * Reclassify for netting only (display rows stay on legacy unpresented list).
- */
-function isB1SmallTimingPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
-  const a = payment.amount
-  return WORKBOOK_B1_SMALL_AMOUNTS.some((amt) => Math.abs(a - amt) <= amountTolerance)
 }
 
 export interface WorkbookNettingPair {
@@ -155,12 +112,6 @@ function isRound1ClearingOffsetBank(line: ClearingTxLike): boolean {
 
 function isRound1BlockCBank(line: ClearingTxLike): boolean {
   return isRound1WithdrawalOffsetBank(line) || isRound1ClearingOffsetBank(line)
-}
-
-/** Manual block E contras are commonly 3,000 / PAYE-sized (~3,214.89) payments. */
-function isRound2ContraPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
-  const a = payment.amount
-  return WORKBOOK_ROUND2_CONTRA_AMOUNTS.some((amt) => Math.abs(a - amt) <= amountTolerance)
 }
 
 /** Manual block D: 3,000 withdrawals and ~3,214 inward clearing lines only (not FT / payroll). */
@@ -266,7 +217,7 @@ function greedyRound1ChequeOffsets(
       }
       if (
         isRound1ClearingOffsetBank(bank) &&
-        isB1SmallTimingPayment(payment, amountTolerance)
+        isManualB1TimingPayment(payment, amountTolerance)
       ) {
         usedBank.add(bank.id)
         pairs.push({ paymentId: payment.id, bankId: bank.id, amount: bank.amount })
@@ -413,6 +364,41 @@ export function computeWorkbookNettedUnpresented(
       amount: p.bankDebit.amount,
     })),
     round2Pairs,
+  }
+}
+
+/**
+ * Preparer `??` working-paper unpresented:
+ *   section A (true unpresented) + open B₁ timing (not bank-linked / **).
+ * Companion bank-only debits = face (√) BOD + (workingUnp − faceUnp).
+ */
+export function computeWorkingPaperUnpresented(
+  unmatchedPayments: ClearingTxLike[],
+  allBankDebits: ClearingTxLike[],
+  allBankCredits: ClearingTxLike[],
+  amountTolerance = 0.01
+): {
+  unpresentedChequesTotal: number
+  sectionATotal: number
+  openB1Total: number
+  sectionARows: ClearingTxLike[]
+  openB1Rows: ClearingTxLike[]
+} {
+  const sectionARows: ClearingTxLike[] = []
+  const openB1Rows: ClearingTxLike[] = []
+  for (const p of unmatchedPayments) {
+    const group = classifyGhanaBrsPayment(p, allBankDebits, allBankCredits, amountTolerance)
+    if (group === 'section_a') sectionARows.push(p)
+    else if (group === 'timing_open') openB1Rows.push(p)
+  }
+  const sectionATotal = sectionARows.reduce((s, t) => s + t.amount, 0)
+  const openB1Total = openB1Rows.reduce((s, t) => s + t.amount, 0)
+  return {
+    unpresentedChequesTotal: sectionATotal + openB1Total,
+    sectionATotal,
+    openB1Total,
+    sectionARows,
+    openB1Rows,
   }
 }
 

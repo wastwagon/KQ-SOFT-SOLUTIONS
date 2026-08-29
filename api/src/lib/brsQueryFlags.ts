@@ -9,7 +9,8 @@ export function parseWorkbookNettingQuery(value: unknown): boolean | undefined {
   return undefined
 }
 
-export type WorkbookNettingMode = 'inherit' | 'on' | 'off'
+/** `working` = preparer ?? schedule (section A + open B₁); `on` = √ face Groups 2–3. */
+export type WorkbookNettingMode = 'inherit' | 'on' | 'off' | 'working'
 
 export type WorkbookNettingSource = 'query' | 'project' | 'org' | 'platform' | 'env' | 'off'
 
@@ -17,6 +18,7 @@ export function normalizeWorkbookNettingMode(value: unknown): WorkbookNettingMod
   const v = String(value ?? '').trim().toLowerCase()
   if (v === 'on') return 'on'
   if (v === 'off') return 'off'
+  if (v === 'working' || v === '??' || v === 'working-paper') return 'working'
   return 'inherit'
 }
 
@@ -44,11 +46,16 @@ export function resolveWorkbookNetting(opts?: {
   platformDefault?: boolean | null | undefined
 }): WorkbookNettingResolution {
   const mode = normalizeWorkbookNettingMode(opts?.projectMode)
+  const q = String(opts?.queryValue ?? '').trim().toLowerCase()
+  if (q === 'working' || q === '??' || q === 'working-paper') {
+    return { enabled: true, source: 'query', mode: 'working' }
+  }
   const parsed = parseWorkbookNettingQuery(opts?.queryValue)
-  if (parsed === true) return { enabled: true, source: 'query', mode }
+  if (parsed === true) return { enabled: true, source: 'query', mode: mode === 'working' ? 'working' : mode }
   if (parsed === false) return { enabled: false, source: 'query', mode }
 
   if (mode === 'on') return { enabled: true, source: 'project', mode }
+  if (mode === 'working') return { enabled: true, source: 'project', mode }
   if (mode === 'off') return { enabled: false, source: 'project', mode }
 
   if (opts?.orgDefault === true) return { enabled: true, source: 'org', mode }

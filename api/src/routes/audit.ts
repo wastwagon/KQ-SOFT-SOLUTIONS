@@ -14,6 +14,7 @@ const ACTION_LABELS: Record<string, string> = {
   match_created: 'Match created',
   match_deleted: 'Match removed',
   match_bulk: 'Bulk match',
+  match_auto_complete: 'Auto-complete matching',
   report_generated: 'Report generated',
   report_exported: 'Report exported',
   project_reopened: 'Project reopened',

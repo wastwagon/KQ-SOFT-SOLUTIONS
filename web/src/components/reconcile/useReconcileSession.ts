@@ -8,7 +8,6 @@ import {
   isSubscriptionInactiveError,
   unlessSubscriptionInactive,
 } from '../../lib/api'
-import { runPhasedAutoMatchRounds } from '../../lib/phasedAutoMatch'
 import { RECONCILE_CLIENT_LIMIT, RECONCILE_CLIENT_MAX_LIMIT } from '../../lib/importLimits'
 import { useToast } from '../ui/Toast'
 import type {
@@ -348,20 +347,16 @@ export function useReconcileSession(projectId: string): ReconcileSession {
   })
 
   const phasedAutoMatchMutation = useMutation<{ totalMatched: number; rounds: number }, Error, void>({
-    mutationFn: () =>
-      runPhasedAutoMatchRounds(
-        () =>
-          reconcile.get(projectId, {
-            bankAccountId: effectiveBankAccountId || undefined,
-            limit: reconcileLimit,
-            suggestionLimit,
-            useDate: matchParams.useDate,
-            useDocRef: matchParams.useDocRef,
-            useChequeNo: matchParams.useChequeNo,
-          }) as Promise<ReconcileApiResponse>,
-        (matches) =>
-          reconcile.createMatchBulk(projectId, { matches }) as Promise<{ created: number }>
-      ),
+    mutationFn: async () => {
+      setReconcileLimit(RECONCILE_CLIENT_MAX_LIMIT)
+      const resp = await reconcile.createMatchAutoComplete(projectId, {
+        bankAccountId: effectiveBankAccountId || undefined,
+        useDate: matchParams.useDate,
+        useDocRef: matchParams.useDocRef,
+        useChequeNo: matchParams.useChequeNo,
+      })
+      return { totalMatched: resp.created ?? 0, rounds: resp.rounds ?? 0 }
+    },
     onSuccess: (resp) => {
       invalidateAll()
       setBulkSelected(new Set())

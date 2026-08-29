@@ -1,7 +1,10 @@
 # Bank Reconciliation SaaS - Development (hot reload)
-# Run: docker compose -f docker-compose.development.yml up
+# Run: docker compose -f docker-compose.development.yml up -d
+# Docker Desktop project name: kqsoftsolutions
 #
 # KQ SOFT SOLUTIONS
+
+name: kqsoftsolutions
 
 services:
   api:
@@ -9,7 +12,7 @@ services:
       context: ./api
       dockerfile: Dockerfile.development
     ports:
-      - "${API_PORT:-9001}:9001"
+      - "${API_PORT:-9101}:9001"
     tty: true
     stdin_open: true
     environment:
@@ -32,8 +35,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    # Regenerate Prisma client, run migrations, then start dev server.
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+    # Fresh DBs have no baseline migration; migrate deploy fails on add_project_slug
+    # (projects table missing). db push matches production empty-DB bootstrap.
+    command: sh -c "npx prisma generate && npx prisma db push --skip-generate && npm run dev"
     restart: unless-stopped
 
   parse-worker:

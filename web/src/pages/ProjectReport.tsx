@@ -383,7 +383,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               : null
 
   const updateBrsSettingsMutation = useMutation({
-    mutationFn: (mode: 'inherit' | 'on' | 'off') => projects.updateBrsSettings(projectId, { workbookNettingMode: mode }),
+    mutationFn: (mode: 'inherit' | 'on' | 'off' | 'working') =>
+      projects.updateBrsSettings(projectId, { workbookNettingMode: mode }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
@@ -629,23 +630,40 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {ecobankBrsProfile && (
             <div className="inline-flex min-h-[40px] flex-col justify-center gap-0.5 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
               <label
-                className="inline-flex items-center gap-2"
-                title="Apply manual workbook Groups 2–3 netting to unpresented cheques (Ecobank Ghana BRS). Saved on this project for your whole team."
+                className="inline-flex flex-col gap-1"
+                title="Ecobank Ghana BRS schedule: Face (√) uses Groups 2–3 netting; Working (??) uses section A + open B₁ timing with companion bank-only debits."
               >
-                <input
-                  type="checkbox"
-                  checked={workbookNettingEnabled}
+                <span className="text-xs text-gray-500">BRS schedule</span>
+                <select
+                  className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                  value={
+                    workbookNettingMode === 'working'
+                      ? 'working'
+                      : workbookNettingMode === 'off'
+                        ? 'off'
+                        : workbookNettingMode === 'on'
+                          ? 'on'
+                          : workbookNettingEnabled
+                            ? 'on'
+                            : 'off'
+                  }
                   disabled={updateBrsSettingsMutation.isPending}
-                  onChange={(e) => updateBrsSettingsMutation.mutate(e.target.checked ? 'on' : 'off')}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                Workbook netting
+                  onChange={(e) =>
+                    updateBrsSettingsMutation.mutate(
+                      e.target.value as 'on' | 'off' | 'working'
+                    )
+                  }
+                >
+                  <option value="on">Face (√ netting)</option>
+                  <option value="working">Working (??)</option>
+                  <option value="off">Off (legacy)</option>
+                </select>
               </label>
               {workbookNettingSourceLabel && (
-                <span className="text-xs text-gray-500 pl-6">
+                <span className="text-xs text-gray-500">
                   {workbookNettingMode === 'inherit'
                     ? `Using ${workbookNettingSourceLabel}`
-                    : `Project override (${workbookNettingEnabled ? 'on' : 'off'})`}
+                    : `Project override (${workbookNettingMode === 'working' ? 'working ??' : workbookNettingEnabled ? 'face √' : 'off'})`}
                   {workbookNettingMode !== 'inherit' && (
                     <>
                       {' · '}
@@ -665,6 +683,49 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 </span>
               )}
             </div>
+          )}
+          {data?.paymentGroups && (
+            <details className="max-w-xl rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 print:hidden">
+              <summary className="cursor-pointer font-medium text-slate-800">
+                Why Face (√) and Working (??) differ
+              </summary>
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                {data.paymentGroups.scheduleExplanation}
+              </p>
+              <ul className="mt-2 space-y-1.5 text-xs">
+                {data.paymentGroups.buckets.map((b) => (
+                  <li key={b.group} className="border-t border-slate-100 pt-1.5">
+                    <span className="font-medium text-slate-800">{b.label}</span>
+                    {' · '}
+                    {b.count} item{b.count === 1 ? '' : 's'} ·{' '}
+                    {b.total.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                    <div className="text-slate-500">{b.meaning}</div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-slate-500">
+                Working unpresented build-up:{' '}
+                {data.paymentGroups.sectionATotal.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{' '}
+                (A) +{' '}
+                {data.paymentGroups.openTimingTotal.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{' '}
+                (open timing) ={' '}
+                <strong>
+                  {data.paymentGroups.workingUnpresentedTotal.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </strong>
+              </p>
+            </details>
           )}
           <label className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
             <input

@@ -7,6 +7,7 @@ export type AuditAction =
   | 'match_deleted'
   | 'matches_cleared'
   | 'match_bulk'
+  | 'match_auto_complete'
   | 'report_generated'
   | 'report_exported'
   | 'project_reopened'

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeWorkbookNettedUnpresented,
+  computeWorkingPaperUnpresented,
   unpresentedWithOptionalWorkbookNetting,
   workbookBankOnlyExcludedBankIds,
 } from './ghanaBrsWorkbookNetting.js'
@@ -163,5 +164,27 @@ describe('computeWorkbookNettedUnpresented', () => {
     })
     expect(result.total).toBe(1234.56)
     expect(result.workbook).toBeUndefined()
+  })
+})
+
+describe('computeWorkingPaperUnpresented (?? schedule)', () => {
+  it('sums section A + open B₁ timing (Account901 ?? = 17,825.86 shape)', () => {
+    const payments = [
+      tx({ id: 'a1', amount: 4839.56, chqNo: '926073', name: 'ECG' }),
+      tx({ id: 'a2', amount: 650, chqNo: '926072' }),
+      tx({ id: 'a3', amount: 510.7, chqNo: '926023' }),
+      tx({ id: 'a4', amount: 2000, chqNo: '925928' }),
+      tx({ id: 'b1', amount: 950, chqNo: '926101', name: 'Samuel Narh' }),
+      tx({ id: 'b2', amount: 950, chqNo: '926058', name: 'Samuel Narh' }),
+      tx({ id: 'b3', amount: 975.2, chqNo: '926105', name: 'Skones' }),
+      tx({ id: 'b4', amount: 975.2, chqNo: '926061', name: 'Skones' }),
+      tx({ id: 'b5', amount: 975.2, chqNo: '925942', name: 'Skones' }),
+      tx({ id: 'b6', amount: 5000, chqNo: '926075', name: 'Royal Adjei' }),
+      tx({ id: 'j1', amount: 2981.81, chqNo: '926092', name: 'GRA' }),
+    ]
+    const result = computeWorkingPaperUnpresented(payments, [], [])
+    expect(result.sectionATotal).toBeCloseTo(8000.26, 2)
+    expect(result.openB1Total).toBeCloseTo(9825.6, 2)
+    expect(result.unpresentedChequesTotal).toBeCloseTo(17825.86, 2)
   })
 })

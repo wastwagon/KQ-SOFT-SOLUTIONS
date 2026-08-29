@@ -92,6 +92,11 @@ import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { heavyOrgRouteLimiter } from '../middleware/heavyRouteLimiter.js'
 import { logger } from '../middleware/logging.js'
+import {
+  applyDuplicateWarnings,
+  clearCorroboratedDuplicateWarnings,
+} from '../services/suggestionDuplicateFlags.js'
+import { runProjectAutoComplete } from '../services/autoCompleteMatching.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -494,6 +499,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     ? Math.max(matchOptions.dateWindowDays, ecobankProfile.clearingDateWindowDays)
     : matchOptions.dateWindowDays
 
+  const { inversion: sideInversion, receiptBank, paymentBank } = resolveMatchSides({
+    receipts: receiptsFull,
+    payments: paymentsFull,
+    credits: creditsFull,
+    debits: debitsFull,
+  })
+
   const annotateSuggestions = (
     list: {
       cashBookTx: Tx
@@ -526,7 +538,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const scbSweepSuggestions = scbProfile.active
     ? suggestScbSweepMatches(
         receiptsFull,
-        creditsFull,
+        receiptBank,
         matchedCbIds,
         matchedBankIds,
         matchOptions.amountTolerance
@@ -536,35 +548,35 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     ? mergeScbPaymentSuggestions(
         suggestScbInwardClearingDebitMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
         ),
         suggestScbInwardClearingCrossRefMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
         ),
         suggestScbInwardClearingAlternateDebitMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
         ),
         suggestScbInwardClearingFooterAmountMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
         ),
         suggestScbWithdrawnToInwClgMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
@@ -575,7 +587,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const scbReturnedChequeSuggestions = scbProfile.active
     ? suggestScbReturnedChequeCreditMatches(
         receiptsFull,
-        creditsFull,
+        receiptBank,
         matchedCbIds,
         matchedBankIds,
         matchOptions.amountTolerance
@@ -584,7 +596,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const scbCashWithdrawalSuggestions = scbProfile.active
     ? suggestScbCashWithdrawalMatches(
         paymentsFull,
-        debitsFull,
+        paymentBank,
         matchedCbIds,
         matchedBankIds,
         matchOptions.amountTolerance
@@ -593,7 +605,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const scbChqRefSuggestions = scbProfile.active
     ? suggestScbChqRefDebitMatches(
         paymentsFull,
-        debitsFull,
+        paymentBank,
         matchedCbIds,
         matchedBankIds,
         matchOptions.amountTolerance
@@ -602,7 +614,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const scbOtRefSuggestions = scbProfile.active
     ? suggestScbOtRefMatches(
         paymentsFull,
-        debitsFull,
+        paymentBank,
         matchedCbIds,
         matchedBankIds,
         matchOptions.amountTolerance
@@ -623,14 +635,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       ? mergeGhanaRegionalPaymentSuggestions(
           suggestGcbChequeWithdrawalMatches(
             paymentsFull,
-            debitsFull,
+            paymentBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestGcbBogChqMatches(
             paymentsFull,
-            debitsFull,
+            paymentBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
@@ -641,7 +653,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     regionalActive && gcbProfile.active
       ? suggestGcbCashDepositMatches(
           receiptsFull,
-          creditsFull,
+          receiptBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
@@ -651,7 +663,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     regionalActive && nibProfile.active
       ? suggestNibInwardChequeMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
@@ -662,14 +674,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       ? mergeGhanaRegionalReceiptSuggestions(
           suggestNibCashDepositMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestNibTelexMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
@@ -681,21 +693,21 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       ? mergeGhanaRegionalPaymentSuggestions(
           suggestPrudentialInwardClearingMatches(
             paymentsFull,
-            debitsFull,
+            paymentBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestPrudentialChequeWithdrawalMatches(
             paymentsFull,
-            debitsFull,
+            paymentBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestPrudentialNrtMatches(
             paymentsFull,
-            debitsFull,
+            paymentBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
@@ -706,7 +718,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     regionalActive && prudentialProfile.active
       ? suggestPrudentialCreditTypeMatches(
           receiptsFull,
-          creditsFull,
+          receiptBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
@@ -717,21 +729,21 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       ? mergeGhanaRegionalReceiptSuggestions(
           suggestAbsaInvestmentCreditMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestAbsaEboxCreditMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestAbsaFtMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
@@ -742,7 +754,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     regionalActive && absaProfile.active
       ? suggestAbsaFtMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
@@ -752,7 +764,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     regionalActive && boaProfile.active
       ? suggestBoaInwardChequeMatches(
           paymentsFull,
-          debitsFull,
+          paymentBank,
           matchedCbIds,
           matchedBankIds,
           matchOptions.amountTolerance
@@ -763,21 +775,21 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       ? mergeGhanaRegionalReceiptSuggestions(
           suggestBoaCashDepositMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestBoaMaturityMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
           ),
           suggestBoaInterestMatches(
             receiptsFull,
-            creditsFull,
+            receiptBank,
             matchedCbIds,
             matchedBankIds,
             matchOptions.amountTolerance
@@ -786,12 +798,6 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       : []
 
   // Matching suggestions for all plans (intelligent matching clues)
-  const { inversion: sideInversion, receiptBank, paymentBank } = resolveMatchSides({
-    receipts: receiptsFull,
-    payments: paymentsFull,
-    credits: creditsFull,
-    debits: debitsFull,
-  })
   const standardReceiptSuggestions = suggestMatches(
     receiptsFull,
     receiptBank,
@@ -844,7 +850,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const ecobankPaymentDebitSuggestions = ecobankProfile.active
     ? suggestEcobankPaymentDebitMatches(
         paymentsFull,
-        debitsFull,
+        paymentBank,
         matchedCbIds,
         matchedBankIds,
         matchOptions.amountTolerance
@@ -952,6 +958,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   }
   addRuleSuggestions(receiptsFull, receiptBank, receiptSuggestions)
   addRuleSuggestions(paymentsFull, paymentBank, paymentSuggestions)
+
+  applyDuplicateWarnings(receiptSuggestions)
+  applyDuplicateWarnings(paymentSuggestions)
+  clearCorroboratedDuplicateWarnings(receiptSuggestions)
+  clearCorroboratedDuplicateWarnings(paymentSuggestions)
 
   let splitSuggestions: { receipts: SuggestedSplitMatch[]; payments: SuggestedSplitMatch[] } = {
     receipts: [],
@@ -1151,6 +1162,44 @@ const multiMatchSchema = z.union([
     bankTransactionIds: z.array(z.string()).min(2).max(25),
   }),
 ])
+
+router.post('/:projectId/match/auto-complete', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canReconcile(role)) {
+    return res.status(403).json({ error: 'Insufficient permission to reconcile' })
+  }
+  const orgId = req.auth!.orgId
+  const projectId = await resolveProjectId(req.params.projectId, orgId)
+  if (!projectId) return res.status(404).json({ error: 'Project not found' })
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId },
+  })
+  if (!project) return res.status(404).json({ error: 'Project not found' })
+  if (!isProjectEditable(project.status)) {
+    return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
+  }
+  try {
+    const bankAccountId = (req.query.bankAccountId as string) || undefined
+    const useDate = parseBooleanQuery(req.query.useDate, true)
+    const useDocRef = parseBooleanQuery(req.query.useDocRef, true)
+    const useChequeNo = parseBooleanQuery(req.query.useChequeNo, true)
+    const result = await runProjectAutoComplete(projectId, orgId, {
+      bankAccountId,
+      useDate,
+      useDocRef,
+      useChequeNo,
+      userId: req.auth!.userId,
+    })
+    res.status(201).json(result)
+  } catch (e) {
+    const msg = (e as Error).message
+    if (msg.includes('Standard plan')) {
+      return res.status(403).json({ error: msg })
+    }
+    logger.error({ err: e, projectId }, 'auto-complete matching failed')
+    res.status(500).json({ error: msg || 'Auto-complete matching failed' })
+  }
+})
 
 router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
   const role = req.auth!.role

@@ -12,6 +12,7 @@ import { canAddTransactions, adjustTransactions } from './usage.js'
 import { classifyBySourceSign, summarizeSignBuckets, type SourceDocumentType } from './signClassifier.js'
 import { SIGN_WARNINGS_PREVIEW_MAX } from '../config/importLimits.js'
 import type { ParseResult } from './parser.js'
+import { purgeOrphanMatches } from './purgeOrphanMatches.js'
 
 export type MappingInput = Record<string, number>
 
@@ -147,7 +148,7 @@ export async function applyDocumentMapping(
       const extracted = extractChqNoFromDescription(details)
       if (extracted) chqNo = extracted
     }
-    const fp = `${i}|${parseImportedDate(getVal(dateField))?.toISOString() ?? 'null'}|${normalizedAmount}|${(getVal('name') ?? '').toString().trim()}|${(details ?? '').trim()}|${(getVal('doc_ref') ?? '').toString().trim()}|${(chqNo ?? '').trim()}`
+    const fp = `${parseImportedDate(getVal(dateField))?.toISOString() ?? 'null'}|${normalizedAmount}|${(getVal('name') ?? '').toString().trim()}|${(details ?? '').trim()}|${(getVal('doc_ref') ?? '').toString().trim()}|${(chqNo ?? '').trim()}`
     if (duplicateRowFingerprints.has(fp)) {
       skippedDuplicateRows++
       continue
@@ -193,6 +194,7 @@ export async function applyDocumentMapping(
       data: transactions.map((t) => ({ documentId, ...t })),
     })
   }
+  await purgeOrphanMatches(projectId)
   await prisma.project.update({
     where: { id: projectId },
     data: { status: 'mapping' },

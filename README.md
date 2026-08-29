@@ -47,7 +47,7 @@ Then use **http://localhost:8080** (web) and **http://localhost:9001** (API), or
 
 Then restart with the same `-f docker-compose.development.yml` you used to start.
 
-**Production (VPS / Coolify):** **`docker-compose.yml`** is the production stack (same as **`docker-compose.prod.yml`**). Step-by-step: **[docs/DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md)** (includes GitHub remote `wastwagon/kqsoftwaresolutions`).
+**Production (VPS / Coolify):** **`docker-compose.yml`** is the production stack (same as **`docker-compose.prod.yml`**). Step-by-step: **[docs/DEPLOY_COOLIFY.md](docs/DEPLOY_COOLIFY.md)** (GitHub remote `wastwagon/KQ-SOFT-SOLUTIONS`).
 
 ---
 

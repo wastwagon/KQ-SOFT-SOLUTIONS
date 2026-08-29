@@ -280,15 +280,16 @@ export default function ProjectReconcile({
           {data.sideInversion?.inverted && canReconcile && (
             <p>
               <strong>Cash-book sides look swapped</strong> — this export appears to flip receipts with
-              bank debits and payments with bank credits. Suggestions are paired on the crossed sides
-              automatically. {data.sideInversion.reason}
+              bank debits and payments with bank credits. Suggestions and <strong>Auto-match all</strong>{' '}
+              use the crossed sides automatically. {data.sideInversion.reason}
             </p>
           )}
           {(data.duplicateChequeWarnings?.length ?? 0) > 0 && canReconcile && (
             <p>
               <strong>Duplicate cheque numbers in cash book:</strong>{' '}
-              {data.duplicateChequeWarnings!.map((w) => `${w.chqNo} (×${w.count})`).join(', ')}. Match
-              each row carefully — bulk match skips ambiguous pairs.
+              {data.duplicateChequeWarnings!.map((w) => `${w.chqNo} (×${w.count})`).join(', ')}. Use{' '}
+              <strong>Auto-match all</strong> to pair by amount + reference; review any rows still open
+              afterward.
             </p>
           )}
         </ReconcileNotices>

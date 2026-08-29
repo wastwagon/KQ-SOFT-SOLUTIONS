@@ -15,6 +15,7 @@ import {
   ecobankClearingLineHasPaymentCounterpart,
   creditHasCashBookCounterpart,
   isCreditReclassifiedAsDebit,
+  isTreasuryBillReclassifiedAsDebit,
   suggestEcobankPaymentDebitMatches,
   suggestEcobankStatutoryDepositMatches,
   bankAccountsForScope,
@@ -272,13 +273,37 @@ describe('computeBankOnlyCreditsTotal', () => {
         amount: 1247.1,
         details: 'CHEQUE CLEARING - OUTWARD LCY OMNI BANK CHQ# 206046',
       }),
-      tx({ id: 'c4', amount: 114947, details: 'TREASURY BILLS MATURED 182-DAY' }),
+      tx({ id: 'c4', amount: 114947, details: 'TREASURY BILLS MATURED 182-DAY Bill AUC 1963 IFO LORDSHIP' }),
     ]
     expect(isCreditReclassifiedAsDebit(credits[0]!)).toBe(true)
     expect(isCreditReclassifiedAsDebit(credits[1]!)).toBe(true)
     expect(isCreditReclassifiedAsDebit(credits[2]!)).toBe(false)
+    expect(isCreditReclassifiedAsDebit(credits[3]!)).toBe(false)
     const total = computeBankOnlyCreditsTotal(credits, [], [], 0)
     expect(total).toBe(1247.1 + 114947)
+  })
+
+  it('reclassifies short-form treasury Auct. maturities to bank-only debits', () => {
+    const credits = [
+      tx({ id: 'a1', amount: 100398.83, details: 'TREASURY BILLS MATURED 91-DAY Auct.' }),
+      tx({
+        id: 'a2',
+        amount: 114946.61,
+        details: 'TREASURY BILLS MATURED 182-DAY Auct. 1989@11.6 Due 13-JUL-2026',
+      }),
+      tx({
+        id: 'a3',
+        amount: 100399,
+        details: 'TREASURY BILLS MATURED 91-DAY Bill AUC 1976 MAT @ 10.2',
+      }),
+    ]
+    expect(isTreasuryBillReclassifiedAsDebit(credits[0]!)).toBe(true)
+    expect(isTreasuryBillReclassifiedAsDebit(credits[1]!)).toBe(true)
+    expect(isTreasuryBillReclassifiedAsDebit(credits[2]!)).toBe(false)
+    const debitTotal = computeBankOnlyDebitsTotal([], credits, [], 0.01, new Set())
+    expect(debitTotal).toBeCloseTo(100398.83 + 114946.61, 2)
+    const creditTotal = computeBankOnlyCreditsTotal(credits, [], [], 0)
+    expect(creditTotal).toBe(100399)
   })
 })
 

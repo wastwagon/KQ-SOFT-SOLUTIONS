@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
-const DATA = path.join(ROOT, 'testdataandresultsforacct002')
+const DATA = path.join(ROOT, process.env.BRS_DATA_DIR || 'testdataandresultsforacct002')
 
 const API = process.env.API_URL || 'http://localhost:9101'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
@@ -222,21 +222,29 @@ async function main() {
   })
 
   const proj2 = await api('GET', `/projects/${project.slug}`, token)
-  console.log('\nMapping documents...')
-  for (const doc of proj2.documents || []) {
-    const isCash = doc.type.startsWith('cash_book_')
-    let mapping
-    let sheetIndex = 0
-    if (isCash) {
-      mapping = { ...CASH_MAP }
-      sheetIndex = CASH_SHEET_INDEX
-      if (doc.type === 'cash_book_receipts') delete mapping.amt_paid
-      else delete mapping.amt_received
-    } else {
-      mapping = doc.type === 'bank_credits' ? { ...BANK_MAP_CREDITS } : { ...BANK_MAP_DEBITS }
+  const skipMap =
+    process.env.BRS_SKIP_MAP === '1' ||
+    (process.env.BRS_FORCE_REMAP !== '1' &&
+      (proj2.documents || []).every((d) => (d._count?.transactions ?? 0) > 0))
+  if (skipMap) {
+    console.log('\nSkipping document remap (already mapped; use BRS_FORCE_REMAP=1 to re-import)')
+  } else {
+    console.log('\nMapping documents...')
+    for (const doc of proj2.documents || []) {
+      const isCash = doc.type.startsWith('cash_book_')
+      let mapping
+      let sheetIndex = 0
+      if (isCash) {
+        mapping = { ...CASH_MAP }
+        sheetIndex = CASH_SHEET_INDEX
+        if (doc.type === 'cash_book_receipts') delete mapping.amt_paid
+        else delete mapping.amt_received
+      } else {
+        mapping = doc.type === 'bank_credits' ? { ...BANK_MAP_CREDITS } : { ...BANK_MAP_DEBITS }
+      }
+      const mapped = await api('POST', `/documents/${doc.id}/map`, token, { mapping, sheetIndex })
+      console.log(`  ${doc.type}: ${mapped.count} transactions (sheet ${sheetIndex})`)
     }
-    const mapped = await api('POST', `/documents/${doc.id}/map`, token, { mapping, sheetIndex })
-    console.log(`  ${doc.type}: ${mapped.count} transactions (sheet ${sheetIndex})`)
   }
 
   try {
@@ -246,8 +254,16 @@ async function main() {
     console.log('\nCould not clear matches:', e.message)
   }
 
-  console.log('\nAuto-matching...')
-  const totalMatched = await autoMatch(API, token, project.slug)
+  let totalMatched = 0
+  if (process.env.BRS_USE_SCRIPT_MATCH === '1') {
+    console.log('\nAuto-matching (legacy)...')
+    totalMatched = await autoMatch(API, token, project.slug)
+  } else {
+    console.log('\nAuto-complete matching (product API)...')
+    const ac = await api('POST', `/reconcile/${project.slug}/match/auto-complete`, token)
+    totalMatched = ac.created ?? 0
+    console.log(`  Phases: ${JSON.stringify(ac.phases || {})}`)
+  }
   console.log(`  Total bulk matched: ${totalMatched}`)
 
   const rec2 = await api('GET', `/reconcile/${project.slug}`, token)

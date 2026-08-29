@@ -8,7 +8,7 @@ This project ships these Compose files:
 | `docker-compose.prod.yml` | Same production stack (explicit filename); keep in sync with `docker-compose.yml`. |
 | `docker-compose.development.yml` | Local development (hot reload, `Dockerfile.development`). |
 
-Repository: [https://github.com/wastwagon/kqsoftwaresolutions](https://github.com/wastwagon/kqsoftwaresolutions)
+Repository: [https://github.com/wastwagon/KQ-SOFT-SOLUTIONS](https://github.com/wastwagon/KQ-SOFT-SOLUTIONS)
 
 **Live production app:** [https://kqsoftwaresolutions.com/](https://kqsoftwaresolutions.com/)
 
@@ -21,14 +21,14 @@ git init
 git add .
 git commit -m "Initial commit: Bank Reconciliation SaaS"
 git branch -M main
-git remote add origin https://github.com/wastwagon/kqsoftwaresolutions.git
+git remote add origin https://github.com/wastwagon/KQ-SOFT-SOLUTIONS.git
 git push -u origin main
 ```
 
 If the remote already exists:
 
 ```bash
-git remote set-url origin https://github.com/wastwagon/kqsoftwaresolutions.git
+git remote set-url origin https://github.com/wastwagon/KQ-SOFT-SOLUTIONS.git
 git push -u origin main
 ```
 
@@ -37,7 +37,7 @@ Do not commit `.env` files; configure secrets in Coolify.
 ## 2. Coolify: create a Docker Compose resource
 
 1. **New resource** → **Docker Compose** (or your Coolify version’s equivalent).
-2. **Repository:** `wastwagon/kqsoftwaresolutions` (or full Git URL).
+2. **Repository:** `wastwagon/KQ-SOFT-SOLUTIONS` (or full Git URL).
 3. **Branch:** `main`.
 4. **Compose file path:** `docker-compose.yml` **or** `docker-compose.prod.yml` (both define the same **production** stack). Do **not** point Coolify at `docker-compose.development.yml`.
 

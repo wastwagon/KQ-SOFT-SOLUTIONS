@@ -8,6 +8,8 @@ From the project root:
 docker compose -f docker-compose.development.yml up -d
 ```
 
+In Docker Desktop this stack is named **`kqsoftsolutions`**. Web: http://localhost:9100 · API: http://localhost:9101. Postgres on the host is **`15441`**.
+
 This will:
 
 1. **Postgres** – host port `15432` → container `5432`

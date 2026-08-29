@@ -98,6 +98,26 @@ function rowsFor(data: CountMatchDiagnostic, key: ListKey): CountAmountRow[] {
   }
 }
 
+/** Sum of transaction counts (not amount-bucket rows). Five txs of the same amount ⇒ 5. */
+function sumTxCounts(rows: CountAmountRow[]): { cb: number; bank: number } {
+  let cb = 0
+  let bank = 0
+  for (const r of rows) {
+    cb += r.cashBookCount
+    bank += r.bankCount
+  }
+  return { cb, bank }
+}
+
+function listCountLabel(rows: CountAmountRow[]): string {
+  const amounts = rows.length
+  const { cb, bank } = sumTxCounts(rows)
+  const txs = cb + bank
+  if (amounts === 0) return '0'
+  if (txs === amounts) return String(txs)
+  return `${amounts} amts · ${txs} txs`
+}
+
 interface CountMatchPanelProps {
   projectId: string
   projectSlug?: string
@@ -136,13 +156,32 @@ export default function CountMatchPanel({
 
   const summaryBits = useMemo(() => {
     if (!query.data) return null
-    const r = query.data.receiptsCredits.summary
-    const p = query.data.paymentsDebits.summary
+    const d = query.data
+    const onlyCbRows = [...d.brsDetails.onlyCashBookReceived, ...d.brsDetails.onlyCashBookPayments]
+    const onlyBankRows = [...d.brsDetails.onlyBankLodgments, ...d.brsDetails.onlyBankDebits]
+    const openRows = [
+      ...d.brsDetails.openReceiptsVsCreditsCbSurplus,
+      ...d.brsDetails.openReceiptsVsCreditsBankSurplus,
+      ...d.brsDetails.openPaymentsVsDebitsCbSurplus,
+      ...d.brsDetails.openPaymentsVsDebitsBankSurplus,
+    ]
+    const cancelRows = [
+      ...d.cancelSchedule.receiptsEqualsCredits,
+      ...d.cancelSchedule.paymentsEqualsDebits,
+    ]
+    const onlyCbTx = sumTxCounts(onlyCbRows)
+    const onlyBankTx = sumTxCounts(onlyBankRows)
+    const openTx = sumTxCounts(openRows)
+    const cancelTx = sumTxCounts(cancelRows)
     return {
-      onlyCb: r.onlyCashBook + p.onlyCashBook,
-      onlyBank: r.onlyBank + p.onlyBank,
-      open: r.openCbSurplus + r.openBankSurplus + p.openCbSurplus + p.openBankSurplus,
-      cancel: r.batchCancel + p.batchCancel,
+      onlyCbAmounts: onlyCbRows.length,
+      onlyCbTxs: onlyCbTx.cb + onlyCbTx.bank,
+      onlyBankAmounts: onlyBankRows.length,
+      onlyBankTxs: onlyBankTx.cb + onlyBankTx.bank,
+      openAmounts: openRows.length,
+      openTxs: openTx.cb + openTx.bank,
+      cancelAmounts: cancelRows.length,
+      cancelTxs: cancelTx.cb + cancelTx.bank,
     }
   }, [query.data])
 
@@ -201,8 +240,10 @@ export default function CountMatchPanel({
             Match by counting
           </h3>
           <p className="text-sm text-slate-600 max-w-2xl pl-6">
-            Amount-frequency schedules for BRS lists and a separate batch-cancel report. Diagnostic
-            only — never auto-clears.
+            Groups by amount; <strong className="font-semibold text-slate-700">CB count</strong> and{' '}
+            <strong className="font-semibold text-slate-700">Bank count</strong> are transaction
+            tallies (five lines of the same amount ⇒ 5, not 1). Amount is the value only. Diagnostic
+            — never auto-clears.
           </p>
         </Button>
         {open && (
@@ -276,17 +317,45 @@ export default function CountMatchPanel({
           {query.data && summaryBits && (
             <>
               <div className="flex flex-wrap gap-2 mb-3">
-                <Badge tone="neutral" size="sm">
-                  Only CB: {summaryBits.onlyCb}
+                <Badge
+                  tone="neutral"
+                  size="sm"
+                  title={`${summaryBits.onlyCbAmounts} distinct amounts · ${summaryBits.onlyCbTxs} transactions`}
+                >
+                  Only CB: {summaryBits.onlyCbTxs} txs
+                  {summaryBits.onlyCbAmounts !== summaryBits.onlyCbTxs
+                    ? ` (${summaryBits.onlyCbAmounts} amts)`
+                    : ''}
                 </Badge>
-                <Badge tone="neutral" size="sm">
-                  Only bank: {summaryBits.onlyBank}
+                <Badge
+                  tone="neutral"
+                  size="sm"
+                  title={`${summaryBits.onlyBankAmounts} distinct amounts · ${summaryBits.onlyBankTxs} transactions`}
+                >
+                  Only bank: {summaryBits.onlyBankTxs} txs
+                  {summaryBits.onlyBankAmounts !== summaryBits.onlyBankTxs
+                    ? ` (${summaryBits.onlyBankAmounts} amts)`
+                    : ''}
                 </Badge>
-                <Badge tone="warning" size="sm">
-                  Open imbalances: {summaryBits.open}
+                <Badge
+                  tone="warning"
+                  size="sm"
+                  title={`${summaryBits.openAmounts} distinct amounts · ${summaryBits.openTxs} transactions`}
+                >
+                  Open: {summaryBits.openTxs} txs
+                  {summaryBits.openAmounts !== summaryBits.openTxs
+                    ? ` (${summaryBits.openAmounts} amts)`
+                    : ''}
                 </Badge>
-                <Badge tone="success" size="sm">
-                  Batch cancel: {summaryBits.cancel}
+                <Badge
+                  tone="success"
+                  size="sm"
+                  title={`${summaryBits.cancelAmounts} distinct amounts · ${summaryBits.cancelTxs} transactions`}
+                >
+                  Batch cancel: {summaryBits.cancelTxs} txs
+                  {summaryBits.cancelAmounts !== summaryBits.cancelTxs
+                    ? ` (${summaryBits.cancelAmounts} amts)`
+                    : ''}
                 </Badge>
                 {query.data.invertedSides && (
                   <Badge tone="brand" size="sm">
@@ -306,7 +375,7 @@ export default function CountMatchPanel({
                 </p>
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {LIST_META.filter((m) => m.group === 'brs').map((m) => {
-                    const n = rowsFor(query.data!, m.key).length
+                    const listRows = rowsFor(query.data!, m.key)
                     return (
                       <Button
                         key={m.key}
@@ -314,10 +383,11 @@ export default function CountMatchPanel({
                         size="xs"
                         variant={listKey === m.key ? 'primary' : 'outline'}
                         aria-pressed={listKey === m.key}
+                        title="Label shows distinct amounts and transaction counts (same amount counted per line)"
                         onClick={() => setListKey(m.key)}
                       >
                         {m.label}
-                        <span className="ml-1 opacity-70">({n})</span>
+                        <span className="ml-1 opacity-70">({listCountLabel(listRows)})</span>
                       </Button>
                     )
                   })}
@@ -327,7 +397,7 @@ export default function CountMatchPanel({
                 </p>
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {LIST_META.filter((m) => m.group === 'cancel').map((m) => {
-                    const n = rowsFor(query.data!, m.key).length
+                    const listRows = rowsFor(query.data!, m.key)
                     return (
                       <Button
                         key={m.key}
@@ -335,26 +405,41 @@ export default function CountMatchPanel({
                         size="xs"
                         variant={listKey === m.key ? 'primary' : 'outline'}
                         aria-pressed={listKey === m.key}
+                        title="Label shows distinct amounts and transaction counts (same amount counted per line)"
                         onClick={() => setListKey(m.key)}
                       >
                         {m.label}
-                        <span className="ml-1 opacity-70">({n})</span>
+                        <span className="ml-1 opacity-70">({listCountLabel(listRows)})</span>
                       </Button>
                     )
                   })}
                 </div>
               </div>
 
-              <p className="text-xs text-slate-500 mb-2">{activeMeta.hint}</p>
+              <p className="text-xs text-slate-500 mb-2">
+                {activeMeta.hint}. Table: <span className="font-medium text-slate-600">Amount</span>{' '}
+                = value; <span className="font-medium text-slate-600">CB count / Bank count</span> =
+                number of transactions.
+                {rows.length > 0 && (
+                  <>
+                    {' '}
+                    This list: {listCountLabel(rows)}.
+                  </>
+                )}
+              </p>
 
               <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHead>
                     <tr>
-                      <TableTh>Amount</TableTh>
-                      <TableTh>CB count</TableTh>
-                      <TableTh>Bank count</TableTh>
-                      <TableTh>Diff</TableTh>
+                      <TableTh title="Money value used to group lines — not a count">Amount</TableTh>
+                      <TableTh title="Number of cash-book transactions at this amount">
+                        CB count
+                      </TableTh>
+                      <TableTh title="Number of bank transactions at this amount">
+                        Bank count
+                      </TableTh>
+                      <TableTh title="CB count − Bank count">Diff</TableTh>
                       <TableTh />
                     </tr>
                   </TableHead>

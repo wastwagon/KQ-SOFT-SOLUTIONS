@@ -73,7 +73,7 @@ async function main() {
   const matchedCount = report.summary?.matchedCount ?? totalMatched
   console.log(`  ℹ Matched pairs: ${matchedCount} (manual workbook ~${MANUAL.matchedPairs})`)
   console.log(`\nProject slug: ${project.slug}`)
-  console.log(`Web UI: http://localhost:9101 (log in as ${EMAIL})`)
+  console.log(`Web UI: http://localhost:9100/projects/${project.slug}`)
   const allOk = checks.every(Boolean)
   process.exit(allOk ? 0 : 1)
 }

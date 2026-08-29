@@ -287,7 +287,7 @@ const reportCommentsSchema = z.object({
 })
 
 const brsSettingsSchema = z.object({
-  workbookNettingMode: z.enum(['inherit', 'on', 'off']),
+  workbookNettingMode: z.enum(['inherit', 'on', 'off', 'working']),
 })
 
 router.patch('/:id/brs-settings', async (req: AuthRequest, res) => {

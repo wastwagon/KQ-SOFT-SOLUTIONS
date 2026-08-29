@@ -149,7 +149,7 @@ export interface ReportProjectInfo {
   reportNarrative?: string | null
   preparerComment?: string | null
   reviewerComment?: string | null
-  workbookNettingMode?: 'inherit' | 'on' | 'off'
+  workbookNettingMode?: 'inherit' | 'on' | 'off' | 'working'
   preparedBy?: { name?: string | null; email?: string | null } | null
   preparedAt?: string | null
   reviewedBy?: { name?: string | null; email?: string | null } | null
@@ -313,7 +313,7 @@ export interface ReportResponse {
     ghanaBrs?: boolean
     clearingDateWindowDays?: number
     workbookNetting?: boolean
-    workbookNettingMode?: 'inherit' | 'on' | 'off'
+    workbookNettingMode?: 'inherit' | 'on' | 'off' | 'working'
     workbookNettingSource?: 'query' | 'project' | 'org' | 'platform' | 'env' | 'off'
     workbookNettingDetail?: {
       sectionATotal?: number
@@ -324,7 +324,28 @@ export interface ReportResponse {
       workbookUnpresented?: number
       legacyUnpresented?: number
       applied?: number
+      schedule?: 'face' | 'working'
+      workingPaperUnpresented?: number
+      workingPaperSectionA?: number
+      workingPaperOpenB1?: number
+      workingPaperBankOnlyDebitsDelta?: number
     }
+  } | null
+  paymentGroups?: {
+    workingUnpresentedTotal: number
+    sectionATotal: number
+    openTimingTotal: number
+    scheduleExplanation: string
+    buckets: {
+      group: string
+      label: string
+      meaning: string
+      inWorkingUnpresented: boolean
+      faceRole: string
+      count: number
+      total: number
+      sampleChqNos: string[]
+    }[]
   } | null
   unmatchedReceipts?: ReportSimpleTx[]
   unmatchedCredits?: ReportSimpleTx[]
@@ -666,10 +687,10 @@ export const projects = {
     api(`/projects/${id}/approve`, { method: 'PATCH' }),
   updateReportComments: (id: string, body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null }) =>
     api(`/projects/${id}/report-comments`, { method: 'PATCH', body: JSON.stringify(body) }),
-  updateBrsSettings: (id: string, body: { workbookNettingMode: 'inherit' | 'on' | 'off' }) =>
+  updateBrsSettings: (id: string, body: { workbookNettingMode: 'inherit' | 'on' | 'off' | 'working' }) =>
     api(`/projects/${id}/brs-settings`, { method: 'PATCH', body: JSON.stringify(body) }) as Promise<{
       id: string
-      workbookNettingMode: 'inherit' | 'on' | 'off'
+      workbookNettingMode: 'inherit' | 'on' | 'off' | 'working'
     }>,
 }
 
@@ -1075,6 +1096,19 @@ export const reconcile = {
   ) => api(`/reconcile/${projectId}/match/multi`, { method: 'POST', body: JSON.stringify(body) }),
   createMatchBulk: (projectId: string, body: { matches: { cashBookTransactionId: string; bankTransactionId: string }[] }) =>
     api(`/reconcile/${projectId}/match/bulk`, { method: 'POST', body: JSON.stringify(body) }),
+  createMatchAutoComplete: (
+    projectId: string,
+    params?: { bankAccountId?: string; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean }
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.bankAccountId) q.set('bankAccountId', params.bankAccountId)
+    if (params?.useDate === false) q.set('useDate', 'false')
+    if (params?.useDocRef === false) q.set('useDocRef', 'false')
+    if (params?.useChequeNo === false) q.set('useChequeNo', 'false')
+    return api(`/reconcile/${projectId}/match/auto-complete${q.toString() ? `?${q}` : ''}`, {
+      method: 'POST',
+    }) as Promise<{ created: number; rounds: number; phases: Record<string, number> }>
+  },
   deleteMatch: (projectId: string, matchId: string) =>
     api(`/reconcile/${projectId}/match/${matchId}`, { method: 'DELETE' }),
   clearAllMatches: (projectId: string) =>

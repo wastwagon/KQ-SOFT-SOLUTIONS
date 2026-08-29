@@ -105,9 +105,9 @@ export default function SuggestedMatchesPanel({
               onClick={onPhasedAutoMatch}
               disabled={isMatching}
               isLoading={isPhasedAutoMatching}
-              title="Runs safe 90%+ matches, then bank-pattern suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA)"
+              title="Runs server-side auto-complete: safe 90%+ matches, bank-pattern 85%+, corroborated cheque refs, then residual sweeps/clearing pairs (SCB/Ecobank/GCB/NIB etc.)"
             >
-              Auto-match all (safe → patterns)
+              Auto-match all
             </Button>
           )}
           {highConfidence.length > 0 && (

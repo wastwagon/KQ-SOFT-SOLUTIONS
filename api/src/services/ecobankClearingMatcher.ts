@@ -28,6 +28,9 @@ const TRANSFER_DEBIT_RE = /FUNDS\s+TRANSFER|OUTWARD\s*-\s*LOCAL|NRT\s+BO|SWIFT\s
 const GT_BANK_MIRROR_RE = /SWIFT\s+TRANSFER|FUND\s+TRANSFER|INWARD\s+TRANSFER|COMMISSION\/OUTWARD|SETTLE\s+CENTRALIZED\s+INWARD/i
 const FT_CONSOLIDATION_RE = /FT\s+Consolidation|PAYROLL\s+UPLOAD/i
 const WITHDRAWAL_DEBIT_RE = /CHEQUE\s+WITHDRAWAL|WITHDRAWAL/i
+/** Short-form treasury auction maturities (not full Bill AUC lines) — debit side on Ghana manual BRS. */
+const TREASURY_AUCT_RE = /TREASURY\s+BILLS[\s\S]*MATURED\s+\d+-DAY\s+Auct/i
+const TREASURY_BILL_AUC_RE = /Bill\s+AUC|REDISCOUNT/i
 
 /** Bulk-match tier B: only auto-apply payment suggestions with these reasons (not generic chq↔debit). */
 export const ECOBANK_BULK_SAFE_REASON_RE =
@@ -529,9 +532,20 @@ export function computeUnpresentedChequesTotal(
 }
 
 /** Ghana manual BRS: inward clearing and FT payroll credits appear on the debit (add) side. */
+export function isTreasuryBillReclassifiedAsDebit(credit: ClearingTxLike): boolean {
+  const text = bankText(credit as Tx)
+  if (!TREASURY_AUCT_RE.test(text)) return false
+  if (TREASURY_BILL_AUC_RE.test(text)) return false
+  return true
+}
+
 export function isCreditReclassifiedAsDebit(credit: ClearingTxLike): boolean {
   const text = bankText(credit as Tx)
-  return isEcobankClearingCredit(credit) || FT_CONSOLIDATION_RE.test(text)
+  return (
+    isEcobankClearingCredit(credit) ||
+    FT_CONSOLIDATION_RE.test(text) ||
+    isTreasuryBillReclassifiedAsDebit(credit)
+  )
 }
 
 export interface BankOnlyDebitsContext {

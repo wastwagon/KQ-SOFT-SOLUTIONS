@@ -126,6 +126,19 @@ export async function mapAllDocuments(API, token, projectSlug) {
 }
 
 export async function autoMatchEcobank(API, token, projectSlug, { safeOnly = false } = {}) {
+  if (process.env.SAFE_MATCH_ONLY === '1' || safeOnly) {
+    return autoMatchEcobankLegacy(API, token, projectSlug, { safeOnly: true })
+  }
+  if (process.env.BRS_USE_SCRIPT_MATCH === '1') {
+    return autoMatchEcobankLegacy(API, token, projectSlug, { safeOnly: false })
+  }
+  console.log('  Auto-complete matching (product API)...')
+  const ac = await api(API, 'POST', `/reconcile/${projectSlug}/match/auto-complete`, token)
+  console.log(`  Phases: ${JSON.stringify(ac.phases || {})}`)
+  return ac.created ?? 0
+}
+
+async function autoMatchEcobankLegacy(API, token, projectSlug, { safeOnly = false } = {}) {
   let totalMatched = 0
   const phases = safeOnly
     ? [['A-safe', 0.9, 'safe']]
@@ -187,6 +200,18 @@ export async function ensureQ1Project(API, token) {
   const projectsRaw = await api(API, 'GET', '/projects', token)
   const projects = Array.isArray(projectsRaw) ? projectsRaw : projectsRaw.projects ?? []
   let project = projects.find((p) => p.name === Q1_PROJECT_NAME)
+  if (process.env.BRS_FORCE_REUPLOAD === '1' && project) {
+    if (LOCKED_Q1_STATUSES.has(project.status)) {
+      try {
+        await api(API, 'PATCH', `/projects/${project.slug}/reopen`, token)
+      } catch {
+        /* continue to delete */
+      }
+    }
+    await api(API, 'DELETE', `/projects/${project.slug}`, token)
+    console.log('Deleted existing project for clean re-upload:', project.slug)
+    project = null
+  }
   if (!project) {
     project = await api(API, 'POST', '/projects', token, {
       name: Q1_PROJECT_NAME,
@@ -204,41 +229,53 @@ export async function ensureQ1Project(API, token) {
     })
   }
 
-  const proj = await api(API, 'GET', `/projects/${project.slug}`, token)
-  if (LOCKED_Q1_STATUSES.has(proj.status)) {
-    return { project: proj, totalMatched: 0, locked: true }
+  let projFresh = await api(API, 'GET', `/projects/${project.slug}`, token)
+  if (LOCKED_Q1_STATUSES.has(projFresh.status)) {
+    return { project: projFresh, totalMatched: 0, locked: true }
   }
-  if (!proj.documents?.length) {
+  if (!projFresh.documents?.length) {
     const cb = path.join(DATA, 'LIBcashbk1 2026 1qtr.xlsx')
     const bank = path.join(DATA, '1778163944552 dated 4.6.26.xlsx')
     const acct = 'Ecobank Tesano 1441001519033'
     const acctNo = '1441001519033'
-    await uploadFile(API, token, proj.id, 'cash-book', cb, { type: 'receipts' })
-    await uploadFile(API, token, proj.id, 'cash-book', cb, { type: 'payments' })
-    await uploadFile(API, token, proj.id, 'bank-statement', bank, {
+    await uploadFile(API, token, projFresh.id, 'cash-book', cb, { type: 'receipts' })
+    await uploadFile(API, token, projFresh.id, 'cash-book', cb, { type: 'payments' })
+    await uploadFile(API, token, projFresh.id, 'bank-statement', bank, {
       type: 'credits',
       accountName: acct,
       accountNo: acctNo,
     })
-    await uploadFile(API, token, proj.id, 'bank-statement', bank, {
+    await uploadFile(API, token, projFresh.id, 'bank-statement', bank, {
       type: 'debits',
       accountName: acct,
       accountNo: acctNo,
     })
+    projFresh = await api(API, 'GET', `/projects/${project.slug}`, token)
   }
 
   await api(API, 'PATCH', `/projects/${project.slug}`, token, {
     bankStatementClosingBalance: MANUAL_Q1.bankClosing,
   })
 
-  await mapAllDocuments(API, token, project.slug)
+  const skipMap =
+    process.env.BRS_SKIP_MAP === '1' ||
+    process.env.BRS_FINISH_ONLY === '1' ||
+    (process.env.BRS_FORCE_REMAP !== '1' &&
+      (projFresh.documents || []).every((d) => (d._count?.transactions ?? 0) > 0))
+  if (skipMap) {
+    console.log('\nSkipping document remap (already mapped; use BRS_FORCE_REMAP=1 to re-import)')
+  } else {
+    await mapAllDocuments(API, token, project.slug)
+  }
 
   try {
-    await api(API, 'DELETE', `/reconcile/${project.slug}/matches`, token)
+    const cleared = await api(API, 'DELETE', `/reconcile/${project.slug}/matches`, token)
+    console.log(`\nCleared ${cleared.deleted ?? 0} existing match(es)`)
   } catch {
     /* no matches yet */
   }
 
+  console.log('\nMapping complete. Running auto-match...')
   const totalMatched = await autoMatchEcobank(API, token, project.slug, {
     safeOnly: process.env.SAFE_MATCH_ONLY === '1',
   })

@@ -20,7 +20,8 @@ const API = process.env.API_URL || 'http://localhost:9101'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
 const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 
-const PROJECT_NAME = 'Lordship – Ecobank 9035 Q1 2026 (accountno095)'
+const PROJECT_NAME =
+  process.env.BRS_Q1_PROJECT_NAME || 'Lordship – Ecobank 9035 Q1 2026 (accountno095)'
 const RECON_DATE = '2026-03-31T00:00:00.000Z'
 const MANUAL_BRS_FILE = path.join(DATA, 'Account902 brs as at 31.3.2026.xlsx')
 
@@ -126,6 +127,13 @@ async function main() {
   let project = projects.find((p) => p.name === PROJECT_NAME)
 
   if (process.env.BRS_FORCE_REUPLOAD === '1' && project) {
+    if (['completed', 'approved', 'submitted_for_review'].includes(project.status)) {
+      try {
+        await api('PATCH', `/projects/${project.slug}/reopen`, token)
+      } catch {
+        /* continue to delete */
+      }
+    }
     await api('DELETE', `/projects/${project.slug}`, token)
     console.log('Deleted existing project for clean re-upload:', project.slug)
     project = null
@@ -173,6 +181,14 @@ async function main() {
   }
 
   const proj2 = await api('GET', `/projects/${project.slug}`, token)
+  const skipMap =
+    process.env.BRS_SKIP_MAP === '1' ||
+    process.env.BRS_FINISH_ONLY === '1' ||
+    (process.env.BRS_FORCE_REMAP !== '1' &&
+      (proj2.documents || []).every((d) => (d._count?.transactions ?? 0) > 0))
+  if (skipMap) {
+    console.log('\nSkipping document remap (already mapped; use BRS_FORCE_REMAP=1 to re-import)')
+  } else {
   console.log('\nMapping documents...')
   for (const doc of proj2.documents || []) {
     const isCash = doc.type.startsWith('cash_book_')
@@ -191,6 +207,7 @@ async function main() {
     const mapped = await api('POST', `/documents/${doc.id}/map`, token, { mapping, sheetIndex: 0 })
     console.log(`  ${doc.type}: ${mapped.count} transactions`)
   }
+  }
 
   // Reset prior matches so we measure enhancement behaviour cleanly.
   try {
@@ -204,9 +221,16 @@ async function main() {
   console.log(
     safeOnly
       ? '\nAuto-matching (phase A only: 90%+ safe, skip duplicates)...'
-      : '\nAuto-matching (phase A: 90%+ safe, phase B: receipts + Ecobank patterns 85%+)...'
+      : process.env.BRS_USE_SCRIPT_MATCH === '1'
+        ? '\nAuto-matching (legacy phase A/B)...'
+        : '\nAuto-complete matching (product API)...'
   )
   let totalMatched = 0
+  if (!safeOnly && process.env.BRS_USE_SCRIPT_MATCH !== '1') {
+    const ac = await api('POST', `/reconcile/${project.slug}/match/auto-complete`, token)
+    totalMatched = ac.created ?? 0
+    console.log(`  Phases: ${JSON.stringify(ac.phases || {})}`)
+  } else {
   const ECOBANK_REASON_RE = /Ecobank clearing|Ecobank transfer|Ecobank withdrawal/i
   const phases = safeOnly
     ? [['A-safe', 0.9, 'safe']]
@@ -265,6 +289,7 @@ async function main() {
     totalMatched += n
     console.log(`  ${phase} round ${round + 1}: matched ${n} pairs`)
     }
+  }
   }
   console.log(`  Total bulk matched: ${totalMatched}`)
 

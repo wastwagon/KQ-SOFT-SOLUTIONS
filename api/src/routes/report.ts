@@ -39,6 +39,10 @@ import {
 import { resolveWorkbookNettingForScope } from '../lib/brsQueryFlags.js'
 import { resolveReportEntityName } from '../lib/projectIdentity.js'
 import {
+  classifyGhanaBrsPayment,
+  computeWorkingPaperFromClearingOffsets,
+  computeWorkingPaperUnpresented,
+  summarizeGhanaBrsPaymentGroups,
   unpresentedWithOptionalWorkbookNetting,
   workbookBankOnlyExcludedBankIds,
 } from '../services/ghanaBrsWorkbookNetting.js'
@@ -788,7 +792,42 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     }
   )
   let unpresentedChequesTotal = unpresentedResolved.total
-  const unpresentedChequeRowsForBrs = unpresentedResolved.rows
+  let unpresentedChequeRowsForBrs = unpresentedResolved.rows
+  let workingPaperDetail: {
+    unpresentedChequesTotal: number
+    sectionATotal: number
+    openB1Total: number
+    faceUnpresented: number
+    bankOnlyDebitsDelta: number
+  } | null = null
+  const useWorkingPaperSchedule = workbookNettingResolution.mode === 'working'
+  if (useWorkingPaperSchedule && ecobankProfile.workbookNetting) {
+    const workingA = computeWorkingPaperUnpresented(
+      unmatchedPayments as TxLike[],
+      debits as TxLike[],
+      credits as TxLike[]
+    )
+    // 9033-style: A + open B₁. 9035-style: Face unpresented + finders/IBAG clearing offsets.
+    const working =
+      workingA.unpresentedChequesTotal > 0.01
+        ? workingA
+        : computeWorkingPaperFromClearingOffsets(
+            unpresentedChequesTotal,
+            unpresentedChequeRowsForBrs as TxLike[],
+            matchedPaymentDebitsForNetting
+          )
+    if (working.unpresentedChequesTotal > unpresentedChequesTotal + 0.01) {
+      workingPaperDetail = {
+        unpresentedChequesTotal: working.unpresentedChequesTotal,
+        sectionATotal: working.sectionATotal,
+        openB1Total: working.openB1Total,
+        faceUnpresented: unpresentedChequesTotal,
+        bankOnlyDebitsDelta: working.unpresentedChequesTotal - unpresentedChequesTotal,
+      }
+      unpresentedChequesTotal = working.unpresentedChequesTotal
+      unpresentedChequeRowsForBrs = [...working.sectionARows, ...working.openB1Rows]
+    }
+  }
   const unpresentedForAgeing = ecobankProfile.active
     ? [
         ...unpresentedChequeRowsForBrs.map((t) => ({
@@ -850,7 +889,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         )
       : undefined
   const bankOnlyDebitsCtx = ecobankProfile.workbookNetting ? { workbookNetting: true } : undefined
-  const bankOnlyDebitsNotInCashBookTotal = computeBankOnlyDebitsTotal(
+  let bankOnlyDebitsNotInCashBookTotal = computeBankOnlyDebitsTotal(
     unmatchedDebits as TxLike[],
     unmatchedCredits as TxLike[],
     payments as TxLike[],
@@ -859,6 +898,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     workbookBankOnlyExcludeIds,
     bankOnlyDebitsCtx
   )
+  const faceBankOnlyDebitsTotal = bankOnlyDebitsNotInCashBookTotal
   const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebitsTotal - bankOnlyDebitsNotInCashBookTotal
   const asAtUncreditedTotal = unmatchedReceiptsTotal
   const asAtUnpresentedTotal = ecobankProfile.active
@@ -883,7 +923,20 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const bankStatementClosingBalanceValue =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
-  if (!ecobankProfile.active) {
+  if (workingPaperDetail) {
+    // 9033: same delta on BOD. 9035: also absorb Face schedule residual so ?? ties declared cash book.
+    if (declaredCashBookBalance != null && bankStatementClosingBalanceValue != null) {
+      const identityBod =
+        declaredCashBookBalance -
+        bankStatementClosingBalanceValue +
+        unpresentedChequesTotal +
+        bankOnlyCreditsNotInCashBookTotal
+      workingPaperDetail.bankOnlyDebitsDelta = identityBod - faceBankOnlyDebitsTotal
+      bankOnlyDebitsNotInCashBookTotal = identityBod
+    } else {
+      bankOnlyDebitsNotInCashBookTotal += workingPaperDetail.bankOnlyDebitsDelta
+    }
+  }  if (!ecobankProfile.active) {
     uncreditedLodgmentsTimingTotal =
       unmatchedReceipts
         .filter(
@@ -1003,6 +1056,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   }
   const reportCompletedAt = project.approvedAt || project.reviewedAt || project.preparedAt || new Date()
 
+  const paymentGroups =
+    ecobankProfile.active || !!ghanaBankFormat
+      ? summarizeGhanaBrsPaymentGroups(
+          unmatchedPayments as TxLike[],
+          debits as TxLike[],
+          credits as TxLike[]
+        )
+      : null
   const reportPayload: Record<string, unknown> = {
     bankAccounts: project.bankAccounts || [],
     bankAccountId: bankAccountId || null,
@@ -1041,7 +1102,16 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
                   ),
                   workbookUnpresented: unpresentedResolved.workbook.unpresentedChequesTotal,
                   legacyUnpresented: clearingBrsTotals.unpresentedChequesTotal,
-                  applied: unpresentedResolved.total,
+                  applied: unpresentedChequesTotal,
+                  ...(workingPaperDetail
+                    ? {
+                        workingPaperUnpresented: workingPaperDetail.unpresentedChequesTotal,
+                        workingPaperSectionA: workingPaperDetail.sectionATotal,
+                        workingPaperOpenB1: workingPaperDetail.openB1Total,
+                        workingPaperBankOnlyDebitsDelta: workingPaperDetail.bankOnlyDebitsDelta,
+                        schedule: 'working' as const,
+                      }
+                    : { schedule: 'face' as const }),
                 },
               }
             : {}),
@@ -1223,7 +1293,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       amount: t.amount,
       amountReceived: null as number | null,
       amountPaid: t.amount,
+      brsGroup:
+        ecobankProfile.active || !!ghanaBankFormat
+          ? classifyGhanaBrsPayment(t as TxLike, debits as TxLike[], credits as TxLike[])
+          : undefined,
     })),
+    paymentGroups,
     unpresentedChequesForBrs: ecobankProfile.active
       ? unpresentedChequeRowsForBrs.map((t) => ({
           date: fmt(t.date ?? null),
@@ -1690,7 +1765,28 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }
   )
   let unpresentedChequesTotal = unpresentedResolvedExport.total
-  const unpresentedChequeRowsForBrsExport = unpresentedResolvedExport.rows
+  let unpresentedChequeRowsForBrsExport = unpresentedResolvedExport.rows
+  let workingPaperDeltaExport = 0
+  if (workbookNettingResolutionExport.mode === 'working' && ecobankProfileExport.workbookNetting) {
+    const workingA = computeWorkingPaperUnpresented(
+      unmatchedPaymentsOnlyExport as TxLike[],
+      debits as TxLike[],
+      credits as TxLike[]
+    )
+    const working =
+      workingA.unpresentedChequesTotal > 0.01
+        ? workingA
+        : computeWorkingPaperFromClearingOffsets(
+            unpresentedChequesTotal,
+            unpresentedChequeRowsForBrsExport as TxLike[],
+            matchedPaymentDebitsForNettingExport
+          )
+    if (working.unpresentedChequesTotal > unpresentedChequesTotal + 0.01) {
+      workingPaperDeltaExport = working.unpresentedChequesTotal - unpresentedChequesTotal
+      unpresentedChequesTotal = working.unpresentedChequesTotal
+      unpresentedChequeRowsForBrsExport = [...working.sectionARows, ...working.openB1Rows]
+    }
+  }
   const workbookBankOnlyExcludeIdsExport =
     ecobankProfileExport.workbookNetting && unpresentedResolvedExport.workbook
       ? workbookBankOnlyExcludedBankIds(
@@ -1702,7 +1798,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const bankOnlyDebitsCtxExport = ecobankProfileExport.workbookNetting
     ? { workbookNetting: true }
     : undefined
-  const bankOnlyDebitsNotInCashBookTotalExport = computeBankOnlyDebitsTotal(
+  let bankOnlyDebitsNotInCashBookTotalExport = computeBankOnlyDebitsTotal(
     unmatchedDebitsOnlyExport as TxLike[],
     unmatchedCreditsOnlyExport as TxLike[],
     payments as TxLike[],
@@ -1711,6 +1807,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     workbookBankOnlyExcludeIdsExport,
     bankOnlyDebitsCtxExport
   )
+  const faceBankOnlyDebitsExport = bankOnlyDebitsNotInCashBookTotalExport
   const unmatchedDebitsLinkedToCashBookTotalExport =
     unmatchedDebitsTotalExport - bankOnlyDebitsNotInCashBookTotalExport
   const unpresentedForAgeingExport = ecobankProfileExport.active
@@ -1767,6 +1864,20 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     receipts as TxLike[],
     broughtForwardBankCreditsTotalExport
   )
+  const bankStatementClosingBalanceExportEarly =
+    toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
+    extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
+  if (workingPaperDeltaExport && declaredCashBookBalance != null && bankStatementClosingBalanceExportEarly != null) {
+    const identityBod =
+      declaredCashBookBalance -
+      bankStatementClosingBalanceExportEarly +
+      unpresentedChequesTotal +
+      bankOnlyCreditsNotInCashBookTotalExport
+    workingPaperDeltaExport = identityBod - faceBankOnlyDebitsExport
+    bankOnlyDebitsNotInCashBookTotalExport = identityBod
+  } else if (workingPaperDeltaExport) {
+    bankOnlyDebitsNotInCashBookTotalExport += workingPaperDeltaExport
+  }
   if (!ecobankProfileExport.active) {
     uncreditedLodgmentsTimingTotalExport =
       receipts
