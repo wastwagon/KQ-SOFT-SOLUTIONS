@@ -87,7 +87,7 @@ export function isRound2ContraPayment(payment: ClearingTxLike, amountTolerance =
   return WORKBOOK_ROUND2_CONTRA_AMOUNTS.some((amt) => Math.abs(payment.amount - amt) <= amountTolerance)
 }
 
-function isB1SmallTimingPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
+export function isB1SmallTimingPayment(payment: ClearingTxLike, amountTolerance = 0.01): boolean {
   return WORKBOOK_B1_SMALL_AMOUNTS.some((amt) => Math.abs(payment.amount - amt) <= amountTolerance)
 }
 

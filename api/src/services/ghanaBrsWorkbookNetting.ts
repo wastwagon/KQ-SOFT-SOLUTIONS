@@ -23,6 +23,7 @@ import {
 } from './ecobankClearingMatcher.js'
 import {
   classifyGhanaBrsPayment,
+  isB1SmallTimingPayment,
   isManualB1TimingPayment,
   isManualSectionAPayment,
   isRound2ContraPayment,
