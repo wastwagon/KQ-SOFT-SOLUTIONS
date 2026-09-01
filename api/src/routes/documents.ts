@@ -291,8 +291,9 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   const { resolveReadablePath } = await import('../lib/storage.js')
+  let localPath: string
   try {
-    const localPath = await resolveReadablePath(doc.filepath)
+    localPath = await resolveReadablePath(doc.filepath)
     if (!fs.existsSync(localPath)) {
       return res.status(404).json({ error: 'File not found' })
     }
@@ -305,7 +306,12 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
   if (!org) return res.status(404).json({ error: 'Organization not found' })
   try {
     const body = mapSchema.parse(req.body)
-    const result = await parseDocumentFile(doc.filepath, doc.type, body.sheetIndex ?? 0)
+    const fileType = detectFileType(localPath)
+    const sheetIndex =
+      body.sheetIndex ??
+      doc.excelSheetIndex ??
+      (fileType === 'excel' ? pickBestExcelSheetIndex(localPath, doc.type) : 0)
+    const result = await parseDocumentFile(doc.filepath, doc.type, sheetIndex)
     const mapping = sanitizeMapping(body.mapping as Record<string, number | string>, result.headers.length)
     const err = validateMapping(doc.type, mapping, result.headers.length)
     if (err) return res.status(400).json({ error: err })
@@ -344,7 +350,7 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     await prisma.document.update({
       where: { id },
       data: {
-        excelSheetIndex: body.sheetIndex ?? 0,
+        excelSheetIndex: sheetIndex,
         columnMapping: mapping as object,
       },
     })

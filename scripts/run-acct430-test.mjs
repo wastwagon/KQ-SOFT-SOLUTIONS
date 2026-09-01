@@ -36,21 +36,33 @@ const MANUAL = {
 }
 
 /**
- * Cash book — original TGL Excel columns (Sheet2 / index 1 recommended):
- * 4 Transaction Date, 6 Description, 11 Foreign Currency Amount (signed EUR), 12 Cheque No, 13 Doc Ref No, 0 TGL Account Code.
+ * Cash book — Sheet2 (index 1): dr[20] receipts, cr[21] payments (pre-reconciliation extract).
+ * Also valid: Foreign Currency Amount [11] signed — do not use Amount [7] (GHS).
  */
-const CASH_MAP = {
+const CASH_MAP_RECEIPTS = {
   date: 4,
   name: 6,
   details: 6,
   doc_ref: 13,
   chq_no: 12,
   accode: 0,
-  amt_received: 11,
-  amt_paid: 11,
+  amt_received: 20,
 }
 
-const CASH_SHEET_INDEX = 1
+const CASH_MAP_PAYMENTS = {
+  date: 4,
+  name: 6,
+  details: 6,
+  doc_ref: 13,
+  chq_no: 12,
+  accode: 0,
+  amt_paid: 21,
+}
+
+/** Omit on map to verify server auto-picks Sheet2; set to 1 to force. */
+const CASH_SHEET_INDEX = process.env.BRS_CASH_SHEET_INDEX != null
+  ? Number(process.env.BRS_CASH_SHEET_INDEX)
+  : undefined
 
 /** Bank Sheet1: Trans. Date(0), Debits(3), Credits(4), Remarks(7) */
 const BANK_MAP_CREDITS = {
@@ -264,14 +276,17 @@ async function main() {
     let mapping
     let sheetIndex = 0
     if (isCash) {
-      mapping = { ...CASH_MAP }
+      mapping = doc.type === 'cash_book_receipts' ? { ...CASH_MAP_RECEIPTS } : { ...CASH_MAP_PAYMENTS }
       sheetIndex = CASH_SHEET_INDEX
     } else {
       sheetIndex = BANK_SHEET_INDEX
       mapping = doc.type === 'bank_credits' ? { ...BANK_MAP_CREDITS } : { ...BANK_MAP_DEBITS }
     }
-    const mapped = await api('POST', `/documents/${doc.id}/map`, token, { mapping, sheetIndex })
-    console.log(`  ${doc.type}: ${mapped.count} transactions (sheet ${sheetIndex})`)
+    const mapBody = { mapping, ...(sheetIndex != null ? { sheetIndex } : {}) }
+    const mapped = await api('POST', `/documents/${doc.id}/map`, token, mapBody)
+    console.log(
+      `  ${doc.type}: ${mapped.count} transactions${sheetIndex != null ? ` (sheet ${sheetIndex})` : ' (auto sheet)'}`
+    )
   }
 
   try {
