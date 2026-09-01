@@ -119,6 +119,14 @@ The system picks the best Excel worksheet automatically when a workbook has mult
 
 Confidence labels (**high**, **medium**, **low**) show how sure the system is about each field mapping.
 
+### Saved layouts — Forget layout
+
+After you apply a mapping, the organisation **remembers** that column map (by header names, not column letters). The next similar upload can pre-fill Date, Amount, Description, and so on.
+
+When a saved layout is used, the Map page shows a **Saved layout applied** banner.
+
+**Forget layout** deletes that saved memory so it is **not** suggested for future similar files. It does **not** unmap the current document, delete extracted transactions, or change the file. Map again and apply to save a new layout. Use Forget layout when the remembered columns are wrong for this kind of file going forward.
+
 ### Fields to map — cash book
 
 | Field | Label in app | Required? | Notes |
@@ -239,12 +247,16 @@ The **Match by counting** panel on Reconcile builds amount-frequency schedules (
 
 - Amounts only in the cash book (Received / Payment)
 - Amounts only on the bank (Lodgment / Debits)
-- Both sides where batch counts do **not** cancel (open more/less imbalances)
+- Both sides where batch counts do **not** cancel — **Open — more** lists (CB surplus or bank surplus)
 - Both sides where batch counts **do** cancel — a **separate schedule**, not the main BRS
 
-Default scope is **unmatched** lines (toggle **All lines** if needed). Export to **Excel or PDF** from the panel. **Select lines** pre-selects those transactions for manual or suggested matching (capped at 50 lines per side so bulk match stays safe).
+There is **no separate Open — less list**. More on one side is the same as less on the other, so each amount is listed once. Read **CB count**, **Bank count**, and **Diff** on the row to see both sides.
 
-Counting is **diagnostic only**. It never auto-clears. Confirmed clears still use suggested/manual matching with amount plus date / reference / cheque / narration corroboration.
+Recommended order on the panel: **Cancel** (equal counts) → **Open** → **Only**. Default scope is **unmatched** lines (toggle **All lines** if needed).
+
+On **Open** rows, **Select overlap** pre-selects the matching count on both sides (e.g. 3 vs 3 when the cash book has 5 and the bank has 3). Confirm those lines as usual. Leftovers stay unmatched and then appear on **Only** (keep Unmatched) — the panel switches to that Only list and highlights the amount. **Select all** still selects every line at that amount, including the surplus. **Select lines** on Cancel and Only lists pre-selects those transactions (capped at 50 lines per side).
+
+Export to **Excel or PDF** from the panel. Counting is **diagnostic only**. It never auto-clears. Confirmed clears still use suggested/manual matching with amount plus date / reference / cheque / narration corroboration.
 
 ### Manual matching (step by step)
 
@@ -453,6 +465,8 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 | **Signed amount mode** | One column holds both positive and negative amounts |
 | **Confidence** | How likely a suggested match is correct (0–100%) |
 | **BRS** | Bank Reconciliation Statement — final report |
+| **Forget layout** | Deletes a saved organisation column map so it is not suggested for similar uploads; does not unmap the current file |
+| **Open — more** | Match-by-counting list where one side has more lines at that amount; equivalent to open — less on the other side (listed once) |
 
 ---
 

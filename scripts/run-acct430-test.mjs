@@ -11,10 +11,14 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
-const DATA = path.join(ROOT, 'testofacct430')
+const DATA = process.env.BRS_DATA_DIR
+  ? path.resolve(process.env.BRS_DATA_DIR)
+  : fs.existsSync(path.join(ROOT, 'acct430', 'acct430 cash book.xlsx'))
+    ? path.join(ROOT, 'acct430')
+    : path.join(ROOT, 'testofacct430')
 
 const API = process.env.API_URL || 'http://localhost:9101'
-const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
+const EMAIL = process.env.BRS_TEST_EMAIL || 'firm@test.com'
 const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 
 const PROJECT_NAME =
@@ -32,21 +36,22 @@ const MANUAL = {
 }
 
 /**
- * Cash book Sheet1: … Transaction Date(4), Description(6), Amount GHS(7), …
- * Foreign Currency Amount(11) — EUR amounts used in manual BRS.
+ * Cash book — after TGL ERP normalizeTglErpCashBookTable (api/src/services/cashBookExcel.ts):
+ * 0 Date, 1 Description, 2 Doc Ref, 3 Chq No, 4 Accode, … 10 FC AMT RECEIVED, 11 FC AMT PAID.
+ * Use Sheet2 (index 1): pre-reconciliation CB; Sheet1 includes double-entry expense rows (90019/90033).
  */
 const CASH_MAP = {
-  date: 4,
-  name: 6,
-  details: 6,
-  doc_ref: 13,
-  chq_no: 12,
-  accode: 0,
-  amt_received: 11,
+  date: 0,
+  name: 1,
+  details: 1,
+  doc_ref: 2,
+  chq_no: 3,
+  accode: 4,
+  amt_received: 10,
   amt_paid: 11,
 }
 
-const CASH_SHEET_INDEX = 0
+const CASH_SHEET_INDEX = 1
 
 /** Bank Sheet1: Trans. Date(0), Debits(3), Credits(4), Remarks(7) */
 const BANK_MAP_CREDITS = {
@@ -197,6 +202,20 @@ async function main() {
   const projectsRaw = await api('GET', '/projects', token)
   const projects = Array.isArray(projectsRaw) ? projectsRaw : projectsRaw.projects ?? []
   let project = projects.find((p) => p.name === PROJECT_NAME)
+
+  if (process.env.BRS_FORCE_REUPLOAD === '1' && project) {
+    if (['completed', 'approved', 'submitted_for_review'].includes(project.status)) {
+      try {
+        await api('PATCH', `/projects/${project.slug}/reopen`, token)
+      } catch {
+        /* continue */
+      }
+    }
+    await api('DELETE', `/projects/${project.slug}`, token)
+    console.log('Deleted existing project for clean re-upload:', project.slug)
+    project = null
+  }
+
   if (!project) {
     project = await api('POST', '/projects', token, {
       name: PROJECT_NAME,
@@ -236,6 +255,7 @@ async function main() {
 
   await api('PATCH', `/projects/${project.slug}/report-comments`, token, {
     bankStatementClosingBalance: MANUAL.bankClosing,
+    cashBookClosingBalance: MANUAL.cashBookBalance,
   })
 
   const proj2 = await api('GET', `/projects/${project.slug}`, token)

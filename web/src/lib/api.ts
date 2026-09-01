@@ -146,6 +146,7 @@ export interface ReportProjectInfo {
   status?: string
   reconciliationDate?: string | null
   bankStatementClosingBalance?: number | null
+  cashBookClosingBalance?: number | null
   reportNarrative?: string | null
   preparerComment?: string | null
   reviewerComment?: string | null
@@ -685,7 +686,7 @@ export const projects = {
     api(`/projects/${id}/submit`, { method: 'PATCH' }),
   approve: (id: string) =>
     api(`/projects/${id}/approve`, { method: 'PATCH' }),
-  updateReportComments: (id: string, body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null }) =>
+  updateReportComments: (id: string, body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null; cashBookClosingBalance?: number | null }) =>
     api(`/projects/${id}/report-comments`, { method: 'PATCH', body: JSON.stringify(body) }),
   updateBrsSettings: (id: string, body: { workbookNettingMode: 'inherit' | 'on' | 'off' | 'working' }) =>
     api(`/projects/${id}/brs-settings`, { method: 'PATCH', body: JSON.stringify(body) }) as Promise<{

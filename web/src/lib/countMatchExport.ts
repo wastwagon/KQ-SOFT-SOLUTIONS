@@ -6,7 +6,11 @@ type ScheduleSheet = {
   rows: CountAmountRow[]
   cbLabel: string
   bankLabel: string
+  note?: string
 }
+
+const OPEN_LESS_NOTE =
+  'Open — more on one side is open — less on the other; each amount is listed once (see CB count vs Bank count).'
 
 function categoryLabel(category: string): string {
   switch (category) {
@@ -62,6 +66,7 @@ function buildSchedules(diagnostic: CountMatchDiagnostic): ScheduleSheet[] {
       rows: d.openReceiptsVsCreditsCbSurplus,
       cbLabel: 'Received',
       bankLabel: 'Lodgment',
+      note: OPEN_LESS_NOTE,
     },
     {
       sheetName: 'Open Recv Bank+',
@@ -69,6 +74,7 @@ function buildSchedules(diagnostic: CountMatchDiagnostic): ScheduleSheet[] {
       rows: d.openReceiptsVsCreditsBankSurplus,
       cbLabel: 'Received',
       bankLabel: 'Lodgment',
+      note: OPEN_LESS_NOTE,
     },
     {
       sheetName: 'Open Pay CB+',
@@ -76,6 +82,7 @@ function buildSchedules(diagnostic: CountMatchDiagnostic): ScheduleSheet[] {
       rows: d.openPaymentsVsDebitsCbSurplus,
       cbLabel: 'Payment',
       bankLabel: 'Debits',
+      note: OPEN_LESS_NOTE,
     },
     {
       sheetName: 'Open Pay Bank+',
@@ -83,6 +90,7 @@ function buildSchedules(diagnostic: CountMatchDiagnostic): ScheduleSheet[] {
       rows: d.openPaymentsVsDebitsBankSurplus,
       cbLabel: 'Payment',
       bankLabel: 'Debits',
+      note: OPEN_LESS_NOTE,
     },
     {
       sheetName: 'Cancel Recv=Credit',
@@ -101,10 +109,16 @@ function buildSchedules(diagnostic: CountMatchDiagnostic): ScheduleSheet[] {
   ]
 }
 
-function sheetAoa(title: string, rows: CountAmountRow[], cbLabel: string, bankLabel: string) {
-  const aoa: (string | number)[][] = [
-    [title],
-    [
+function sheetAoa(
+  title: string,
+  rows: CountAmountRow[],
+  cbLabel: string,
+  bankLabel: string,
+  note?: string
+) {
+  const aoa: (string | number)[][] = [[title]]
+  if (note) aoa.push([note])
+  aoa.push([
       'Amount',
       `${cbLabel} count`,
       `${bankLabel} count`,
@@ -112,8 +126,7 @@ function sheetAoa(title: string, rows: CountAmountRow[], cbLabel: string, bankLa
       'Category',
       'CB lines',
       'Bank lines',
-    ],
-  ]
+  ])
   for (const r of rows) {
     aoa.push([
       r.amount,
@@ -143,7 +156,7 @@ export async function exportCountMatchExcel(
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
   for (const s of buildSchedules(diagnostic)) {
-    const aoa = sheetAoa(s.title, s.rows, s.cbLabel, s.bankLabel)
+    const aoa = sheetAoa(s.title, s.rows, s.cbLabel, s.bankLabel, s.note)
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     XLSX.utils.book_append_sheet(wb, ws, s.sheetName.slice(0, 31))
   }
@@ -176,6 +189,9 @@ export async function exportCountMatchPdf(
     doc.setFontSize(8)
     doc.setTextColor(90)
     doc.text(subtitle, 40, 62)
+    if (s.note) {
+      doc.text(s.note, 40, 74)
+    }
     doc.setTextColor(0)
 
     const head = [
@@ -195,7 +211,7 @@ export async function exportCountMatchPdf(
     autoTable(doc, {
       head,
       body,
-      startY: 72,
+      startY: s.note ? 84 : 72,
       styles: { fontSize: 8, cellPadding: 3 },
       headStyles: { fillColor: [15, 61, 46], textColor: 255 },
       margin: { left: 28, right: 28 },

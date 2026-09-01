@@ -165,6 +165,7 @@ Common fields include:
 Tips:
 - Always map date columns
 - Use **Apply suggested mapping to selected** for speed (tick which files to include)
+- After you apply a mapping, similar files can reuse that column map. **Forget layout** on the Map banner stops suggesting it for future uploads; it does not unmap the current file.
 
 **Detailed guide:** [Mapping & Matching Transactions](/mapping-and-matching-manual.md) — field reference, signed amount mode, Ghana bank tips, matching settings, troubleshooting, and a training checklist.
 
@@ -193,6 +194,7 @@ Available actions:
 - split suggestions for bulk deposits (Premium+)
 - unmatch
 - bank account filtering
+- **Match by counting** (diagnostic): recommended order **Cancel → Open (select overlap) → Only**. There is no Open — less list — more on one side is less on the other. After Open overlap is matched, leftovers appear on Only (Unmatched scope).
 
 See [Mapping & Matching Transactions](/mapping-and-matching-manual.md) for the full walkthrough.
 

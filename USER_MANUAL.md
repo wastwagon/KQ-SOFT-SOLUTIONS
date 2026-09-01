@@ -251,7 +251,7 @@ If any document has unmapped columns, the Map step will show them.
    - Select which column maps to **Amount Received** (amt_received) or **Amount Paid** (amt_paid) for cash book; **Credit** or **Debit** for bank
    - Select which column maps to **Description** (or Particulars, Narrative)
    - Optionally map **Reference** and **Cheque number**
-2. Click **Save mapping**.
+2. Click **Save mapping**. Similar files can reuse that column map; **Forget layout** on the Map banner stops suggesting it for future uploads (it does not unmap the current file).
 3. Proceed to **Reconcile**.
 
 ---
@@ -308,7 +308,7 @@ Match each payment to its corresponding bank debit (or leave unmatched if it is 
 - Bank pattern layers (Ecobank, SCB, GCB, NIB, Prudential, Absa, Bank of Africa) rank ahead of generic pairs when the profile is detected.
 - Bank rules (Settings → Bank rules, Standard+) need amount **plus** date, ref/chq, or narration corroboration — amount alone is never enough.
 - AI ranking from previously confirmed pairs also runs when match memory is available.
-- **Match by counting:** On Reconcile, use the counting panel for only-CB / only-bank / open-imbalance lists and a separate batch-cancel schedule. Export Excel or PDF if needed. **Select lines** is capped at 50 per side. Counts never auto-clear — confirm matches as usual.
+- **Match by counting:** On Reconcile, use the counting panel in order: **Cancel** → **Open** (Select overlap, then confirm) → **Only**. There is no Open — less list (more on one side is less on the other). After an Open overlap is matched, leftovers appear on Only if scope is Unmatched. Export Excel or PDF if needed. Selection is capped at 50 per side. Counts never auto-clear — confirm matches as usual.
 - **Limits:** one currency per project (no FX conversion in matching); no pro-rata partial amounts — use 1-to-many / many-to-1 when several lines sum to a full amount.
 
 For the full mapping & matching guide, see [Mapping & Matching Manual](docs/MAPPING_AND_MATCHING_MANUAL.md).

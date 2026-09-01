@@ -282,6 +282,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
 const reportCommentsSchema = z.object({
   reportNarrative: z.string().max(2000).optional(),
   bankStatementClosingBalance: z.union([z.number(), z.string()]).optional().nullable(),
+  cashBookClosingBalance: z.union([z.number(), z.string()]).optional().nullable(),
   preparerComment: z.string().max(1000).optional(),
   reviewerComment: z.string().max(1000).optional(),
 })
@@ -324,16 +325,23 @@ router.patch('/:id/report-comments', async (req: AuthRequest, res) => {
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   try {
     const body = reportCommentsSchema.parse(req.body)
-    const data: { reportNarrative?: string | null; bankStatementClosingBalance?: number | null; preparerComment?: string | null; reviewerComment?: string | null } = {}
+    const data: {
+      reportNarrative?: string | null
+      bankStatementClosingBalance?: number | null
+      cashBookClosingBalance?: number | null
+      preparerComment?: string | null
+      reviewerComment?: string | null
+    } = {}
     if (body.reportNarrative !== undefined) data.reportNarrative = body.reportNarrative || null
     if (body.bankStatementClosingBalance !== undefined) data.bankStatementClosingBalance = body.bankStatementClosingBalance === '' || body.bankStatementClosingBalance == null ? null : Number(body.bankStatementClosingBalance)
+    if (body.cashBookClosingBalance !== undefined) data.cashBookClosingBalance = body.cashBookClosingBalance === '' || body.cashBookClosingBalance == null ? null : Number(body.cashBookClosingBalance)
     if (body.preparerComment !== undefined) data.preparerComment = body.preparerComment || null
     if (body.reviewerComment !== undefined) data.reviewerComment = body.reviewerComment || null
     if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No fields to update' })
     const updated = await prisma.project.update({
       where: { id: projectId },
       data,
-      select: { id: true, reportNarrative: true, preparerComment: true, reviewerComment: true, bankStatementClosingBalance: true },
+      select: { id: true, reportNarrative: true, preparerComment: true, reviewerComment: true, bankStatementClosingBalance: true, cashBookClosingBalance: true },
     })
     res.json(updated)
   } catch (e) {

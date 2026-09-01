@@ -14,7 +14,8 @@ const HELP_CONTENT = {
       { term: 'Cash book receipts', desc: 'Money received by the business (your records). Match these to bank credits.' },
       { term: 'Cash book payments', desc: 'Money paid out by the business (e.g. cheques issued). Match these to bank debits.' },
       { term: 'Bank credits', desc: 'Money lodged or credited to the account (bank’s record).' },
-      { term: 'Bank debits', desc: 'Money withdrawn or debited from the account (e.g. cheques presented).' },
+          { term: 'Bank debits', desc: 'Money withdrawn or debited from the account (e.g. cheques presented).' },
+          { term: 'Open — more (counting)', desc: 'Amount appears on both sides but more times on this side. Same as open — less on the other side — listed once. Select overlap to match the shared count; leftovers move to Only after you confirm (Unmatched scope).' },
     ],
   },
   reportTerms: {

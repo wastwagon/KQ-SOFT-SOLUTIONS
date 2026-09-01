@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Download, FileText, Hash } from 'lucide-react'
 import { reconcile } from '../../lib/api'
+import { exportCountMatchExcel, exportCountMatchPdf } from '../../lib/countMatchExport'
 import {
-  COUNT_MATCH_SELECT_CAP,
-  exportCountMatchExcel,
-  exportCountMatchPdf,
-} from '../../lib/countMatchExport'
+  countMatchSelection,
+  leftoverOnlyListKey,
+  type CountSelectMode,
+} from '../../lib/countMatchSelect'
 import { formatAmount } from '../../lib/format'
 import Button from '../ui/Button'
 import Alert from '../ui/Alert'
@@ -29,34 +30,34 @@ type ListKey =
   | 'cancel_recv'
   | 'cancel_pay'
 
-const LIST_META: { key: ListKey; label: string; group: 'brs' | 'cancel'; hint: string }[] = [
-  { key: 'only_cb_received', label: 'Only CB — Received', group: 'brs', hint: 'Amounts only in cash book (receipts)' },
-  { key: 'only_cb_payment', label: 'Only CB — Payment', group: 'brs', hint: 'Amounts only in cash book (payments)' },
-  { key: 'only_bank_lodgment', label: 'Only bank — Lodgment', group: 'brs', hint: 'Amounts only on bank credits' },
-  { key: 'only_bank_debits', label: 'Only bank — Debits', group: 'brs', hint: 'Amounts only on bank debits' },
+const LIST_META: { key: ListKey; label: string; group: 'only' | 'open' | 'cancel'; hint: string }[] = [
+  { key: 'only_cb_received', label: 'Only CB — Received', group: 'only', hint: 'Amounts only in cash book (receipts)' },
+  { key: 'only_cb_payment', label: 'Only CB — Payment', group: 'only', hint: 'Amounts only in cash book (payments)' },
+  { key: 'only_bank_lodgment', label: 'Only bank — Lodgment', group: 'only', hint: 'Amounts only on bank credits' },
+  { key: 'only_bank_debits', label: 'Only bank — Debits', group: 'only', hint: 'Amounts only on bank debits' },
   {
     key: 'open_recv_cb',
     label: 'Open — more receipts in CB',
-    group: 'brs',
-    hint: 'Both sides; CB receipt count > bank credit count',
+    group: 'open',
+    hint: 'Both sides; CB receipt count > bank credit count (same as fewer credits on the bank — listed once, not as Open — less)',
   },
   {
     key: 'open_recv_bank',
     label: 'Open — more credits in bank',
-    group: 'brs',
-    hint: 'Both sides; bank credit count > CB receipt count',
+    group: 'open',
+    hint: 'Both sides; bank credit count > CB receipt count (same as fewer receipts in the cash book — listed once, not as Open — less)',
   },
   {
     key: 'open_pay_cb',
     label: 'Open — more payments in CB',
-    group: 'brs',
-    hint: 'Both sides; CB payment count > bank debit count',
+    group: 'open',
+    hint: 'Both sides; CB payment count > bank debit count (same as fewer debits on the bank — listed once, not as Open — less)',
   },
   {
     key: 'open_pay_bank',
     label: 'Open — more debits in bank',
-    group: 'brs',
-    hint: 'Both sides; bank debit count > CB payment count',
+    group: 'open',
+    hint: 'Both sides; bank debit count > CB payment count (same as fewer payments in the cash book — listed once, not as Open — less)',
   },
   {
     key: 'cancel_recv',
@@ -118,6 +119,44 @@ function listCountLabel(rows: CountAmountRow[]): string {
   return `${amounts} amts · ${txs} txs`
 }
 
+function ListGroupButtons({
+  group,
+  listKey,
+  onPick,
+  data,
+}: {
+  group: 'only' | 'open' | 'cancel'
+  listKey: ListKey
+  onPick: (key: ListKey) => void
+  data: CountMatchDiagnostic
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-3">
+      {LIST_META.filter((m) => m.group === group).map((m) => {
+        const listRows = rowsFor(data, m.key)
+        return (
+          <Button
+            key={m.key}
+            type="button"
+            size="xs"
+            variant={listKey === m.key ? 'primary' : 'outline'}
+            aria-pressed={listKey === m.key}
+            title={
+              m.group === 'open'
+                ? `${m.hint}. Open — more on one side is open — less on the other; each amount is listed once.`
+                : 'Label shows distinct amounts and transaction counts (same amount counted per line)'
+            }
+            onClick={() => onPick(m.key)}
+          >
+            {m.label}
+            <span className="ml-1 opacity-70">({listCountLabel(listRows)})</span>
+          </Button>
+        )
+      })}
+    </div>
+  )
+}
+
 interface CountMatchPanelProps {
   projectId: string
   projectSlug?: string
@@ -138,8 +177,15 @@ export default function CountMatchPanel({
   const toast = useToast()
   const [open, setOpen] = useState(true)
   const [scope, setScope] = useState<CountScope>('unmatched')
-  const [listKey, setListKey] = useState<ListKey>('only_cb_received')
+  const [listKey, setListKey] = useState<ListKey>('cancel_recv')
   const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null)
+  const [pendingLeftover, setPendingLeftover] = useState<{
+    amountKey: string
+    openKey: ListKey
+    onlyKey: ListKey
+    seenUpdatedAt: number
+  } | null>(null)
+  const [highlightAmountKey, setHighlightAmountKey] = useState<string | null>(null)
 
   const query = useQuery({
     queryKey: ['reconcile-count-match', projectId, bankAccountId || null, scope],
@@ -153,6 +199,33 @@ export default function CountMatchPanel({
 
   const activeMeta = LIST_META.find((m) => m.key === listKey)!
   const rows = useMemo(() => (query.data ? rowsFor(query.data, listKey) : []), [query.data, listKey])
+
+  useEffect(() => {
+    if (!pendingLeftover || !query.data || scope !== 'unmatched') return
+    if (query.dataUpdatedAt === pendingLeftover.seenUpdatedAt) return
+    const onlyRows = rowsFor(query.data, pendingLeftover.onlyKey)
+    const moved = onlyRows.some((r) => r.amountKey === pendingLeftover.amountKey)
+    if (moved) {
+      setListKey(pendingLeftover.onlyKey)
+      setHighlightAmountKey(pendingLeftover.amountKey)
+      setPendingLeftover(null)
+      toast.info(
+        'Leftovers moved to Only',
+        'The unmatched remainder is now on the Only list. Check suggestions or leave as BRS items.'
+      )
+      return
+    }
+    const stillOpen = rowsFor(query.data, pendingLeftover.openKey).some(
+      (r) => r.amountKey === pendingLeftover.amountKey
+    )
+    if (stillOpen) {
+      setPendingLeftover((prev) =>
+        prev ? { ...prev, seenUpdatedAt: query.dataUpdatedAt } : null
+      )
+      return
+    }
+    setPendingLeftover(null)
+  }, [pendingLeftover, query.data, query.dataUpdatedAt, scope, toast])
 
   const summaryBits = useMemo(() => {
     if (!query.data) return null
@@ -202,24 +275,43 @@ export default function CountMatchPanel({
     }
   }
 
-  function handleSelectRow(r: CountAmountRow) {
+  function handleSelectRow(r: CountAmountRow, mode: CountSelectMode) {
     if (!onSelectAmountRows) return
-    const cbRaw = r.cashBookTxIds
-    const bankRaw = r.bankTxIds
-    const cbCapped = cbRaw.length > COUNT_MATCH_SELECT_CAP
-    const bankCapped = bankRaw.length > COUNT_MATCH_SELECT_CAP
-    const cb = cbRaw.slice(0, COUNT_MATCH_SELECT_CAP)
-    const bank = bankRaw.slice(0, COUNT_MATCH_SELECT_CAP)
-    onSelectAmountRows(cb, bank)
-    if (cbCapped || bankCapped) {
+    const sel = countMatchSelection(r.cashBookTxIds, r.bankTxIds, mode)
+    onSelectAmountRows(sel.cashBookTxIds, sel.bankTxIds)
+    const leftover = sel.leftoverCb + sel.leftoverBank
+    if (mode === 'overlap' && leftover > 0 && scope === 'unmatched') {
+      const onlyKey = leftoverOnlyListKey(listKey, sel.leftoverCb, sel.leftoverBank)
+      if (onlyKey) {
+        setPendingLeftover({
+          amountKey: r.amountKey,
+          openKey: listKey,
+          onlyKey,
+          seenUpdatedAt: query.dataUpdatedAt,
+        })
+      }
+    } else {
+      setPendingLeftover(null)
+    }
+    setHighlightAmountKey(null)
+    if (sel.capped) {
       toast.warning(
         'Selection capped',
-        `Selected first ${COUNT_MATCH_SELECT_CAP} lines per side (of ${cbRaw.length} CB / ${bankRaw.length} bank). Match in batches — counts never auto-clear.`
+        `Selected first ${sel.cashBookTxIds.length} CB / ${sel.bankTxIds.length} bank. Match in batches — counts never auto-clear.`
+      )
+    } else if (mode === 'overlap' && leftover > 0) {
+      toast.info(
+        'Overlap selected',
+        `${sel.cashBookTxIds.length} cash book · ${sel.bankTxIds.length} bank (matching count). Confirm match. Leftover ${sel.leftoverCb} CB / ${sel.leftoverBank} bank stay unmatched${
+          scope === 'unmatched'
+            ? ' and will show on Only after you confirm.'
+            : ' — switch to Unmatched after confirm so leftovers appear on Only.'
+        }`
       )
     } else {
       toast.info(
         'Lines selected',
-        `${cb.length} cash book · ${bank.length} bank. Confirm with Match or review suggested pairs — counting does not clear.`
+        `${sel.cashBookTxIds.length} cash book · ${sel.bankTxIds.length} bank. Confirm with Match or review suggested pairs — counting does not clear.`
       )
     }
   }
@@ -242,8 +334,11 @@ export default function CountMatchPanel({
           <p className="text-sm text-slate-600 max-w-2xl pl-6">
             Groups by amount; <strong className="font-semibold text-slate-700">CB count</strong> and{' '}
             <strong className="font-semibold text-slate-700">Bank count</strong> are transaction
-            tallies (five lines of the same amount ⇒ 5, not 1). Amount is the value only. Diagnostic
-            — never auto-clears.
+            tallies (five lines of the same amount ⇒ 5, not 1). Recommended order:{' '}
+            <strong className="font-semibold text-slate-700">Cancel</strong>, then{' '}
+            <strong className="font-semibold text-slate-700">Open</strong> (overlap), then{' '}
+            <strong className="font-semibold text-slate-700">Only</strong>. Diagnostic — never
+            auto-clears.
           </p>
         </Button>
         {open && (
@@ -370,50 +465,50 @@ export default function CountMatchPanel({
               </div>
 
               <div className="mb-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                  BRS detail lists
+                <p className="text-xs text-slate-600 mb-3 max-w-3xl leading-relaxed">
+                  Recommended order:{' '}
+                  <span className="font-semibold text-slate-800">1. Cancel</span> (equal counts) →{' '}
+                  <span className="font-semibold text-slate-800">2. Open</span> (select overlap, then
+                  confirm) → <span className="font-semibold text-slate-800">3. Only</span>{' '}
+                  (suggestions, or leave as BRS items). Keep{' '}
+                  <span className="font-medium text-slate-700">Unmatched</span> so leftover Open
+                  lines move to Only after the overlap is matched. Counting never auto-clears.
                 </p>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {LIST_META.filter((m) => m.group === 'brs').map((m) => {
-                    const listRows = rowsFor(query.data!, m.key)
-                    return (
-                      <Button
-                        key={m.key}
-                        type="button"
-                        size="xs"
-                        variant={listKey === m.key ? 'primary' : 'outline'}
-                        aria-pressed={listKey === m.key}
-                        title="Label shows distinct amounts and transaction counts (same amount counted per line)"
-                        onClick={() => setListKey(m.key)}
-                      >
-                        {m.label}
-                        <span className="ml-1 opacity-70">({listCountLabel(listRows)})</span>
-                      </Button>
-                    )
-                  })}
-                </div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                  Separate cancel schedule
+                  1. Cancel schedule
                 </p>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {LIST_META.filter((m) => m.group === 'cancel').map((m) => {
-                    const listRows = rowsFor(query.data!, m.key)
-                    return (
-                      <Button
-                        key={m.key}
-                        type="button"
-                        size="xs"
-                        variant={listKey === m.key ? 'primary' : 'outline'}
-                        aria-pressed={listKey === m.key}
-                        title="Label shows distinct amounts and transaction counts (same amount counted per line)"
-                        onClick={() => setListKey(m.key)}
-                      >
-                        {m.label}
-                        <span className="ml-1 opacity-70">({listCountLabel(listRows)})</span>
-                      </Button>
-                    )
-                  })}
-                </div>
+                <ListGroupButtons
+                  group="cancel"
+                  listKey={listKey}
+                  onPick={setListKey}
+                  data={query.data}
+                />
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                  2. Open lists
+                </p>
+                <ListGroupButtons
+                  group="open"
+                  listKey={listKey}
+                  onPick={setListKey}
+                  data={query.data}
+                />
+                <p className="text-xs text-slate-500 mb-3 -mt-1 max-w-3xl">
+                  <span className="font-medium text-slate-600">Open — more</span> on one side is the
+                  same as <span className="font-medium text-slate-600">open — less</span> on the
+                  other, so there is no separate Open — less list. Each amount appears once.{' '}
+                  <span className="font-medium text-slate-600">Select overlap</span> takes the
+                  matching count on both sides; leftovers stay unmatched and show on Only after
+                  confirm (Unmatched scope).
+                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                  3. Only lists
+                </p>
+                <ListGroupButtons
+                  group="only"
+                  listKey={listKey}
+                  onPick={setListKey}
+                  data={query.data}
+                />
               </div>
 
               <p className="text-xs text-slate-500 mb-2">
@@ -452,7 +547,12 @@ export default function CountMatchPanel({
                       </TableRow>
                     )}
                     {rows.map((r) => (
-                      <TableRow key={`${listKey}-${r.amountKey}`}>
+                      <TableRow
+                        key={`${listKey}-${r.amountKey}`}
+                        className={
+                          highlightAmountKey === r.amountKey ? 'bg-amber-50' : undefined
+                        }
+                      >
                         <TableTd className="font-medium text-gray-900 tabular-nums">
                           {formatAmount(r.amount, currency)}
                         </TableTd>
@@ -462,15 +562,35 @@ export default function CountMatchPanel({
                         <TableTd className="text-right">
                           {onSelectAmountRows &&
                             (r.cashBookTxIds.length > 0 || r.bankTxIds.length > 0) && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="xs"
-                                className="text-primary-700"
-                                onClick={() => handleSelectRow(r)}
-                              >
-                                Select lines
-                              </Button>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {listKey.startsWith('open_') &&
+                                  Math.min(r.cashBookTxIds.length, r.bankTxIds.length) > 0 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="xs"
+                                      className="text-primary-700"
+                                      title="Select the matching count on both sides. Leftovers stay unmatched and move to Only after you confirm (Unmatched scope)."
+                                      onClick={() => handleSelectRow(r, 'overlap')}
+                                    >
+                                      Select overlap
+                                    </Button>
+                                  )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="xs"
+                                  className="text-primary-700"
+                                  title={
+                                    listKey.startsWith('open_')
+                                      ? 'Select every line at this amount, including the surplus. Confirm match requires equal totals.'
+                                      : 'Select these lines for manual or suggested matching'
+                                  }
+                                  onClick={() => handleSelectRow(r, 'all')}
+                                >
+                                  {listKey.startsWith('open_') ? 'Select all' : 'Select lines'}
+                                </Button>
+                              </div>
                             )}
                         </TableTd>
                       </TableRow>

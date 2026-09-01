@@ -238,6 +238,7 @@ model Project {
   approvedAt              DateTime? @map("approved_at")
   reportNarrative             String?   @map("report_narrative")   // optional executive summary (or auto-generated)
   bankStatementClosingBalance Decimal?  @map("bank_statement_closing_balance") @db.Decimal(18, 2)  // optional: as-per-bank closing for audit comparison
+  cashBookClosingBalance      Decimal?  @map("cash_book_closing_balance") @db.Decimal(18, 2)      // optional: as-per-cash-book / IBIS closing for audit comparison
   preparerComment             String?   @map("preparer_comment")    // optional preparer notes
   reviewerComment         String?   @map("reviewer_comment")    // optional reviewer notes
   workbookNettingMode     String    @default("inherit") @map("workbook_netting_mode") // inherit | on | off | working

@@ -15,6 +15,7 @@ import {
 } from '../lib/api'
 import { canSubmitForReview, canApprove, canUploadDocuments, canDeleteAttachment, canReopenProject, canExportReport } from '../lib/permissions'
 import { formatDate, formatBrsAsAtLine, formatBrsFormalDate, formatPrintDateAccra } from '../lib/format'
+import { formatAmountForReport } from '../lib/currency'
 import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
@@ -84,6 +85,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const [editingComments, setEditingComments] = useState(false)
   const [editNarrative, setEditNarrative] = useState('')
   const [editBankStatementClosingBalance, setEditBankStatementClosingBalance] = useState<string>('')
+  const [editCashBookClosingBalance, setEditCashBookClosingBalance] = useState<string>('')
   const [editPreparerComment, setEditPreparerComment] = useState('')
   const [editReviewerComment, setEditReviewerComment] = useState('')
   const [reportLogoLoadFailed, setReportLogoLoadFailed] = useState(false)
@@ -396,7 +398,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   })
 
   const updateCommentsMutation = useMutation({
-    mutationFn: (body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null }) =>
+    mutationFn: (body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null; cashBookClosingBalance?: number | null }) =>
       projects.updateReportComments(projectId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
@@ -411,6 +413,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const proj = data?.project
     setEditNarrative(proj?.reportNarrative ?? data?.narrative ?? '')
     setEditBankStatementClosingBalance(proj?.bankStatementClosingBalance != null ? String(proj.bankStatementClosingBalance) : '')
+    setEditCashBookClosingBalance(proj?.cashBookClosingBalance != null ? String(proj.cashBookClosingBalance) : '')
     setEditPreparerComment(proj?.preparerComment ?? '')
     setEditReviewerComment(proj?.reviewerComment ?? '')
     setEditingComments(true)
@@ -965,6 +968,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 lines are in Export & download → Full workbook.
               </Alert>
             )}
+            {data?.project?.cashBookClosingBalance == null &&
+              brsStatement?.workbookScheduleTieOutVariance != null &&
+              Math.abs(brsStatement.workbookScheduleTieOutVariance) > 0.02 && (
+              <Alert tone="warning" title="Cash book closing balance not entered" className="mb-4 print:hidden">
+                Enter the as-per-cash-book / IBIS closing figure under Notes if your manual BRS uses a
+                declared balance (common on GT Bank EUR and similar exports). Until then, the platform
+                derives the cash book line from reconciling items.
+              </Alert>
+            )}
             <div className="mt-8 w-full overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm text-slate-900">
                 <colgroup>
@@ -1132,19 +1144,33 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         )}
 
         {/* D2: Bank statement closing balance, Preparer / Reviewer comments */}
-        {((data?.project?.bankStatementClosingBalance != null) || data.preparerComment || data.reviewerComment || editingComments) && (
+        {((data?.project?.bankStatementClosingBalance != null) ||
+          (data?.project?.cashBookClosingBalance != null) ||
+          data.preparerComment ||
+          data.reviewerComment ||
+          editingComments) && (
           <div className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
             <h3 className={`text-sm font-semibold mb-2 ${hasBranding ? '' : 'text-slate-700'}`} style={secondaryColor ? { color: secondaryColor } : undefined}>Notes</h3>
             {editingComments ? (
               <>
-                <div className="max-w-xs">
+                <div className="grid gap-3 sm:grid-cols-2 max-w-2xl">
                   <Input
                     type="number"
                     step="0.01"
-                    label="As per bank statement (optional) — for audit comparison"
+                    label="As per bank statement (optional)"
+                    hint="Closing balance from the bank statement — for audit comparison"
                     value={editBankStatementClosingBalance}
                     onChange={(e) => setEditBankStatementClosingBalance(e.target.value)}
-                    placeholder="e.g. 3950.50"
+                    placeholder="e.g. 83.72"
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    label="As per cash book (optional)"
+                    hint="Declared IBIS / manual BRS closing — GT Bank EUR and similar"
+                    value={editCashBookClosingBalance}
+                    onChange={(e) => setEditCashBookClosingBalance(e.target.value)}
+                    placeholder="e.g. 8977.46"
                   />
                 </div>
                 <Textarea
@@ -1170,6 +1196,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       preparerComment: editPreparerComment || undefined,
                       reviewerComment: editReviewerComment || undefined,
                       bankStatementClosingBalance: editBankStatementClosingBalance.trim() === '' ? null : (Number.isFinite(parseFloat(editBankStatementClosingBalance)) ? parseFloat(editBankStatementClosingBalance) : null),
+                      cashBookClosingBalance: editCashBookClosingBalance.trim() === '' ? null : (Number.isFinite(parseFloat(editCashBookClosingBalance)) ? parseFloat(editCashBookClosingBalance) : null),
                     })}
                     isLoading={updateCommentsMutation.isPending}
                   >
@@ -1187,6 +1214,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               </>
             ) : (
               <div className="space-y-2 text-sm text-slate-700">
+                {data.project?.bankStatementClosingBalance != null && (
+                  <p>
+                    <span className="font-medium text-slate-600">As per bank statement:</span>{' '}
+                    {formatAmountForReport(data.project.bankStatementClosingBalance, currency)}
+                  </p>
+                )}
+                {data.project?.cashBookClosingBalance != null && (
+                  <p>
+                    <span className="font-medium text-slate-600">As per cash book:</span>{' '}
+                    {formatAmountForReport(data.project.cashBookClosingBalance, currency)}
+                  </p>
+                )}
                 {data.preparerComment && <p><span className="font-medium text-slate-600">Preparer:</span> {data.preparerComment}</p>}
                 {data.reviewerComment && <p><span className="font-medium text-slate-600">Reviewer:</span> {data.reviewerComment}</p>}
               </div>

@@ -16,7 +16,7 @@ Canonical user guide: [MAPPING_AND_MATCHING_MANUAL.md](./MAPPING_AND_MATCHING_MA
 | Pattern layers | Ecobank, SCB, GCB, NIB, Prudential, Absa, Bank of Africa |
 | Phase B auto-match | ≥0.85 only for bank-pattern suggestions (`bankPattern` / reason tags) |
 | Profile UI | Bank-specific tip banner from `reconcileProfile.bankFormat` |
-| Count-match diagnostic | Read-only amount-frequency lists (only CB / only bank / open imbalances / batch-cancel schedule). Excel + PDF export; Select lines capped at 50/side. Does **not** clear matches. Lives on Reconcile (not a standalone Tools module). |
+| Count-match diagnostic | Read-only amount-frequency lists (only CB / only bank / open imbalances / batch-cancel schedule). Excel + PDF export; **Select overlap** on Open (min count both sides); Select lines capped at 50/side. Does **not** clear matches. Lives on Reconcile (not a standalone Tools module). |
 | Docs | Mapping & Matching manual, USER_MANUAL, BRS factors (points here) |
 
 ## Product limits (not open gaps)

@@ -778,12 +778,13 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                         type="button"
                         variant="outline"
                         size="sm"
+                        title="Stop suggesting this saved column map for similar uploads. Does not unmap this file."
                         isLoading={forgetLayoutMutation.isPending}
                         onClick={async () => {
                           const ok = await confirm({
                             title: 'Forget this saved layout?',
                             description:
-                              'This column map will no longer be suggested for similar uploads. You can save a new layout by mapping again.',
+                              'This saved column map will no longer be suggested for similar uploads. The current file stays mapped. Map again to save a new layout.',
                             confirmLabel: 'Forget layout',
                             tone: 'warning',
                           })
@@ -804,7 +805,8 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   {preview.layoutMemoryApplied.useCount > 1
                     ? ` (used ${preview.layoutMemoryApplied.useCount}×)`
                     : ''}
-                  . Adjust if needed; saving updates the memory for next time.
+                  . Adjust if needed; applying mapping updates the saved layout for next time. Forget
+                  layout only removes that memory — it does not unmap this file.
                 </Alert>
               )}
               {preview.typeInference?.mismatch && (
