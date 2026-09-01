@@ -56,7 +56,15 @@ export function buildSmartSuggestedMapping(
       const i = find([/^accode$/, /tgl\s*account\s*code/, /account\s*code/, /ac\s*code/, /^code$/])
       if (i >= 0) out.accode = i
     }
-    if (out.amt_received == null) {
+    const tglLayout = find([/tgl\s*account\s*code/]) >= 0
+    const tglDrIdx = normalized.findIndex((h) => h === 'dr')
+    const tglCrIdx = normalized.findIndex((h) => h === 'cr')
+    const tglDrCrSplit = tglLayout && tglDrIdx >= 0 && tglCrIdx >= 0
+    if (tglDrCrSplit) {
+      // IBIS pre-reconciliation export: dr = receipts, cr = payments (acct430 Sheet2 style).
+      if (out.amt_received == null) out.amt_received = tglDrIdx
+      if (out.amt_paid == null) out.amt_paid = tglCrIdx
+    } else if (out.amt_received == null) {
       if (options.preferForeignCurrencyAmounts) {
         const fc = find([/^foreign\s*currency\s*amount$/, /^fc\s*amount$/, /^foreign\s*amount$/, /^fc\s*amt\s*received$/])
         if (fc >= 0) {
@@ -70,7 +78,7 @@ export function buildSmartSuggestedMapping(
         if (i >= 0) out.amt_received = i
       }
     }
-    if (out.amt_paid == null) {
+    if (!tglDrCrSplit && out.amt_paid == null) {
       if (options.preferForeignCurrencyAmounts) {
         const fc = find([/^foreign\s*currency\s*amount$/, /^fc\s*amount$/, /^foreign\s*amount$/, /^fc\s*amt\s*paid$/])
         if (fc >= 0) {
@@ -177,8 +185,8 @@ export function getMappingConfidence(
     doc_ref: [/^doc ref$/, /^doc_ref$/, /^ref$/, /reference/, /voucher/],
     chq_no: [/^chq no$/, /^chq_no$/, /cheque\s*no/, /cheque\s*number/],
     accode: [/^accode$/, /account\s*code/, /ac\s*code/],
-    amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credits?$/, /\bcr\b/],
-    amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debits?$/, /\bdr\b/],
+    amt_received: [/amt\s*received/, /amount\s*received/, /receipts?/, /^received$/, /^credits?$/, /\bcr\b/, /^dr$/],
+    amt_paid: [/amt\s*paid/, /amount\s*paid/, /payments?/, /^paid$/, /^debits?$/, /\bdr\b/, /^cr$/],
     credit: [/^credits?$/, /\bcr\b/, /^deposits?$/, /deposits?/, /^money\s*in$/, /^amount\s*in$/],
     debit: [/^debits?$/, /\bdr\b/, /^payments?$/, /payments?/, /withdrawals?/, /^money\s*out$/, /^amount\s*out$/],
   }

@@ -39,6 +39,21 @@ export function getMappingIssues(
       )
     )
     const tglLayout = headers.some((h) => /tgl\s*account\s*code/i.test(String(h).trim()))
+    const hasTglDrCr =
+      tglLayout &&
+      headers.some((h) => /^dr$/i.test(String(h).trim())) &&
+      headers.some((h) => /^cr$/i.test(String(h).trim()))
+    if (hasTglDrCr && mapping.amt_received != null && mapping.amt_paid != null && mapping.amt_received !== mapping.amt_paid) {
+      const recHdr = String(headers[mapping.amt_received] || '').trim()
+      const payHdr = String(headers[mapping.amt_paid] || '').trim()
+      if (/^dr$/i.test(recHdr) && /^cr$/i.test(payHdr)) {
+        issues.push({
+          severity: 'info',
+          message: 'TGL pre-reconciliation export: dr → receipts, cr → payments.',
+          fix: 'Recommended when you export only the pre-BRS cash book sheet. Foreign Currency Amount also works if you prefer one signed column.',
+        })
+      }
+    }
     if (hasFcColumns) {
       const mappedIdx = mapping[amountField]
       const mappedHeader =

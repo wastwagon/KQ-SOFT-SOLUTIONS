@@ -32,8 +32,8 @@ export const GHANA_BANK_PROFILE_TIPS: Record<
     body: 'Prefer CHECK PAID / INW.CHQ debits with cheque number, YOUR CASH DEPOSIT credits with payee, and MAT.DEPOT matches on Our Reference.',
   },
   gt_bank_eur: {
-    title: 'GT Bank EUR — schedule BRS profile',
-    body: 'The BRS is built on Report from timing rules (uncredited, unpresented, bank-only lines). Matching on this page is optional — do not use Match by counting or bulk auto-match. Do not pair bank charges (SOFITEL, QUAD, DUGOL) to cash book BANKCHG lines. Proceed to Report after Map.',
+    title: 'GT Bank EUR profile',
+    body: 'Report builds uncredited lodgments, unpresented cheques, and bank-only lines from schedule rules — you can leave those timing items unmatched here. Do not pair bank charges (SOFITEL, QUAD, DUGOL) to cash book BANKCHG lines. Enter closing balances on Report and confirm tie-out ≈ 0.',
   },
 }
 

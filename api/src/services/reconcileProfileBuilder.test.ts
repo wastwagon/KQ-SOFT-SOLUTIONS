@@ -11,9 +11,19 @@ describe('buildReconcileProfile', () => {
     })
     expect(profile?.bankFormat).toBe('gt_bank_eur')
     expect(profile?.brsStyle).toBe('schedule_first')
-    expect(profile?.showCountMatch).toBe(false)
-    expect(profile?.encourageAutoMatch).toBe(false)
+    expect(profile?.showCountMatch).toBe(true)
+    expect(profile?.encourageAutoMatch).toBe(true)
     expect(profile?.scheduleBrs).toBe(true)
+  })
+
+  it('shows count match for SCB ghana format', () => {
+    const profile = buildReconcileProfile({
+      project: { currency: 'GHS', name: 'SCB test' },
+      bankAccounts: [{ bankName: 'Standard Chartered' }],
+      ecobankActive: false,
+      ghanaBankFormat: 'scb',
+    })
+    expect(profile?.showCountMatch).toBe(true)
   })
 
   it('prefers ecobank over gt when both active flags supplied', () => {

@@ -13,9 +13,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 const DATA = process.env.BRS_DATA_DIR
   ? path.resolve(process.env.BRS_DATA_DIR)
-  : fs.existsSync(path.join(ROOT, 'acct430', 'acct430 cash book.xlsx'))
+  : fs.existsSync(path.join(ROOT, 'acct430', 'cashbook.xlsx'))
     ? path.join(ROOT, 'acct430')
-    : path.join(ROOT, 'testofacct430')
+    : fs.existsSync(path.join(ROOT, 'acct430', 'acct430 cash book.xlsx'))
+      ? path.join(ROOT, 'acct430')
+      : path.join(ROOT, 'testofacct430')
 
 const API = process.env.API_URL || 'http://localhost:9101'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'firm@test.com'
@@ -203,7 +205,10 @@ async function main() {
   console.log('API:', API)
   console.log('Data:', DATA)
 
-  for (const f of ['acct430 cash book.xlsx', 'acct430 bank statement.xlsx']) {
+  const cashFile = fs.existsSync(path.join(DATA, 'cashbook.xlsx'))
+    ? 'cashbook.xlsx'
+    : 'acct430 cash book.xlsx'
+  for (const f of [cashFile, 'acct430 bank statement.xlsx']) {
     if (!fs.existsSync(path.join(DATA, f))) throw new Error(`Missing ${f}`)
   }
 
@@ -242,7 +247,7 @@ async function main() {
 
   const proj = await api('GET', `/projects/${project.slug}`, token)
   if (!proj.documents?.length) {
-    const cb = path.join(DATA, 'acct430 cash book.xlsx')
+    const cb = path.join(DATA, cashFile)
     const bank = path.join(DATA, 'acct430 bank statement.xlsx')
     const acct = 'GT Bank EUR 201/105646/430'
     const acctNo = '201/105646/430'

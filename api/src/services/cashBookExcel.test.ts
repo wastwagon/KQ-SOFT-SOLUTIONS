@@ -41,6 +41,26 @@ describe('cashBookExcel', () => {
     expect(tglDrCr).toBe(29)
   })
 
+  it('suggests TGL dr/cr split columns for pre-reconciliation export', () => {
+    const headers = [
+      'TGL Account Code',
+      'Transaction Date',
+      'Description',
+      'Amount',
+      'Foreign Currency Amount',
+      'dr',
+      'cr',
+    ]
+    const rec = buildSuggestedMappingForDocument('cash_book_receipts', headers, null, {
+      projectCurrency: 'EUR',
+    })
+    const pay = buildSuggestedMappingForDocument('cash_book_payments', headers, null, {
+      projectCurrency: 'EUR',
+    })
+    expect(headers[rec.amt_received!]).toBe('dr')
+    expect(headers[pay.amt_paid!]).toBe('cr')
+  })
+
   it('picks a transaction sheet for Grace Baptist acct002 cash book', () => {
     if (!fs.existsSync(ACCT002_CASH)) return
     const best = pickBestExcelSheetIndex(ACCT002_CASH, 'cash_book_payments')

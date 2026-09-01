@@ -861,12 +861,21 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 </Alert>
               )}
               {preview.tglErpLayout && (
-                <Alert tone="info" title="TGL / IBIS cash book — original column titles">
-                  Column names match your Excel export (Transaction Date, Description, Amount,
-                  Foreign Currency Amount, TGL Account Code, etc.). Amount columns use{' '}
-                  <strong>signed values</strong>: negative = receipt, positive = payment. For a euro
-                  bank account, map Amount received/paid to <strong>Foreign Currency Amount</strong>{' '}
-                  — not Amount (cedi equivalent).
+                <Alert tone="info" title="TGL / IBIS cash book">
+                  {preview.sheetNames && preview.sheetNames.length === 1 ? (
+                    <>
+                      Single worksheet — no tab selection needed. If this is your{' '}
+                      <strong>pre-reconciliation export</strong> (recommended), map and bulk-apply as usual.
+                    </>
+                  ) : (
+                    <>
+                      Multiple worksheets — use the pre-reconciliation sheet (not post-BRS updates). The app
+                      auto-picks the best tab when you bulk-apply.
+                    </>
+                  )}{' '}
+                  Amount columns: map receipts to <strong>dr</strong> and payments to <strong>cr</strong> when
+                  those columns exist; otherwise use <strong>Foreign Currency Amount</strong> (signed:
+                  negative = receipt, positive = payment) for euro accounts — not Amount (cedi).
                 </Alert>
               )}
               {preview.hasForeignCurrencyColumns && !preview.tglErpLayout && (
@@ -885,7 +894,8 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 </Alert>
               )}
               {preview.hasForeignCurrencyColumns && preview.tglErpLayout && preview.projectCurrency &&
-                preview.projectCurrency.toUpperCase() !== 'GHS' && (
+                preview.projectCurrency.toUpperCase() !== 'GHS' &&
+                !preview.headers.some((h) => /^dr$/i.test(String(h).trim()) && (
                 <Alert tone="info" title={`Project currency: ${preview.projectCurrency}`}>
                   Foreign Currency Amount is suggested for Amount received/paid (euro/USD). Amount is
                   the cedi (GHS) equivalent — use only if reconciling in cedis.

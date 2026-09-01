@@ -321,11 +321,11 @@ Every project follows **Upload → Map → Reconcile → Review → Report**. Th
 | Profile | On Reconcile | Match by counting | Bulk auto-match | BRS built on |
 |---------|--------------|-------------------|-----------------|--------------|
 | **Ecobank** | Match + clearing patterns | Yes (Cancel / Open / Only) | Encouraged | Report (+ workbook netting if enabled) |
-| **SCB / GCB / NIB / …** | Match pattern suggestions | No | Encouraged | Report |
-| **GT Bank EUR** | **Optional** — leave timing items open | **No** | **Do not use** | **Report schedule rules** |
+| **SCB / GCB / NIB / …** | Match pattern suggestions | Yes | Encouraged | Report |
+| **GT Bank EUR** | Match suggestions (timing items can stay open) | Yes | Encouraged | Report schedule rules |
 | **Generic** | Match safe suggestions | No | Optional | Report |
 
-**GT Bank EUR (schedule BRS):** Map Sheet2 cash book (`dr` / `cr` or Foreign Currency Amount), enter closing balances on Report, tie-out ≈ 0. **Zero matches on Reconcile is correct.** Do not pair bank charges (SOFITEL, QUAD, DUGOL) to cash book BANKCHG lines.
+**GT Bank EUR:** Export only the **pre-reconciliation** cash book sheet when possible (one worksheet — no tab confusion). Map **dr** → receipts, **cr** → payments, or Foreign Currency Amount. Enter closing balances on Report; tie-out ≈ 0. Leave uncredited / unpresented items unmatched — Report adds them. Do not pair bank charges (SOFITEL, QUAD, DUGOL) to cash book BANKCHG lines.
 
 ### Ecobank Ghana tips
 
@@ -345,7 +345,7 @@ When the Ecobank Ghana BRS profile is active:
 | **Prudential** | Inward clearing (bank **debit**), cheque withdrawal, NRT |
 | **Absa** | Investment bank, EBOX, FT ref |
 | **Bank of Africa** | Inward cheque (CHECK PAID), cash deposit, maturity (MAT.DEPOT) |
-| **GT Bank EUR** | Schedule BRS — no bulk match; CANBNKCHG → uncredited, BANKCHRG → unpresented on Report |
+| **GT Bank EUR** | Leave timing items open; match others if helpful | CANBNKCHG / BANKCHRG on Report |
 
 ### Best practice for cheques
 
@@ -463,9 +463,9 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 
 **Schedule-first profiles (GT Bank EUR):**
 
-1. Confirm Map counts (e.g. 20 receipts / 9 payments on Sheet2)  
-2. **Proceed to Report** — matching on Reconcile is optional  
-3. Enter bank and cash book closing balances  
+1. Confirm Map counts (e.g. 20 receipts / 9 payments)  
+2. Match only if helpful — **leave lodgments and unpresented cheques open**  
+3. **Proceed to Report** — enter closing balances  
 4. Confirm tie-out ≈ 0  
 
 ### Keyboard / selection tips
