@@ -177,7 +177,10 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
     let typeInference: DocumentTypeInference | undefined
 
     const ft = detectFileType(doc.filepath)
-    let sheetIndex = ft === 'excel' ? pickBestExcelSheetIndex(doc.filepath, docType) : 0
+    let sheetIndex =
+      ft === 'excel'
+        ? (doc.excelSheetIndex ?? pickBestExcelSheetIndex(doc.filepath, docType))
+        : 0
     let parsed = await parseDocumentFile(doc.filepath, docType, sheetIndex)
 
     typeInference = inferDocumentFamily(parsed.headers, {
@@ -279,6 +282,13 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
     if (learned.match) {
       await touchLayoutMemoryUse(learned.match.id).catch(() => undefined)
     }
+    await prisma.document.update({
+      where: { id: documentId },
+      data: {
+        excelSheetIndex: sheetIndex,
+        columnMapping: mapping as object,
+      },
+    })
     await markDocumentParseReady(
       documentId,
       `Auto-mapped ${result.count} transaction(s)`

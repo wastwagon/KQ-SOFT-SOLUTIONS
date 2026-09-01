@@ -10,6 +10,7 @@ import {
   normalizeErpGlCashBookTable,
   normalizeTglErpCashBookTable,
   pickBestExcelSheetIndex,
+  countTglDrCrTransactions,
 } from './cashBookExcel.js'
 import { buildSuggestedMappingForDocument, canAutoMap } from './autoMapDocument.js'
 import { parseImportedAmount } from './amountParser.js'
@@ -18,6 +19,7 @@ import { parseExcel } from './parser.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ACCT002_CASH = path.join(__dirname, '../../../testdataandresultsforacct002/cash book acct 2.xlsx')
 const ACCT4702_CASH = path.join(__dirname, '../../../specimenbankstatementformats/acct4702 cashbk.xlsx')
+const ACCT430_CASH = path.join(__dirname, '../../../acct430/acct430 cash book.xlsx')
 const ADB_CASH = path.join(__dirname, '../../../adbstatementsformat/ADB cash bk.xlsx')
 
 describe('cashBookExcel', () => {
@@ -28,6 +30,15 @@ describe('cashBookExcel', () => {
       [9, '04-SEP-17', '', 'CHEQUE', '', '', '', '', '', '', 1200, 145.74],
     ]
     expect(findCashBookTransactionHeaderRow(data)).toBe(1)
+  })
+
+  it('picks pre-reconciliation TGL sheet (acct430 Sheet2 not Sheet1)', () => {
+    if (!fs.existsSync(ACCT430_CASH)) return
+    const best = pickBestExcelSheetIndex(ACCT430_CASH, 'cash_book_receipts')
+    expect(best).toBe(1)
+    const parsed = parseExcel(ACCT430_CASH, best)
+    const tglDrCr = countTglDrCrTransactions(parsed)
+    expect(tglDrCr).toBe(29)
   })
 
   it('picks a transaction sheet for Grace Baptist acct002 cash book', () => {

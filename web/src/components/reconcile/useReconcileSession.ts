@@ -108,7 +108,11 @@ interface ReconcileApiResponse {
   reconcileProfile?: {
     bankFormat: string
     ghanaBrs: boolean
+    brsStyle?: 'match_first' | 'schedule_first'
     clearingDateWindowDays: number
+    showCountMatch?: boolean
+    encourageAutoMatch?: boolean
+    scheduleBrs?: boolean
     workbookNetting?: boolean
   } | null
   project?: { currency?: string }

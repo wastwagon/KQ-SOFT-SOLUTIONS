@@ -59,6 +59,7 @@ import {
   computeGtBankEurTimingSchedule,
   isGtBankEurScope,
 } from '../services/gtBankEurWorkbookSchedule.js'
+import { buildReconcileProfile } from '../services/reconcileProfileBuilder.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -1104,56 +1105,49 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     preparerComment: (project as { preparerComment?: string | null }).preparerComment ?? null,
     reviewerComment: (project as { reviewerComment?: string | null }).reviewerComment ?? null,
     reportLanguageProfile,
-    reconcileProfile: ecobankProfile.active
-      ? {
-          bankFormat: 'ecobank' as const,
-          ghanaBrs: true,
-          clearingDateWindowDays: ecobankProfile.clearingDateWindowDays,
-          workbookNetting: ecobankProfile.workbookNetting,
-          workbookNettingMode: workbookNettingResolution.mode,
-          workbookNettingSource: workbookNettingResolution.source,
-          ...(unpresentedResolved.workbook
-            ? {
-                workbookNettingDetail: {
-                  sectionATotal: unpresentedResolved.workbook.sectionATotal,
-                  sectionBTotal: unpresentedResolved.workbook.sectionBTotal,
-                  sectionCOffsetTotal: unpresentedResolved.workbook.sectionCOffsetTotal,
-                  matchedB1Add: unpresentedResolved.workbook.matchedB1Add,
-                  matchedCAdd: unpresentedResolved.workbook.matchedCAdd,
-                  group2Net: unpresentedResolved.workbook.group2Net,
-                  group3OffsetTotal: unpresentedResolved.workbook.group3OffsetTotal,
-                  group3Net: unpresentedResolved.workbook.group3Net,
-                  round1PairCount: unpresentedResolved.workbook.round1Pairs.length,
-                  round1MatchedPairCount: unpresentedResolved.workbook.round1MatchedPairs.length,
-                  round2PairCount: unpresentedResolved.workbook.round2Pairs.length,
-                  round2PaymentOffset: unpresentedResolved.workbook.round2Pairs.reduce(
-                    (s, p) => s + p.amount,
-                    0
-                  ),
-                  workbookUnpresented: unpresentedResolved.workbook.unpresentedChequesTotal,
-                  legacyUnpresented: clearingBrsTotals.unpresentedChequesTotal,
-                  applied: unpresentedChequesTotal,
-                  ...(workingPaperDetail
-                    ? {
-                        workingPaperUnpresented: workingPaperDetail.unpresentedChequesTotal,
-                        workingPaperSectionA: workingPaperDetail.sectionATotal,
-                        workingPaperOpenB1: workingPaperDetail.openB1Total,
-                        workingPaperBankOnlyDebitsDelta: workingPaperDetail.bankOnlyDebitsDelta,
-                        schedule: 'working' as const,
-                      }
-                    : { schedule: 'face' as const }),
-                },
-              }
-            : {}),
-        }
-      : ghanaBankFormat
+    reconcileProfile: buildReconcileProfile({
+      project,
+      bankAccounts: project.bankAccounts || [],
+      sampleBankText,
+      ecobankActive: ecobankProfile.active,
+      ecobankClearingDateWindowDays: ecobankProfile.clearingDateWindowDays,
+      ecobankWorkbookNetting: ecobankProfile.workbookNetting,
+      workbookNettingMode: workbookNettingResolution.mode,
+      workbookNettingSource: workbookNettingResolution.source,
+      workbookNettingDetail: unpresentedResolved.workbook
         ? {
-            bankFormat: ghanaBankFormat,
-            ghanaBrs: true,
-            clearingDateWindowDays: 3,
-            workbookNetting: false,
+            sectionATotal: unpresentedResolved.workbook.sectionATotal,
+            sectionBTotal: unpresentedResolved.workbook.sectionBTotal,
+            sectionCOffsetTotal: unpresentedResolved.workbook.sectionCOffsetTotal,
+            matchedB1Add: unpresentedResolved.workbook.matchedB1Add,
+            matchedCAdd: unpresentedResolved.workbook.matchedCAdd,
+            group2Net: unpresentedResolved.workbook.group2Net,
+            group3OffsetTotal: unpresentedResolved.workbook.group3OffsetTotal,
+            group3Net: unpresentedResolved.workbook.group3Net,
+            round1PairCount: unpresentedResolved.workbook.round1Pairs.length,
+            round1MatchedPairCount: unpresentedResolved.workbook.round1MatchedPairs.length,
+            round2PairCount: unpresentedResolved.workbook.round2Pairs.length,
+            round2PaymentOffset: unpresentedResolved.workbook.round2Pairs.reduce(
+              (s, p) => s + p.amount,
+              0
+            ),
+            workbookUnpresented: unpresentedResolved.workbook.unpresentedChequesTotal,
+            legacyUnpresented: clearingBrsTotals.unpresentedChequesTotal,
+            applied: unpresentedChequesTotal,
+            ...(workingPaperDetail
+              ? {
+                  workingPaperUnpresented: workingPaperDetail.unpresentedChequesTotal,
+                  workingPaperSectionA: workingPaperDetail.sectionATotal,
+                  workingPaperOpenB1: workingPaperDetail.openB1Total,
+                  workingPaperBankOnlyDebitsDelta: workingPaperDetail.bankOnlyDebitsDelta,
+                  schedule: 'working' as const,
+                }
+              : { schedule: 'face' as const }),
           }
-        : null,
+        : undefined,
+      ghanaBankFormat,
+      defaultDateWindowDays: 3,
+    }),
     brsStatement: {
       bankClosingBalance,
       bankClosingBalanceLegacy,

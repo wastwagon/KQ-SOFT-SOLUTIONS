@@ -207,6 +207,22 @@ export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
   return { ...result, headers: outHeaders, rows: outRows }
 }
 
+/** Count rows with populated dr/cr on TGL pre-reconciliation extracts (acct430 Sheet2 vs Sheet1). */
+export function countTglDrCrTransactions(parsed: ParseResult): number | null {
+  if (!isTglErpCashBookLayout(parsed.headers)) return null
+  const normHeaders = parsed.headers.map((h) => norm(String(h ?? '')))
+  const drIdx = normHeaders.findIndex((h) => h === 'dr')
+  const crIdx = normHeaders.findIndex((h) => h === 'cr')
+  if (drIdx < 0 || crIdx < 0) return null
+  let count = 0
+  for (const row of parsed.rows) {
+    const dr = drIdx >= 0 ? parseImportedAmount(row[drIdx]) : 0
+    const cr = crIdx >= 0 ? parseImportedAmount(row[crIdx]) : 0
+    if (dr > 0 || cr > 0) count++
+  }
+  return count
+}
+
 /** Prefer detail sheets over monthly summary tabs (e.g. acct002 Sheet1 vs Sheet2). */
 export function scoreExcelSheetForDocument(
   parsed: ParseResult,
@@ -232,7 +248,15 @@ export function scoreExcelSheetForDocument(
   else score -= 100
   if (suggested[amountField] != null) score += 30
   else score -= 40
-  score += Math.min(rows.length, 80)
+
+  const tglDrCrCount = countTglDrCrTransactions(parsed)
+  if (tglDrCrCount != null) {
+    // Pre-reconciliation TGL extracts (dr/cr) have fewer rows than post-BRS Sheet1 copies.
+    score += 50
+    score += Math.max(0, 80 - tglDrCrCount)
+  } else {
+    score += Math.min(rows.length, 80)
+  }
 
   const cleanRows = rows.filter(
     (r) => !r.some((c) => typeof c === 'string' && (c.includes('\r\n') || c.includes('\n')))
@@ -261,12 +285,22 @@ export function pickBestExcelSheetIndex(filepath: string, docType: DocumentType)
   let best = 0
   let bestScore = Number.NEGATIVE_INFINITY
   let bestRows = -1
+  let bestTglDrCr: number | null = null
   for (let si = 0; si < wb.SheetNames.length; si++) {
     const parsed = parseExcel(filepath, si)
     const score = scoreExcelSheetForDocument(parsed, docType)
-    if (score > bestScore || (score === bestScore && parsed.rows.length > bestRows)) {
+    const tglDrCr = countTglDrCrTransactions(parsed)
+    const better =
+      score > bestScore ||
+      (score === bestScore &&
+        tglDrCr != null &&
+        bestTglDrCr != null &&
+        tglDrCr < bestTglDrCr) ||
+      (score === bestScore && tglDrCr == null && parsed.rows.length > bestRows)
+    if (better) {
       bestScore = score
       bestRows = parsed.rows.length
+      bestTglDrCr = tglDrCr
       best = si
     }
   }

@@ -15,6 +15,7 @@ import {
 } from '../services/matching.js'
 import { resolveMatchSides } from '../services/sideInversion.js'
 import { buildCountMatchDiagnostic } from '../services/countMatchDiagnostic.js'
+import { buildReconcileProfile } from '../services/reconcileProfileBuilder.js'
 import {
   detectDuplicateChequePayments,
   isEcobankPatternMatchReason,
@@ -1097,23 +1098,18 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     },
     reconcileFetchLimit: limit,
     suggestionCap,
-    reconcileProfile: ecobankProfile.active
-      ? {
-          bankFormat: 'ecobank' as const,
-          ghanaBrs: true,
-          clearingDateWindowDays,
-          workbookNetting: ecobankProfile.workbookNetting,
-          workbookNettingMode: workbookNettingResolution.mode,
-          workbookNettingSource: workbookNettingResolution.source,
-        }
-      : ghanaBankFormat
-        ? {
-            bankFormat: ghanaBankFormat,
-            ghanaBrs: true,
-            clearingDateWindowDays: matchOptions.dateWindowDays,
-            workbookNetting: false,
-          }
-        : null,
+    reconcileProfile: buildReconcileProfile({
+      project,
+      bankAccounts: project.bankAccounts || [],
+      sampleBankText,
+      ecobankActive: ecobankProfile.active,
+      ecobankClearingDateWindowDays: clearingDateWindowDays,
+      ecobankWorkbookNetting: ecobankProfile.workbookNetting,
+      workbookNettingMode: workbookNettingResolution.mode,
+      workbookNettingSource: workbookNettingResolution.source,
+      ghanaBankFormat,
+      defaultDateWindowDays: matchOptions.dateWindowDays,
+    }),
     duplicateChequeWarnings,
     flaggedBankIds,
     existingMatches: project.matches.length,

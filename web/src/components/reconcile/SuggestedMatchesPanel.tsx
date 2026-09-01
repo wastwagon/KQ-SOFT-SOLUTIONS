@@ -33,6 +33,8 @@ interface SuggestedMatchesPanelProps {
   isMatching: boolean
   onForgetMemory?: (memoryId: string) => void
   isForgettingMemory?: boolean
+  /** When false (schedule-first BRS), hide bulk auto-match actions. */
+  encourageAutoMatch?: boolean
 }
 
 export default function SuggestedMatchesPanel({
@@ -52,6 +54,7 @@ export default function SuggestedMatchesPanel({
   isMatching,
   onForgetMemory,
   isForgettingMemory = false,
+  encourageAutoMatch = true,
 }: SuggestedMatchesPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [listCount, setListCount] = useState(150)
@@ -73,9 +76,11 @@ export default function SuggestedMatchesPanel({
     <Card
       title="Suggested matches"
       sublabel={
-        canBulk
-          ? 'Click a suggestion to pre-select, or tick to bulk-select.'
-          : 'Click a suggestion to pre-select, then click Match.'
+        encourageAutoMatch
+          ? canBulk
+            ? 'Click a suggestion to pre-select, or tick to bulk-select.'
+            : 'Click a suggestion to pre-select, then click Match.'
+          : 'Reference only for schedule BRS — do not bulk-match. Open Report for uncredited, unpresented, and bank-only lines.'
       }
       actions={
         <Button
@@ -95,7 +100,7 @@ export default function SuggestedMatchesPanel({
         <MatchSettingsPanel value={matchParams} onChange={onMatchParamsChange} />
       )}
 
-      {canBulk && (
+      {canBulk && encourageAutoMatch && (
         <div className="flex flex-wrap gap-2 mb-4">
           {onPhasedAutoMatch && (
             <Button

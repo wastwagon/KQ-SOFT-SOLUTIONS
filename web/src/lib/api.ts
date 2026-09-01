@@ -83,6 +83,10 @@ export interface DocumentPreviewResponse {
   sheetNames?: string[]
   /** Excel only: worksheet index used for this preview (after server clamping). */
   sheetIndex?: number
+  /** Last successfully mapped worksheet (re-open Map uses this). */
+  savedSheetIndex?: number
+  /** Last successful column mapping (same sheet as savedSheetIndex). */
+  savedMapping?: Record<string, number>
   canonicalFields?: string[]
   detectedBankFormat?: string
   suggestedMapping?: Record<string, number>
@@ -312,9 +316,13 @@ export interface ReportResponse {
     }
   }
   reconcileProfile?: {
-    bankFormat?: 'ecobank' | string
+    bankFormat?: 'ecobank' | 'gt_bank_eur' | string
     ghanaBrs?: boolean
+    brsStyle?: 'match_first' | 'schedule_first'
     clearingDateWindowDays?: number
+    showCountMatch?: boolean
+    encourageAutoMatch?: boolean
+    scheduleBrs?: boolean
     workbookNetting?: boolean
     workbookNettingMode?: 'inherit' | 'on' | 'off' | 'working'
     workbookNettingSource?: 'query' | 'project' | 'org' | 'platform' | 'env' | 'off'

@@ -5,9 +5,9 @@
 **Audience:** Preparers, reviewers, and trainers  
 **Updated:** August 2026
 
-This guide explains how to **map** uploaded files to the correct columns and **match** cash book lines to bank statement lines. It is the detailed companion to the main [User Manual](/user-manual.md).
+This guide explains how to **map** uploaded files to the correct columns and **match** cash book lines to bank statement lines. It is the detailed companion to the main [User Manual](../web/public/user-manual.md).
 
-> **Maintainers:** keep this file aligned with the repo copy `docs/MAPPING_AND_MATCHING_MANUAL.md` (this public file is what the in-app mapping page loads).
+> **In-app copy:** also update [`web/public/mapping-and-matching-manual.md`](../web/public/mapping-and-matching-manual.md) — that is what the product mapping page serves.
 
 ---
 
@@ -167,7 +167,7 @@ For supported banks, the system may:
 - Suggest normalized column mappings.
 - Apply mapping on upload when confidence is medium or high.
 
-**Supported banks include:** Ecobank, GCB, Standard Chartered (SCB), NIB, ADB, Bank of Africa, Bank of Ghana (BOG), Prudential, UMB, Access, Stanbic, Fidelity, UBA, and Absa.
+**Supported banks include:** Ecobank, GCB, Standard Chartered (SCB), NIB, ADB, Bank of Africa, Bank of Ghana (BOG), Prudential, UMB, Access, Stanbic, Fidelity, UBA, and Absa. See [Supported Ghana Banks](../docs/SUPPORTED_BANKS.md) for column layouts.
 
 **Ecobank tip:** If you see Payments/Deposits layout, prefer Excel exports. Map **Debit** for the bank debits document and **Credit** for the bank credits document (Payments → Debit, Deposits → Credit after normalization).
 
@@ -239,7 +239,7 @@ A matched row cannot be matched again until you **unmatch** it.
 
 **Bank pattern layers:** When the reconcile profile detects Ecobank, SCB, GCB, NIB, Prudential, Absa, or Bank of Africa, dedicated pattern suggestions (clearing, INW CLG, cheque paid, telex, EBOX/FT, MAT.DEPOT, etc.) are ranked ahead of generic pairs. Unique-amount-only pattern tips stay below the Phase B auto-match floor so they need human review.
 
-**Limits (by design):** Each project is **one currency** — matching does not convert FX. Partial/open-item amounts (pro-rata) are not suggested; use 1-to-many / many-to-1 when several lines sum to a full amount. Many-to-many confirm requires cash-book and bank sides to **sum to the same total**.
+**Limits (by design):** Each project is **one currency** — matching does not convert FX. Partial/open-item amounts (pro-rata) are not suggested; use 1-to-many / many-to-1 when several lines sum to a full amount. Many-to-many confirm requires cash-book and bank sides to **sum to the same total**. See [MATCHING_GO_LIVE.md](./MATCHING_GO_LIVE.md) for go-live close-out status.
 
 ### Match by counting (diagnostic)
 
@@ -314,6 +314,19 @@ The **Confirmed matches** panel lists pairs you have already linked. From here y
 - **Clear all** — remove all matches (use with care)  
 - **Upload evidence** — attach a supporting file to a match (e.g. remittance advice)
 
+### Bank profile — same steps, different Reconcile rules
+
+Every project follows **Upload → Map → Reconcile → Review → Report**. The app detects a **bank profile** and shows guidance on Reconcile. Follow the profile — do not use one bank’s procedure for another.
+
+| Profile | On Reconcile | Match by counting | Bulk auto-match | BRS built on |
+|---------|--------------|-------------------|-----------------|--------------|
+| **Ecobank** | Match + clearing patterns | Yes (Cancel / Open / Only) | Encouraged | Report (+ workbook netting if enabled) |
+| **SCB / GCB / NIB / …** | Match pattern suggestions | No | Encouraged | Report |
+| **GT Bank EUR** | **Optional** — leave timing items open | **No** | **Do not use** | **Report schedule rules** |
+| **Generic** | Match safe suggestions | No | Optional | Report |
+
+**GT Bank EUR (schedule BRS):** Map Sheet2 cash book (`dr` / `cr` or Foreign Currency Amount), enter closing balances on Report, tie-out ≈ 0. **Zero matches on Reconcile is correct.** Do not pair bank charges (SOFITEL, QUAD, DUGOL) to cash book BANKCHG lines.
+
 ### Ecobank Ghana tips
 
 When the Ecobank Ghana BRS profile is active:
@@ -332,6 +345,7 @@ When the Ecobank Ghana BRS profile is active:
 | **Prudential** | Inward clearing (bank **debit**), cheque withdrawal, NRT |
 | **Absa** | Investment bank, EBOX, FT ref |
 | **Bank of Africa** | Inward cheque (CHECK PAID), cash deposit, maturity (MAT.DEPOT) |
+| **GT Bank EUR** | Schedule BRS — no bulk match; CANBNKCHG → uncredited, BANKCHRG → unpresented on Report |
 
 ### Best practice for cheques
 
@@ -438,12 +452,21 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 
 ### Reconcile — typical monthly workflow
 
+**Match-first profiles (Ecobank, SCB, GCB, …):**
+
 1. **Receipts vs Credits** → match or leave lodgments unmatched  
 2. **Payments vs Debits** → match or leave unpresented cheques unmatched  
 3. Review **Suggested matches** with **Strict** settings first  
 4. Use **Auto-match all** for remaining safe pairs  
 5. Manually match exceptions  
 6. **Proceed to Review**
+
+**Schedule-first profiles (GT Bank EUR):**
+
+1. Confirm Map counts (e.g. 20 receipts / 9 payments on Sheet2)  
+2. **Proceed to Report** — matching on Reconcile is optional  
+3. Enter bank and cash book closing balances  
+4. Confirm tie-out ≈ 0  
 
 ### Keyboard / selection tips
 
@@ -477,12 +500,11 @@ Use this when onboarding preparers:
 - [ ] Upload sample cash book as **Both** and bank statement as **Both**
 - [ ] Complete **bulk apply** mapping on first run
 - [ ] Re-map one document individually and read mapping issues
-- [ ] Match 5 receipt↔credit pairs manually
-- [ ] Match 5 payment↔debit pairs manually
-- [ ] Try **Strict** vs **Amount + Date** matching settings
-- [ ] Leave one lodgment and one unpresented cheque unmatched
-- [ ] Unmatch and re-match one pair
-- [ ] Proceed to Review and confirm exceptions appear correctly
+- [ ] Read the **bank profile banner** on Reconcile (Ecobank vs GT Bank EUR vs SCB)
+- [ ] **Match-first only:** match 5 receipt↔credit and 5 payment↔debit pairs manually
+- [ ] **Match-first only:** try **Strict** vs **Amount + Date** matching settings
+- [ ] Leave one lodgment and one unpresented cheque unmatched (or use GT Bank EUR schedule on Report)
+- [ ] **Proceed to Report** and confirm tie-out ≈ 0
 
 ---
 

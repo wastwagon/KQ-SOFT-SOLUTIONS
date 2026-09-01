@@ -198,6 +198,9 @@ export default function ProjectReconcile({
       ? ghanaBankProfileTip(data.reconcileProfile?.bankFormat)
       : null
   const ghanaWindowDays = data.reconcileProfile?.clearingDateWindowDays
+  const scheduleFirstBrs = data.reconcileProfile?.brsStyle === 'schedule_first'
+  const showCountMatch = data.reconcileProfile?.showCountMatch !== false
+  const encourageAutoMatch = data.reconcileProfile?.encourageAutoMatch !== false
   const hasWarnings =
     anyTruncated ||
     (receipts.length === 0 && (view === 'receipts' || view === 'all')) ||
@@ -211,8 +214,20 @@ export default function ProjectReconcile({
       <WorkflowStepIntro
         eyebrow="Match"
         title="Reconcile transactions"
-        subtitle="Match cash book receipts and payments to bank credits and debits. Confirm suggestions, or select rows and match yourself."
+        subtitle={
+          scheduleFirstBrs
+            ? 'Optional for this bank profile — the BRS is built on Report from timing rules. You may leave items unmatched.'
+            : 'Match cash book receipts and payments to bank credits and debits. Confirm suggestions, or select rows and match yourself.'
+        }
       />
+
+      {canReconcile && scheduleFirstBrs && (
+        <Alert tone="info" title="Schedule BRS profile — matching optional">
+          This project uses a <strong>workbook schedule</strong> (uncredited, unpresented, bank-only lines on Report).
+          You do not need to confirm suggested matches. Avoid bulk auto-match and Match by counting — proceed to{' '}
+          <strong>Report</strong> after Map and enter closing balances.
+        </Alert>
+      )}
 
       <BrsHelp variant="reconcile" />
 
@@ -306,7 +321,7 @@ export default function ProjectReconcile({
         </details>
       )}
 
-      {canReconcile && (
+      {canReconcile && showCountMatch && (
         <CountMatchPanel
           projectId={projectId}
           projectName={(data.project as { name?: string } | undefined)?.name}
@@ -346,6 +361,7 @@ export default function ProjectReconcile({
           isMatching={bulkMatchMutation.isPending}
           onForgetMemory={(id) => forgetMemoryMutation.mutate(id)}
           isForgettingMemory={forgetMemoryMutation.isPending}
+          encourageAutoMatch={encourageAutoMatch}
         />
       )}
 

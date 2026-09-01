@@ -74,7 +74,9 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       const rawSheet = req.query.sheetIndex
       const hasSheetQuery =
         rawSheet !== undefined && rawSheet !== null && String(rawSheet).trim() !== ''
-      const requested = hasSheetQuery ? parseSheetIndexQuery(rawSheet) : pickBestExcelSheetIndex(localPath, doc.type)
+      const requested = hasSheetQuery
+        ? parseSheetIndexQuery(rawSheet)
+        : (doc.excelSheetIndex ?? pickBestExcelSheetIndex(localPath, doc.type))
       result = await parseDocumentFile(doc.filepath, doc.type, requested)
       const names = result.sheetNames ?? []
       const active = result.activeSheet
@@ -211,6 +213,11 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       totalRows: result.rows.length,
       sheetNames: result.sheetNames,
       sheetIndex: excelPreviewSheetIndex,
+      savedSheetIndex: doc.excelSheetIndex ?? undefined,
+      savedMapping:
+        doc.columnMapping && typeof doc.columnMapping === 'object' && !Array.isArray(doc.columnMapping)
+          ? (doc.columnMapping as Record<string, number>)
+          : undefined,
       canonicalFields: doc.type.startsWith('cash_book_') ? CANONICAL_CASH_BOOK : CANONICAL_BANK,
       detectedBankFormat: detectedBankFormat ?? undefined,
       suggestedMapping,
@@ -334,6 +341,13 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
       mapping,
       parseMethodHint: result.parseMethod,
     }).catch(() => undefined)
+    await prisma.document.update({
+      where: { id },
+      data: {
+        excelSheetIndex: body.sheetIndex ?? 0,
+        columnMapping: mapping as object,
+      },
+    })
     await markDocumentParseReady(id, `Mapped ${applied.count} transaction(s)`).catch(() => undefined)
     res.json({
       count: applied.count,

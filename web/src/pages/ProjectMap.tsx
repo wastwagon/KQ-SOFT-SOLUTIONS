@@ -306,6 +306,16 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     }
     if (!Object.keys(mapping).length && selectedDoc) {
       const headers = preview.headers || []
+      const saved =
+        preview.savedMapping &&
+        preview.savedSheetIndex != null &&
+        preview.sheetIndex === preview.savedSheetIndex
+          ? preview.savedMapping
+          : undefined
+      if (saved && Object.keys(saved).length) {
+        setMapping(saved)
+        return
+      }
       const isCashBook = (selectedDoc as { type?: string }).type?.startsWith('cash_book_') ?? false
       const suggested = mergedSuggestedFromPreview(headers, isCashBook, preview)
       setMapping(suggested)

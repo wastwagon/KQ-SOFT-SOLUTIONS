@@ -31,6 +31,10 @@ export const GHANA_BANK_PROFILE_TIPS: Record<
     title: 'Bank of Africa profile',
     body: 'Prefer CHECK PAID / INW.CHQ debits with cheque number, YOUR CASH DEPOSIT credits with payee, and MAT.DEPOT matches on Our Reference.',
   },
+  gt_bank_eur: {
+    title: 'GT Bank EUR — schedule BRS profile',
+    body: 'The BRS is built on Report from timing rules (uncredited, unpresented, bank-only lines). Matching on this page is optional — do not use Match by counting or bulk auto-match. Do not pair bank charges (SOFITEL, QUAD, DUGOL) to cash book BANKCHG lines. Proceed to Report after Map.',
+  },
 }
 
 export function ghanaBankProfileTip(bankFormat: string | undefined | null): {
