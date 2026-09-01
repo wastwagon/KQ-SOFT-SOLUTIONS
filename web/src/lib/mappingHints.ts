@@ -34,24 +34,37 @@ export function getMappingIssues(
   if (isCashBook) {
     const amountField = isReceipts ? 'amt_received' : 'amt_paid'
     const hasFcColumns = headers.some((h) =>
-      /^(fc\s*amt\s*(received|paid)|foreign\s*currency\s*amount)$/i.test(String(h).trim())
+      /^(foreign\s*currency\s*amount|fc\s*amount|fc\s*amt\s*(received|paid)|currency\s*code|exch\s*rate)$/i.test(
+        String(h).trim()
+      )
     )
+    const tglLayout = headers.some((h) => /tgl\s*account\s*code/i.test(String(h).trim()))
     if (hasFcColumns) {
       const mappedIdx = mapping[amountField]
       const mappedHeader =
         mappedIdx != null && mappedIdx >= 0 && mappedIdx < headers.length
           ? String(headers[mappedIdx] || '')
           : ''
-      const mappedIsFc = /^fc\s*amt\s*(received|paid)$/i.test(mappedHeader)
+      const mappedIsFc = /^(foreign\s*currency\s*amount|fc\s*amount|fc\s*amt\s*(received|paid))$/i.test(
+        mappedHeader.trim()
+      )
       issues.push({
         severity: mappedIsFc ? 'info' : 'warning',
         field: amountField,
         message: mappedIsFc
-          ? 'Foreign-currency (euro/USD) amount column is selected.'
-          : 'This cash book also has foreign-currency columns (FC AMT RECEIVED / FC AMT PAID).',
+          ? tglLayout
+            ? 'Foreign Currency Amount is selected (TGL signed column — negative = receipt, positive = payment).'
+            : 'Foreign-currency (euro/USD) amount column is selected.'
+          : tglLayout
+            ? 'This TGL export has Foreign Currency Amount for euro/USD and Amount for cedi equivalents.'
+            : 'This cash book also has foreign-currency columns (Foreign Currency Amount).',
         fix: mappedIsFc
-          ? 'Keep FC amounts when the bank statement is in EUR/USD. Use AMT RECEIVED / AMT PAID for GHS/cedi equivalents.'
-          : 'If the bank statement is in euros (or another foreign currency), map Amount received/paid to FC AMT RECEIVED / FC AMT PAID — not the cedi Amount columns.',
+          ? tglLayout
+            ? 'Keep Foreign Currency Amount when the bank statement is in EUR/USD. Amount is the cedi (GHS) equivalent.'
+            : 'Keep FC amounts when the bank statement is in EUR/USD. Use separate receipt/payment columns for GHS/cedi equivalents.'
+          : tglLayout
+            ? 'For a euro bank account, map Amount received/paid to Foreign Currency Amount (one signed column). Do not use Amount unless reconciling in cedis.'
+            : 'If the bank statement is in euros (or another foreign currency), map Amount received/paid to Foreign Currency Amount — not the cedi Amount column.',
       })
     }
     if (mapping[amountField] == null) {
@@ -59,14 +72,21 @@ export function getMappingIssues(
         severity: 'error',
         field: amountField,
         message: `${isReceipts ? 'Amount received' : 'Amount paid'} must be mapped for this document type.`,
-        fix: `Select AMT RECEIVED / AMT PAID (or FC AMT RECEIVED / FC AMT PAID for euro/USD, or the single amount column if using signed-amount mode).`,
+        fix: `Select AMT RECEIVED / AMT PAID, Foreign Currency Amount (TGL signed column), or the single Amount column if using signed-amount mode.`,
       })
     }
     if (mapping.amt_received != null && mapping.amt_paid != null && mapping.amt_received === mapping.amt_paid) {
+      const mappedHeader =
+        headers[mapping.amt_received] != null ? String(headers[mapping.amt_received]).trim() : ''
+      const tglSigned =
+        tglLayout &&
+        /^(amount|foreign currency amount|fc amount)$/i.test(mappedHeader)
       issues.push({
         severity: 'info',
         message: 'Signed amount mode: one column mapped to both receipt and payment fields.',
-        fix: 'Positive values → receipts; negative → payments. Ideal when your cash book uses one Amount column.',
+        fix: tglSigned
+          ? 'TGL/IBIS convention on this column: negative values → receipts; positive → payments.'
+          : 'Positive values → receipts; negative → payments. Ideal when your cash book uses one Amount column.',
       })
     }
     if (mapping.date != null && headers[mapping.date] && /^month$/i.test(headers[mapping.date].trim())) {

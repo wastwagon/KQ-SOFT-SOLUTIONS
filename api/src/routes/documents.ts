@@ -235,6 +235,7 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
         : undefined,
       projectCurrency: doc.project.currency || 'GHS',
       hasForeignCurrencyColumns: hasForeignCurrencyColumns || undefined,
+      tglErpLayout: result.tglErpLayout || undefined,
       parseMethod: result.parseMethod,
       parseSummary,
       pdfTruncated: result.pdfTruncated,

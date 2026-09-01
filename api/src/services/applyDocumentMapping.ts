@@ -30,6 +30,17 @@ export function sanitizeMapping(
   return mapping
 }
 
+function normHeaderLabel(h: string): string {
+  return (h || '').toLowerCase().replace(/[\s_]+/g, ' ').trim()
+}
+
+/** TGL exports: negative = receipt, positive = payment in Amount / Foreign Currency Amount. */
+export function isTglErpSignedAmountColumn(headers: string[], colIdx: number | undefined): boolean {
+  if (colIdx == null || colIdx < 0 || colIdx >= headers.length) return false
+  const h = normHeaderLabel(headers[colIdx] || '')
+  return h === 'amount' || h === 'foreign currency amount' || h === 'fc amount' || h === 'foreign amount'
+}
+
 export function defaultAmountField(docType: DocumentType): string {
   if (docType === 'cash_book_receipts') return 'amt_received'
   if (docType === 'cash_book_payments') return 'amt_paid'
@@ -124,9 +135,23 @@ export async function applyDocumentMapping(
     const amount = parseImportedAmount(getVal(amountField))
     let normalizedAmount = amount
     let includeRow = Math.abs(amount) > 0
+    const tglSignedCol =
+      isCashBook &&
+      isTglErpSignedAmountColumn(
+        result.headers,
+        mapping[amountField] ?? mapping.amt_received ?? mapping.amt_paid
+      )
     if (includeRow && isCashMixedOneColumn) {
-      if (docType === 'cash_book_receipts') includeRow = amount > 0
+      if (tglSignedCol) {
+        if (docType === 'cash_book_receipts') includeRow = amount < 0
+        else includeRow = amount > 0
+      } else if (docType === 'cash_book_receipts') includeRow = amount > 0
       else includeRow = amount < 0
+      normalizedAmount = Math.abs(amount)
+    } else if (includeRow && tglSignedCol && isCashBook) {
+      // TGL single-column map (receipts doc maps amt_received only, etc.)
+      if (docType === 'cash_book_receipts') includeRow = amount < 0
+      else if (docType === 'cash_book_payments') includeRow = amount > 0
       normalizedAmount = Math.abs(amount)
     } else if (includeRow && isBankMixedOneColumn) {
       if (docType === 'bank_credits') includeRow = amount > 0

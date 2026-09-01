@@ -98,6 +98,8 @@ export interface DocumentPreviewResponse {
   }[]
   projectCurrency?: string
   hasForeignCurrencyColumns?: boolean
+  /** TGL/IBIS ERP cash book — original Excel column titles preserved. */
+  tglErpLayout?: boolean
   pdfTruncated?: boolean
   pdfPagesProcessed?: number
   pdfTotalPages?: number

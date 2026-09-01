@@ -53,13 +53,16 @@ export function buildSmartSuggestedMapping(
       if (i >= 0) out.chq_no = i
     }
     if (out.accode == null) {
-      const i = find([/^accode$/, /account\s*code/, /ac\s*code/, /^code$/])
+      const i = find([/^accode$/, /tgl\s*account\s*code/, /account\s*code/, /ac\s*code/, /^code$/])
       if (i >= 0) out.accode = i
     }
     if (out.amt_received == null) {
       if (options.preferForeignCurrencyAmounts) {
-        const fc = find([/^fc\s*amt\s*received$/])
-        if (fc >= 0) out.amt_received = fc
+        const fc = find([/^foreign\s*currency\s*amount$/, /^fc\s*amount$/, /^foreign\s*amount$/, /^fc\s*amt\s*received$/])
+        if (fc >= 0) {
+          out.amt_received = fc
+          if (out.amt_paid == null) out.amt_paid = fc
+        }
       }
       if (out.amt_received == null) {
         // Prefer local AMT RECEIVED over FC AMT RECEIVED (FC checked explicitly above).
@@ -69,8 +72,11 @@ export function buildSmartSuggestedMapping(
     }
     if (out.amt_paid == null) {
       if (options.preferForeignCurrencyAmounts) {
-        const fc = find([/^fc\s*amt\s*paid$/])
-        if (fc >= 0) out.amt_paid = fc
+        const fc = find([/^foreign\s*currency\s*amount$/, /^fc\s*amount$/, /^foreign\s*amount$/, /^fc\s*amt\s*paid$/])
+        if (fc >= 0) {
+          out.amt_paid = fc
+          if (out.amt_received == null) out.amt_received = fc
+        }
       }
       if (out.amt_paid == null) {
         const i = find([/^amt\s*paid$/, /^amount\s*paid$/, /payments?$/, /^paid$/, /^debit$/, /\bdr\b/, /withdrawal/])

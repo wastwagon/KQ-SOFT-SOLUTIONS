@@ -8,7 +8,7 @@ import {
   isErpGlCashBookLayout,
   isTglErpCashBookLayout,
   normalizeErpGlCashBookTable,
-  normalizeTglErpCashBookTable,
+  filterTglErpCashBookTable,
 } from './cashBookExcel.js'
 import { findEcobankTransactionHeaderRow, normalizeEcobankExcelTable } from './ecobankStatement.js'
 import {
@@ -28,6 +28,8 @@ export interface ParseResult {
   rows: unknown[][]
   sheetNames?: string[]
   activeSheet?: string
+  /** TGL/IBIS ERP cash book — signed Amount / Foreign Currency Amount columns preserved. */
+  tglErpLayout?: boolean
 }
 
 export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
@@ -118,7 +120,7 @@ export function parseExcel(filepath: string, sheetIndex = 0): ParseResult {
   } else if (erpGlHeaderRow >= 0 && isErpGlCashBookLayout(headers)) {
     result = normalizeErpGlCashBookTable(result)
   } else if (cashBookHeaderRow >= 0 && isTglErpCashBookLayout(headers)) {
-    result = normalizeTglErpCashBookTable(result)
+    result = filterTglErpCashBookTable(result)
   }
   return result
 }

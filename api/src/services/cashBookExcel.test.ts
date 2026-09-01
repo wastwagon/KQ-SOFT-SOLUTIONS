@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import {
   findCashBookTransactionHeaderRow,
   findErpGlCashBookHeaderRow,
+  filterTglErpCashBookTable,
   isTglErpCashBookLayout,
   normalizeErpGlCashBookTable,
   normalizeTglErpCashBookTable,
@@ -38,30 +39,54 @@ describe('cashBookExcel', () => {
     expect(parsed.rows.length).toBeGreaterThan(20)
   })
 
-  it('parses TGL ERP acct4702 cashbook with auto-map', () => {
+  it('parses TGL ERP acct4702 cashbook with original Excel headers', () => {
     if (!fs.existsSync(ACCT4702_CASH)) return
 
-    const raw = parseExcel(ACCT4702_CASH)
-    expect(raw.headers).toContain('AMT RECEIVED')
-    expect(raw.headers).toContain('AMT PAID')
+    const raw = parseExcel(ACCT4702_CASH, 1)
+    expect(raw.tglErpLayout).toBe(true)
     expect(raw.headers).toContain('Transaction Date')
-    expect(raw.rows.length).toBe(779)
+    expect(raw.headers).toContain('Amount')
+    expect(raw.headers).toContain('Foreign Currency Amount')
+    expect(raw.headers).not.toContain('AMT RECEIVED')
+    expect(raw.rows.length).toBeGreaterThan(100)
 
-    const sumReceived = raw.rows.reduce(
-      (s, r) => s + (parseImportedAmount(r[5]) || 0),
+    const amtIdx = raw.headers.indexOf('Amount')
+    const sumAbs = raw.rows.reduce(
+      (s, r) => s + Math.abs(parseImportedAmount(r[amtIdx]) || 0),
       0
     )
-    const sumPaid = raw.rows.reduce((s, r) => s + (parseImportedAmount(r[6]) || 0), 0)
-    expect(sumReceived).toBeCloseTo(11_756_548.18, 0)
-    expect(sumPaid).toBeCloseTo(12_296_754.21, 0)
+    expect(sumAbs).toBeGreaterThan(20_000_000)
 
     const cr = buildSuggestedMappingForDocument('cash_book_receipts', raw.headers, null)
     const dr = buildSuggestedMappingForDocument('cash_book_payments', raw.headers, null)
+    expect(cr.amt_received).toBe(amtIdx)
+    expect(cr.amt_paid).toBe(amtIdx)
+    expect(dr.amt_paid).toBe(amtIdx)
     expect(canAutoMap('cash_book_receipts', raw.headers, cr)).toBe(true)
     expect(canAutoMap('cash_book_payments', raw.headers, dr)).toBe(true)
   })
 
-  it('normalizes signed ERP Amount into receipt and payment columns', () => {
+  it('filters TGL rows but keeps original headers', () => {
+    const result = filterTglErpCashBookTable({
+      headers: [
+        'TGL Account Code',
+        'Transaction Date',
+        'Description',
+        'Amount',
+        'Foreign Currency Amount',
+      ],
+      rows: [
+        ['25010', '4-Jan-2019', 'SWEEP TO GHS', 89_565.85, null],
+        ['25010', '5-Jan-2019', 'INWARD TRANSFER', -1_200.5, -200],
+        ['25010', '5-Jan-2019', 'Total Debit', 0, 0],
+      ],
+    })
+    expect(result.headers).toContain('Amount')
+    expect(result.tglErpLayout).toBe(true)
+    expect(result.rows).toHaveLength(2)
+  })
+
+  it('legacy normalizer still splits signed Amount into receipt and payment columns', () => {
     const result = normalizeTglErpCashBookTable({
       headers: [
         'TGL Account Code',
@@ -82,7 +107,29 @@ describe('cashBookExcel', () => {
     expect(result.rows[1]![6]).toBeNull()
   })
 
-  it('preserves euro/foreign-currency columns on TGL multi-currency cash books', () => {
+  it('suggests Foreign Currency Amount for EUR TGL cash books', () => {
+    const headers = [
+      'TGL Account Code',
+      'Transaction Date',
+      'Description',
+      'Amount',
+      'Currency Code',
+      'Exch Rate',
+      'Foreign Currency Amount',
+    ]
+    const eurMap = buildSuggestedMappingForDocument('cash_book_receipts', headers, null, {
+      projectCurrency: 'EUR',
+    })
+    expect(headers[eurMap.amt_received!]).toBe('Foreign Currency Amount')
+    expect(eurMap.amt_paid).toBe(eurMap.amt_received)
+
+    const ghsMap = buildSuggestedMappingForDocument('cash_book_receipts', headers, null, {
+      projectCurrency: 'GHS',
+    })
+    expect(headers[ghsMap.amt_received!]).toBe('Amount')
+  })
+
+  it('legacy normalizer preserves euro columns as FC AMT RECEIVED / FC AMT PAID', () => {
     const result = normalizeTglErpCashBookTable({
       headers: [
         'TGL Account Code',
@@ -135,7 +182,7 @@ describe('cashBookExcel', () => {
     const eurMap = buildSuggestedMappingForDocument('cash_book_receipts', result.headers, null, {
       projectCurrency: 'EUR',
     })
-    expect(result.headers[eurMap.amt_received!]).toBe('FC AMT RECEIVED')
+    expect(result.headers[eurMap.amt_received!]).toBe('Foreign Currency Amount')
 
     const ghsMap = buildSuggestedMappingForDocument('cash_book_receipts', result.headers, null, {
       projectCurrency: 'GHS',

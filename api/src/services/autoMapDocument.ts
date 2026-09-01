@@ -60,7 +60,9 @@ export function buildSuggestedMappingForDocument(
     options.preferForeignCurrencyAmounts ??
     (isCashBook &&
       currency !== 'GHS' &&
-      headers.some((h) => /^fc\s*amt\s*(received|paid)$/i.test(String(h).trim())))
+      headers.some((h) =>
+        /^(foreign\s*currency\s*amount|fc\s*amount|fc\s*amt\s*(received|paid))$/i.test(String(h).trim())
+      ))
   let full = buildSmartSuggestedMapping(headers, isCashBook, base, {
     preferForeignCurrencyAmounts: preferForeign,
   })

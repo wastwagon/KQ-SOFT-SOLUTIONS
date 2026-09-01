@@ -116,9 +116,35 @@ export function isTglErpCashBookLayout(headers: string[]): boolean {
 }
 
 /**
- * Normalize TGL ERP cash books into receipt/payment columns.
- * Preserves foreign-currency columns (euro/USD) so EUR projects can map
- * FC AMT RECEIVED / FC AMT PAID instead of the GHS Amount equivalent.
+ * TGL ERP cash book: keep original Excel column titles; drop total/summary rows only.
+ * Amount and Foreign Currency Amount stay as single signed columns (negative = receipt,
+ * positive = payment) — see applyDocumentMapping TGL signed-amount handling.
+ */
+export function filterTglErpCashBookTable(result: ParseResult): ParseResult {
+  const normHeaders = result.headers.map((h) => norm(String(h ?? '')))
+  const idx = (patterns: RegExp[]) =>
+    normHeaders.findIndex((h) => patterns.some((p) => p.test(h)))
+  const descIdx = idx([/^description$/])
+  const amtIdx = idx([/^amount$/])
+  const fcAmtIdx = idx([/^foreign\s*currency\s*amount$/, /^fc\s*amount$/, /^foreign\s*amount$/])
+
+  const outRows: unknown[][] = []
+  for (const row of result.rows) {
+    const get = (i: number) => (i >= 0 && i < row.length ? row[i] : null)
+    const desc = String(get(descIdx) ?? '').trim()
+    if (/^total\s+(debit|credit)/i.test(desc)) continue
+    const amt = amtIdx >= 0 ? parseImportedAmount(get(amtIdx)) : 0
+    const fcAmt = fcAmtIdx >= 0 ? parseImportedAmount(get(fcAmtIdx)) : 0
+    if (amt === 0 && fcAmt === 0) continue
+    outRows.push(row)
+  }
+
+  return { ...result, rows: outRows, tglErpLayout: true }
+}
+
+/**
+ * @deprecated Prefer {@link filterTglErpCashBookTable} — keeps original Excel headers.
+ * Legacy normalizer that split signed Amount / FC into separate receipt/payment columns.
  */
 export function normalizeTglErpCashBookTable(result: ParseResult): ParseResult {
   const normHeaders = result.headers.map(norm)

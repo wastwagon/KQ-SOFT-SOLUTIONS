@@ -36,18 +36,17 @@ const MANUAL = {
 }
 
 /**
- * Cash book — after TGL ERP normalizeTglErpCashBookTable (api/src/services/cashBookExcel.ts):
- * 0 Date, 1 Description, 2 Doc Ref, 3 Chq No, 4 Accode, … 10 FC AMT RECEIVED, 11 FC AMT PAID.
- * Use Sheet2 (index 1): pre-reconciliation CB; Sheet1 includes double-entry expense rows (90019/90033).
+ * Cash book — original TGL Excel columns (Sheet2 / index 1 recommended):
+ * 4 Transaction Date, 6 Description, 11 Foreign Currency Amount (signed EUR), 12 Cheque No, 13 Doc Ref No, 0 TGL Account Code.
  */
 const CASH_MAP = {
-  date: 0,
-  name: 1,
-  details: 1,
-  doc_ref: 2,
-  chq_no: 3,
-  accode: 4,
-  amt_received: 10,
+  date: 4,
+  name: 6,
+  details: 6,
+  doc_ref: 13,
+  chq_no: 12,
+  accode: 0,
+  amt_received: 11,
   amt_paid: 11,
 }
 

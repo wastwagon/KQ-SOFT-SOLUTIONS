@@ -850,18 +850,35 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                     : ''}
                 </Alert>
               )}
-              {preview.hasForeignCurrencyColumns && (
+              {preview.tglErpLayout && (
+                <Alert tone="info" title="TGL / IBIS cash book — original column titles">
+                  Column names match your Excel export (Transaction Date, Description, Amount,
+                  Foreign Currency Amount, TGL Account Code, etc.). Amount columns use{' '}
+                  <strong>signed values</strong>: negative = receipt, positive = payment. For a euro
+                  bank account, map Amount received/paid to <strong>Foreign Currency Amount</strong>{' '}
+                  — not Amount (cedi equivalent).
+                </Alert>
+              )}
+              {preview.hasForeignCurrencyColumns && !preview.tglErpLayout && (
                 <Alert tone="info" title="Multi-currency cash book">
-                  Columns include cedi equivalents (amount received / amount paid) and foreign amounts (FC
-                  amount received / FC amount paid, plus currency code / exchange rate). For a euro bank
-                  account, map amounts to the <strong>FC</strong> columns — not the cedi ones.
+                  Columns include cedi equivalents (amount received / amount paid) and foreign amounts
+                  (Foreign Currency Amount, plus currency code / exchange rate). For a euro bank
+                  account, map amounts to the <strong>Foreign Currency Amount</strong> column — not the
+                  cedi Amount column.
                   {preview.projectCurrency && preview.projectCurrency.toUpperCase() !== 'GHS' && (
                     <>
                       {' '}
-                      Project currency is <strong>{preview.projectCurrency}</strong>, so FC columns are suggested
-                      by default.
+                      Project currency is <strong>{preview.projectCurrency}</strong>, so Foreign Currency
+                      Amount is suggested by default.
                     </>
                   )}
+                </Alert>
+              )}
+              {preview.hasForeignCurrencyColumns && preview.tglErpLayout && preview.projectCurrency &&
+                preview.projectCurrency.toUpperCase() !== 'GHS' && (
+                <Alert tone="info" title={`Project currency: ${preview.projectCurrency}`}>
+                  Foreign Currency Amount is suggested for Amount received/paid (euro/USD). Amount is
+                  the cedi (GHS) equivalent — use only if reconciling in cedis.
                 </Alert>
               )}
               <div className="rounded-xl border border-border overflow-hidden">
