@@ -43,20 +43,19 @@ const MANUAL = {
 }
 
 /**
- * After TGL ERP normalisation (parseExcel on Sheet 2): Transaction Date(0), Description(1),
- * Doc Ref(2), Chq No(3), Accode(4), AMT RECEIVED(5), AMT PAID(6).
- * Positive Amount → AMT PAID; negative → AMT RECEIVED (see cashBookExcel.ts).
+ * TGL ERP cash book Sheet 2 (index 1): original Excel headers.
+ * Amount [7] signed — negative = receipt, positive = payment.
  */
 const CASH_MAP_BASE = {
-  date: 0,
-  name: 1,
-  details: 1,
+  date: 4,
+  name: 6,
+  details: 6,
   doc_ref: 2,
-  chq_no: 3,
-  accode: 4,
+  chq_no: 12,
+  accode: 0,
 }
-const CASH_MAP_RECEIPTS = { ...CASH_MAP_BASE, amt_received: 5 }
-const CASH_MAP_PAYMENTS = { ...CASH_MAP_BASE, amt_paid: 6 }
+const CASH_MAP_RECEIPTS = { ...CASH_MAP_BASE, amt_received: 7 }
+const CASH_MAP_PAYMENTS = { ...CASH_MAP_BASE, amt_paid: 7 }
 
 const CASH_SHEET_INDEX = 1
 

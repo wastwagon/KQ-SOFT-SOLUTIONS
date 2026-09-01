@@ -895,7 +895,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               )}
               {preview.hasForeignCurrencyColumns && preview.tglErpLayout && preview.projectCurrency &&
                 preview.projectCurrency.toUpperCase() !== 'GHS' &&
-                !preview.headers.some((h) => /^dr$/i.test(String(h).trim()) && (
+                !preview.headers.some((h) => /^dr$/i.test(String(h).trim())) && (
                 <Alert tone="info" title={`Project currency: ${preview.projectCurrency}`}>
                   Foreign Currency Amount is suggested for Amount received/paid (euro/USD). Amount is
                   the cedi (GHS) equivalent — use only if reconciling in cedis.

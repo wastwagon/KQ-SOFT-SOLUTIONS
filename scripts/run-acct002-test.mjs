@@ -11,14 +11,21 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
-const DATA = path.join(ROOT, process.env.BRS_DATA_DIR || 'testdataandresultsforacct002')
+const DATA = process.env.BRS_DATA_DIR
+  ? path.join(ROOT, process.env.BRS_DATA_DIR)
+  : fs.existsSync(path.join(ROOT, 'fileprudential', 'cash book acct 2.xlsx'))
+    ? path.join(ROOT, 'fileprudential')
+    : path.join(ROOT, 'testdataandresultsforacct002')
 
 const API = process.env.API_URL || 'http://localhost:9101'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'premium@test.com'
 const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 
 const PROJECT_NAME =
-  process.env.BRS_ACCT002_PROJECT_NAME || 'Grace Baptist Academy - Ecobank acct 2 (Aug 2018)'
+  process.env.BRS_ACCT002_PROJECT_NAME ||
+  (DATA.includes('fileprudential')
+    ? 'Grace Baptist Academy – Cash book 2 (fileprudential Aug 2018)'
+    : 'Grace Baptist Academy - Ecobank acct 2 (Aug 2018)')
 const RECON_DATE = '2018-08-31T00:00:00.000Z'
 
 /** From brs acct 2.xlsx / PDF — fully reconciled (no timing differences). */
@@ -266,7 +273,39 @@ async function main() {
   }
   console.log(`  Total bulk matched: ${totalMatched}`)
 
-  const rec2 = await api('GET', `/reconcile/${project.slug}`, token)
+  // Same amount + date duplicates (e.g. two 300 GHS transfers on 21-Dec-17) may need a final 1:1 pass.
+  const recMid = await api('GET', `/reconcile/${project.slug}?limit=500`, token)
+  const matchedCb = new Set(recMid.matchedCashBookIds || [])
+  const matchedBk = new Set(recMid.matchedBankIds || [])
+  const umPays = (recMid.payments?.transactions || []).filter((p) => !matchedCb.has(p.id))
+  const umDebs = (recMid.debits?.transactions || []).filter((d) => !matchedBk.has(d.id))
+  const byAmount = (rows) => {
+    const m = new Map()
+    for (const r of rows) {
+      const k = Number(r.amount).toFixed(2)
+      if (!m.has(k)) m.set(k, [])
+      m.get(k).push(r)
+    }
+    return m
+  }
+  const payM = byAmount(umPays)
+  const debM = byAmount(umDebs)
+  const extra = []
+  for (const [amt, pays] of payM) {
+    const debs = debM.get(amt) || []
+    const n = Math.min(pays.length, debs.length)
+    for (let i = 0; i < n; i++) {
+      extra.push({ cashBookTransactionId: pays[i].id, bankTransactionId: debs[i].id })
+    }
+  }
+  if (extra.length) {
+    const bulk = await api('POST', `/reconcile/${project.slug}/match/bulk`, token, { matches: extra })
+    const n = bulk.created ?? bulk.count ?? extra.length
+    totalMatched += n
+    console.log(`  Residual same-amount pairs: matched ${n}`)
+  }
+
+  const rec2 = await api('GET', `/reconcile/${project.slug}?limit=500`, token)
   console.log(`\nAfter auto-match:`)
   console.log(`  Matched pairs: ${rec2.matchedCount ?? rec2.matches?.length ?? '?'}`)
   console.log(`  Unmatched receipts: ${rec2.unmatched?.receipts?.length ?? '?'}`)
