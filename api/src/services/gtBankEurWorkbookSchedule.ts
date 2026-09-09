@@ -52,6 +52,7 @@ export function isGtBankChargeCancelPayment(tx: ClearingTxLike): boolean {
 }
 
 export function isGtBankChargeReceipt(tx: ClearingTxLike): boolean {
+  if (isGtBankChargeCancelPayment(tx)) return false
   return BANKCHR_RE.test(bankText(tx))
 }
 
@@ -121,6 +122,10 @@ export function computeGtBankEurTimingSchedule(input: {
   const unpresentedRows: ClearingTxLike[] = []
 
   for (const receipt of input.unmatchedReceipts) {
+    if (isGtBankChargeCancelPayment(receipt) || isGtBankLodgmentTransferPayment(receipt)) {
+      uncreditedRows.push(receipt)
+      continue
+    }
     if (isGtBankChargeReceipt(receipt) || isGtBankRelocationReceipt(receipt)) {
       if (
         isGtBankChargeReceipt(receipt) &&

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * End-to-end test: file4702 (preferred) or testdataforacct4702 → BRS project → compare with manual BRS.
- * TGL Properties — SCB 0100106024702, as at 31 Dec 2019.
+ * End-to-end test for SCB 4702 — separate projects per data folder:
+ *   acct4702/  (CB.xlsx + BS.xlsx, Sheet1) → project name "acct4702"
+ *   file4702/  (legacy filenames, Sheet2)   → project name "file4702"
  *
  * Usage:
- *   API_URL=http://localhost:9101 BRS_TEST_EMAIL=firm@test.com node scripts/run-acct4702-test.mjs
- *   BRS_DATA_DIR=./file4702 node scripts/run-acct4702-test.mjs
+ *   BRS_DATA_DIR=acct4702 node scripts/run-acct4702-test.mjs
+ *   BRS_DATA_DIR=file4702 node scripts/run-acct4702-test.mjs
  */
 import fs from 'fs'
 import path from 'path'
@@ -13,13 +14,23 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
+const ACCT4702 = path.join(ROOT, 'acct4702')
 const FILE4702 = path.join(ROOT, 'file4702')
 const LEGACY = path.join(ROOT, 'testdataforacct4702')
 const DATA = process.env.BRS_DATA_DIR
   ? path.resolve(ROOT, process.env.BRS_DATA_DIR)
-  : fs.existsSync(path.join(FILE4702, 'acct4702 cashbk.xlsx'))
-    ? FILE4702
-    : LEGACY
+  : fs.existsSync(path.join(ACCT4702, 'CB.xlsx'))
+    ? ACCT4702
+    : fs.existsSync(path.join(FILE4702, 'acct4702 cashbk.xlsx'))
+      ? FILE4702
+      : LEGACY
+
+const CASH_FILE = fs.existsSync(path.join(DATA, 'CB.xlsx'))
+  ? 'CB.xlsx'
+  : 'acct4702 cashbk.xlsx'
+const BANK_FILE = fs.existsSync(path.join(DATA, 'BS.xlsx'))
+  ? 'BS.xlsx'
+  : 'acct 4702 bank statement.xlsx'
 
 const API = process.env.API_URL || 'http://localhost:9101'
 const EMAIL = process.env.BRS_TEST_EMAIL || 'firm@test.com'
@@ -27,9 +38,16 @@ const PASSWORD = process.env.BRS_TEST_PASSWORD || 'Test123!'
 
 const PROJECT_NAME =
   process.env.BRS_ACCT4702_PROJECT_NAME ||
-  (DATA === FILE4702
-    ? 'TGL Properties – SCB 4702 (file4702 Dec 2019)'
-    : 'TGL Properties – SCB 4702 (Dec 2019)')
+  (DATA === ACCT4702 || path.basename(DATA) === 'acct4702'
+    ? 'acct4702'
+    : DATA === FILE4702
+      ? 'file4702'
+      : 'TGL Properties – SCB 4702 (Dec 2019)')
+
+/** Legacy long name from earlier runs — removed when BRS_FORCE_REUPLOAD=1 on acct4702 folder. */
+const LEGACY_ACCT4702_PROJECT_NAMES = [
+  'TGL Properties – SCB 4702 (acct4702 Dec 2019)',
+]
 const RECON_DATE = '2019-12-31T00:00:00.000Z'
 
 /** From acct 4702 brs.xlsx — fully reconciled. */
@@ -57,9 +75,14 @@ const CASH_MAP_BASE = {
 const CASH_MAP_RECEIPTS = { ...CASH_MAP_BASE, amt_received: 7 }
 const CASH_MAP_PAYMENTS = { ...CASH_MAP_BASE, amt_paid: 7 }
 
-const CASH_SHEET_INDEX = 1
+const CASH_SHEET_INDEX =
+  process.env.BRS_CASH_SHEET_INDEX != null
+    ? Number(process.env.BRS_CASH_SHEET_INDEX)
+    : CASH_FILE === 'CB.xlsx'
+      ? 0
+      : 1
 
-/** After SCB Excel normalisation on Sheet 2: DEBITS(4), CREDITS(5). */
+/** SCB: DEBITS(4), CREDITS(5) — acct4702/BS.xlsx Sheet1 or file4702 Sheet2. */
 const BANK_MAP_CREDITS = {
   transaction_date: 0,
   description: 2,
@@ -72,7 +95,12 @@ const BANK_MAP_DEBITS = {
   debit: 4,
 }
 
-const BANK_SHEET_INDEX = 1
+const BANK_SHEET_INDEX =
+  process.env.BRS_BANK_SHEET_INDEX != null
+    ? Number(process.env.BRS_BANK_SHEET_INDEX)
+    : BANK_FILE === 'BS.xlsx'
+      ? 0
+      : 1
 
 /** 779 cash + 779 bank txs — platform default supports up to 10k per lane at max limit. */
 const RECONCILE_LIMIT = 40_000
@@ -446,7 +474,7 @@ async function main() {
   console.log('API:', API)
   console.log('Data:', DATA)
 
-  for (const f of ['acct4702 cashbk.xlsx', 'acct 4702 bank statement.xlsx']) {
+  for (const f of [CASH_FILE, BANK_FILE]) {
     if (!fs.existsSync(path.join(DATA, f))) throw new Error(`Missing ${f}`)
   }
 
@@ -456,6 +484,29 @@ async function main() {
   const projectsRaw = await api('GET', '/projects', token)
   const projects = Array.isArray(projectsRaw) ? projectsRaw : projectsRaw.projects ?? []
   let project = projects.find((p) => p.name === PROJECT_NAME)
+
+  async function deleteProjectIfExists(p) {
+    if (!p) return
+    if (['completed', 'approved', 'submitted_for_review'].includes(p.status)) {
+      try {
+        await api('PATCH', `/projects/${p.slug}/reopen`, token)
+      } catch {
+        /* continue */
+      }
+    }
+    await api('DELETE', `/projects/${p.slug}`, token)
+    console.log('Deleted project:', p.name, `(${p.slug})`)
+  }
+
+  if (process.env.BRS_FORCE_REUPLOAD === '1') {
+    if (project) await deleteProjectIfExists(project)
+    project = null
+    for (const legacyName of LEGACY_ACCT4702_PROJECT_NAMES) {
+      const legacy = projects.find((p) => p.name === legacyName)
+      if (legacy && legacyName !== PROJECT_NAME) await deleteProjectIfExists(legacy)
+    }
+  }
+
   if (!project) {
     project = await api('POST', '/projects', token, {
       name: PROJECT_NAME,
@@ -471,8 +522,8 @@ async function main() {
 
   const proj = await api('GET', `/projects/${project.slug}`, token)
   if (!proj.documents?.length) {
-    const cb = path.join(DATA, 'acct4702 cashbk.xlsx')
-    const bank = path.join(DATA, 'acct 4702 bank statement.xlsx')
+    const cb = path.join(DATA, CASH_FILE)
+    const bank = path.join(DATA, BANK_FILE)
     const acct = 'SCB 0100106024702'
     const acctNo = '0100106024702'
     console.log('\nUploading cash book...')
@@ -576,7 +627,9 @@ async function main() {
   console.log(`  ℹ Matched pairs: ${report.summary?.matchedCount ?? totalMatched}`)
   console.log(`  ℹ Total transactions: ${report.summary?.totalTransactions ?? '?'}`)
   console.log(`\nProject slug: ${project.slug}`)
-  console.log(`Web UI: http://localhost:9100/projects/${project.slug}`)
+  const webBase = (process.env.WEB_URL || (API.includes('kqsoftwaresolutions.com') ? 'https://kqsoftwaresolutions.com' : 'http://localhost:9100')).replace(/\/$/, '')
+  console.log(`Web UI: ${webBase}/projects/${project.slug}`)
+  console.log(`Environment: ${API.includes('kqsoftwaresolutions.com') ? 'production' : 'local'} (${API})`)
   const closingOk = checks.slice(0, 2).every(Boolean)
   const timingOk = checks.slice(2).every(Boolean)
   const matched = report.summary?.matchedCount ?? totalMatched

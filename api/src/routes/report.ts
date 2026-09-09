@@ -31,9 +31,6 @@ import {
   buildBankOnlyScheduleRows,
   computeBankOnlyCreditsTotal,
   computeBankOnlyDebitsTotal,
-  isBankStatementMirrorReceipt,
-  paymentHasBankCreditCounterpart,
-  paymentHasBankDebitCounterpart,
   resolveEcobankGhanaProfileForScope,
   resolveGhanaBankFormatLabel,
 } from '../services/ecobankClearingMatcher.js'
@@ -57,9 +54,12 @@ import {
 } from '../services/brsRollForward.js'
 import {
   computeGtBankEurBankOnlyDebitsTotal,
-  computeGtBankEurTimingSchedule,
   isGtBankEurScope,
 } from '../services/gtBankEurWorkbookSchedule.js'
+import {
+  currentPeriodTimingTotal,
+  resolveCanonicalTimingSchedule,
+} from '../services/brsCanonicalSchedule.js'
 import { buildReconcileProfile } from '../services/reconcileProfileBuilder.js'
 
 const router = Router()
@@ -839,54 +839,6 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       unpresentedChequeRowsForBrs = [...working.sectionARows, ...working.openB1Rows]
     }
   }
-  const unpresentedForAgeing = ecobankProfile.active
-    ? [
-        ...unpresentedChequeRowsForBrs.map((t) => ({
-          date: t.date ?? null,
-          name: t.name ?? null,
-          chqNo: t.chqNo,
-          amount: t.amount,
-          fromProject: project.name,
-        })),
-        ...broughtForwardItems.map((t) => ({
-          date: t.date,
-          name: t.name,
-          chqNo: t.chqNo,
-          amount: t.amount,
-          fromProject: t.fromProject,
-        })),
-      ]
-    : [
-        ...unmatchedPayments.map((t) => ({ ...t, fromProject: project.name })),
-        ...broughtForwardItems.map((t) => ({
-          date: t.date,
-          name: t.name,
-          chqNo: t.chqNo,
-          amount: t.amount,
-          fromProject: t.fromProject,
-        })),
-      ]
-  const missingChequesWithAgeing = buildMissingChequesAgeing(unpresentedForAgeing, refDate)
-  const missingChequesAgeingSummary = {
-    band0_30: {
-      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').length,
-      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').reduce((s, x) => s + x.amount, 0),
-    },
-    band31_60: {
-      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').length,
-      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').reduce((s, x) => s + x.amount, 0),
-    },
-    band61_90: {
-      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').length,
-      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').reduce((s, x) => s + x.amount, 0),
-    },
-    band90_plus: {
-      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').length,
-      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').reduce((s, x) => s + x.amount, 0),
-    },
-  }
-  const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
-  const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
   const unmatchedDebitsTotal = unmatchedDebits.reduce((s, t) => s + t.amount, 0)
   const matchedPaymentIds = new Set(
     payments.filter((t) => matchedCbIds.has(t.id)).map((t) => t.id)
@@ -920,10 +872,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       )
   const faceBankOnlyDebitsTotal = bankOnlyDebitsNotInCashBookTotal
   const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebitsTotal - bankOnlyDebitsNotInCashBookTotal
-  const asAtUncreditedTotal = unmatchedReceiptsTotal
-  const asAtUnpresentedTotal = ecobankProfile.active
-    ? unpresentedChequesTotal
-    : unmatchedPaymentsTotal
+  let asAtUncreditedTotal = unmatchedReceiptsTotal
+  let asAtUnpresentedTotal = unpresentedChequesTotal
   const bankOnlyCreditsNotInCashBookTotal = computeBankOnlyCreditsTotal(
     unmatchedCredits as TxLike[],
     payments as TxLike[],
@@ -956,40 +906,64 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     } else {
       bankOnlyDebitsNotInCashBookTotal += workingPaperDetail.bankOnlyDebitsDelta
     }
-  }  if (gtBankEurProfile.active) {
-    const gtSchedule = computeGtBankEurTimingSchedule({
-      unmatchedReceipts: unmatchedReceipts as TxLike[],
-      unmatchedPayments: unmatchedPayments as TxLike[],
-      unmatchedDebits: unmatchedDebits as TxLike[],
-      unmatchedCredits: unmatchedCredits as TxLike[],
-      allBankDebits: debits as TxLike[],
-      allBankCredits: credits as TxLike[],
-      broughtForwardReceiptLodgmentsTotal: broughtForwardReceiptLodgmentsTotal,
-      broughtForwardUnpresentedTotal: broughtForwardTotal,
-    })
-    uncreditedLodgmentsTimingTotal = gtSchedule.uncreditedLodgmentsTimingTotal
-    unpresentedChequesTotal = gtSchedule.unpresentedChequesTotal
-  } else if (!ecobankProfile.active) {
-    uncreditedLodgmentsTimingTotal =
-      unmatchedReceipts
-        .filter(
-          (r) =>
-            !isBankStatementMirrorReceipt(
-              r as TxLike,
-              unmatchedDebits as TxLike[],
-              unmatchedCredits as TxLike[]
-            )
-        )
-        .reduce((s, t) => s + t.amount, 0) + broughtForwardReceiptLodgmentsTotal
-    unpresentedChequesTotal =
-      unmatchedPayments
-        .filter(
-          (p) =>
-            !paymentHasBankDebitCounterpart(p as TxLike, debits as TxLike[]) &&
-            !paymentHasBankCreditCounterpart(p as TxLike, credits as TxLike[])
-        )
-        .reduce((s, t) => s + t.amount, 0) + broughtForwardTotal
   }
+  const canonicalTiming = resolveCanonicalTimingSchedule({
+    unmatchedReceipts: unmatchedReceipts as TxLike[],
+    unmatchedPayments: unmatchedPayments as TxLike[],
+    unmatchedDebits: unmatchedDebits as TxLike[],
+    unmatchedCredits: unmatchedCredits as TxLike[],
+    allBankDebits: debits as TxLike[],
+    allBankCredits: credits as TxLike[],
+    broughtForwardReceiptLodgmentsTotal,
+    broughtForwardUnpresentedTotal: broughtForwardTotal,
+    gtBankEur: gtBankEurProfile.active,
+    ecobank: ecobankProfile.active,
+    ecobankUnpresentedRows: unpresentedChequeRowsForBrs as TxLike[],
+    ecobankUnpresentedTotal: unpresentedChequesTotal,
+  })
+  uncreditedLodgmentsTimingTotal = canonicalTiming.uncreditedLodgmentsTimingTotal
+  unpresentedChequesTotal = canonicalTiming.unpresentedChequesTotal
+  const uncreditedRowsForBrs = canonicalTiming.uncreditedRows
+  unpresentedChequeRowsForBrs = canonicalTiming.unpresentedRows
+  asAtUncreditedTotal = currentPeriodTimingTotal(uncreditedRowsForBrs)
+  asAtUnpresentedTotal = currentPeriodTimingTotal(unpresentedChequeRowsForBrs as TxLike[])
+  const unpresentedForAgeing = [
+    ...unpresentedChequeRowsForBrs.map((t) => ({
+      date: t.date ?? null,
+      name: t.name ?? null,
+      chqNo: t.chqNo,
+      amount: t.amount,
+      fromProject: project.name,
+    })),
+    ...broughtForwardItems.map((t) => ({
+      date: t.date,
+      name: t.name,
+      chqNo: t.chqNo,
+      amount: t.amount,
+      fromProject: t.fromProject,
+    })),
+  ]
+  const missingChequesWithAgeing = buildMissingChequesAgeing(unpresentedForAgeing, refDate)
+  const missingChequesAgeingSummary = {
+    band0_30: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '0–30').reduce((s, x) => s + x.amount, 0),
+    },
+    band31_60: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '31–60').reduce((s, x) => s + x.amount, 0),
+    },
+    band61_90: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '61–90').reduce((s, x) => s + x.amount, 0),
+    },
+    band90_plus: {
+      count: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').length,
+      total: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').reduce((s, x) => s + x.amount, 0),
+    },
+  }
+  const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
+  const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
   if (declaredCashBookBalance == null && bankStatementClosingBalanceValue != null) {
     balancePerCashBook = deriveCashBookFromWorkbookSchedule({
       bankClosingBalance: bankStatementClosingBalanceValue,
@@ -1013,10 +987,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     bankOnlyDebitsNotInCashBookTotal,
     bankStatementClosingBalance: bankStatementClosingBalanceValue,
   })
-  const unpresentedCurrentCashBookPeriod = ecobankProfile.active
-    ? unpresentedChequeRowsForBrs.reduce((s, t) => s + t.amount, 0)
-    : unmatchedPaymentsTotal
-  const timingUncreditedCurrentPeriod = unmatchedReceiptsTotal
+  const unpresentedCurrentCashBookPeriod = currentPeriodTimingTotal(
+    unpresentedChequeRowsForBrs as TxLike[]
+  )
+  const timingUncreditedCurrentPeriod = currentPeriodTimingTotal(uncreditedRowsForBrs)
   const timingUncreditedBroughtForwardPrior = broughtForwardReceiptLodgmentsTotal
   const unpresentedBroughtForwardPrior = broughtForwardTotal
   const bankOnlyCreditsCurrentPeriod = unmatchedCreditsTotal
@@ -1328,18 +1302,26 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
           : undefined,
     })),
     paymentGroups,
-    unpresentedChequesForBrs: ecobankProfile.active
-      ? unpresentedChequeRowsForBrs.map((t) => ({
-          date: fmt(t.date ?? null),
-          name: t.name || '—',
-          details: t.details || '—',
-          chqNo: t.chqNo || null,
-          docRef: t.docRef || null,
-          amount: t.amount,
-          amountReceived: null as number | null,
-          amountPaid: t.amount,
-        }))
-      : [],
+    uncreditedLodgmentsForBrs: uncreditedRowsForBrs.map((t) => ({
+      date: fmt(t.date ?? null),
+      name: t.name || '—',
+      details: t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      amountReceived: t.amount,
+      amountPaid: null as number | null,
+    })),
+    unpresentedChequesForBrs: unpresentedChequeRowsForBrs.map((t) => ({
+      date: fmt(t.date ?? null),
+      name: t.name || '—',
+      details: t.details || '—',
+      chqNo: t.chqNo || null,
+      docRef: t.docRef || null,
+      amount: t.amount,
+      amountReceived: null as number | null,
+      amountPaid: t.amount,
+    })),
     unmatchedDebits: unmatchedDebits.map((t) => ({
       date: fmt(t.date),
       description: t.name || t.details || '—',
@@ -1852,54 +1834,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const faceBankOnlyDebitsExport = bankOnlyDebitsNotInCashBookTotalExport
   const unmatchedDebitsLinkedToCashBookTotalExport =
     unmatchedDebitsTotalExport - bankOnlyDebitsNotInCashBookTotalExport
-  const unpresentedForAgeingExport = ecobankProfileExport.active
-    ? [
-        ...unpresentedChequeRowsForBrsExport.map((t) => ({
-          date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
-          name: t.name || t.details || '—',
-          chqNo: t.chqNo || null,
-          amount: t.amount,
-        })),
-        ...broughtForwardItemsExport.map((t) => ({
-          date: t.date,
-          name: t.name,
-          chqNo: t.chqNo,
-          amount: t.amount,
-        })),
-      ]
-    : [
-        ...payments.filter((t) => !matchedCbIds.has(t.id)).map((t) => ({
-          date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
-          name: t.name || t.details || '—',
-          chqNo: t.chqNo || null,
-          amount: t.amount,
-        })),
-        ...broughtForwardItemsExport.map((t) => ({
-          date: t.date,
-          name: t.name,
-          chqNo: t.chqNo,
-          amount: t.amount,
-        })),
-      ]
-  const missingChequesAgeingExport = buildMissingChequesAgeing(unpresentedForAgeingExport, refDateExport).map((t) => ({
-    Date: t.date,
-    'CHQ NO': t.chqNo || '',
-    'DOC REF': '',
-    Name: t.name || '',
-    [amountColumnHeader(curr)]: t.amount,
-    'Days Outstanding': t.daysOutstanding,
-    'Ageing Band': t.ageingBand,
-  }))
-  const unpresentedChequesForBrsExport = unpresentedChequeRowsForBrsExport.map((t) => ({
-    Date: fmt(t.date ?? null),
-    Details: t.name || t.details || '',
-    'CHQ NO': t.chqNo || '',
-    [amountColumnHeader(curr)]: t.amount,
-  }))
-  const asAtUncreditedTotalExport = unmatchedReceiptsTotalExport
-  const asAtUnpresentedTotalExport = ecobankProfileExport.active
-    ? unpresentedChequesTotal
-    : unmatchedPaymentsTotalExport
   const bankOnlyCreditsNotInCashBookTotalExport = computeBankOnlyCreditsTotal(
     unmatchedCreditsOnlyExport as TxLike[],
     payments as TxLike[],
@@ -1920,41 +1854,101 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   } else if (workingPaperDeltaExport) {
     bankOnlyDebitsNotInCashBookTotalExport += workingPaperDeltaExport
   }
-  if (gtBankEurProfileExport.active) {
-    const gtScheduleExport = computeGtBankEurTimingSchedule({
-      unmatchedReceipts: receipts.filter((t) => !matchedCbIds.has(t.id)) as TxLike[],
-      unmatchedPayments: unmatchedPaymentsOnlyExport as TxLike[],
-      unmatchedDebits: unmatchedDebitsOnlyExport as TxLike[],
-      unmatchedCredits: unmatchedCreditsOnlyExport as TxLike[],
-      allBankDebits: debits as TxLike[],
-      allBankCredits: credits as TxLike[],
-      broughtForwardReceiptLodgmentsTotal: broughtForwardReceiptLodgmentsTotalExport,
-      broughtForwardUnpresentedTotal: broughtForwardChequesTotalExport,
-    })
-    uncreditedLodgmentsTimingTotalExport = gtScheduleExport.uncreditedLodgmentsTimingTotal
-    unpresentedChequesTotal = gtScheduleExport.unpresentedChequesTotal
-  } else if (!ecobankProfileExport.active) {
-    uncreditedLodgmentsTimingTotalExport =
-      receipts
-        .filter((t) => !matchedCbIds.has(t.id))
-        .filter(
-          (r) =>
-            !isBankStatementMirrorReceipt(
-              r as TxLike,
-              unmatchedDebitsOnlyExport as TxLike[],
-              unmatchedCreditsOnlyExport as TxLike[]
-            )
-        )
-        .reduce((s, t) => s + t.amount, 0) + broughtForwardReceiptLodgmentsTotalExport
-    unpresentedChequesTotal =
-      unmatchedPaymentsOnlyExport
-        .filter(
-          (p) =>
-            !paymentHasBankDebitCounterpart(p as TxLike, debits as TxLike[]) &&
-            !paymentHasBankCreditCounterpart(p as TxLike, credits as TxLike[])
-        )
-        .reduce((s, t) => s + t.amount, 0) + broughtForwardChequesTotalExport
-  }
+  const canonicalTimingExport = resolveCanonicalTimingSchedule({
+    unmatchedReceipts: unmatchedReceiptsRaw as TxLike[],
+    unmatchedPayments: unmatchedPaymentsOnlyExport as TxLike[],
+    unmatchedDebits: unmatchedDebitsOnlyExport as TxLike[],
+    unmatchedCredits: unmatchedCreditsOnlyExport as TxLike[],
+    allBankDebits: debits as TxLike[],
+    allBankCredits: credits as TxLike[],
+    broughtForwardReceiptLodgmentsTotal: broughtForwardReceiptLodgmentsTotalExport,
+    broughtForwardUnpresentedTotal: broughtForwardChequesTotalExport,
+    gtBankEur: gtBankEurProfileExport.active,
+    ecobank: ecobankProfileExport.active,
+    ecobankUnpresentedRows: unpresentedChequeRowsForBrsExport as TxLike[],
+    ecobankUnpresentedTotal: unpresentedChequesTotal,
+  })
+  uncreditedLodgmentsTimingTotalExport = canonicalTimingExport.uncreditedLodgmentsTimingTotal
+  unpresentedChequesTotal = canonicalTimingExport.unpresentedChequesTotal
+  unpresentedChequeRowsForBrsExport = canonicalTimingExport.unpresentedRows
+  const uncreditedRowsForBrsExport = canonicalTimingExport.uncreditedRows
+  const unpresentedForAgeingExport = [
+    ...unpresentedChequeRowsForBrsExport.map((t) => ({
+      date: t.date ? new Date(t.date).toISOString().slice(0, 10) : '',
+      name: t.name || t.details || '—',
+      chqNo: t.chqNo || null,
+      amount: t.amount,
+    })),
+    ...broughtForwardItemsExport.map((t) => ({
+      date: t.date,
+      name: t.name,
+      chqNo: t.chqNo,
+      amount: t.amount,
+    })),
+  ]
+  const missingChequesAgeingExport = buildMissingChequesAgeing(unpresentedForAgeingExport, refDateExport).map((t) => ({
+    Date: t.date,
+    'CHQ NO': t.chqNo || '',
+    'DOC REF': '',
+    Name: t.name || '',
+    [amountColumnHeader(curr)]: t.amount,
+    'Days Outstanding': t.daysOutstanding,
+    'Ageing Band': t.ageingBand,
+  }))
+  const uncreditedAmtCol = amountColumnHeader(curr)
+  const uncreditedLodgmentsForBrsExport = [
+    ...uncreditedRowsForBrsExport.map((t) => ({
+      Date: fmt(t.date ?? null),
+      Details: t.name || t.details || '',
+      'CHQ NO': t.chqNo || '',
+      [uncreditedAmtCol]: t.amount,
+    })),
+    ...(broughtForwardReceiptLodgmentsTotalExport > 0.005
+      ? [
+          {
+            Date: '',
+            Details: 'Brought forward (prior period)',
+            'CHQ NO': '',
+            [uncreditedAmtCol]: broughtForwardReceiptLodgmentsTotalExport,
+          },
+        ]
+      : []),
+    {
+      Date: '',
+      Details: 'TOTAL (BRS Add line)',
+      'CHQ NO': '',
+      [uncreditedAmtCol]: uncreditedLodgmentsTimingTotalExport,
+    },
+  ]
+  const unpresentedChequesForBrsExport = [
+    ...unpresentedChequeRowsForBrsExport.map((t) => ({
+      Date: fmt(t.date ?? null),
+      Details: t.name || t.details || '',
+      'CHQ NO': t.chqNo || '',
+      [uncreditedAmtCol]: t.amount,
+    })),
+    ...(broughtForwardChequesTotalExport > 0.005
+      ? [
+          {
+            Date: '',
+            Details: 'Brought forward (prior period)',
+            'CHQ NO': '',
+            [uncreditedAmtCol]: broughtForwardChequesTotalExport,
+          },
+        ]
+      : []),
+    {
+      Date: '',
+      Details: 'TOTAL (BRS Less line)',
+      'CHQ NO': '',
+      [uncreditedAmtCol]: unpresentedChequesTotal,
+    },
+  ]
+  const asAtUncreditedTotalExport = currentPeriodTimingTotal(uncreditedRowsForBrsExport)
+  const asAtUnpresentedTotalExport = currentPeriodTimingTotal(
+    unpresentedChequeRowsForBrsExport as TxLike[]
+  )
+
   const bankOnlyScheduleExport = buildBankOnlyScheduleRows(
     unmatchedDebitsOnlyExport as TxLike[],
     unmatchedCreditsOnlyExport as TxLike[],
@@ -2001,10 +1995,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     bankStatementClosingBalance: bankStatementClosingBalanceExport,
   })
   const epsComposition = 0.005
-  const unpresentedCurrentCashBookPeriodExport = ecobankProfileExport.active
-    ? unpresentedChequeRowsForBrsExport.reduce((s, t) => s + t.amount, 0)
-    : unmatchedPaymentsTotalExport
-  const timingUncreditedCurrentPeriodExport = unmatchedReceiptsTotalExport
+  const unpresentedCurrentCashBookPeriodExport = currentPeriodTimingTotal(
+    unpresentedChequeRowsForBrsExport as TxLike[]
+  )
+  const timingUncreditedCurrentPeriodExport = currentPeriodTimingTotal(uncreditedRowsForBrsExport)
   const timingUncreditedBroughtForwardPriorExport = broughtForwardReceiptLodgmentsTotalExport
   const unpresentedBroughtForwardPriorExport = broughtForwardChequesTotalExport
   const bankOnlyCreditsCurrentPeriodExport = unmatchedCreditsTotalExport
@@ -2145,6 +2139,20 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (mappedBankDebitRows.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mappedBankDebitRows), 'BANK DEBITS (MAPPED)')
     }
+    if (uncreditedLodgmentsForBrsExport.length) {
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(uncreditedLodgmentsForBrsExport),
+        'UNCREDITED LODGMENTS (BRS)'
+      )
+    }
+    if (unpresentedChequesForBrsExport.length) {
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(unpresentedChequesForBrsExport),
+        'UNPRESENTED CHEQUES (BRS)'
+      )
+    }
 
     if (!brsOnlyExport) {
     const additionalInformationRows: (string | number)[][] = [
@@ -2173,16 +2181,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
 
     // --- AUDIT WORKING PAPERS (INTERNAL USE) ---
     if (unmatchedReceipts.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedReceipts), 'UNMATCHED RECEIPTS')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedReceipts), 'UNMATCHED RECEIPTS (DIAG)')
     }
-    if (ecobankProfileExport.active && unpresentedChequesForBrsExport.length) {
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(unpresentedChequesForBrsExport),
-        'UNPRESENTED CHEQUES (BRS)'
-      )
-    } else if (unmatchedPayments.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedPayments), 'UNMATCHED PAYMENTS')
+    if (unmatchedPayments.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedPayments), 'UNMATCHED PAYMENTS (DIAG)')
     }
     if (bankOnlyDebitsSheet.length) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bankOnlyDebitsSheet), 'BANK-ONLY DEBITS (ADD)')
@@ -2213,9 +2215,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   }
 
   if (format === 'pdf') {
-    // BRS-only exports are typically one page; buffering + footer iteration has produced
-    // trailing blank pages in some viewers — disable buffering for statement-only PDFs.
-    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: !brsOnlyExport })
+    // bufferPages lets us stamp the footer on every real page without PDFKit
+    // auto-adding pages when current y is already in the footer band.
+    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true })
     const pdfNamePrefix = brsOnlyExport ? 'BRS_statement_only_' : 'BRS_'
     const filename = `${pdfNamePrefix}${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
     res.setHeader('Content-Type', 'application/pdf')
@@ -2514,7 +2516,74 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     doc.font('Helvetica').fillColor('#000000')
     doc.moveDown(0.6)
 
-    // Full export: NOTES + narrative on their own page(s); brs_only stops after sign-off.
+    const toPdfBrsRow = (t: {
+      date?: Date | string | null
+      chqNo?: string | null
+      docRef?: string | null
+      name?: string | null
+      details?: string | null
+      amount: number
+    }) => ({
+      date: fmt(t.date ?? null),
+      ref: t.chqNo || t.docRef || '',
+      details: (t.name || t.details || '—').slice(0, 80),
+      amount: t.amount,
+    })
+    const pdfUncreditedBrsRows = [
+      ...uncreditedRowsForBrsExport.map(toPdfBrsRow),
+      ...(broughtForwardReceiptLodgmentsTotalExport > 0.005
+        ? [
+            {
+              date: '—',
+              ref: '',
+              details: 'Brought forward (prior period)',
+              amount: broughtForwardReceiptLodgmentsTotalExport,
+            },
+          ]
+        : []),
+    ]
+    const pdfUnpresentedBrsRows = [
+      ...unpresentedChequeRowsForBrsExport.map(toPdfBrsRow),
+      ...(broughtForwardChequesTotalExport > 0.005
+        ? [
+            {
+              date: '—',
+              ref: '',
+              details: 'Brought forward (prior period)',
+              amount: broughtForwardChequesTotalExport,
+            },
+          ]
+        : []),
+    ]
+    doc.addPage()
+    doc.x = margin
+    doc.y = 50
+    doc
+      .fontSize(11)
+      .font('Helvetica-Bold')
+      .fillColor('#0F172A')
+      .text('BRS supporting lists', { width: contentWidth, align: 'left' })
+    doc.moveDown(0.25)
+    doc
+      .fontSize(8)
+      .font('Helvetica-Oblique')
+      .fillColor('#64748B')
+      .text(
+        'These lists are the same rows that make up the Add and Less lines on the Bank Reconciliation Statement.',
+        { width: contentWidth }
+      )
+      .fillColor('#000000')
+    doc.moveDown(0.6)
+    drawTable('UNCREDITED LODGMENTS (BRS ADD LINE)', pdfUncreditedBrsRows, {
+      allowEmptyText: 'None',
+      refLabel: 'CHQ NO / DOC REF',
+    })
+    drawTable('UNPRESENTED CHEQUES (BRS LESS LINE)', pdfUnpresentedBrsRows, {
+      allowEmptyText: 'None',
+      refLabel: 'CHQ NO / DOC REF',
+    })
+
+    // Full export: NOTES + narrative on their own page(s).
     if (!brsOnlyExport) {
       doc.addPage()
       doc.x = margin
@@ -2582,7 +2651,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       details: (t as { Details?: string }).Details || '—',
       amount: findAmountColumnValue(t as Record<string, unknown>, curr),
     }))
-    drawTable('UNMATCHED RECEIPTS IN CASH BOOK', unmatchedReceiptRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
+    drawTable('UNMATCHED RECEIPTS IN CASH BOOK (DIAGNOSTIC — NOT BRS FACE)', unmatchedReceiptRows, { allowEmptyText: 'None', refLabel: 'DOC REF' })
 
     const unmatchedPaymentRows = unmatchedPayments.map((t) => ({
       date: (t as { Date: string }).Date,
@@ -2590,7 +2659,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       details: (t as { Details?: string }).Details || '—',
       amount: findAmountColumnValue(t as Record<string, unknown>, curr),
     }))
-    drawTable('UNMATCHED PAYMENTS IN CASH BOOK', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
+    drawTable('UNMATCHED PAYMENTS IN CASH BOOK (DIAGNOSTIC — NOT BRS FACE)', unmatchedPaymentRows, { allowEmptyText: 'None', refLabel: 'CHQ NO / DOC REF' })
 
     const bankOnlyDebitRows = bankOnlyScheduleExport.debits.map((t) => ({
       date: fmt(t.date ?? null),
@@ -2631,26 +2700,40 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     /** Footer sits above the physical bottom edge so it is not flush with the page trim. */
     const footerBlockTop = doc.page.height - 58
     const drawPdfFooter = (pageIndex: number, totalPages: number) => {
+      const savedBottom = doc.page.margins.bottom
+      doc.page.margins.bottom = 0
       doc.x = margin
+      doc.y = doc.page.margins.top
       const ruleY = footerBlockTop - 6
       doc.moveTo(margin, ruleY).lineTo(doc.page.width - margin, ruleY).strokeColor('#E2E8F0').lineWidth(0.5).stroke()
       const leftColW = contentWidth - 88
       const textY = footerBlockTop
       if (footerText) {
-        doc.fontSize(7).fillColor('#64748B').text(footerText, margin, textY, { width: leftColW, align: 'left' })
+        doc.fontSize(7).fillColor('#64748B').text(footerText, margin, textY, {
+          width: leftColW,
+          align: 'left',
+          lineBreak: false,
+        })
       }
-      doc.fontSize(7).fillColor('#64748B').text(printDateFooter, margin, textY + 9, { width: leftColW, align: 'left' })
-      doc.fontSize(7).fillColor('#64748B').text(`Page ${pageIndex + 1} of ${totalPages}`, margin, textY, { width: contentWidth, align: 'right' })
+      doc.fontSize(7).fillColor('#64748B').text(printDateFooter, margin, textY + 9, {
+        width: leftColW,
+        align: 'left',
+        lineBreak: false,
+      })
+      doc.fontSize(7).fillColor('#64748B').text(`Page ${pageIndex + 1} of ${totalPages}`, margin, textY, {
+        width: contentWidth,
+        align: 'right',
+        lineBreak: false,
+      })
       doc.fillColor('#000000')
+      doc.page.margins.bottom = savedBottom
+      doc.y = footerBlockTop
     }
-    if (brsOnlyExport) {
-      drawPdfFooter(0, 1)
-    } else {
-      const range = doc.bufferedPageRange()
-      for (let i = 0; i < range.count; i++) {
-        doc.switchToPage(range.start + i)
-        drawPdfFooter(i, range.count)
-      }
+    const range = doc.bufferedPageRange()
+    const totalPages = range.count
+    for (let i = 0; i < totalPages; i++) {
+      doc.switchToPage(range.start + i)
+      drawPdfFooter(i, totalPages)
     }
     doc.end()
     await logAudit({

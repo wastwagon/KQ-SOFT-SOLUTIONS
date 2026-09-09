@@ -381,6 +381,7 @@ export interface ReportResponse {
   unmatchedReceipts?: ReportSimpleTx[]
   unmatchedCredits?: ReportSimpleTx[]
   unmatchedPayments?: ReportSimpleTx[]
+  uncreditedLodgmentsForBrs?: ReportSimpleTx[]
   unpresentedChequesForBrs?: ReportSimpleTx[]
   unmatchedDebits?: ReportSimpleTx[]
   bankOnlyDebits?: ReportSimpleTx[]

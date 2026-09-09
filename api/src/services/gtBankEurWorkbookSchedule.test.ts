@@ -54,6 +54,28 @@ describe('computeGtBankEurTimingSchedule', () => {
     expect(result.uncreditedLodgmentsTimingTotal).toBeCloseTo(7790.17 + 65, 2)
     expect(result.unpresentedChequesTotal).toBeCloseTo(2475.16 + 65 + 38.99 + 100, 2)
   })
+  it('does not treat CANBNKCHG receipts as BANKCHG unpresented', () => {
+    const result = computeGtBankEurTimingSchedule({
+      unmatchedReceipts: [
+        tx('r1', 65, 'CANBNKCHG-65-MAR18/BOOK(CANMAR-GTB-230 )'),
+        tx('r2', 40, 'CANBNKCHG-$40-MAR18/MACAI(CANMAR-GTB-230 )'),
+        tx('r3', 40, 'CANBNKCHG-$40-MAR18/PEGAS(CANMAR-GTB-230 )'),
+        tx('r4', 85.66, 'CANBNKCHG-$85.66-MAR18/EL(CANMAR-GTB-230 )'),
+      ],
+      unmatchedPayments: [tx('p1', 7790.17, 'TRANSFER FROM A/C 230')],
+      unmatchedDebits: [],
+      unmatchedCredits: [],
+      allBankDebits: [],
+      allBankCredits: [],
+      broughtForwardReceiptLodgmentsTotal: 0,
+      broughtForwardUnpresentedTotal: 0,
+    })
+    expect(result.uncreditedLodgmentsTimingTotal).toBeCloseTo(7790.17 + 230.66, 2)
+    expect(result.unpresentedChequesTotal).toBeCloseTo(0, 2)
+    expect(result.uncreditedRows.every((r) => /CANBNK|TRANSFER FROM A\/C/i.test(r.details || ''))).toBe(
+      true
+    )
+  })
 })
 
 describe('computeGtBankEurBankOnlyDebitsTotal', () => {

@@ -314,8 +314,8 @@ This creates a repeatable, audit-friendly monthly process.
 
 - **Cash book:** internal ledger of receipts/payments
 - **Bank statement:** bank-side record of credits/debits
-- **Uncredited lodgments:** cash book receipts not yet reflected by bank
-- **Unpresented cheques:** cash book payments not yet reflected by bank
+- **Uncredited lodgments:** BRS Add line (canonical supporting list + brought-forward lodgments), not every unmatched receipt
+- **Unpresented cheques:** BRS Less line (canonical supporting list + brought-forward cheques), not every unmatched payment
 - **Variance:** difference indicator between unmatched totals
 - **Roll-forward:** carry period-end pending items into next project
 

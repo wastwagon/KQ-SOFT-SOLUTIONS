@@ -493,16 +493,17 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const matchedPaymentsVsDebits = data.matchedPaymentsVsDebits || []
   const unmatchedReceipts = data.unmatchedReceipts || []
   const ecobankBrsProfile = data.reconcileProfile?.bankFormat === 'ecobank'
-  const unpresentedChequesForBrs = data.unpresentedChequesForBrs || []
+  const uncreditedLodgmentsForBrs = data.uncreditedLodgmentsForBrs ?? unmatchedReceipts
   const unmatchedPayments = data.unmatchedPayments || []
-  const unpresentedPaymentsForSection2 = ecobankBrsProfile
-    ? unpresentedChequesForBrs
-    : unmatchedPayments
+  const unpresentedPaymentsForSection2 = data.unpresentedChequesForBrs ?? unmatchedPayments
   const bankOnlyDebitsForSection3 = (data.bankOnlyDebits?.length ? data.bankOnlyDebits : data.unmatchedDebits) || []
   const bankOnlyCreditsForSection3 = (data.bankOnlyCredits?.length ? data.bankOnlyCredits : data.unmatchedCredits) || []
   const broughtForwardItems = data.broughtForwardItems || []
   const broughtForwardLodgments = data.broughtForwardLodgments || []
-  const localAsAtUncreditedTotal = unmatchedReceipts.reduce((s, t) => s + t.amount, 0)
+  const uncreditedBroughtForward = broughtForwardLodgments.filter(
+    (t) => t.source === 'cash_book_receipts'
+  )
+  const localAsAtUncreditedTotal = (uncreditedLodgmentsForBrs || []).reduce((s, t) => s + t.amount, 0)
   const localAsAtUnpresentedTotal = unpresentedPaymentsForSection2.reduce((s, t) => s + t.amount, 0)
   const localPostPeriodLodgmentsTotal = broughtForwardLodgments.reduce((s, t) => s + t.amount, 0)
   const localPostPeriodChequesTotal = broughtForwardItems.reduce((s, t) => s + t.amount, 0)
@@ -1438,10 +1439,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           <div className="rounded-xl border border-green-200 bg-green-50/30 p-5 print:bg-white print:border-slate-300">
             <h3 className="font-semibold mb-3 text-green-900">1. UNCREDITED LODGMENTS</h3>
             <p className="text-sm text-green-800 mb-4">
-              Items to add to bank balance: unmatched receipts in cash book (deposits not yet credited by bank).
+              Items to add to bank balance: cash-book lodgments not yet credited by the bank (BRS schedule).
             </p>
           <div>
-            <h4 className="text-sm font-medium mb-2 text-gray-800">1a. Unmatched receipts in cash book (deposits not yet in bank)</h4>
+            <h4 className="text-sm font-medium mb-2 text-gray-800">1a. Uncredited lodgments (same rows as the BRS Add line)</h4>
             <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
               <table className="min-w-full text-sm text-slate-900">
                 <thead className="bg-slate-100">
@@ -1452,10 +1453,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   </tr>
                 </thead>
                 <tbody>
-                  {(data.unmatchedReceipts || []).length === 0 ? (
+                  {(uncreditedLodgmentsForBrs || []).length === 0 ? (
                     <tr><td colSpan={3} className="px-2 py-4 text-center text-gray-500">None</td></tr>
                   ) : (
-                    (data.unmatchedReceipts || []).map((t, i: number) => (
+                    (uncreditedLodgmentsForBrs || []).map((t, i: number) => (
                       <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
                         <td className="px-2 py-1.5">{fmt(t.date)}</td>
                         <td className="px-2 py-1.5 truncate max-w-[220px]" title={`${t.name || ''} ${t.details || ''}`}>{t.name || t.details || '—'}</td>
@@ -1464,17 +1465,49 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     ))
                   )}
                 </tbody>
-                {(data.unmatchedReceipts || []).length > 0 && (
+                {(uncreditedLodgmentsForBrs || []).length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
-                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (unmatched receipts)</td>
-                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.unmatchedReceipts || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
+                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (uncredited lodgments)</td>
+                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((uncreditedLodgmentsForBrs || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
                     </tr>
                   </tfoot>
                 )}
               </table>
             </div>
           </div>
+          {uncreditedBroughtForward.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium mb-2 text-gray-800">1b. Brought forward from previous period BRS</h4>
+              <p className="text-xs text-gray-600 mb-2">Receipt lodgments carried from the previous period that still form part of the BRS Add line.</p>
+              <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
+                <table className="min-w-full text-sm text-slate-900">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left">Date</th>
+                      <th className="px-2 py-1.5 text-left">Details</th>
+                      <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {uncreditedBroughtForward.map((t, i: number) => (
+                      <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
+                        <td className="px-2 py-1.5">{fmt(t.date)}</td>
+                        <td className="px-2 py-1.5 truncate max-w-[220px]" title={`${t.name || ''} ${t.fromProject || ''}`}>{t.name || t.docRef || t.fromProject || '—'}</td>
+                        <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-300 bg-slate-50/80">
+                      <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (brought forward)</td>
+                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt(uncreditedBroughtForward.reduce((s, t) => s + t.amount, 0))}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
           <div className="mt-3 pt-3 border-t border-green-200">
             <div className="border border-slate-200 rounded-xl overflow-auto">
               <table className="min-w-full text-sm text-slate-900">
@@ -1497,13 +1530,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <p className="text-sm text-blue-800 mb-4">
               {ecobankBrsProfile
                 ? 'Items to deduct from bank balance: unpresented cheques per Ecobank clearing rules (BRS schedule), plus brought-forward unpresented cheques from the previous period.'
-                : 'Items to deduct from bank balance: unmatched payments in cash book (cheques issued not yet presented) and brought-forward unpresented cheques from previous period.'}
+                : 'Items to deduct from bank balance: unpresented cheques on the BRS schedule, plus brought-forward unpresented cheques from the previous period.'}
             </p>
           <div>
             <h4 className="text-sm font-medium mb-2 text-gray-800">
-              {ecobankBrsProfile
-                ? '2a. Unpresented cheques (BRS schedule — Ecobank clearing filter)'
-                : '2a. Unmatched payments in cash book (payments not yet in bank)'}
+              2a. Unpresented cheques (same rows as the BRS Less line)
             </h4>
             <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
               <table className="min-w-full text-sm text-slate-900">
@@ -1531,7 +1562,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
                       <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">
-                        {ecobankBrsProfile ? 'Subtotal (BRS unpresented cheques)' : 'Subtotal (unmatched payments)'}
+                        {ecobankBrsProfile ? 'Subtotal (BRS unpresented cheques)' : 'Subtotal (unpresented cheques)'}
                       </td>
                       <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt(unpresentedPaymentsForSection2.reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
                     </tr>
@@ -1543,15 +1574,31 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {(data.broughtForwardItems || []).length > 0 && (
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2 text-gray-800">2b. Brought forward from previous period BRS</h4>
-              <p className="text-xs text-gray-600 mb-2">Shown in the table above (Brought forward unpresented cheques section)</p>
-              <div className="border border-slate-200 rounded-xl overflow-auto">
+              <p className="text-xs text-gray-600 mb-2">Unpresented cheques carried from the previous period that still form part of the BRS Less line.</p>
+              <div className="border border-slate-200 rounded-xl overflow-auto max-h-48">
                 <table className="min-w-full text-sm text-slate-900">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left">Date</th>
+                      <th className="px-2 py-1.5 text-left">Details</th>
+                      <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
+                    </tr>
+                  </thead>
                   <tbody>
+                    {(data.broughtForwardItems || []).map((t, i: number) => (
+                      <tr key={i} className={`border-t border-slate-200 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
+                        <td className="px-2 py-1.5">{fmt(t.date)}</td>
+                        <td className="px-2 py-1.5 truncate max-w-[220px]" title={`${t.name || ''} ${t.fromProject || ''}`}>{t.name || t.chqNo || t.fromProject || '—'}</td>
+                        <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
                     <tr className="border-t-2 border-slate-300 bg-slate-50/80">
                       <td colSpan={2} className="px-2 py-1.5 font-semibold text-slate-700">Subtotal (brought forward)</td>
                       <td className="px-2 py-1.5 text-right font-semibold text-slate-900">{fmtSignedReportAmt((data.broughtForwardItems || []).reduce((s: number, t: { amount: number }) => s + t.amount, 0))}</td>
                     </tr>
-                  </tbody>
+                  </tfoot>
                 </table>
               </div>
             </div>

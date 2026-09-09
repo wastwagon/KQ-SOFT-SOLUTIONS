@@ -328,13 +328,15 @@ export function extractScbTransactions(rows: unknown[][]): Array<{
     debit: number | ''
     credit: number | ''
     balance: number | ''
+    sourceIndex: number
   }> = []
+  let sourceIndex = 0
 
-  const pushTx = (tx: (typeof transactions)[number]) => {
+  const pushTx = (tx: Omit<(typeof transactions)[number], 'sourceIndex'>) => {
     const fp = txFingerprint(tx)
     if (seen.has(fp)) return
     seen.add(fp)
-    transactions.push(tx)
+    transactions.push({ ...tx, sourceIndex: sourceIndex++ })
   }
 
   for (const row of rows) {
@@ -363,7 +365,8 @@ export function extractScbTransactions(rows: unknown[][]): Array<{
       typeof b.entryDate === 'number'
         ? b.entryDate
         : Date.parse(String(b.entryDate)) / 86400000 + 25569
-    return da - db
+    if (da !== db) return da - db
+    return a.sourceIndex - b.sourceIndex
   })
 
   return transactions

@@ -30,7 +30,7 @@ Applies to: **first block** on `ProjectReport`, Excel sheet **`BANK RECONCILIATI
 **Main lines (fixed order)**
 
 1. Closing balance per bank statement — **bold** amount.
-2. Add: Uncredited lodgments / uncleared deposits — **timing** total (current-period unmatched receipts + brought-forward receipt lodgments, when roll-forward).
+2. Add: Uncredited lodgments / uncleared deposits — **timing** total (canonical current-period uncredited rows + brought-forward receipt lodgments, when roll-forward). Bank classifiers (e.g. Ghana / GT EUR) choose which rows belong in this list; the face amount is always the sum of that list plus BF.
 3. Less: Unpresented cheques — **magnitude** (current unpresented after blank-detail rule + brought-forward cheques).
 4. Add: Bank-only debits not in cash book.
 5. Deduct: Bank-only credits not in cash book.
@@ -95,8 +95,9 @@ Allowed columns:
 3. `{currency}` (e.g. `GHS`)
 
 Totals:
-- `Subtotal (unmatched receipts)`
-- `TOTAL UNCREDITED LODGMENTS (FOR BRS ADD LINE)`
+- `Subtotal (uncredited lodgments)` — current-period canonical BRS rows (not unmatched receipts)
+- `Subtotal (brought forward)` — receipt lodgments carried from the previous period BRS (when applicable)
+- `TOTAL UNCREDITED LODGMENTS (FOR BRS ADD LINE)` — subtotal + BF; must equal the workbook Add line
 
 ---
 
@@ -108,9 +109,9 @@ Allowed columns:
 3. `{currency}` (e.g. `GHS`)
 
 Totals:
-- `Subtotal (unmatched payments)`
+- `Subtotal (unpresented cheques)` — current-period canonical BRS rows (not unmatched payments)
 - `Subtotal (brought forward)` (when applicable)
-- `Total Unpresented Cheques (for BRS Less line)`
+- `Total Unpresented Cheques (for BRS Less line)` — subtotal + BF; must equal the workbook Less line
 
 ---
 

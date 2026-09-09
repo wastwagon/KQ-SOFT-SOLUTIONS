@@ -11,7 +11,7 @@ Standard layout and terminology for Bank Reconciliation Statements (BRS) as used
 3. **Bank:** When a single bank account is selected, header lines use **`{bankName or account name} Account Number {accountNo}`** (e.g. `Ecobank Account Number 5565668889`). Web, Excel first sheet, and PDF share `formatBankAccountHeaderLine` / `bankAccountHeaderLine`.
 4. **Currency:** e.g. "GHS" or "GH₵".
 5. **Primary workbook block** (two-column): Closing balance per bank statement → Add timing uncredited → Less unpresented (magnitudes) → Add bank-only debits → Deduct bank-only credits → Cash book balance. Optional indented lines split **current period vs brought-forward** when roll-forward applies. See `docs/REPORT_LAYOUT_SCHEMA.md` §0 and `deriveCashBookFromWorkbookSchedule` in `api/src/routes/report.ts`.
-6. **Supporting tables:** Uncredited lodgments (unmatched receipts + lists), Unpresented cheques (unmatched payments + brought forward). Compact columns per schema.
+6. **Supporting tables:** Uncredited lodgments (canonical BRS rows + brought-forward receipt lodgments), Unpresented cheques (canonical BRS rows + brought forward). Compact columns per schema. Unmatched receipts/payments remain diagnostic working papers only; they do not define the face totals.
 7. **Workbook sign-off** on the primary block (bottom-right dashed grid): columns **Prepared By**, **Checked By**, **Approved By**; rows **NAME**, **SIGNATURE**, **DATE** — NAME/DATE pre-filled from workflow when submitted; SIGNATURE blank for wet sign. Footer retains digital audit trail (Prepared / Reviewed / Approved with timestamps).
 8. Footer (from organisation branding).
 

@@ -69,21 +69,22 @@
   `balancePerCashBook = Σ(receipts.amount) − Σ(payments.amount)`  
   i.e. total receipts minus total payments (all transactions in the project’s cash book documents).
 
-- **Uncredited lodgments total:**  
-  `uncreditedLodgmentsTotal = Σ(unmatched receipts.amount)`  
-  Receipts not yet matched to any bank credit.
+- **Uncredited lodgments total (BRS Add line):**  
+  `uncreditedLodgmentsTimingTotal = Σ(canonical uncredited rows.amount) + Σ(brought-forward receipt lodgments.amount)`  
+  Canonical rows are bank-classified timing items (cash-book receipts not yet credited, including GT EUR receipt-side CANBNK / TRANSFER FROM A/C). Unmatched receipts are diagnostic only.
 
-- **Unpresented cheques total:**  
-  `unpresentedChequesTotal = Σ(unmatched payments.amount) + Σ(broughtForwardItems.amount)`  
-  Unmatched payments (current period) plus brought-forward unpresented cheques from the previous period (roll-forward).
+- **Unpresented cheques total (BRS Less line):**  
+  `unpresentedChequesTotal = Σ(canonical unpresented rows.amount) + Σ(broughtForwardItems.amount)`  
+  Canonical current-period unpresented cheques plus brought-forward unpresented cheques from the previous period (roll-forward). Unmatched payments are diagnostic only.
 
-- **Closing balance per bank statement (derived):**  
-  `bankClosingBalance = balancePerCashBook + unpresentedChequesTotal − uncreditedLodgmentsTotal`  
-  This satisfies the identity:  
-  **Bank closing + Uncredited lodgments − Unpresented cheques = Balance per cash book**  
-  So: `bankClosingBalance = balancePerCashBook − uncreditedLodgmentsTotal + unpresentedChequesTotal`.
+- **Closing balance per bank statement:**  
+  Uses the **declared** statement closing when present (`bankStatementClosingBalance`). Otherwise falls back to a Ghana-style reconstruction from cash book and timing/bank-only totals.
 
-**Accuracy:** Algebra is correct. The report **derives** “Closing balance per bank statement” from the cash book and the two adjustments so the printed identity holds. The system does not currently take an “as per bank statement” closing balance as a separate input; if that is added later, it could be shown alongside the derived figure for comparison.
+- **Cash book balance at end of period (workbook):**  
+  `cashBook = bankClosing + uncreditedLodgmentsTimingTotal − unpresentedChequesTotal + bankOnlyDebits − bankOnlyCredits`  
+  (`deriveCashBookFromWorkbookSchedule`). Face Add/Less lines use the canonical supporting lists, not unmatched receipts/payments.
+
+**Accuracy:** The printed workbook starts from the bank closing (declared when available) and adds/lesses the canonical lists. Unmatched receipts/payments remain diagnostic working papers.
 
 ### 2.6 Report — ageing (missing cheques)
 
@@ -107,9 +108,9 @@
 
 | Term | Use in app | Professional meaning |
 |------|------------|----------------------|
-| **Closing balance per bank statement** | First line of BRS; value derived so identity holds | Balance as per bank at period end (here: derived from cash book and adjustments). |
-| **Add: Uncredited lodgments** | Second line; sum of unmatched receipts | Receipts recorded in cash book not yet credited by the bank. |
-| **Less: Unpresented cheques** | Third line; unmatched payments + brought forward | Cheques issued (cash book) not yet presented to the bank. |
+| **Closing balance per bank statement** | First line of BRS; declared statement closing when present | Balance as per bank at period end. |
+| **Add: Uncredited lodgments** | Second line; sum of canonical uncredited rows + BF receipt lodgments | Receipts/lodgments recorded in cash book not yet credited by the bank (classifier may include same-side bank items such as GT EUR CANBNK). |
+| **Less: Unpresented cheques** | Third line; canonical unpresented rows + brought forward | Cheques issued (cash book) not yet presented to the bank. |
 | **Balance per cash book at end of period** | Fourth line; receipts − payments | Reconciled cash book balance; equals bank + uncredited − unpresented. |
 | **Uncredited lodgments** (in narrative/help) | Report narrative; Reconcile “Note”; BrsHelp | Same as above; “receipts not in bank” / “not yet shown as credited by the bank”. |
 | **Unpresented cheques** (in narrative/help) | Report narrative; Reconcile “Note”; BrsHelp | Same as above; “payments not in bank” / “not yet presented to the bank”. |

@@ -57,6 +57,21 @@ describe('scbStatement', () => {
     )
   })
 
+  it('keeps file order when several transactions share the same date', () => {
+    const rows = [
+      ['ENTRY DATE', 'VALUE DATE', 'DESCRIPTION', 'NARRATION', 'DEBITS', 'CREDITS', 'BALANCE'],
+      [43466, 43466, 'FIRST SAME DAY', '', 10, '', 90],
+      [43466, 43466, 'SECOND SAME DAY', '', 5, '', 85],
+      [43467, 43467, 'NEXT DAY', '', 1, '', 84],
+    ]
+    const txs = extractScbTransactions(rows)
+    expect(txs.map((t) => t.description)).toEqual([
+      'FIRST SAME DAY',
+      'SECOND SAME DAY',
+      'NEXT DAY',
+    ])
+  })
+
   it('extractScbTransactions dedupes and sorts', () => {
     if (!fs.existsSync(SCB_RAW)) return
     const rows = XLSX.utils.sheet_to_json(XLSX.readFile(SCB_RAW).Sheets.Sheet1, {
