@@ -33,6 +33,19 @@ import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import { getMappingIssues, fieldLabel } from '../lib/mappingHints'
 import { DEFAULT_PDF_OCR_MAX_PAGES, SIGN_WARNINGS_PREVIEW_MAX } from '../lib/importLimits'
+import {
+  autoMapSkippedNeedsManual,
+  docTransactionCount,
+  formatMapDocType,
+  hasBankDocs,
+  hasCashBookDocs,
+  isDocMapped,
+  isDocParsing,
+  mappedCountSummary,
+  nextBulkSelection,
+  sameIdSet,
+  type MapListDoc,
+} from '../lib/mapDocumentStatus'
 
 function confidenceTone(level: MappingConfidence): 'success' | 'warning' | 'neutral' {
   if (level === 'high') return 'success'
@@ -214,48 +227,63 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   /** Document IDs included in bulk “apply suggested mapping”. New files default on; existing choices survive list refresh. */
   const [bulkDocIds, setBulkDocIds] = useState<Set<string>>(() => new Set())
   const bulkSelectionDocKeyRef = useRef('')
+  const prevTxnCountRef = useRef<Record<string, number>>({})
 
-  const docs = project?.documents || []
-  const parseJobsInflight = useMemo(
-    () =>
-      (docs as { parseStatus?: string }[]).filter(
-        (d) => d.parseStatus === 'pending' || d.parseStatus === 'processing'
-      ).length,
+  const docs = (project?.documents || []) as MapListDoc[]
+  const parseJobsInflight = useMemo(() => docs.filter(isDocParsing).length, [docs])
+  const mappedDocs = useMemo(() => docs.filter(isDocMapped), [docs])
+  const unmappedReadyDocs = useMemo(
+    () => docs.filter((d) => !isDocParsing(d) && d.parseStatus !== 'failed' && !isDocMapped(d)),
     [docs]
   )
-  const hasBankDocuments = useMemo(
-    () =>
-      (docs as { type: string }[]).some((d) => d.type === 'bank_credits' || d.type === 'bank_debits'),
-    [docs]
+  const mappedSelectedCount = useMemo(
+    () => docs.filter((d) => bulkDocIds.has(d.id) && isDocMapped(d)).length,
+    [docs, bulkDocIds]
   )
+  const hasBankDocuments = useMemo(() => hasBankDocs(docs), [docs])
+  const missingCashBook = docs.length > 0 && !hasCashBookDocs(docs)
+  const missingBank = docs.length > 0 && !hasBankDocuments
+  const projectCurrency = String((project as { currency?: string | null } | undefined)?.currency || 'GHS').toUpperCase()
   const selectedDoc = docs.find((d: { id: string }) => d.id === selectedDocId)
 
   useEffect(() => {
-    const idList = (docs as { id: string }[]).map((d) => d.id)
-    const key = idList.slice().sort().join(',')
-    if (key === bulkSelectionDocKeyRef.current) return
+    const idList = docs.map((d) => d.id)
     const oldKey = bulkSelectionDocKeyRef.current
-    bulkSelectionDocKeyRef.current = key
-    const oldIds = new Set(oldKey ? oldKey.split(',') : [])
+    const previousDocIds = oldKey ? oldKey.split(',').filter(Boolean) : []
+    bulkSelectionDocKeyRef.current = idList.slice().sort().join(',')
+    const prevCounts = { ...prevTxnCountRef.current }
+
     setBulkDocIds((prevSelected) => {
-      if (oldKey === '') return new Set(idList)
-      const next = new Set<string>()
-      for (const id of idList) {
-        if (!oldIds.has(id)) next.add(id)
-        else if (prevSelected.has(id)) next.add(id)
-      }
-      return next
+      const next = nextBulkSelection({
+        docs,
+        prevSelected,
+        previousDocIds,
+        prevTxnCounts: prevCounts,
+      })
+      return sameIdSet(next, prevSelected) ? prevSelected : next
     })
+
+    const nextCounts: Record<string, number> = {}
+    for (const d of docs) nextCounts[d.id] = docTransactionCount(d)
+    prevTxnCountRef.current = nextCounts
   }, [docs])
 
   async function applySuggestedToAll() {
     if (!docs.length) return
-    const selectedDocs = (docs as { id: string; type: string; filename?: string }[]).filter((d) =>
-      bulkDocIds.has(d.id)
-    )
+    const selectedDocs = docs.filter((d) => bulkDocIds.has(d.id))
     if (selectedDocs.length === 0) {
       setError('Select at least one document in the list below, or use “Select all”.')
       return
+    }
+    const alreadyMapped = selectedDocs.filter(isDocMapped)
+    if (alreadyMapped.length > 0) {
+      const ok = await confirm({
+        title: 'Replace existing mapping?',
+        description: `${alreadyMapped.length} selected file${alreadyMapped.length === 1 ? ' already has' : 's already have'} transactions. Applying suggested mapping will overwrite those columns.`,
+        confirmLabel: 'Replace mapping',
+        tone: 'warning',
+      })
+      if (!ok) return
     }
     setError('')
     setApplyingAll(true)
@@ -317,6 +345,39 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     } finally {
       setApplyingAll(false)
     }
+  }
+
+  async function handleProceedToReconcile() {
+    if (!onProceedToReconcile) return
+    if (parseJobsInflight > 0) {
+      const ok = await confirm({
+        title: 'Files are still parsing',
+        description:
+          'Wait until parsing finishes so transactions are complete. Proceed anyway only if you want to open Reconcile now.',
+        confirmLabel: 'Proceed anyway',
+        tone: 'warning',
+      })
+      if (!ok) return
+    } else if (unmappedReadyDocs.length > 0) {
+      const ok = await confirm({
+        title: 'Some files are not mapped',
+        description: `${unmappedReadyDocs.length} file${unmappedReadyDocs.length === 1 ? ' has' : 's have'} no transactions yet. Reconcile will be incomplete until you apply mapping.`,
+        confirmLabel: 'Proceed anyway',
+        tone: 'warning',
+      })
+      if (!ok) return
+    } else if (missingCashBook || missingBank) {
+      const ok = await confirm({
+        title: 'Cash book or bank statement missing',
+        description: missingCashBook
+          ? 'This project has no cash book files. Reconcile needs both a cash book and a bank statement.'
+          : 'This project has no bank statement files. Reconcile needs both a cash book and a bank statement.',
+        confirmLabel: 'Proceed anyway',
+        tone: 'warning',
+      })
+      if (!ok) return
+    }
+    onProceedToReconcile()
   }
 
   useEffect(() => {
@@ -411,21 +472,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     })
   }, [preview, mapping, selectedDoc?.type])
 
-  const documentsWithoutTransactions = useMemo(() => {
-    return (
-      docs as {
-        id: string
-        filename: string
-        type: string
-        _count?: { transactions?: number }
-      }[]
-    ).filter(
-      (d) =>
-        d._count != null &&
-        typeof d._count.transactions === 'number' &&
-        d._count.transactions === 0
-    )
-  }, [docs])
+  const documentsWithoutTransactions = unmappedReadyDocs
 
   if (!id) return <WorkflowStepSkeleton />
   if (paywallBlocked) {
@@ -585,11 +632,48 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         </Alert>
       )}
 
+      {canMap && !projectLocked && docs.length === 0 && (
+        <Alert tone="info" title="No files to map yet">
+          Upload a cash book and a bank statement first. Mapping starts automatically when the file is
+          recognised; otherwise apply suggested mapping or map columns by hand on this page.
+        </Alert>
+      )}
+      {canMap && !projectLocked && docs.length > 0 && projectCurrency !== 'GHS' && (
+        <Alert tone="info" title={`Project currency is ${projectCurrency}`}>
+          Confirm the amount column is in {projectCurrency} before applying mapping. A local-currency
+          Amount column (for example GHS) will not match a {projectCurrency} bank statement.
+        </Alert>
+      )}
+      {canMap && !projectLocked && docs.length > 0 && mappedDocs.length === docs.length && parseJobsInflight === 0 && (
+        <Alert tone="success" title="Files already mapped">
+          All {docs.length} file{docs.length === 1 ? '' : 's'} already have transactions
+          {mappedCountSummary(docs) ? ` (${mappedCountSummary(docs)})` : ''}. Proceed to Reconcile.
+          Apply suggested mapping only if you need to change columns — it overwrites the current mapping.
+        </Alert>
+      )}
+      {canMap &&
+        !projectLocked &&
+        docs.length > 0 &&
+        mappedDocs.length > 0 &&
+        mappedDocs.length < docs.length && (
+        <Alert tone="warning" title="Some files still need mapping">
+          {mappedDocs.length} of {docs.length} files have transactions
+          {mappedCountSummary(docs) ? ` (${mappedCountSummary(docs)})` : ''}. Tick the remaining files
+          and apply suggested mapping, or open each under “Select a document”.
+        </Alert>
+      )}
+      {canMap && !projectLocked && (missingCashBook || missingBank) && (
+        <Alert tone="warning" title="Incomplete uploads">
+          {missingCashBook
+            ? 'No cash book files on this project. Upload receipts and/or payments, then map them.'
+            : 'No bank statement files on this project. Upload credits and/or debits, then map them.'}
+        </Alert>
+      )}
       {canMap && !projectLocked && docs.length > 0 && (
         <Card
           className="max-w-2xl"
           title="Bulk apply — which files?"
-          sublabel="Only ticked files are processed (any supported upload—CSV/Excel, PDF, images, etc.). New uploads are ticked automatically; untick any file you want to skip or map by hand below."
+          sublabel="Tick files that still need mapping. Already-mapped files are left unticked so you do not overwrite them by accident. New uploads are ticked until they have transactions."
         >
           <div className="space-y-3">
           <div className="flex flex-wrap gap-2 text-xs font-medium">
@@ -598,24 +682,27 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               variant="ghost"
               size="sm"
               className="text-primary-700 hover:text-primary-800"
-              onClick={() => setBulkDocIds(new Set((docs as { id: string }[]).map((d) => d.id)))}
+              onClick={() => setBulkDocIds(new Set(docs.map((d) => d.id)))}
             >
               Select all
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-primary-700 hover:text-primary-800"
+              onClick={() =>
+                setBulkDocIds(new Set(docs.filter((d) => isDocParsing(d) || !isDocMapped(d)).map((d) => d.id)))
+              }
+            >
+              Select files that need mapping
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setBulkDocIds(new Set())}>
               Clear selection
             </Button>
           </div>
           <ul className="space-y-2 max-h-52 overflow-y-auto border border-gray-100 rounded-xl p-2 bg-gray-50/50">
-            {(
-              docs as {
-                id: string
-                filename: string
-                type: string
-                parseStatus?: string
-                parseStatusMessage?: string | null
-              }[]
-            ).map((d) => (
+            {docs.map((d) => (
               <li key={d.id} className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -629,18 +716,18 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                       return next
                     })
                   }}
-                  aria-label={`Include ${d.filename} in bulk mapping`}
+                  aria-label={`Include ${d.filename} (${formatMapDocType(d.type)}) in bulk mapping`}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="text-gray-900 break-words">{d.filename}</span>
-                  <span className="text-gray-500 text-xs"> ({d.type})</span>
+                  <span className="text-gray-500 text-xs"> ({formatMapDocType(d.type)})</span>
                   {d.parseStatus === 'pending' && (
-                    <Badge tone="brand" size="sm" className="ml-2 uppercase tracking-wide">
+                    <Badge tone="brand" size="sm" className="ml-2">
                       Queued
                     </Badge>
                   )}
                   {d.parseStatus === 'processing' && (
-                    <Badge tone="brand" size="sm" className="ml-2 uppercase tracking-wide">
+                    <Badge tone="brand" size="sm" className="ml-2">
                       Parsing…
                     </Badge>
                   )}
@@ -648,24 +735,27 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                     <Badge
                       tone="danger"
                       size="sm"
-                      className="ml-2 uppercase tracking-wide"
+                      className="ml-2"
                       title={d.parseStatusMessage || 'Parse failed'}
                     >
                       Failed
                     </Badge>
                   )}
-                  {d.parseStatus === 'ready' &&
-                    d.parseStatusMessage &&
-                    /map them on this page|map manually|not a recognised|not certain/i.test(
-                      d.parseStatusMessage
-                    ) && (
+                  {isDocMapped(d) && (
+                    <Badge tone="success" size="sm" className="ml-2" title="Already extracted — proceed, or tick to remap">
+                      Mapped · {docTransactionCount(d)}
+                    </Badge>
+                  )}
+                  {!isDocParsing(d) &&
+                    d.parseStatus !== 'failed' &&
+                    !isDocMapped(d) && (
                     <Badge
                       tone="warning"
                       size="sm"
-                      className="ml-2 uppercase tracking-wide"
-                      title={d.parseStatusMessage}
+                      className="ml-2"
+                      title={d.parseStatusMessage || 'No transactions yet — apply mapping'}
                     >
-                      Map needed
+                      {autoMapSkippedNeedsManual(d) ? 'Map needed' : 'Not mapped'}
                     </Badge>
                   )}
                 </span>
@@ -691,6 +781,18 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
               </p>
             </details>
           </div>
+          {mappedSelectedCount > 0 && (
+            <p className="text-xs text-amber-800">
+              {mappedSelectedCount} ticked file{mappedSelectedCount === 1 ? ' already has' : 's already have'}{' '}
+              transactions. Applying will replace that mapping.
+            </p>
+          )}
+          {unmappedReadyDocs.length > 0 && bulkDocIds.size === 0 && (
+            <p className="text-xs text-amber-800">
+              {unmappedReadyDocs.length} file{unmappedReadyDocs.length === 1 ? '' : 's'} still need mapping.
+              Tick them above or open each under “Select a document”.
+            </p>
+          )}
           </div>
         </Card>
       )}
@@ -709,14 +811,16 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
           }}
         >
           <option value="">Select a document</option>
-          {docs.map((d: { id: string; filename: string; type: string; parseStatus?: string }) => (
+          {docs.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.filename} ({d.type})
-              {d.parseStatus === 'pending' || d.parseStatus === 'processing'
+              {d.filename} ({formatMapDocType(d.type)})
+              {isDocParsing(d)
                 ? ' — parsing…'
                 : d.parseStatus === 'failed'
                   ? ' — parse failed'
-                  : ''}
+                  : isDocMapped(d)
+                    ? ` — mapped, ${docTransactionCount(d)}`
+                    : ' — not mapped'}
             </option>
           ))}
         </Select>
@@ -1140,8 +1244,18 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       {onProceedToReconcile && (
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-gray-600">Mapping done? Go to Reconcile to match transactions.</p>
-          <Button type="button" onClick={onProceedToReconcile}>
+          <p className="text-sm text-gray-600">
+            {docs.length === 0
+              ? 'Upload files first, then return here to map columns.'
+              : parseJobsInflight > 0
+                ? 'Wait until parsing finishes before reconciling.'
+                : unmappedReadyDocs.length > 0
+                  ? `${unmappedReadyDocs.length} file${unmappedReadyDocs.length === 1 ? '' : 's'} still need mapping.`
+                  : mappedDocs.length > 0
+                    ? 'All files have transactions. Continue to Reconcile.'
+                    : 'Apply mapping, then go to Reconcile to match transactions.'}
+          </p>
+          <Button type="button" onClick={() => void handleProceedToReconcile()} disabled={docs.length === 0}>
             Proceed to Reconcile
           </Button>
           </div>
