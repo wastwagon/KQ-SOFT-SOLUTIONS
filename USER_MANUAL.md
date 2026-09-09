@@ -302,7 +302,7 @@ Match each payment to its corresponding bank debit (or leave unmatched if it is 
 
 1. **Single match:** Select one cash book line and one bank line, then click **Match**.
 2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all (safe → patterns)** for phased high-confidence suggestions (90%+ any safe pair, then bank-pattern suggestions at 85%+). Available on Standard+ with bulk match.
-3. **1-to-many / many-to-many (Premium+):** Select one cash book line and multiple bank lines (or vice versa), then match. Many-to-many requires both sides to sum to the same total.
+3. **1-to-many / many-to-many:** Select one cash book line and multiple bank lines (or vice versa), then match. Many-to-many requires both sides to sum to the same total.
 
 #### Suggestions
 

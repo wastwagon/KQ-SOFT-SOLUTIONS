@@ -180,7 +180,7 @@ Work in:
 
 Matching modes:
 - 1:1 (all plans)
-- 1:many / many:1 / many:many (Premium+)
+- 1:many / many:1 / many:many (all plans)
 
 Matching settings presets:
 - **Strict** — amount + date + reference + cheque
@@ -191,7 +191,7 @@ Available actions:
 - manual matching (select rows → **Confirm Match**)
 - suggested matching (Standard+)
 - bulk matching and auto-match (Standard+)
-- split suggestions for bulk deposits (Premium+)
+- split suggestions for bulk deposits (all plans)
 - unmatch
 - bank account filtering
 - **Match by counting** (diagnostic): recommended order **Cancel → Open (select overlap) → Only**. There is no Open — less list — more on one side is less on the other. After Open overlap is matched, leftovers appear on Only (Unmatched scope).
@@ -309,7 +309,8 @@ Create and revoke keys for programmatic access.
 | Suggested matches, bulk / auto-match, AI ranking | All tiers |
 | Match by counting (diagnostic lists / cancel schedule; never auto-clears) | All tiers |
 | Bank rules, audit, discrepancy | Standard+ |
-| 1:many / many:many, roll-forward, threshold approval, priority support | Premium+ |
+| 1:many / many:many, split suggestions | All tiers |
+| Roll-forward, threshold approval, priority support | Premium+ |
 | Multi-client workspace, public API, custom contract | Custom |
 
 ---

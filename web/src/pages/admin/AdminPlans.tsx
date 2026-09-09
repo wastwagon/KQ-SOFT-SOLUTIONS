@@ -57,8 +57,8 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
     audit_trail: false,
     discrepancy_report: false,
     missing_cheques_report: false,
-    one_to_many: false,
-    many_to_many: false,
+    one_to_many: true,
+    many_to_many: true,
     roll_forward: false,
     threshold_approval: false,
     full_branding: false,
@@ -73,8 +73,8 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
     audit_trail: true,
     discrepancy_report: true,
     missing_cheques_report: true,
-    one_to_many: false,
-    many_to_many: false,
+    one_to_many: true,
+    many_to_many: true,
     roll_forward: false,
     threshold_approval: false,
     full_branding: true,
@@ -115,6 +115,9 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
     multi_client: true,
   },
 }
+
+/** Split / many-to-1 matching is on every package; CMS cannot turn it off. */
+const UNGATED_PLAN_FEATURES = new Set(['one_to_many', 'many_to_many'])
 
 function fmtLimit(n: number) {
   return n < 0 ? 'Unlimited' : n.toLocaleString()
@@ -349,7 +352,7 @@ function PlanForm({
       bankAccounts: parseInt(bankAccounts, 10) || 0,
       cleanExportsPerMonth: parseInt(cleanExportsPerMonth, 10) || 0,
       usersLimit: parseInt(usersLimit, 10) || 0,
-      features,
+      features: { ...features, one_to_many: true, many_to_many: true },
       active,
     })
   }
@@ -405,8 +408,8 @@ function PlanForm({
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-1">Features</h4>
         <p className="text-xs text-gray-500 mb-3">
-          These flags gate the product (API keys, bank rules, matching, reports). Saving updates every workspace on this
-          package.
+          These flags gate the product (API keys, bank rules, reports). One-to-many and many-to-many
+          matching stay on for every package. Saving updates every workspace on this package.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {rows.map((f) => (
@@ -414,7 +417,8 @@ function PlanForm({
               <input
                 type="checkbox"
                 className="mt-0.5 rounded border-gray-300"
-                checked={!!features[f.id]}
+                checked={UNGATED_PLAN_FEATURES.has(f.id) ? true : !!features[f.id]}
+                disabled={UNGATED_PLAN_FEATURES.has(f.id)}
                 onChange={(e) => setFeatures((prev) => ({ ...prev, [f.id]: e.target.checked }))}
               />
               <span>

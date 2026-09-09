@@ -19,7 +19,7 @@
  *   - web/src/lib/plans.ts → MARKETING_PLANS
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
-import { defaultFeaturesForPlan, isStoredFeaturesEmpty } from '../src/config/planFeatures.js'
+import { isStoredFeaturesEmpty, mergePlanFeatures } from '../src/config/planFeatures.js'
 
 const prisma = new PrismaClient()
 
@@ -101,7 +101,7 @@ async function main() {
     const isLegacy =
       !!existing && (legacyMonthly[plan.slug] ?? []).includes(existing.monthlyGhs)
     const shouldReset = force || isLegacy || !existing
-    const features = defaultFeaturesForPlan(plan.slug) as Prisma.InputJsonValue
+    const features = mergePlanFeatures(plan.slug, existing?.features) as Prisma.InputJsonValue
     const shouldBackfillFeatures = !!existing && isStoredFeaturesEmpty(existing.features)
     const firstTimeCms = shouldBackfillFeatures
       ? {
@@ -118,9 +118,11 @@ async function main() {
       update: shouldReset
         ? { ...plan, features }
         : {
-            // Keep admin CMS edits (prices, monthly volume, seats, features).
+            // Keep admin CMS edits (prices, monthly volume, seats) but always
+            // persist ungated split matching so Basic/Standard Confirm match works.
             name: plan.name,
             slug: plan.slug,
+            features,
             ...firstTimeCms,
           },
     })

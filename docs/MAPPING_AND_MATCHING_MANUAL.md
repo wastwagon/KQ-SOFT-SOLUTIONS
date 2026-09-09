@@ -231,9 +231,9 @@ Each match links:
 | Match type | Selection | Plan |
 |------------|-----------|------|
 | **1-to-1** | 1 cash book + 1 bank | All plans |
-| **1-to-many** | 1 cash book + 2+ bank | Premium+ |
-| **Many-to-1** | 2+ cash book + 1 bank | Premium+ |
-| **Many-to-many** | 2+ cash book + 2+ bank | Premium+ |
+| **1-to-many** | 1 cash book + 2+ bank | All plans |
+| **Many-to-1** | 2+ cash book + 1 bank | All plans |
+| **Many-to-many** | 2+ cash book + 2+ bank | All plans |
 
 A matched row cannot be matched again until you **unmatch** it.
 
@@ -304,9 +304,9 @@ Settings are saved per project in your browser.
 
 Bulk match is limited to **50 pairs** per action. Ambiguous pairs (e.g. duplicate cheque numbers) are skipped.
 
-### Split suggestions (Premium plan and above)
+### Split suggestions
 
-**Split suggestions** appear when several cash book lines likely belong to one bank deposit (or vice versa). Click a card to select the whole group, then **Confirm Match**.
+**Split suggestions** appear on every plan when several cash book lines likely belong to one bank deposit (or vice versa). Click a card to select the whole group, then **Confirm match**. You can also tick the rows yourself and confirm at the bottom of the screen.
 
 ### Confirmed matches
 
@@ -401,8 +401,8 @@ Rules influence suggestions during Reconcile — they do not replace your review
 | Auto-match (phased) | ✓ | ✓ | ✓ | ✓ |
 | AI match ranking (org memory) | ✓ | ✓ | ✓ | ✓ |
 | Bank rules | | ✓ | ✓ | ✓ |
-| 1-to-many / many-to-many | | | ✓ | ✓ |
-| Split suggestions | | | ✓ | ✓ |
+| 1-to-many / many-to-many | ✓ | ✓ | ✓ | ✓ |
+| Split suggestions | ✓ | ✓ | ✓ | ✓ |
 | Match evidence upload | ✓ | ✓ | ✓ | ✓ |
 
 If a feature is greyed out or shows an upgrade notice, your organisation’s plan does not include it.

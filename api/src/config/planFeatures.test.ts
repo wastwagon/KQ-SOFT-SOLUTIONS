@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { hasPlanFeature, isStoredFeaturesEmpty, planRank, setPlanRuntimeEntitlements, clearPlanRuntimeEntitlements } from './planFeatures.js'
+import { hasPlanFeature, isStoredFeaturesEmpty, mergePlanFeatures, planRank, setPlanRuntimeEntitlements, clearPlanRuntimeEntitlements } from './planFeatures.js'
 
 describe('planFeatures', () => {
   afterEach(() => {
@@ -20,19 +20,20 @@ describe('planFeatures', () => {
     }
   })
 
-  it('keeps one_to_many on Premium+', () => {
-    expect(hasPlanFeature('basic', 'one_to_many')).toBe(false)
-    expect(hasPlanFeature('standard', 'one_to_many')).toBe(false)
-    expect(hasPlanFeature('premium', 'one_to_many')).toBe(true)
+  it('enables split matching on every tier', () => {
+    for (const plan of ['basic', 'standard', 'premium', 'firm'] as const) {
+      expect(hasPlanFeature(plan, 'one_to_many')).toBe(true)
+      expect(hasPlanFeature(plan, 'many_to_many')).toBe(true)
+    }
   })
 
   it('lets CMS runtime entitlements override code defaults', () => {
-    setPlanRuntimeEntitlements('basic', { features: { one_to_many: true, bank_rules: true } })
-    expect(hasPlanFeature('basic', 'one_to_many')).toBe(true)
+    setPlanRuntimeEntitlements('basic', { features: { one_to_many: false, bank_rules: true } })
     expect(hasPlanFeature('basic', 'bank_rules')).toBe(true)
     expect(hasPlanFeature('basic', 'api_access')).toBe(false)
+    expect(hasPlanFeature('basic', 'one_to_many')).toBe(true)
     clearPlanRuntimeEntitlements()
-    expect(hasPlanFeature('basic', 'one_to_many')).toBe(false)
+    expect(hasPlanFeature('basic', 'one_to_many')).toBe(true)
   })
 
   it('treats missing CMS feature JSON as empty', () => {
@@ -40,5 +41,12 @@ describe('planFeatures', () => {
     expect(isStoredFeaturesEmpty({})).toBe(true)
     expect(isStoredFeaturesEmpty({ bank_rules: true })).toBe(false)
     expect(isStoredFeaturesEmpty({ unknown: true })).toBe(true)
+  })
+
+  it('keeps split matching on when CMS stored false', () => {
+    const merged = mergePlanFeatures('basic', { one_to_many: false, many_to_many: false, bank_rules: false })
+    expect(merged.one_to_many).toBe(true)
+    expect(merged.many_to_many).toBe(true)
+    expect(merged.bank_rules).toBe(false)
   })
 })

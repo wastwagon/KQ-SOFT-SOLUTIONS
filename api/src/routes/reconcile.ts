@@ -1224,7 +1224,7 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'one_to_many')) || !(await planHasFeature(org.plan, 'many_to_many'))) {
-    return res.status(403).json({ error: 'One-to-many and many-to-many matching require Premium plan or higher.' })
+    return res.status(403).json({ error: 'One-to-many and many-to-many matching is not available on this workspace.' })
   }
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })

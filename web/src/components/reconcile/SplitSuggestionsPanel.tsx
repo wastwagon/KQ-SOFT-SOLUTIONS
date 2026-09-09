@@ -5,10 +5,10 @@ import Card from '../ui/Card'
 import type { SuggestedSplitMatch, Tx } from './types'
 
 /**
- * Premium split-suggestion cards for 1-to-many or many-to-1 reconciliation
+ * Split-suggestion cards for 1-to-many or many-to-1 reconciliation
  * candidates (typically bulk deposits or aggregated payments).  Clicking a
  * card pre-selects every cash-book and bank id in the proposed group so the
- * floating action bar can confirm the multi-match.
+ * floating action bar can confirm the multi-match. Available on every plan.
  */
 interface SplitSuggestionsPanelProps {
   suggestions: SuggestedSplitMatch[]
@@ -19,8 +19,6 @@ interface SplitSuggestionsPanelProps {
   onSelectGroup: (cbIds: string[], bankIds: string[]) => void
   onForgetMemory?: (memoryId: string) => void
   isForgettingMemory?: boolean
-  /** False when the org plan cannot confirm many-to-1 / 1-to-many matches. */
-  splitMatchingEnabled?: boolean
 }
 
 export default function SplitSuggestionsPanel({
@@ -32,27 +30,18 @@ export default function SplitSuggestionsPanel({
   onSelectGroup,
   onForgetMemory,
   isForgettingMemory = false,
-  splitMatchingEnabled = true,
 }: SplitSuggestionsPanelProps) {
   return (
     <Card
       id="split-suggestions"
       title={
         <span className="flex items-center gap-2">
-          <Badge tone="brand" size="sm">
-            Premium
-          </Badge>
           Split suggestions — many-to-1 / 1-to-many
         </span>
       }
       sublabel="Different amounts that add up (for example 6,200 + 3,800 = 10,000). This is not Match by counting, which only groups the same amount. Auto-match all does not apply these groups."
     >
-      {!splitMatchingEnabled ? (
-        <p className="text-sm text-gray-600">
-          This workspace plan cannot confirm many-to-1 matches. Tick 1 cash-book row and 1 bank row
-          to Confirm match, or leave the group unmatched so it stays on the BRS open lists.
-        </p>
-      ) : suggestions.length === 0 ? (
+      {suggestions.length === 0 ? (
         <p className="text-sm text-gray-600">
           No split groups suggested right now. You can still match them yourself: tick the cash-book
           rows that add up and the one bank row, then use <strong>Confirm match</strong> at the

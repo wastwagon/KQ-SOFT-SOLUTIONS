@@ -45,8 +45,8 @@ export const PLAN_FEATURE_CATALOG: { id: PlanFeature; label: string; hint: strin
   { id: 'audit_trail', label: 'Audit trail', hint: 'Workspace activity log' },
   { id: 'discrepancy_report', label: 'Discrepancy report', hint: 'Date/amount variance report' },
   { id: 'missing_cheques_report', label: 'Missing cheques report', hint: 'Unpresented cheques listing' },
-  { id: 'one_to_many', label: 'One-to-many matches', hint: 'Split payments' },
-  { id: 'many_to_many', label: 'Many-to-many matches', hint: 'Grouped matches' },
+  { id: 'one_to_many', label: 'One-to-many matches', hint: 'Split payments (all plans)' },
+  { id: 'many_to_many', label: 'Many-to-many matches', hint: 'Grouped matches (all plans)' },
   { id: 'roll_forward', label: 'Roll forward', hint: 'Carry unpresented items to the next period' },
   { id: 'threshold_approval', label: 'Threshold approval', hint: 'Require review above an amount' },
   { id: 'full_branding', label: 'Full branding', hint: 'Logo, colours, custom footer on reports' },
@@ -57,6 +57,17 @@ export const PLAN_FEATURE_CATALOG: { id: PlanFeature; label: string; hint: strin
 
 const PLAN_ORDER = ['basic', 'standard', 'premium', 'firm'] as const
 
+/** Confirm match for 1-to-many / many-to-1 / many-to-many is available on every tier. */
+const UNGATED_FEATURES = new Set<PlanFeature>(['one_to_many', 'many_to_many'])
+
+function withUngatedFeatures(
+  features: Record<PlanFeature, boolean>
+): Record<PlanFeature, boolean> {
+  const out = { ...features }
+  for (const id of UNGATED_FEATURES) out[id] = true
+  return out
+}
+
 /** Minimum plan required for each feature (code defaults when CMS has no override). */
 const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
   bank_rules: 'standard',
@@ -65,8 +76,8 @@ const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
   audit_trail: 'standard',
   discrepancy_report: 'standard',
   missing_cheques_report: 'standard',
-  one_to_many: 'premium',
-  many_to_many: 'premium',
+  one_to_many: 'basic',
+  many_to_many: 'basic',
   roll_forward: 'premium',
   threshold_approval: 'premium',
   full_branding: 'standard',
@@ -124,6 +135,7 @@ export function planRank(plan: string): number {
 }
 
 export function defaultHasPlanFeature(plan: string, feature: PlanFeature): boolean {
+  if (UNGATED_FEATURES.has(feature)) return true
   const minPlan = FEATURE_MIN_PLAN[feature]
   const minRank = planRank(minPlan)
   const planRankVal = planRank(plan)
@@ -156,13 +168,14 @@ export function mergePlanFeatures(
   plan: string,
   stored: unknown
 ): Record<PlanFeature, boolean> {
-  return {
+  return withUngatedFeatures({
     ...defaultFeaturesForPlan(plan),
     ...parseStoredFeatures(stored),
-  }
+  })
 }
 
 export function hasPlanFeature(plan: string, feature: PlanFeature): boolean {
+  if (UNGATED_FEATURES.has(feature)) return true
   const runtime = runtimeBySlug.get(plan)?.features?.[feature]
   if (typeof runtime === 'boolean') return runtime
   return defaultHasPlanFeature(plan, feature)

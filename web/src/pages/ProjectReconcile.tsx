@@ -390,9 +390,8 @@ export default function ProjectReconcile({
         >
           {wantsMultiMatch && !hasMultiMatch ? (
             <p>
-              Tick one cash-book row and one bank row to confirm a 1:1 match. Groups such as two
-              receipts that add to one bank credit stay unmatched unless this workspace includes
-              Premium split matching. See <strong>Split suggestions</strong> below.
+              Tick one cash-book row and one bank row to confirm a 1:1 match, or leave the group
+              unmatched so it stays on the BRS open lists. See <strong>Split suggestions</strong> below.
             </p>
           ) : selectionKind == null ? (
             <p>
@@ -411,7 +410,6 @@ export default function ProjectReconcile({
           suggestions={splitSuggestions}
           currency={currency}
           features={features}
-          splitMatchingEnabled={hasMultiMatch}
           selectedCbIds={selectedCbIds}
           selectedBankIds={selectedBankIds}
           onSelectGroup={(cbIds, bankIds) => {

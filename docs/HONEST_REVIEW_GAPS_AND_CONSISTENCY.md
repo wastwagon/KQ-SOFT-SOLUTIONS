@@ -17,7 +17,7 @@
 | **Project.rollForwardFromProjectId** | ✅ | ✅ (create) | ❌ Not in ProjectNew | User cannot choose “roll forward from” when creating from scratch. Roll forward only exists from **ProjectReport** (“Create next period”). |
 | **UsageLog** | ✅ | ✅ (subscription/usage) | ✅ (Dashboard metrics) | No gap. |
 | **PasswordResetToken** | ✅ | ✅ (forgot/reset) | ✅ (ForgotPassword, ResetPassword) | No gap. |
-| **Match.type** | `one_to_one \| one_to_many \| many_to_one \| many_to_many` | ✅ Set in reconcile routes | ✅ UI supports all (including many-to-many for Premium+) | No gap. |
+| **Match.type** | `one_to_one \| one_to_many \| many_to_one \| many_to_many` | ✅ Set in reconcile routes | ✅ UI supports all (all plans) | No gap. |
 
 **Summary:**  
 - **Missing in UI:** reconciliation date and “roll forward from” in **New Project**; **reviewer/preparer/viewer** roles; **many-to-many** matching in Reconcile.  
@@ -112,7 +112,7 @@
 - 1-to-many and many-to-1 (multi-match): **complete** (API + UI).  
 - Bulk match: API exists; UI uses it where applicable.  
 - Delete match: **complete**.  
-- **many_to_many**: ✅ supported in API and UI (Premium+; multi-select cash book + bank).  
+- **many_to_many**: ✅ supported in API and UI on every plan (multi-select cash book + bank).  
 - AI/suggestions and bank rules: **implemented** (suggestions, confidence, rules).
 
 ### 5.5 Review and report

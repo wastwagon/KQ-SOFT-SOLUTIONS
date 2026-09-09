@@ -25,7 +25,7 @@
 | **Audit trail** | Standard+ | ✅ API + UI gated |
 | **Discrepancy report** | Standard+ | ✅ API returns empty for Basic; UI shows upgrade message |
 | **Missing cheques report** | Standard+ | ✅ API returns empty for Basic; UI shows upgrade message |
-| **One-to-many / Many-to-many** | Premium+ | ✅ API + UI gated |
+| **One-to-many / Many-to-many** | All plans | ✅ Ungated (Confirm match + split suggestions) |
 | **Roll forward** | Premium+ | ✅ API + UI gated |
 | **Threshold approval** | Premium+ | ✅ Configurable approval threshold in Settings > Branding; reviewers blocked when discrepancy exceeds threshold |
 | **Full branding (logo)** | Premium+ | ✅ API + UI gated |
