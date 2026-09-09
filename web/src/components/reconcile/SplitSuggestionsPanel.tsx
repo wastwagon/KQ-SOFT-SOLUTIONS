@@ -19,6 +19,8 @@ interface SplitSuggestionsPanelProps {
   onSelectGroup: (cbIds: string[], bankIds: string[]) => void
   onForgetMemory?: (memoryId: string) => void
   isForgettingMemory?: boolean
+  /** False when the org plan cannot confirm many-to-1 / 1-to-many matches. */
+  splitMatchingEnabled?: boolean
 }
 
 export default function SplitSuggestionsPanel({
@@ -30,20 +32,34 @@ export default function SplitSuggestionsPanel({
   onSelectGroup,
   onForgetMemory,
   isForgettingMemory = false,
+  splitMatchingEnabled = true,
 }: SplitSuggestionsPanelProps) {
   return (
     <Card
+      id="split-suggestions"
       title={
         <span className="flex items-center gap-2">
           <Badge tone="brand" size="sm">
             Premium
           </Badge>
-          Split suggestions
+          Split suggestions — many-to-1 / 1-to-many
         </span>
       }
-      sublabel="These items appear to be bulk deposits or multi-item payments. Click to select the group."
+      sublabel="Different amounts that add up (for example 6,200 + 3,800 = 10,000). This is not Match by counting, which only groups the same amount. Auto-match all does not apply these groups."
     >
-      <div className="grid gap-2 sm:grid-cols-2">
+      {!splitMatchingEnabled ? (
+        <p className="text-sm text-gray-600">
+          This workspace plan cannot confirm many-to-1 matches. Tick 1 cash-book row and 1 bank row
+          to Confirm match, or leave the group unmatched so it stays on the BRS open lists.
+        </p>
+      ) : suggestions.length === 0 ? (
+        <p className="text-sm text-gray-600">
+          No split groups suggested right now. You can still match them yourself: tick the cash-book
+          rows that add up and the one bank row, then use <strong>Confirm match</strong> at the
+          bottom of the screen (including from Cash book all, when receipts are paired with credits).
+        </p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
         {suggestions.map((s, i) => {
           const allSelected =
             s.cashBookTxs.every((t: Tx) => selectedCbIds.has(t.id)) &&
@@ -127,7 +143,8 @@ export default function SplitSuggestionsPanel({
             </div>
           )
         })}
-      </div>
+        </div>
+      )}
     </Card>
   )
 }

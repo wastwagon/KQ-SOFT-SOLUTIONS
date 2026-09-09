@@ -18,6 +18,7 @@ import Button from '../components/ui/Button'
 import Alert from '../components/ui/Alert'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 import { ghanaBankProfileTip } from '../lib/ghanaBankProfileTips'
+import { reconcileSelectionKind } from '../lib/reconcileSelectionKind'
 import { documents, unlessSubscriptionInactive } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
 
@@ -181,8 +182,17 @@ export default function ProjectReconcile({
   // Decide which match mutation fires for the current selection.
   const cbArr = Array.from(selectedCbIds)
   const bankArr = Array.from(selectedBankIds)
-  const canMatchInView = view !== 'all' && matchingAllowed
+  const selectionKind = reconcileSelectionKind(selectedCbIds, selectedBankIds, {
+    receipts: new Set(receipts.map((t) => t.id)),
+    payments: new Set(payments.map((t) => t.id)),
+    credits: new Set(credits.map((t) => t.id)),
+    debits: new Set(debits.map((t) => t.id)),
+  })
+  // Cash book (all) can confirm when the ticks are all receipts↔credits or all payments↔debits.
+  const canMatchInView = matchingAllowed && (view !== 'all' || selectionKind !== null)
   const hasMultiMatch = !!features.one_to_many && !!features.many_to_many
+  const hasSidesSelected = cbArr.length > 0 && bankArr.length > 0
+  const wantsMultiMatch = hasSidesSelected && (cbArr.length > 1 || bankArr.length > 1)
   const canMatch1to1 = canMatchInView && cbArr.length === 1 && bankArr.length === 1
   const canMatch1toMany = canMatchInView && hasMultiMatch && cbArr.length === 1 && bankArr.length >= 2
   const canMatchManyTo1 = canMatchInView && hasMultiMatch && cbArr.length >= 2 && bankArr.length === 1
@@ -268,18 +278,33 @@ export default function ProjectReconcile({
             <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> matches
             confirmed
             {view === 'all'
-              ? '. Switch to Receipts or Payments to match.'
+              ? '. Tick matching rows, then Confirm match at the bottom.'
               : canReconcile
                 ? '. Select a cash book row and a bank row, then confirm.'
                 : '. View-only.'}
           </p>
-          <ReconcileToolbar
-            view={view}
-            onViewChange={setView}
-            bankAccounts={bankAccounts}
-            bankAccountId={bankAccountId}
-            onBankAccountChange={setBankAccountId}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {matchingAllowed && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-primary-700"
+                onClick={() =>
+                  document.getElementById('split-suggestions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              >
+                Split suggestions
+              </Button>
+            )}
+            <ReconcileToolbar
+              view={view}
+              onViewChange={setView}
+              bankAccounts={bankAccounts}
+              bankAccountId={bankAccountId}
+              onBankAccountChange={setBankAccountId}
+            />
+          </div>
         </div>
       </div>
 
@@ -352,6 +377,52 @@ export default function ProjectReconcile({
         </details>
       )}
 
+      {hasSidesSelected && matchingAllowed && !canMatch && (
+        <Alert
+          tone="info"
+          title={
+            wantsMultiMatch && !hasMultiMatch
+              ? 'Many-to-1 matching is not on this plan'
+              : selectionKind == null
+                ? 'Those rows cannot be matched together'
+                : 'Confirm match is not available for this selection'
+          }
+        >
+          {wantsMultiMatch && !hasMultiMatch ? (
+            <p>
+              Tick one cash-book row and one bank row to confirm a 1:1 match. Groups such as two
+              receipts that add to one bank credit stay unmatched unless this workspace includes
+              Premium split matching. See <strong>Split suggestions</strong> below.
+            </p>
+          ) : selectionKind == null ? (
+            <p>
+              Mix of receipts and payments (or credits and debits). Keep receipts with credits, or
+              payments with debits. Open <strong>Receipts vs Credits</strong> if this is a deposit
+              batch.
+            </p>
+          ) : (
+            <p>Clear the ticks and select the cash-book and bank rows that belong together.</p>
+          )}
+        </Alert>
+      )}
+
+      {matchingAllowed && (
+        <SplitSuggestionsPanel
+          suggestions={splitSuggestions}
+          currency={currency}
+          features={features}
+          splitMatchingEnabled={hasMultiMatch}
+          selectedCbIds={selectedCbIds}
+          selectedBankIds={selectedBankIds}
+          onSelectGroup={(cbIds, bankIds) => {
+            setSelectedCbIds(new Set(cbIds))
+            setSelectedBankIds(new Set(bankIds))
+          }}
+          onForgetMemory={(id) => forgetMemoryMutation.mutate(id)}
+          isForgettingMemory={forgetMemoryMutation.isPending}
+        />
+      )}
+
       {canReconcile && matchingAllowed && showCountMatch && (
         <CountMatchPanel
           projectId={projectId}
@@ -396,22 +467,6 @@ export default function ProjectReconcile({
         />
       )}
 
-      {splitSuggestions.length > 0 && matchingAllowed && (
-        <SplitSuggestionsPanel
-          suggestions={splitSuggestions}
-          currency={currency}
-          features={features}
-          selectedCbIds={selectedCbIds}
-          selectedBankIds={selectedBankIds}
-          onSelectGroup={(cbIds, bankIds) => {
-            setSelectedCbIds(new Set(cbIds))
-            setSelectedBankIds(new Set(bankIds))
-          }}
-          onForgetMemory={(id) => forgetMemoryMutation.mutate(id)}
-          isForgettingMemory={forgetMemoryMutation.isPending}
-        />
-      )}
-
       {matchesForView.length > 0 && (
         <ConfirmedMatchesPanel
           matches={matchesForView}
@@ -439,9 +494,9 @@ export default function ProjectReconcile({
 
       <p className="text-sm font-medium text-gray-600">
         {view === 'all'
-          ? 'Cash book (all) shows receipts and payments together. A mark next to the date means a suggested match — hover for details. Switch to Receipts or Payments to select and match.'
+          ? 'Cash book (all) shows receipts and payments together. Tick rows that belong together — Confirm match appears at the bottom when receipts pair with credits or payments with debits. A 2→1 split badge means several cash-book lines add up to one bank line.'
           : canReconcile
-            ? 'Click rows to select. A mark next to the date means a suggested match — hover for details. You can match 1-to-1, 1-to-many, many-to-1, or many-to-many.'
+            ? 'Click rows to select. Confirm match appears at the bottom. A 2→1 split badge means many-to-1; a 1:1 badge is a suggested pair.'
             : 'View-only. Row selection is disabled.'}
       </p>
 
@@ -459,6 +514,7 @@ export default function ProjectReconcile({
         flaggedBankIds={flaggedBankIds}
         receiptSugs={receiptSugs}
         paymentSugs={paymentSugs}
+        splitSuggestions={splitSuggestions}
         selectedCbIds={selectedCbIds}
         selectedBankIds={selectedBankIds}
         onToggleCb={toggleCb}

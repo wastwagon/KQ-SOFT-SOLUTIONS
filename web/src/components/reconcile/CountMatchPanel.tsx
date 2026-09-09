@@ -338,7 +338,9 @@ export default function CountMatchPanel({
             <strong className="font-semibold text-slate-700">Cancel</strong>, then{' '}
             <strong className="font-semibold text-slate-700">Open</strong> (overlap), then{' '}
             <strong className="font-semibold text-slate-700">Only</strong>. Diagnostic — never
-            auto-clears.
+            auto-clears. Not split matching: different amounts that add up (6,200 + 3,800 = 10,000)
+            are under <strong className="font-semibold text-slate-700">Split suggestions</strong>{' '}
+            above, not Cancel.
           </p>
         </Button>
         {open && (

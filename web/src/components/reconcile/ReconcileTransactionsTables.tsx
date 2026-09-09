@@ -12,7 +12,7 @@ import ReconcileTableExportButtons from './ReconcileTableExportButtons'
 import SuggestedMatchMark from './SuggestedMatchMark'
 import Badge from '../ui/Badge'
 import Card from '../ui/Card'
-import type { ReconcileView, SuggestedMatch, Tx } from './types'
+import type { ReconcileView, SuggestedMatch, SuggestedSplitMatch, Tx } from './types'
 
 /**
  * The two stacked transaction tables (Cash Book + Bank Statement) shown at
@@ -34,6 +34,7 @@ interface ReconcileTransactionsTablesProps {
   flaggedBankIds: Set<string>
   receiptSugs: SuggestedMatch[]
   paymentSugs: SuggestedMatch[]
+  splitSuggestions?: SuggestedSplitMatch[]
   selectedCbIds: Set<string>
   selectedBankIds: Set<string>
   onToggleCb: (id: string) => void
@@ -67,6 +68,7 @@ export default function ReconcileTransactionsTables({
   flaggedBankIds,
   receiptSugs,
   paymentSugs,
+  splitSuggestions = [],
   selectedCbIds,
   selectedBankIds,
   onToggleCb,
@@ -85,6 +87,7 @@ export default function ReconcileTransactionsTables({
   const cbPaymentToBank = useMemo(() => buildCbToBank(paymentSugs), [paymentSugs])
   const bankCreditToCb = useMemo(() => buildBankToCb(receiptSugs), [receiptSugs])
   const bankDebitToCb = useMemo(() => buildBankToCb(paymentSugs), [paymentSugs])
+  const splitById = useMemo(() => buildSplitHintMap(splitSuggestions), [splitSuggestions])
 
   // Always chronological for balances; reverse for newest-first display.
   const cbTxsChrono = useMemo<Array<Tx & { _type?: 'receipt' | 'payment' }>>(() => {
@@ -328,7 +331,11 @@ export default function ReconcileTransactionsTables({
                     )}
                     <td className="px-2 sm:px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap">
                       {formatDateCompact(t.date)}
-                      {sugMap.has(t.id) && <SuggestedMatchMark title={tooltip} />}
+                      <RowMatchHints
+                        oneToOne={sugMap.has(t.id)}
+                        oneToOneTitle={tooltip}
+                        split={splitById.get(t.id)}
+                      />
                     </td>
                     <td
                       className="px-2 sm:px-3 py-1.5 text-gray-900 max-w-[9rem] truncate"
@@ -486,7 +493,11 @@ export default function ReconcileTransactionsTables({
                     )}
                     <td className="px-2 sm:px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap">
                       {formatDateCompact(t.date)}
-                      {sugMap.has(t.id) && <SuggestedMatchMark title={tooltip} />}
+                      <RowMatchHints
+                        oneToOne={sugMap.has(t.id)}
+                        oneToOneTitle={tooltip}
+                        split={splitById.get(t.id)}
+                      />
                     </td>
                     <td
                       className="px-2 sm:px-3 py-1.5 text-gray-900 max-w-[16rem] truncate"
@@ -561,4 +572,57 @@ function buildBankToCb(sugs: SuggestedMatch[]) {
     map.get(s.bankTx.id)!.push({ cb: s.cashBookTx, confidence: s.confidence, reason: s.reason })
   }
   return map
+}
+
+type SplitHint = { label: string; title: string }
+
+function buildSplitHintMap(splits: SuggestedSplitMatch[]): Map<string, SplitHint> {
+  const map = new Map<string, SplitHint>()
+  for (const s of splits) {
+    const cb = s.cashBookTxs.length
+    const bk = s.bankTxs.length
+    const label = `${cb}→${bk}`
+    const kind =
+      cb > 1 && bk === 1 ? 'Many-to-1' : cb === 1 && bk > 1 ? '1-to-many' : `Split ${cb}:${bk}`
+    const names = [
+      ...s.cashBookTxs.map((t) => t.name || t.details || fmtAmt(t.amount)),
+      ...s.bankTxs.map((t) => t.name || t.details || fmtAmt(t.amount)),
+    ]
+      .map((n) => String(n).slice(0, 28))
+      .join(' · ')
+    const title = `${kind}: ${cb} cash book + ${bk} bank (${Math.round(s.confidence * 100)}%). ${s.reason}. ${names}`
+    for (const t of [...s.cashBookTxs, ...s.bankTxs]) {
+      if (!map.has(t.id)) map.set(t.id, { label, title })
+    }
+  }
+  return map
+}
+
+function RowMatchHints({
+  oneToOne,
+  oneToOneTitle,
+  split,
+}: {
+  oneToOne: boolean
+  oneToOneTitle?: string
+  split?: SplitHint
+}) {
+  if (split) {
+    return (
+      <Badge tone="brand" size="sm" className="ml-1 normal-case tracking-normal" title={split.title}>
+        {split.label} split
+      </Badge>
+    )
+  }
+  if (oneToOne) {
+    return (
+      <span className="inline-flex items-center ml-1 gap-0.5">
+        <SuggestedMatchMark title={oneToOneTitle} />
+        <Badge tone="success" size="sm" className="normal-case tracking-normal" title={oneToOneTitle}>
+          1:1
+        </Badge>
+      </span>
+    )
+  }
+  return null
 }

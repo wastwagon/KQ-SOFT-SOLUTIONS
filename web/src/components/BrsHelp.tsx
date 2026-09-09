@@ -16,6 +16,7 @@ const HELP_CONTENT = {
       { term: 'Bank credits', desc: 'Money lodged or credited to the account (bank’s record).' },
           { term: 'Bank debits', desc: 'Money withdrawn or debited from the account (e.g. cheques presented).' },
           { term: 'Open — more (counting)', desc: 'Amount appears on both sides but more times on this side. Same as open — less on the other side — listed once. Select overlap to match the shared count; leftovers move to Only after you confirm (Unmatched scope).' },
+          { term: 'Split suggestions (many-to-1)', desc: 'Different amounts that add up, e.g. two receipts of 6,200 and 3,800 against one bank credit of 10,000. Not the same as Match by counting (Cancel/Open/Only), which only groups equal amounts. Click Split suggestions in the toolbar, or tick the rows and Confirm match at the bottom.' },
     ],
   },
   reportTerms: {
