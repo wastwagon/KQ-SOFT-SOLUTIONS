@@ -58,6 +58,32 @@ describe('resolveCanonicalTimingSchedule', () => {
     expect(result.unpresentedChequesTotal).toBeCloseTo(listUnpresented, 2)
   })
 
+  it('GT EUR: nets CANBNK against same-period BANKCHRG so neither remains on the face', () => {
+    const result = resolveCanonicalTimingSchedule({
+      unmatchedReceipts: [
+        tx('r1', 2475.16, 'AFRICA MOVE - RELOCATION COST OF GM FOR IBIS'),
+        tx('r-mar', 65, 'BANKCHRG-$65-MAR18/BOOKIN(MARCH GTB-230 )'),
+        tx('r-aug', 65, 'BANKCHRG-$65-AUG18/BOOKIN(AUG GTB-320 )'),
+      ],
+      unmatchedPayments: [
+        tx('p1', 7790.17, 'TRANSFER FROM A/C 230'),
+        tx('p-can', 65, 'CANBNKCHG-65-MAR18/BOOK(CANMAR-GTB-230 )'),
+      ],
+      unmatchedDebits: [],
+      unmatchedCredits: [],
+      allBankDebits: [],
+      allBankCredits: [],
+      broughtForwardReceiptLodgmentsTotal: 0,
+      broughtForwardUnpresentedTotal: 0,
+      gtBankEur: true,
+      ecobank: false,
+    })
+    expect(result.uncreditedRows.map((r) => r.id)).toEqual(['p1'])
+    expect(result.unpresentedRows.map((r) => r.id).sort()).toEqual(['r-aug', 'r1'])
+    expect(result.uncreditedLodgmentsTimingTotal).toBeCloseTo(7790.17, 2)
+    expect(result.unpresentedChequesTotal).toBeCloseTo(2475.16 + 65, 2)
+  })
+
   it('Ecobank: keeps netting rows and does not double-count brought-forward on unpresented', () => {
     const result = resolveCanonicalTimingSchedule({
       unmatchedReceipts: [tx('r1', 50, 'open lodgment')],

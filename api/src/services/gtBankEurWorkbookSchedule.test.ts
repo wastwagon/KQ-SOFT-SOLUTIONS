@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildGtBankEurBankOnlyDebitRows,
   computeGtBankEurBankOnlyDebitsTotal,
   computeGtBankEurTimingSchedule,
   isGtBankEurScope,
@@ -54,6 +55,31 @@ describe('computeGtBankEurTimingSchedule', () => {
     expect(result.uncreditedLodgmentsTimingTotal).toBeCloseTo(7790.17 + 65, 2)
     expect(result.unpresentedChequesTotal).toBeCloseTo(2475.16 + 65 + 38.99 + 100, 2)
   })
+  it('nets March CANBNK against March BANKCHRG and leaves August charges on unpresented', () => {
+    const result = computeGtBankEurTimingSchedule({
+      unmatchedReceipts: [
+        tx('r-move', 2475.16, 'AFRICA MOVE - RELOCATION COST OF GM FOR IBIS'),
+        tx('r-aug', 65, 'BANKCHRG-$65-AUG18/BOOKIN(AUG GTB-320 )'),
+        tx('r-mar-book', 65, 'BANKCHRG-$65-MAR18/BOOKIN(MARCH GTB-230 )'),
+        tx('r-mar-mac', 40, 'BANKCHRG-$40-MAR18/MACAIR(MARCH GTB-230 )'),
+      ],
+      unmatchedPayments: [
+        tx('p-trf', 7790.17, 'TRANSFER FROM A/C 230'),
+        tx('p-can-book', 65, 'CANBNKCHG-65-MAR18/BOOK(CANMAR-GTB-230 )'),
+        tx('p-can-mac', 40, 'CANBNKCHG-$40-MAR18/MACAI(CANMAR-GTB-230 )'),
+      ],
+      unmatchedDebits: [],
+      unmatchedCredits: [],
+      allBankDebits: [],
+      allBankCredits: [],
+      broughtForwardReceiptLodgmentsTotal: 0,
+      broughtForwardUnpresentedTotal: 0,
+    })
+    expect(result.uncreditedLodgmentsTimingTotal).toBeCloseTo(7790.17, 2)
+    expect(result.unpresentedChequesTotal).toBeCloseTo(2475.16 + 65, 2)
+    expect(result.uncreditedRows.map((r) => r.id)).toEqual(['p-trf'])
+    expect(result.unpresentedRows.map((r) => r.id).sort()).toEqual(['r-aug', 'r-move'])
+  })
   it('does not treat CANBNKCHG receipts as BANKCHG unpresented', () => {
     const result = computeGtBankEurTimingSchedule({
       unmatchedReceipts: [
@@ -90,5 +116,21 @@ describe('computeGtBankEurBankOnlyDebitsTotal', () => {
       receipts: [tx('r1', 2529.8, 'PYT-JN3747€2529.8/SOFITEL(BT/2018/01/02 )', '2018-01-02')],
     })
     expect(total).toBeCloseTo(1581.99, 2)
+  })
+  it('omits cancel-out bank debits from the BRS bank-only row list', () => {
+    const rows = buildGtBankEurBankOnlyDebitRows({
+      unmatchedDebits: [
+        tx('d1', 2529.8, 'SWIFT TRSF IFO HOTEL DUGOLF', '2018-01-02'),
+        tx('d2', 1581.99, 'SWIFT TRANSFER TRSF IFO QUADRIGA', '2018-01-05'),
+        tx('d3', 32.1, 'COMMISSION/OUTWARD TRF. TRSF IFO QUADRIGA', '2018-01-05'),
+      ],
+      unmatchedCredits: [],
+      payments: [],
+      receipts: [
+        tx('r1', 2529.8, 'PYT-JN3747€2529.8/SOFITEL(BT/2018/01/02 )', '2018-01-02'),
+        tx('r2', 32.1, 'COMM QUADRIGA', '2018-01-05'),
+      ],
+    })
+    expect(rows.map((r) => r.id)).toEqual(['d2'])
   })
 })

@@ -1,10 +1,10 @@
 /**
- * GT Bank EUR manual BRS workbook rules (acct430-style):
- * - CANBNKCHG payments → uncredited lodgments (cancel/reversal timing)
- * - BANKCHRG receipts → unpresented cheques (charge timing / to be reversed)
+ * GT Bank EUR BRS workbook rules (acct430-style):
+ * - CANBNK vs BANKCHRG at the same amount and charge period are netted off the face
+ *   (both sides leave Add/Less; they are cancel/reversal, not timing residue)
  * - TRANSFER FROM A/C lodgments → uncredited even when booked as CB payments
  * - Relocation receipts → unpresented even when booked as CB receipts
- * - Bank debits pair to cash-book receipts at same amount (EUR sign-flip exports)
+ * - Bank debits with a cash-book counterpart are cancel-out, not bank-only on the BRS
  */
 import {
   clearingCreditHasPaymentCounterpart,
@@ -62,6 +62,98 @@ export function isGtBankLodgmentTransferPayment(tx: ClearingTxLike): boolean {
 
 export function isGtBankRelocationReceipt(tx: ClearingTxLike): boolean {
   return /AFRICA\s+MOVE|RELOCATION/i.test(bankText(tx))
+}
+
+const CHARGE_PERIOD_STOP = new Set([
+  'BANK',
+  'BANKCH',
+  'BANKCHG',
+  'BANKCHRG',
+  'BNKCHG',
+  'CANBNK',
+  'CANBNKCH',
+  'CANBNKCHG',
+  'CANMAR',
+  'MARCH',
+  'SEPT',
+  'FROM',
+  'GTB',
+])
+
+/** Narration month (MAR18 / MARCH / AUG / SEPT / CANMAR) so March cancels do not net August charges. */
+export function gtBankEurChargePeriodKey(tx: ClearingTxLike): string | null {
+  const t = bankText(tx).toUpperCase()
+  if (/CANMAR/.test(t)) return 'MAR'
+  const m = t.match(/\b(JAN|FEB|MAR(?:CH)?|APR|MAY|JUN|JUL|AUG|SEP(?:T)?|OCT|NOV|DEC)\b/)
+  if (!m) return null
+  const raw = m[1]
+  if (raw.startsWith('MAR')) return 'MAR'
+  if (raw.startsWith('SEP')) return 'SEP'
+  return raw.slice(0, 3)
+}
+
+function partyTokens(tx: ClearingTxLike): string[] {
+  return bankText(tx)
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter((w) => w.length >= 3 && !CHARGE_PERIOD_STOP.has(w) && !/^\d+$/.test(w))
+}
+
+function partyScore(a: ClearingTxLike, b: ClearingTxLike): number {
+  const ta = partyTokens(a)
+  const tb = partyTokens(b)
+  let score = 0
+  for (const x of ta) {
+    for (const y of tb) {
+      if (x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y) || y.startsWith(x)))) {
+        score += Math.min(x.length, y.length)
+      }
+    }
+  }
+  return score
+}
+
+/**
+ * Drop matched CANBNK (Add) and BANKCHRG (Less) pairs from the face lists.
+ * Same amount + same charge period; party tokens break ties. Not generic equal-count cancel.
+ */
+export function netGtBankEurChargeReversals(
+  uncreditedRows: ClearingTxLike[],
+  unpresentedRows: ClearingTxLike[],
+  amountTolerance = 0.01
+): {
+  uncreditedRows: ClearingTxLike[]
+  unpresentedRows: ClearingTxLike[]
+  nettedPairs: Array<{ cancel: ClearingTxLike; original: ClearingTxLike }>
+} {
+  const cancels = uncreditedRows.filter(isGtBankChargeCancelPayment)
+  const originals = unpresentedRows.filter(isGtBankChargeReceipt)
+  const usedCancel = new Set<string>()
+  const usedOriginal = new Set<string>()
+  const nettedPairs: Array<{ cancel: ClearingTxLike; original: ClearingTxLike }> = []
+
+  for (const cancel of cancels) {
+    const period = gtBankEurChargePeriodKey(cancel)
+    if (!period) continue
+    const candidates = originals.filter(
+      (o) =>
+        !usedOriginal.has(o.id) &&
+        amountsMatch(cancel.amount, o.amount, amountTolerance) &&
+        gtBankEurChargePeriodKey(o) === period
+    )
+    if (!candidates.length) continue
+    candidates.sort((a, b) => partyScore(cancel, b) - partyScore(cancel, a) || a.id.localeCompare(b.id))
+    const original = candidates[0]!
+    usedCancel.add(cancel.id)
+    usedOriginal.add(original.id)
+    nettedPairs.push({ cancel, original })
+  }
+
+  return {
+    uncreditedRows: uncreditedRows.filter((t) => !usedCancel.has(t.id)),
+    unpresentedRows: unpresentedRows.filter((t) => !usedOriginal.has(t.id)),
+    nettedPairs,
+  }
 }
 
 function dateWithinWindow(
@@ -165,17 +257,52 @@ export function computeGtBankEurTimingSchedule(input: {
     }
   }
 
+  const netted = netGtBankEurChargeReversals(uncreditedRows, unpresentedRows, tol)
   const uncreditedLodgmentsTimingTotal =
-    uncreditedRows.reduce((s, t) => s + t.amount, 0) + input.broughtForwardReceiptLodgmentsTotal
+    netted.uncreditedRows.reduce((s, t) => s + t.amount, 0) + input.broughtForwardReceiptLodgmentsTotal
   const unpresentedChequesTotal =
-    unpresentedRows.reduce((s, t) => s + t.amount, 0) + input.broughtForwardUnpresentedTotal
+    netted.unpresentedRows.reduce((s, t) => s + t.amount, 0) + input.broughtForwardUnpresentedTotal
 
   return {
     uncreditedLodgmentsTimingTotal,
     unpresentedChequesTotal,
-    uncreditedRows,
-    unpresentedRows,
+    uncreditedRows: netted.uncreditedRows,
+    unpresentedRows: netted.unpresentedRows,
   }
+}
+
+/** Bank-only debit rows that belong on the BRS Add line (cancel-out counterparts omitted). */
+export function buildGtBankEurBankOnlyDebitRows(input: {
+  unmatchedDebits: ClearingTxLike[]
+  unmatchedCredits: ClearingTxLike[]
+  payments: ClearingTxLike[]
+  receipts: ClearingTxLike[]
+  amountTolerance?: number
+  matchedPaymentIds?: Set<string>
+  excludeBankIds?: Set<string>
+}): ClearingTxLike[] {
+  const tol = input.amountTolerance ?? 0.01
+  const excluded = input.excludeBankIds ?? new Set<string>()
+  const debits = input.unmatchedDebits.filter(
+    (d) =>
+      !excluded.has(d.id) &&
+      !debitHasGtBankCashBookCounterpart(
+        d,
+        input.payments,
+        input.receipts,
+        input.matchedPaymentIds,
+        tol
+      )
+  )
+  const reclassified = input.unmatchedCredits.filter(
+    (c) =>
+      !excluded.has(c.id) &&
+      isCreditReclassifiedAsDebit(c) &&
+      !clearingCreditHasPaymentCounterpart(c, input.payments, tol, {
+        matchedPaymentIds: input.matchedPaymentIds,
+      })
+  )
+  return [...debits, ...reclassified]
 }
 
 export function computeGtBankEurBankOnlyDebitsTotal(input: {
@@ -187,35 +314,7 @@ export function computeGtBankEurBankOnlyDebitsTotal(input: {
   matchedPaymentIds?: Set<string>
   excludeBankIds?: Set<string>
 }): number {
-  const tol = input.amountTolerance ?? 0.01
-  const excluded = input.excludeBankIds ?? new Set<string>()
-
-  const debitTotal = input.unmatchedDebits
-    .filter((d) => !excluded.has(d.id))
-    .filter(
-      (d) =>
-        !debitHasGtBankCashBookCounterpart(
-          d,
-          input.payments,
-          input.receipts,
-          input.matchedPaymentIds,
-          tol
-        )
-    )
-    .reduce((s, t) => s + t.amount, 0)
-
-  const reclassified = input.unmatchedCredits
-    .filter((c) => !excluded.has(c.id))
-    .filter((c) => isCreditReclassifiedAsDebit(c))
-    .filter(
-      (c) =>
-        !clearingCreditHasPaymentCounterpart(c, input.payments, tol, {
-          matchedPaymentIds: input.matchedPaymentIds,
-        })
-    )
-    .reduce((s, t) => s + t.amount, 0)
-
-  return debitTotal + reclassified
+  return buildGtBankEurBankOnlyDebitRows(input).reduce((s, t) => s + t.amount, 0)
 }
 
 function debitHasGtBankCashBookCounterpart(

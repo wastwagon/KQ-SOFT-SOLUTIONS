@@ -21,7 +21,7 @@ const HELP_CONTENT = {
   reportTerms: {
     title: 'Report terms',
     items: [
-      { term: 'Uncredited lodgments', desc: 'The BRS Add line: supporting-list items not yet credited by the bank (plus brought-forward lodgments). Not the same as every unmatched receipt.' },
+      { term: 'Uncredited lodgments', desc: 'The BRS Add line: supporting-list items not yet credited by the bank (plus brought-forward lodgments). Cancelled reversals are netted off and are not the same as every unmatched receipt.' },
       { term: 'Unpresented cheques', desc: 'The BRS Less line: supporting-list items not yet presented (plus brought-forward cheques). Not the same as every unmatched payment.' },
       { term: 'Balance per cash book', desc: 'End-of-period cash book from the workbook: bank closing + uncredited − unpresented ± bank-only items.' },
     ],

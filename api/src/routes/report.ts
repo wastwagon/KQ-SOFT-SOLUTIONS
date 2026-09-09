@@ -53,6 +53,7 @@ import {
   type RollForwardProjectSnapshot,
 } from '../services/brsRollForward.js'
 import {
+  buildGtBankEurBankOnlyDebitRows,
   computeGtBankEurBankOnlyDebitsTotal,
   isGtBankEurScope,
 } from '../services/gtBankEurWorkbookSchedule.js'
@@ -890,6 +891,16 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     workbookBankOnlyExcludeIds,
     bankOnlyDebitsCtx
   )
+  if (gtBankEurProfile.active) {
+    bankOnlySchedule.debits = buildGtBankEurBankOnlyDebitRows({
+      unmatchedDebits: unmatchedDebits as TxLike[],
+      unmatchedCredits: unmatchedCredits as TxLike[],
+      payments: payments as TxLike[],
+      receipts: receipts as TxLike[],
+      matchedPaymentIds,
+      excludeBankIds: workbookBankOnlyExcludeIds,
+    })
+  }
   const bankStatementClosingBalanceValue =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
@@ -1959,6 +1970,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     workbookBankOnlyExcludeIdsExport,
     bankOnlyDebitsCtxExport
   )
+  if (gtBankEurProfileExport.active) {
+    bankOnlyScheduleExport.debits = buildGtBankEurBankOnlyDebitRows({
+      unmatchedDebits: unmatchedDebitsOnlyExport as TxLike[],
+      unmatchedCredits: unmatchedCreditsOnlyExport as TxLike[],
+      payments: payments as TxLike[],
+      receipts: receipts as TxLike[],
+      matchedPaymentIds: matchedPaymentIdsExport,
+      excludeBankIds: workbookBankOnlyExcludeIdsExport,
+    })
+  }
   const bankOnlyDebitsSheet = bankOnlyScheduleExport.debits.map((t) => ({
     Date: fmt(t.date ?? null),
     Description: t.name || t.details || '',
