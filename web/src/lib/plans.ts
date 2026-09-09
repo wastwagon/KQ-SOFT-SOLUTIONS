@@ -42,6 +42,8 @@ export interface MarketingPlan {
   bankAccounts: number
   /** -1 = unlimited */
   users: number
+  /** Full Tools clean Excel/PDF exports per month (-1 = unlimited). */
+  cleanExportsPerMonth?: number
   /** Concise bullets shown directly on the plan card. */
   bullets: string[]
   /** Inherits-from copy for the card, e.g. "Everything in Standard, plus:". */
@@ -51,6 +53,8 @@ export interface MarketingPlan {
   ctaLabel: string
   /** Either an internal route (`/register`) or external mailto/URL. */
   ctaHref: string
+  /** When false, landing still lists the package but checkout is closed. */
+  active?: boolean
 }
 
 /* -------------------------------------------------------------------------
@@ -120,6 +124,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     features: [
       { id: 'basic_branding', label: 'Default report branding' },
       { id: 'full_branding', label: 'Full branding (logo, colours, custom footer)' },
+      { id: 'firm_dashboard', label: 'Practice overview dashboard' },
       { id: 'multi_client', label: 'Multi-client workspace' },
     ],
   },
@@ -152,6 +157,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     transactionsPerMonth: 1_000,
     bankAccounts: 5,
     users: 1,
+    cleanExportsPerMonth: 5,
     bullets: [
       '5 bank accounts · 1,000 transactions / month',
       'Up to 10 projects / month · 1 team member',
@@ -187,6 +193,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       threshold_approval: false,
       basic_branding: true,
       full_branding: false,
+      firm_dashboard: false,
       multi_client: false,
       api_access: false,
       email_support: true,
@@ -211,6 +218,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     transactionsPerMonth: 5_000,
     bankAccounts: 10,
     users: 3,
+    cleanExportsPerMonth: 20,
     inheritsFromLabel: 'Everything in Basic, plus:',
     bullets: [
       '10 bank accounts · 5,000 transactions / month',
@@ -243,6 +251,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       threshold_approval: false,
       basic_branding: true,
       full_branding: true,
+      firm_dashboard: false,
       multi_client: false,
       api_access: false,
       email_support: true,
@@ -265,6 +274,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     transactionsPerMonth: 20_000,
     bankAccounts: 30,
     users: 5,
+    cleanExportsPerMonth: 60,
     inheritsFromLabel: 'Everything in Standard, plus:',
     bullets: [
       '30 bank accounts · 20,000 transactions / month',
@@ -296,6 +306,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       threshold_approval: true,
       basic_branding: true,
       full_branding: true,
+      firm_dashboard: true,
       multi_client: false,
       api_access: false,
       email_support: true,
@@ -319,6 +330,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     transactionsPerMonth: -1,
     bankAccounts: -1,
     users: -1,
+    cleanExportsPerMonth: -1,
     inheritsFromLabel: 'Everything in Premium, plus:',
     bullets: [
       'Unlimited bank accounts, transactions & members',
@@ -350,6 +362,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       threshold_approval: true,
       basic_branding: true,
       full_branding: true,
+      firm_dashboard: true,
       multi_client: true,
       api_access: true,
       email_support: true,
@@ -366,6 +379,43 @@ export const MARKETING_PLANS: MarketingPlan[] = [
  * Helpers
  * ----------------------------------------------------------------------- */
 
+export function isQuotaBullet(text: string): boolean {
+  return /bank accounts|transactions\s*\/\s*month|projects\s*\/\s*month|team member|clean export/i.test(
+    text
+  )
+}
+
+export function quotaSummaryBullets(plan: {
+  bankAccounts: number
+  transactionsPerMonth: number
+  projectsPerMonth: number
+  users: number
+  cleanExportsPerMonth?: number
+}): string[] {
+  const banks =
+    plan.bankAccounts < 0
+      ? 'Unlimited bank accounts'
+      : `${plan.bankAccounts.toLocaleString('en-GH')} bank accounts`
+  const tx =
+    plan.transactionsPerMonth < 0
+      ? 'unlimited transactions / month'
+      : `${plan.transactionsPerMonth.toLocaleString('en-GH')} transactions / month`
+  const projects =
+    plan.projectsPerMonth < 0
+      ? 'Unlimited projects'
+      : `Up to ${plan.projectsPerMonth.toLocaleString('en-GH')} projects / month`
+  const users =
+    plan.users < 0 ? 'unlimited members' : `${plan.users} team member${plan.users === 1 ? '' : 's'}`
+  const bullets = [`${banks} · ${tx}`, `${projects} · ${users}`]
+  if (plan.cleanExportsPerMonth == null) return bullets
+  bullets.push(
+    plan.cleanExportsPerMonth < 0
+      ? 'Unlimited full clean exports (sample downloads free)'
+      : `${plan.cleanExportsPerMonth.toLocaleString('en-GH')} full clean exports / month (sample downloads free)`
+  )
+  return bullets
+}
+
 /**
  * Merge live data from the API into the static catalogue.
  * If the API is unreachable or returns nothing, the static catalogue is
@@ -380,6 +430,10 @@ export function mergeWithApiPlans(
     projectsPerMonth: number
     transactionsPerMonth: number
     bankAccounts?: number
+    usersLimit?: number
+    cleanExportsPerMonth?: number
+    features?: Record<string, boolean>
+    active?: boolean
   }> | undefined
 ): MarketingPlan[] {
   if (!apiPlans || apiPlans.length === 0) return MARKETING_PLANS
@@ -400,6 +454,9 @@ export function mergeWithApiPlans(
       projectsPerMonth: pickNum(live.projectsPerMonth, p.projectsPerMonth),
       transactionsPerMonth: pickNum(live.transactionsPerMonth, p.transactionsPerMonth),
       bankAccounts: pickNum(live.bankAccounts, p.bankAccounts),
+      users: pickNum(live.usersLimit, p.users),
+      cleanExportsPerMonth: pickNum(live.cleanExportsPerMonth, p.cleanExportsPerMonth ?? 0),
+      active: live.active !== false,
     }
     merged.features = {
       ...p.features,
@@ -413,7 +470,20 @@ export function mergeWithApiPlans(
         merged.transactionsPerMonth < 0
           ? 'Unlimited'
           : `${merged.transactionsPerMonth.toLocaleString('en-GH')} / month`,
+      users: merged.users < 0 ? 'Unlimited' : String(merged.users),
     }
+    if (live.features) {
+      const featureAlias: Record<string, string> = {
+        discrepancy_report: 'discrepancy',
+      }
+      for (const [key, value] of Object.entries(live.features)) {
+        if (typeof value !== 'boolean') continue
+        const target = featureAlias[key] ?? key
+        if (target in merged.features) merged.features[target] = value
+      }
+    }
+    const marketing = p.bullets.filter((b) => !isQuotaBullet(b))
+    merged.bullets = [...quotaSummaryBullets(merged), ...marketing]
     return merged
   })
 }

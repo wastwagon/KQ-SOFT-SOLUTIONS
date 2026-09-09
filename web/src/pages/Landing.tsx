@@ -1143,8 +1143,9 @@ function PlanCard({
 }) {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
-  const isHighlight = !!plan.highlight
+  const isHighlight = !!plan.highlight && plan.active !== false
   const isCustom = plan.slug === 'firm' && plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
+  const checkoutClosed = plan.active === false && !isCustom
   const amount = planAmountForPeriod(plan, period)
   const monthlyEq = period === 'monthly' ? null : planMonthlyEquivalent(plan, period)
   const periodLabel = period === 'yearly' ? 'year' : period === 'quarterly' ? 'quarter' : 'month'
@@ -1220,7 +1221,11 @@ function PlanCard({
         ))}
       </ul>
 
-      {isInternalCta ? (
+      {checkoutClosed ? (
+        <Button className="mt-7 w-full font-bold" variant="outline" disabled>
+          Currently unavailable
+        </Button>
+      ) : isInternalCta ? (
         <Button
           className={`mt-7 w-full gap-1.5 font-bold ${
             isHighlight

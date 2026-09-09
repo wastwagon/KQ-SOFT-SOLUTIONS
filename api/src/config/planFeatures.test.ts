@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { hasPlanFeature, planRank } from './planFeatures.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import { hasPlanFeature, isStoredFeaturesEmpty, planRank, setPlanRuntimeEntitlements, clearPlanRuntimeEntitlements } from './planFeatures.js'
 
 describe('planFeatures', () => {
+  afterEach(() => {
+    clearPlanRuntimeEntitlements()
+  })
   it('ranks plans in order', () => {
     expect(planRank('basic')).toBe(0)
     expect(planRank('standard')).toBe(1)
@@ -21,5 +24,21 @@ describe('planFeatures', () => {
     expect(hasPlanFeature('basic', 'one_to_many')).toBe(false)
     expect(hasPlanFeature('standard', 'one_to_many')).toBe(false)
     expect(hasPlanFeature('premium', 'one_to_many')).toBe(true)
+  })
+
+  it('lets CMS runtime entitlements override code defaults', () => {
+    setPlanRuntimeEntitlements('basic', { features: { one_to_many: true, bank_rules: true } })
+    expect(hasPlanFeature('basic', 'one_to_many')).toBe(true)
+    expect(hasPlanFeature('basic', 'bank_rules')).toBe(true)
+    expect(hasPlanFeature('basic', 'api_access')).toBe(false)
+    clearPlanRuntimeEntitlements()
+    expect(hasPlanFeature('basic', 'one_to_many')).toBe(false)
+  })
+
+  it('treats missing CMS feature JSON as empty', () => {
+    expect(isStoredFeaturesEmpty(null)).toBe(true)
+    expect(isStoredFeaturesEmpty({})).toBe(true)
+    expect(isStoredFeaturesEmpty({ bank_rules: true })).toBe(false)
+    expect(isStoredFeaturesEmpty({ unknown: true })).toBe(true)
   })
 })

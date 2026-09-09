@@ -6,7 +6,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canCreateProject, incrementProjects } from '../services/usage.js'
 import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProject, canReopenProject, canSubmitForReview, canApprove, isProjectEditable, canExportReport, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { logAudit } from '../services/audit.js'
-import { hasPlanFeature } from '../config/planFeatures.js'
+import { planHasFeature } from '../lib/planGate.js'
 import { getProjectVariance } from '../lib/reconcile-variance.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
@@ -52,7 +52,7 @@ const createSchema = z.object({
 router.get('/', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } })
-  const multiClient = org ? hasPlanFeature(org.plan, 'multi_client') : false
+  const multiClient = org ? await planHasFeature(org.plan, 'multi_client') : false
   const clientId = multiClient ? (req.query.clientId as string | undefined) : undefined
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const offset = Math.max(parseInt(req.query.offset as string) || 0, 0)
@@ -100,11 +100,11 @@ router.post('/', async (req: AuthRequest, res) => {
     if (!org) return res.status(404).json({ error: 'Organization not found' })
     const limitCheck = await canCreateProject(orgId, org.plan)
     if (!limitCheck.ok) return res.status(403).json({ error: limitCheck.message })
-    const multiClient = hasPlanFeature(org.plan, 'multi_client')
+    const multiClient = await planHasFeature(org.plan, 'multi_client')
     const clientId = multiClient && body.clientId ? body.clientId : null
     let rollForwardId: string | null = null
     if (body.rollForwardFromProjectId) {
-      if (!hasPlanFeature(org.plan, 'roll_forward')) {
+      if (!(await planHasFeature(org.plan, 'roll_forward'))) {
         return res.status(403).json({ error: 'Roll-forward requires Premium plan or higher.' })
       }
       rollForwardId = await resolveProjectId(body.rollForwardFromProjectId, orgId)
@@ -206,7 +206,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
   try {
     const body = updateSchema.parse(req.body)
     const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } })
-    const multiClient = org ? hasPlanFeature(org.plan, 'multi_client') : false
+    const multiClient = org ? await planHasFeature(org.plan, 'multi_client') : false
     if (body.clientId !== undefined && body.clientId != null && !multiClient) {
       return res.status(403).json({
         error: 'Multi-client workspace requires Firm plan.',
@@ -409,7 +409,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res) => {
   const threshold = branding.approvalThresholdAmount
   if (
     org &&
-    hasPlanFeature(org.plan, 'threshold_approval') &&
+    (await planHasFeature(org.plan, 'threshold_approval')) &&
     threshold != null &&
     threshold > 0 &&
     role === 'reviewer'

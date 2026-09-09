@@ -39,6 +39,7 @@ interface BillingProps {
           cleanExportsUsed?: number
           cleanExportsLimit?: number
           cleanExportsUnlimited?: boolean
+          periodEndsAt?: string
         }
         subscription?: {
           status?: string
@@ -62,6 +63,7 @@ interface BillingProps {
       }
     | undefined
   initializing: string | null
+  checkoutNotice?: { tone: 'success' | 'warning' | 'info' | 'error'; title: string; body?: string } | null
   onUpgrade: (plan: string, period: BillingPeriod) => void
 }
 
@@ -70,10 +72,16 @@ export default function SettingsBillingTab({
   usageData,
   plansData,
   initializing,
+  checkoutNotice,
   onUpgrade,
 }: BillingProps) {
   return (
     <Card title="Billing">
+      {checkoutNotice && (
+        <Alert tone={checkoutNotice.tone} title={checkoutNotice.title} className="mb-4">
+          {checkoutNotice.body}
+        </Alert>
+      )}
       {!canManageBilling(role) && (
         <Alert tone="info" title="View only" className="mb-4">
           Only admins can manage billing.
@@ -99,12 +107,19 @@ export default function SettingsBillingTab({
           />
           <MetricCard
             className="!p-4"
-            label="Transactions / mo"
+            label="Transactions this month"
             value={
               usageData.usage.transactionsDisplay ??
               (usageData.usage.transactionsUnlimited
                 ? `${usageData.usage.transactionsUsed} (unlimited)`
                 : `${usageData.usage.transactionsUsed} / ${usageData.usage.transactionsLimit}`)
+            }
+            sublabel={
+              usageData.usage.transactionsUnlimited
+                ? 'No monthly volume cap'
+                : usageData.usage.periodEndsAt
+                  ? `Resets ${new Date(usageData.usage.periodEndsAt).toLocaleDateString()}`
+                  : 'Calendar-month volume'
             }
           />
           <MetricCard
@@ -172,6 +187,11 @@ export default function SettingsBillingTab({
         </Alert>
       )}
       {canManageBilling(role) && plansData?.paystackConfigured ? (
+        (plansData.plans || []).length === 0 ? (
+          <Alert tone="info" title="Checkout unavailable">
+            No self-serve packages are currently active. Contact support to change your plan.
+          </Alert>
+        ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {(plansData.plans || []).map((p) => {
             const introEligible = plansData?.introOffer?.eligible
@@ -245,6 +265,7 @@ export default function SettingsBillingTab({
             )
           })}
         </div>
+        )
       ) : (
         <p className="text-sm text-gray-600">Billing is not configured. Contact support to upgrade your plan.</p>
       )}

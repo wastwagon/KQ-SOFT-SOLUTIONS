@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBranding, canManageMembers, canMapDocuments, canReconcile } from '../lib/permissions.js'
-import { hasPlanFeature, getUserLimit } from '../config/planFeatures.js'
+import { planHasFeature, planUserLimit } from '../lib/planGate.js'
 import { normalizeOrgMemberRole } from '../lib/orgMemberRole.js'
 import { createOrganizationInvite, revokeOrganizationInvite } from '../services/orgInvite.js'
 
@@ -69,7 +69,7 @@ router.patch('/branding', async (req: AuthRequest, res) => {
       where: { id: orgId },
       select: { plan: true },
     })
-    if (!org || !hasPlanFeature(org.plan, 'full_branding')) {
+    if (!org || !(await planHasFeature(org.plan, 'full_branding'))) {
       return res.status(403).json({ error: 'Logo requires Standard plan or higher.' })
     }
   }
@@ -81,10 +81,10 @@ router.patch('/branding', async (req: AuthRequest, res) => {
     'logoUrl', 'primaryColor', 'secondaryColor',
     'letterheadAddress', 'reportTitle', 'footer',
   ]
-  if (orgForPlan && hasPlanFeature(orgForPlan.plan, 'threshold_approval')) {
+  if (orgForPlan && (await planHasFeature(orgForPlan.plan, 'threshold_approval'))) {
     allowed.push('approvalThresholdAmount')
   }
-  if (orgForPlan && hasPlanFeature(orgForPlan.plan, 'roll_forward')) {
+  if (orgForPlan && (await planHasFeature(orgForPlan.plan, 'roll_forward'))) {
     allowed.push('ghanaBrsWorkbookNettingDefault')
   }
   const existing = await prisma.organization.findUnique({
@@ -136,7 +136,7 @@ router.get('/members', async (req: AuthRequest, res) => {
       select: { plan: true },
     }),
   ])
-  const limit = org ? getUserLimit(org.plan) : 1
+  const limit = org ? await planUserLimit(org.plan) : 1
   res.json({
     members: members.map((m) => ({
       id: m.id,
@@ -222,7 +222,7 @@ router.post('/members', async (req: AuthRequest, res) => {
   })
   if (!org) return res.status(404).json({ error: 'Organization not found' })
 
-  const limit = getUserLimit(org.plan)
+  const limit = await planUserLimit(org.plan)
   if (limit >= 0) {
     const [memberCount, pendingCount] = await Promise.all([
       prisma.organizationMember.count({ where: { organizationId: orgId } }),
@@ -335,7 +335,7 @@ router.delete('/match-memory/:id', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'ai_suggestions')) {
+  if (!org || !(await planHasFeature(org.plan, 'ai_suggestions'))) {
     return res.status(403).json({ error: 'Organisation match memory requires Standard plan or higher.' })
   }
   const { forgetOrganisationMatchMemory } = await import('../services/organizationMatchMemory.js')

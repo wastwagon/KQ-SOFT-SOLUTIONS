@@ -18,7 +18,8 @@
  *   - PLANNING_DATA.json → subscription_tiers
  *   - web/src/lib/plans.ts → MARKETING_PLANS
  */
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
+import { defaultFeaturesForPlan, isStoredFeaturesEmpty } from '../src/config/planFeatures.js'
 
 const prisma = new PrismaClient()
 
@@ -29,6 +30,10 @@ interface PlanSeed {
   transactionsPerMonth: number
   monthlyGhs: number
   yearlyGhs: number
+  quarterlyGhs: number
+  bankAccounts: number
+  cleanExportsPerMonth: number
+  usersLimit: number
 }
 
 /** Jul 2026 catalogue: bank seats + txn caps; annual ≈ 10× monthly. */
@@ -40,6 +45,10 @@ const PLANS: PlanSeed[] = [
     transactionsPerMonth: 1_000,
     monthlyGhs: 300,
     yearlyGhs: 3000,
+    quarterlyGhs: 855,
+    bankAccounts: 5,
+    cleanExportsPerMonth: 5,
+    usersLimit: 1,
   },
   {
     slug: 'standard',
@@ -48,6 +57,10 @@ const PLANS: PlanSeed[] = [
     transactionsPerMonth: 5_000,
     monthlyGhs: 900,
     yearlyGhs: 9000,
+    quarterlyGhs: 2565,
+    bankAccounts: 10,
+    cleanExportsPerMonth: 20,
+    usersLimit: 3,
   },
   {
     slug: 'premium',
@@ -56,6 +69,10 @@ const PLANS: PlanSeed[] = [
     transactionsPerMonth: 20_000,
     monthlyGhs: 1500,
     yearlyGhs: 15000,
+    quarterlyGhs: 4275,
+    bankAccounts: 30,
+    cleanExportsPerMonth: 60,
+    usersLimit: 5,
   },
   {
     slug: 'firm',
@@ -64,6 +81,10 @@ const PLANS: PlanSeed[] = [
     transactionsPerMonth: -1,
     monthlyGhs: 0,
     yearlyGhs: 0,
+    quarterlyGhs: 0,
+    bankAccounts: -1,
+    cleanExportsPerMonth: -1,
+    usersLimit: -1,
   },
 ]
 
@@ -80,19 +101,34 @@ async function main() {
     const isLegacy =
       !!existing && (legacyMonthly[plan.slug] ?? []).includes(existing.monthlyGhs)
     const shouldReset = force || isLegacy || !existing
+    const features = defaultFeaturesForPlan(plan.slug) as Prisma.InputJsonValue
+    const shouldBackfillFeatures = !!existing && isStoredFeaturesEmpty(existing.features)
+    const firstTimeCms = shouldBackfillFeatures
+      ? {
+          features,
+          usersLimit: plan.usersLimit,
+          bankAccounts: plan.bankAccounts,
+          cleanExportsPerMonth: plan.cleanExportsPerMonth,
+          quarterlyGhs: plan.quarterlyGhs,
+        }
+      : {}
     await prisma.plan.upsert({
       where: { slug: plan.slug },
-      create: plan,
+      create: { ...plan, features },
       update: shouldReset
-        ? plan
+        ? { ...plan, features }
         : {
-            // Keep admin edits unless FORCE_PLAN_RESET=1 or legacy catalogue detected.
+            // Keep admin CMS edits (prices, monthly volume, seats, features).
             name: plan.name,
             slug: plan.slug,
+            ...firstTimeCms,
           },
     })
     if (isLegacy && !force) {
       console.log('seed-plans: healed legacy prices for %s → %s/%s GHS', plan.slug, plan.monthlyGhs, plan.yearlyGhs)
+    }
+    if (shouldBackfillFeatures && !shouldReset) {
+      console.log('seed-plans: backfilled default CMS fields for %s', plan.slug)
     }
   }
   console.log(

@@ -18,9 +18,9 @@ export interface PlanQuotaLimits {
 
 export async function getPlanQuotaLimits(planSlug: string): Promise<PlanQuotaLimits> {
   const planData = await getPlanBySlug(planSlug)
-  const bankAccounts = TIER_LIMITS[planSlug]?.bankAccounts ?? TIER_LIMITS.basic.bankAccounts
-  const cleanExportsPerMonth =
-    TIER_LIMITS[planSlug]?.cleanExportsPerMonth ?? TIER_LIMITS.basic.cleanExportsPerMonth
+  const catalogue = TIER_LIMITS[planSlug] ?? TIER_LIMITS.basic
+  const bankAccounts = planData?.bankAccounts ?? catalogue.bankAccounts
+  const cleanExportsPerMonth = planData?.cleanExportsPerMonth ?? catalogue.cleanExportsPerMonth
   const limits = planData
     ? {
         projectsPerMonth: planData.projectsPerMonth,

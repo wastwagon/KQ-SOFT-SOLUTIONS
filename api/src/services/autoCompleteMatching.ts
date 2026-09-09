@@ -4,6 +4,7 @@
  */
 import { prisma } from '../lib/prisma.js'
 import { BULK_MATCH_LIMIT, hasPlanFeature } from '../config/planFeatures.js'
+import { getPlanBySlug } from './plan.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveReconcileMaxLimit } from '../config/importLimits.js'
 import { suggestMatches, type SuggestedMatch, type Tx } from './matching.js'
@@ -318,6 +319,7 @@ async function createBulkMatches(
   pairs: ResidualMatchPair[]
 ): Promise<number> {
   if (!pairs.length) return 0
+  await getPlanBySlug(orgPlan)
 
   const requestedTxIds = new Set<string>()
   for (const pair of pairs) {
@@ -434,6 +436,7 @@ export async function runProjectAutoComplete(
   await purgeOrphanMatches(projectId)
 
   const orgPlan = project.organization?.plan ?? 'basic'
+  await getPlanBySlug(orgPlan)
   if (!hasPlanFeature(orgPlan, 'bulk_match')) {
     throw new Error('Bulk match requires Standard plan or higher.')
   }

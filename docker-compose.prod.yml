@@ -49,6 +49,7 @@ services:
       APP_URL: ${APP_URL:-https://kqsoftwaresolutions.com}
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_WEBHOOK_SECRET: ${PAYSTACK_WEBHOOK_SECRET:-}
+      PAYSTACK_CALLBACK_URL: ${PAYSTACK_CALLBACK_URL:-https://kqsoftwaresolutions.com/settings/billing}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       SUBSCRIPTION_PAYWALL: ${SUBSCRIPTION_PAYWALL:-true}

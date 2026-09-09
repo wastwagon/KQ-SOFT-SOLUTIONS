@@ -2,13 +2,9 @@ import { prisma } from '../lib/prisma.js'
 import { getPlanBySlug } from './plan.js'
 import { getLimits, isUnlimited } from '../config/subscription.js'
 import { countOrgBankAccounts, getPlanQuotaLimits } from './planLimits.js'
+import { currentPeriod, usagePeriodBounds } from './usagePeriod.js'
 
-function currentPeriod(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  return `${year}-${month}`
-}
+export { currentPeriod, usagePeriodBounds }
 
 /** Upsert monthly usage row — safe under concurrent create/increment. */
 export async function getOrCreateUsage(organizationId: string, period: string) {
@@ -43,8 +39,11 @@ export async function getUsageWithLimits(organizationId: string, planSlug: strin
   const bankAccountsUnlimited = isUnlimited(bankAccountsLimit)
   const cleanExportsLimit = quota.cleanExportsPerMonth
   const cleanExportsUnlimited = isUnlimited(cleanExportsLimit)
+  const { startsAt, endsAt } = usagePeriodBounds(period)
   return {
     period,
+    periodStartsAt: startsAt.toISOString(),
+    periodEndsAt: endsAt.toISOString(),
     projectsUsed: log.projectsCount,
     projectsLimit: limits.projectsPerMonth,
     projectsUnlimited: isUnlimited(limits.projectsPerMonth),
@@ -79,7 +78,7 @@ export async function canAddTransactions(
   if (usage.transactionsUsed + count > usage.transactionsLimit) {
     return {
       ok: false,
-      message: `Transaction limit would be exceeded (${usage.transactionsUsed + count} > ${usage.transactionsLimit}/month). Upgrade for more.`,
+      message: `Monthly transaction volume would be exceeded (${usage.transactionsUsed + count} > ${usage.transactionsLimit} this calendar month). Upgrade, or wait until ${usage.periodEndsAt.slice(0, 10)} when usage resets.`,
     }
   }
   return { ok: true }

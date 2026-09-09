@@ -15,8 +15,8 @@ Set these **before** starting the API in production:
 | `API_BASE_URL` | Recommended | Base URL for API (logos, links). Example: `https://api.yourdomain.com` |
 | `UPLOAD_DIR` | Optional | Upload directory (default: `./uploads`) |
 | `MAX_UPLOAD_SIZE_MB` | Optional | Max file size in MB (default: 10) |
-| `PAYSTACK_SECRET_KEY` | For billing | Paystack live secret key |
-| `PAYSTACK_WEBHOOK_SECRET` | For billing | Webhook signature secret |
+| `PAYSTACK_SECRET_KEY` | For billing | Paystack live secret key (also used to verify webhook HMAC) |
+| `APP_URL` | For reset + checkout return | Public SPA URL. Paystack redirects here `/settings/billing` after payment |
 | `PLATFORM_ADMIN_EMAILS` | For admin | Comma-separated admin emails |
 | `RESEND_API_KEY` | For reset | Enables password reset emails |
 | `APP_URL` | For reset | Base URL for reset links |
@@ -35,7 +35,8 @@ The API also refuses to start without `DATABASE_URL` (see `api/start-api.sh`). I
 
 1. In Paystack Dashboard → Settings → Webhooks
 2. Add URL: `https://your-api-domain.com/api/v1/subscription/webhook`
-3. Copy the webhook secret to `PAYSTACK_WEBHOOK_SECRET`
+3. Leave `PAYSTACK_WEBHOOK_SECRET` unset (or set it to the same value as `PAYSTACK_SECRET_KEY`). Paystack does **not** issue a Stripe-style `whsec_` secret; signatures are HMAC SHA512 of the raw body using the secret key.
+4. Set `APP_URL` to the public web app so checkout can send `callback_url` (`/settings/billing`). Optional dashboard callback: `https://your-api-domain.com/api/v1/subscription/callback`.
 
 ### 4. Security
 

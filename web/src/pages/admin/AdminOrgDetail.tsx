@@ -103,11 +103,16 @@ export default function AdminOrgDetail() {
     }
   }, [org?.id, org?.subscription?.status, org?.subscriptionMeta?.trialOverrideEndsAt])
 
-  const { data: plans = [] } = useQuery({
+  const { data: plansData } = useQuery({
     queryKey: ['admin', 'plans'],
-    queryFn: () => api('/admin/plans') as Promise<{ slug: string; name: string }[]>,
+    queryFn: async () => {
+      const raw = await api('/admin/plans')
+      if (Array.isArray(raw)) return { plans: raw as { slug: string; name: string }[] }
+      return raw as { plans: { slug: string; name: string }[] }
+    },
     enabled: !!org,
   })
+  const plans = plansData?.plans ?? []
 
   const updateMutation = useMutation({
     mutationFn: (plan: string) =>

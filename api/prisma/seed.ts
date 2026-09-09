@@ -3,8 +3,9 @@
  * Run: npx prisma db seed
  * Test password for all: Test123!
  */
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { defaultFeaturesForPlan, isStoredFeaturesEmpty } from '../src/config/planFeatures.js'
 
 const prisma = new PrismaClient()
 const SALT_ROUNDS = 10
@@ -15,16 +16,30 @@ async function main() {
 
   // Plans (subscription tiers) — Jul 2026 catalogue
   const plans = [
-    { slug: 'basic', name: 'Basic', projectsPerMonth: 10, transactionsPerMonth: 1000, monthlyGhs: 300, yearlyGhs: 3000 },
-    { slug: 'standard', name: 'Standard', projectsPerMonth: 30, transactionsPerMonth: 5000, monthlyGhs: 900, yearlyGhs: 9000 },
-    { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 20000, monthlyGhs: 1500, yearlyGhs: 15000 },
-    { slug: 'firm', name: 'Custom', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0 },
+    { slug: 'basic', name: 'Basic', projectsPerMonth: 10, transactionsPerMonth: 1000, monthlyGhs: 300, yearlyGhs: 3000, quarterlyGhs: 855, bankAccounts: 5, cleanExportsPerMonth: 5, usersLimit: 1 },
+    { slug: 'standard', name: 'Standard', projectsPerMonth: 30, transactionsPerMonth: 5000, monthlyGhs: 900, yearlyGhs: 9000, quarterlyGhs: 2565, bankAccounts: 10, cleanExportsPerMonth: 20, usersLimit: 3 },
+    { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 20000, monthlyGhs: 1500, yearlyGhs: 15000, quarterlyGhs: 4275, bankAccounts: 30, cleanExportsPerMonth: 60, usersLimit: 5 },
+    { slug: 'firm', name: 'Custom', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0, bankAccounts: -1, cleanExportsPerMonth: -1, usersLimit: -1 },
   ]
   for (const p of plans) {
+    const existing = await prisma.plan.findUnique({ where: { slug: p.slug } })
+    const features = defaultFeaturesForPlan(p.slug) as Prisma.InputJsonValue
     await prisma.plan.upsert({
       where: { slug: p.slug },
-      create: p,
-      update: p,
+      create: { ...p, features },
+      update: {
+        name: p.name,
+        slug: p.slug,
+        ...(existing && isStoredFeaturesEmpty(existing.features)
+          ? {
+              features,
+              usersLimit: p.usersLimit,
+              bankAccounts: p.bankAccounts,
+              cleanExportsPerMonth: p.cleanExportsPerMonth,
+              quarterlyGhs: p.quarterlyGhs,
+            }
+          : {}),
+      },
     })
   }
   console.log('Plans seeded:', plans.map((p) => p.slug).join(', '))

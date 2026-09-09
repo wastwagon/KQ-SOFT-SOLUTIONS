@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
 })
 
 const MAX_DOCUMENT_SIZE = resolveMaxUploadSizeBytes()
-const ALLOWED_DOCUMENT_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.csv', '.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp']
+const ALLOWED_DOCUMENT_EXTENSIONS = ['.xlsx', '.xls', '.xlsm', '.csv', '.pdf', '.ofx', '.qfx', '.mt940', '.sta', '.swift', '.xml', '.camt', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp']
 
 const upload = multer({
   storage,
@@ -319,8 +319,8 @@ router.post('/branding-logo', logoUpload.single('file'), async (req: AuthRequest
     where: { id: orgId },
     select: { plan: true },
   })
-  const { hasPlanFeature } = await import('../config/planFeatures.js')
-  if (!org || !hasPlanFeature(org.plan, 'full_branding')) {
+  const { planHasFeature } = await import('../lib/planGate.js')
+  if (!org || !(await planHasFeature(org.plan, 'full_branding'))) {
     return res.status(403).json({ error: 'Logo upload requires Standard plan or higher.' })
   }
   const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 9001}`

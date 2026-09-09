@@ -127,6 +127,26 @@ export interface DocumentPreviewResponse {
     reasons: string[]
     mismatch?: boolean
   }
+  ingestSafety?: {
+    unknownPdf?: boolean
+    trustedSource?: boolean
+    wouldAutoMap?: boolean
+    skipReason?: string | null
+    skipMessage?: string
+    checksum?: {
+      status: 'not_applicable' | 'passed' | 'failed'
+      blocksReconcile?: boolean
+      opening?: number
+      closing?: number
+      credits?: number
+      debits?: number
+      expectedClosing?: number
+      difference?: number
+      message?: string
+    }
+    checksumAcknowledged?: boolean
+    importLocale?: { dateOrder: 'dmy' | 'mdy'; decimalStyle: 'us' | 'eu' }
+  }
 }
 
 export interface ReportMatchRow {
@@ -436,6 +456,9 @@ export interface SubscriptionUsageResponse {
     cleanExportsLimit?: number
     cleanExportsUnlimited?: boolean
     cleanExportsDisplay?: string
+    period?: string
+    periodStartsAt?: string
+    periodEndsAt?: string
   }
   limits: {
     projectsPerMonth: number
@@ -592,8 +615,18 @@ export const documents = {
     const suffix = q.toString() ? `?${q}` : ''
     return api(`/documents/${id}/preview${suffix}`) as Promise<DocumentPreviewResponse>
   },
-  map: (id: string, body: { mapping: Record<string, number>; sheetIndex?: number }) =>
+  map: (
+    id: string,
+    body: {
+      mapping: Record<string, number>
+      sheetIndex?: number
+      locale?: { dateOrder: 'dmy' | 'mdy'; decimalStyle: 'us' | 'eu' }
+      saveLocaleAsOrgDefault?: boolean
+    }
+  ) =>
     api(`/documents/${id}/map`, { method: 'POST', body: JSON.stringify(body) }) as Promise<MapDocumentResponse>,
+  acknowledgeIngestChecksum: (id: string) =>
+    api(`/documents/${id}/acknowledge-ingest-checksum`, { method: 'POST' }) as Promise<{ ok: boolean }>,
   parseStatus: (id: string) =>
     api(`/documents/${id}/parse-status`) as Promise<{
       documentId: string
@@ -804,6 +837,15 @@ export const subscription = {
   getPlans: () => api('/subscription/plans'),
   initializePayment: (body: { plan: string; period: 'monthly' | 'quarterly' | 'yearly' }) =>
     api('/subscription/initialize', { method: 'POST', body: JSON.stringify(body) }),
+  verifyPayment: (body: { reference: string }) =>
+    api('/subscription/verify', { method: 'POST', body: JSON.stringify(body) }) as Promise<{
+      status: string
+      reference: string
+      plan?: string | null
+      period?: string
+      alreadyApplied?: boolean
+      message?: string
+    }>,
 }
 
 export interface PublicPlan {
@@ -811,8 +853,14 @@ export interface PublicPlan {
   name: string
   monthlyGhs: number
   yearlyGhs: number
+  quarterlyGhs?: number
   projectsPerMonth: number
   transactionsPerMonth: number
+  bankAccounts?: number
+  usersLimit?: number
+  cleanExportsPerMonth?: number
+  features?: Record<string, boolean>
+  active?: boolean
 }
 
 /**

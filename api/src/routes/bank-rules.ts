@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBankRules } from '../lib/permissions.js'
-import { hasPlanFeature } from '../config/planFeatures.js'
+import { planHasFeature } from '../lib/planGate.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
@@ -15,7 +15,7 @@ async function requireBankRulesPlan(req: AuthRequest, res: import('express').Res
     where: { id: req.auth!.orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'bank_rules')) {
+  if (!org || !(await planHasFeature(org.plan, 'bank_rules'))) {
     res.status(403).json({ error: 'Bank rules require Standard plan or higher. Upgrade to unlock.' })
     return false
   }

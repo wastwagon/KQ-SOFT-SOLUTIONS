@@ -336,7 +336,7 @@ export default function Dashboard() {
               sublabel={
                 transactionsUnlimited
                   ? 'Unlimited on plan'
-                  : `${transactionsUsed} of ${transactionsLimit} this month`
+                  : `${transactionsUsed} of ${transactionsLimit} this calendar month (resets on the 1st)`
               }
               icon={<LayoutDashboard />}
               accent="none"
@@ -363,6 +363,34 @@ export default function Dashboard() {
         )}
         </div>
       </section>
+
+      {features.firm_dashboard && (
+        <Card title="Practice overview">
+          <p className="text-sm text-gray-600 mb-5">
+            Multi-entity snapshot for this workspace — clients, open jobs, and reports.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <DashLinkCard
+              to="/clients"
+              icon={<Building2 className="w-4 h-4" aria-hidden />}
+              title="Clients"
+              description="Entities you reconcile for"
+            />
+            <DashLinkCard
+              to="/projects"
+              icon={<FolderKanban className="w-4 h-4" aria-hidden />}
+              title="Projects"
+              description={`${inProgressCount} in progress · ${completedCount} completed`}
+            />
+            <DashLinkCard
+              to="/reports"
+              icon={<FileSpreadsheet className="w-4 h-4" aria-hidden />}
+              title="Reports"
+              description={`${pendingReviewCount} waiting for review`}
+            />
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
-import { hasPlanFeature } from '../config/planFeatures.js'
+import { planHasFeature } from '../lib/planGate.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -31,7 +31,7 @@ router.get('/', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'audit_trail')) {
+  if (!org || !(await planHasFeature(org.plan, 'audit_trail'))) {
     return res.status(403).json({ error: 'Audit trail requires Standard plan or higher.' })
   }
   const projectId = req.query.projectId as string | undefined
@@ -65,7 +65,7 @@ router.get('/export', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'audit_trail')) {
+  if (!org || !(await planHasFeature(org.plan, 'audit_trail'))) {
     return res.status(403).json({ error: 'Audit trail requires Standard plan or higher.' })
   }
   const projectId = req.query.projectId as string | undefined

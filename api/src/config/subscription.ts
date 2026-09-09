@@ -95,18 +95,25 @@ export function isLegacyMonthlyPrice(slug: string, monthlyGhs: number): boolean 
   return set.has(monthlyGhs)
 }
 
-/** Prefer catalogue prices when the DB row still has a known legacy monthly amount. */
+/**
+ * Resolve checkout / public prices.
+ * Admin CMS values win. Catalogue fills missing quarterly (0) and empty rows.
+ * Legacy monthly amounts are healed only by `seed-plans.ts`, not at read time —
+ * otherwise an admin setting Premium to 900 GHS would be silently overwritten.
+ */
 export function resolvePlanPrices(
   slug: string,
-  db: { monthlyGhs: number; yearlyGhs: number } | null | undefined
+  db: { monthlyGhs: number; yearlyGhs: number; quarterlyGhs?: number } | null | undefined
 ): { monthlyGhs: number; yearlyGhs: number; quarterlyGhs: number } {
   const catalogue = PLAN_PRICES[slug] ?? PLAN_PRICES.basic
-  if (!db || isLegacyMonthlyPrice(slug, db.monthlyGhs)) {
-    return { ...catalogue }
-  }
+  if (!db) return { ...catalogue }
+  const quarterly =
+    typeof db.quarterlyGhs === 'number' && db.quarterlyGhs > 0
+      ? db.quarterlyGhs
+      : catalogue.quarterlyGhs
   return {
     monthlyGhs: db.monthlyGhs,
     yearlyGhs: db.yearlyGhs,
-    quarterlyGhs: catalogue.quarterlyGhs,
+    quarterlyGhs: quarterly,
   }
 }

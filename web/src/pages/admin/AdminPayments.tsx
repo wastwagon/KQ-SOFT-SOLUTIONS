@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
@@ -12,6 +12,7 @@ import Alert from '../../components/ui/Alert'
 import Badge from '../../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
+import { useToast } from '../../components/ui/Toast'
 
 type Payment = {
   id: string
@@ -23,12 +24,15 @@ type Payment = {
   reference: string | null
   status: string
   createdAt: string
-  organization: { id: string; name: string }
+  organization: { id: string; name: string; slug?: string }
 }
 
 export default function AdminPayments() {
   const [page, setPage] = useState(1)
   const [orgId, setOrgId] = useState('')
+  const [verifyReference, setVerifyReference] = useState('')
+  const toast = useToast()
+  const queryClient = useQueryClient()
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'payments', page, orgId],
@@ -39,6 +43,37 @@ export default function AdminPayments() {
         payments: Payment[]
         pagination: { page: number; limit: number; total: number; totalPages: number }
       }>
+    },
+  })
+
+  const verifyMutation = useMutation({
+    mutationFn: (reference: string) =>
+      api('/admin/payments/verify', {
+        method: 'POST',
+        body: JSON.stringify({ reference }),
+      }) as Promise<{
+        status: string
+        reference: string
+        plan?: string
+        orgId?: string
+        alreadyApplied?: boolean
+        message?: string
+      }>,
+    onSuccess: (result) => {
+      if (result.status === 'success') {
+        toast.success(
+          result.alreadyApplied ? 'Already applied' : 'Payment applied',
+          result.plan ? `Organisation plan is now ${result.plan}.` : 'Subscription updated from Paystack.'
+        )
+        setVerifyReference('')
+        void queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] })
+        void queryClient.invalidateQueries({ queryKey: ['admin', 'subscribers'] })
+      } else {
+        toast.error('Not confirmed', result.message || 'Paystack has not marked this charge as successful.')
+      }
+    },
+    onError: (err) => {
+      toast.error('Could not confirm payment', err instanceof Error ? err.message : undefined)
     },
   })
 
@@ -100,6 +135,32 @@ export default function AdminPayments() {
             Apply
           </Button>
         </div>
+        <form
+          className="flex flex-wrap items-end gap-3 mb-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const reference = verifyReference.trim()
+            if (!reference) return
+            verifyMutation.mutate(reference)
+          }}
+        >
+          <div className="w-80 max-w-full">
+            <Input
+              type="text"
+              placeholder="Paystack reference (e.g. brs_…)"
+              value={verifyReference}
+              onChange={(e) => setVerifyReference(e.target.value)}
+              aria-label="Paystack reference to confirm"
+            />
+          </div>
+          <Button type="submit" size="sm" isLoading={verifyMutation.isPending}>
+            Confirm from Paystack
+          </Button>
+        </form>
+        <p className="text-xs text-gray-500 mb-4">
+          If a customer paid on Paystack but the workspace plan did not update, paste the transaction reference here
+          to verify the charge and apply the plan.
+        </p>
 
         <Table>
           <TableHead>
@@ -110,12 +171,13 @@ export default function AdminPayments() {
               <TableTh>Period</TableTh>
               <TableTh className="text-right">Amount</TableTh>
               <TableTh>Status</TableTh>
+              <TableTh>Reference</TableTh>
             </tr>
           </TableHead>
           <TableBody>
             {payments.length === 0 ? (
               <TableRow>
-                <TableTd colSpan={6} className="text-center text-gray-500">
+                <TableTd className="text-center text-gray-500" colSpan={7}>
                   No payments found.
                 </TableTd>
               </TableRow>
@@ -127,7 +189,7 @@ export default function AdminPayments() {
                   </TableTd>
                   <TableTd>
                     <Link
-                      to={`/platform-admin/organizations/${pay.organization.id}`}
+                      to={`/platform-admin/organizations/${pay.organization.slug || pay.organization.id}`}
                       className="text-primary-600 hover:underline"
                     >
                       {pay.organization.name}
@@ -152,6 +214,9 @@ export default function AdminPayments() {
                     >
                       {pay.status}
                     </Badge>
+                  </TableTd>
+                  <TableTd className="font-mono text-xs text-gray-500 max-w-[12rem] truncate" title={pay.reference || ''}>
+                    {pay.reference || '—'}
                   </TableTd>
                 </TableRow>
               ))

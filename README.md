@@ -159,12 +159,19 @@ To enable plan upgrades in Settings > Billing:
 2. Add to `api/.env`:
    ```
    PAYSTACK_SECRET_KEY=sk_live_xxx
-   PAYSTACK_WEBHOOK_SECRET=whsec_xxx  # Optional; from webhook settings
+   APP_URL=https://yourdomain.com
    ```
+   Paystack signs webhooks with this **secret key**. Do not set `PAYSTACK_WEBHOOK_SECRET` to a Stripe-style `whsec_…` value — that rejects every webhook and never updates the plan.
 3. In Paystack Dashboard > Settings > Webhooks, add:
    ```
-   https://yourdomain.com/api/v1/subscription/webhook
+   https://your-api-domain.com/api/v1/subscription/webhook
    ```
+   Optional dashboard callback URL (API redirects to Billing):
+   ```
+   https://your-api-domain.com/api/v1/subscription/callback
+   ```
+
+Checkout now sends `callback_url` to `/settings/billing`. After payment the app verifies the charge with Paystack (it does not wait for the webhook alone).
 
 Without `PAYSTACK_SECRET_KEY`, the Billing section shows "Billing is not configured".
 
@@ -186,7 +193,7 @@ npm run db:migrate   # required: adds unique transaction match constraint
 Environment checks:
 
 - `JWT_SECRET` must be set to a strong secret in non-test environments (server now fails fast if missing).
-- `PAYSTACK_SECRET_KEY` and `PAYSTACK_WEBHOOK_SECRET` should both be set when using billing webhooks.
+- `PAYSTACK_SECRET_KEY` must be set when using billing; webhook HMAC uses that key (do not set a mismatched `PAYSTACK_WEBHOOK_SECRET`).
 - Ensure webhook endpoint uses exact URL path: `/api/v1/subscription/webhook`.
 
 Operational behavior now enforced:
@@ -267,9 +274,8 @@ Run this checklist on production rollout day.
 ### 1) Environment sanity
 
 - `JWT_SECRET` is set (strong value, not empty).
-- `PAYSTACK_SECRET_KEY` is set.
-- `PAYSTACK_WEBHOOK_SECRET` is set.
-- `APP_URL` points to the production web domain.
+- `PAYSTACK_SECRET_KEY` is set (also used to verify webhook signatures).
+- `APP_URL` points to the production web domain (used as the Paystack return URL).
 - `DATABASE_URL` points to the production Postgres instance.
 - `RESEND_API_KEY` and `EMAIL_FROM` are set if password-reset emails must be delivered.
 

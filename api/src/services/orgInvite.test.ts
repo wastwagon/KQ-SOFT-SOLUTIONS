@@ -6,6 +6,7 @@ vi.mock('../lib/prisma.js', () => ({
     organizationMember: { count: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     organizationInvite: { count: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn() },
     user: { findUnique: vi.fn() },
+    plan: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   },
 }))

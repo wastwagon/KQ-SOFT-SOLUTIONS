@@ -19,6 +19,7 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canExportReport } from '../lib/permissions.js'
 import { hasPlanFeature } from '../config/planFeatures.js'
+import { getPlanBySlug } from '../services/plan.js'
 import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
 import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
@@ -718,6 +719,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     moreInCbThanBs: paidOutVarianceRows.filter((r) => r.variance > 0),
     moreInBsThanCb: paidOutVarianceRows.filter((r) => r.variance < 0),
   }
+  await getPlanBySlug(project.organization.plan)
   const hasDiscrepancyReport = hasPlanFeature(project.organization.plan, 'discrepancy_report')
   const hasMissingChequesReport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
 
@@ -1612,6 +1614,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const platformDefaults = await getPlatformDefaults()
   const reportTitle = (branding.reportTitle as string) || platformDefaults.defaultReportTitle
   const curr = project.currency || 'GHS'
+  await getPlanBySlug(project.organization.plan)
   const hasDiscrepancyReportExport = hasPlanFeature(project.organization.plan, 'discrepancy_report')
   const hasMissingChequesReportExport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
   const reportLanguageProfile = {

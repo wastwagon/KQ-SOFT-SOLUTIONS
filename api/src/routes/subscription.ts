@@ -1,33 +1,48 @@
-import crypto from 'node:crypto'
 import express from 'express'
 import { Router } from 'express'
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
-import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { getUsageWithLimits } from '../services/usage.js'
-import { getPlanBySlug } from '../services/plan.js'
-import { PLAN_PRICES, planAmountForPeriod, INTRO_OFFER_DISCOUNT, INTRO_OFFER_MONTHS } from '../config/subscription.js'
-import { hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
+import { getPlanBySlug, listSelfServePlans } from '../services/plan.js'
+import { planAmountForPeriod, INTRO_OFFER_DISCOUNT, INTRO_OFFER_MONTHS } from '../config/subscription.js'
+import { hasPlanFeature, PLAN_FEATURE_IDS } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
 import { fetchSubscriptionOverrides } from '../services/subscriptionOverrides.js'
-import {
-  invalidateOrgSubscriptionCache,
-  isSubscriptionPaywallEnabled,
-} from '../services/orgSubscriptionAccess.js'
+import { isSubscriptionPaywallEnabled } from '../services/orgSubscriptionAccess.js'
 import { getPlanQuotaLimits } from '../services/planLimits.js'
 import {
   isIntroOfferEnvEnabled,
   isOrgIntroOfferEligible,
-  recordIntroOfferPayment,
   getIntroOfferPaymentsApplied,
 } from '../services/introOffer.js'
 import { logger } from '../middleware/logging.js'
 import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
 import { isPlatformAdmin } from '../lib/platformAdmin.js'
+import { canManageBilling } from '../lib/permissions.js'
+import {
+  PAYABLE_PLANS,
+  applyVerifiedPaystackCharge,
+  checkoutMetadataPayload,
+  computeWebhookSignature,
+  extractCheckoutMetadata,
+  fulfillSuccessfulCharge,
+  isPayablePlan,
+  isUniqueConstraintError,
+  isValidPaystackSignature,
+  parseWebhookEvent,
+  paystackCallbackUrl,
+  publicAppOrigin,
+  verifyPaystackTransaction,
+} from '../services/paystackFulfillment.js'
 
-const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
+export {
+  computeWebhookSignature,
+  isUniqueConstraintError,
+  parseWebhookEvent,
+}
+
 /** Rank for upgrade/downgrade checks; `firm` is highest (custom billing, not self-service). */
 const PLAN_SLUG_RANK: Record<string, number> = {
   basic: 1,
@@ -39,17 +54,18 @@ const initializeSchema = z.object({
   plan: z.enum(PAYABLE_PLANS),
   period: z.enum(['monthly', 'quarterly', 'yearly']),
 })
+const verifySchema = z.object({
+  reference: z.string().trim().min(3).max(200),
+})
 
-const PLAN_FEATURES: PlanFeature[] = [
-  'bank_rules', 'bulk_match', 'ai_suggestions', 'audit_trail',
-  'discrepancy_report', 'missing_cheques_report',
-  'one_to_many', 'many_to_many', 'roll_forward', 'threshold_approval',
-  'full_branding', 'firm_dashboard', 'api_access', 'multi_client',
-]
+const PLAN_FEATURES = PLAN_FEATURE_IDS
 
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || ''
 const router = Router()
 router.use(authMiddleware)
+
+function paystackSecret(): string {
+  return (process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || '').trim()
+}
 
 /**
  * Rate limit Paystack initialization.  Each call hits Paystack and creates a
@@ -72,26 +88,6 @@ const initializeLimiter = rateLimit({
     return `ip:${ipKeyGenerator(req.ip || 'unknown')}`
   },
 })
-
-export function computeWebhookSignature(rawBody: Buffer, secret: string): string {
-  return crypto.createHmac('sha512', secret).update(rawBody).digest('hex')
-}
-
-export function parseWebhookEvent(rawBody: Buffer) {
-  return JSON.parse(rawBody.toString('utf8')) as {
-    event?: string
-    data?: {
-      reference?: string
-      amount?: number
-      currency?: string
-      metadata?: { orgId?: string; plan?: string; period?: string; introOffer?: boolean }
-    }
-  }
-}
-
-export function isUniqueConstraintError(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
-}
 
 router.get('/usage', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
@@ -167,41 +163,29 @@ router.get('/plans', async (req: AuthRequest, res) => {
       introRemaining = Math.max(0, INTRO_OFFER_MONTHS - applied)
     }
   }
-  const planEntries = Object.entries(PLAN_PRICES).filter(([k]) => k !== 'firm')
+  const selfServe = await listSelfServePlans()
   const plans = await Promise.all(
-    planEntries.map(async ([planId]) => {
-      const p = await getPlanBySlug(planId)
-      const prices = PLAN_PRICES[planId]
-      const quota = await getPlanQuotaLimits(planId)
-      if (p) {
-        return {
-          id: p.slug,
-          name: p.name,
-          monthlyGhs: p.monthlyGhs,
-          yearlyGhs: p.yearlyGhs,
-          quarterlyGhs: prices?.quarterlyGhs ?? Math.round(p.monthlyGhs * 2.85),
-          projectsPerMonth: p.projectsPerMonth,
-          transactionsPerMonth: p.transactionsPerMonth,
-          bankAccounts: quota.bankAccounts,
-        }
-      }
-      const { getLimits } = await import('../config/subscription.js')
-      const limits = getLimits(planId)
+    selfServe.map(async (p) => {
+      const quota = await getPlanQuotaLimits(p.slug)
       return {
-        id: planId,
-        name: planId.charAt(0).toUpperCase() + planId.slice(1),
-        monthlyGhs: prices?.monthlyGhs ?? 0,
-        yearlyGhs: prices?.yearlyGhs ?? 0,
-        quarterlyGhs: prices?.quarterlyGhs ?? 0,
-        projectsPerMonth: limits.projectsPerMonth,
-        transactionsPerMonth: limits.transactionsPerMonth,
-        bankAccounts: limits.bankAccounts,
+        id: p.slug,
+        name: p.name,
+        monthlyGhs: p.monthlyGhs,
+        yearlyGhs: p.yearlyGhs,
+        quarterlyGhs: p.quarterlyGhs,
+        projectsPerMonth: p.projectsPerMonth,
+        transactionsPerMonth: p.transactionsPerMonth,
+        bankAccounts: quota.bankAccounts,
+        cleanExportsPerMonth: quota.cleanExportsPerMonth,
+        usersLimit: p.usersLimit,
+        features: p.features,
+        active: p.active,
       }
     })
   )
   res.json({
     plans,
-    paystackConfigured: !!PAYSTACK_SECRET,
+    paystackConfigured: !!paystackSecret(),
     introOffer: isIntroOfferEnvEnabled()
       ? {
           discountPercent: 50,
@@ -216,7 +200,11 @@ router.get('/plans', async (req: AuthRequest, res) => {
 
 router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
-  if (!PAYSTACK_SECRET) {
+  if (!canManageBilling(req.auth?.role)) {
+    return res.status(403).json({ error: 'Only organisation admins can manage billing.' })
+  }
+  const secret = paystackSecret()
+  if (!secret) {
     return res.status(503).json({ error: 'Billing not configured. Contact support to upgrade.' })
   }
   const parsed = initializeSchema.safeParse(req.body)
@@ -231,18 +219,20 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
   if (!planData) {
     return res.status(400).json({ error: 'Unknown plan.' })
   }
+  if (!planData.active) {
+    return res.status(400).json({ error: 'This plan is not available for checkout.' })
+  }
   if (planData.monthlyGhs <= 0 && planData.yearlyGhs <= 0) {
     return res.status(400).json({
       error:
         'This plan has no online checkout amount (custom / contract plans). Choose a paid tier to upgrade, or contact support for firm billing.',
     })
   }
-  const priceFallback = PLAN_PRICES[plan]
   let amountGhs = planAmountForPeriod(
     {
       monthlyGhs: planData.monthlyGhs,
       yearlyGhs: planData.yearlyGhs,
-      quarterlyGhs: priceFallback?.quarterlyGhs,
+      quarterlyGhs: planData.quarterlyGhs,
     },
     period
   )
@@ -280,14 +270,19 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
 
   const amountPesewas = Math.round(amountGhs * 100) // GHS to pesewas
   const ref = `brs_${orgId}_${plan}_${period}_${Date.now()}`
-  const metadata: { orgId: string; plan: string; period: string; introOffer?: boolean } = { orgId, plan, period }
-  if (introOfferApplied) metadata.introOffer = true
+  const callbackUrl = paystackCallbackUrl()
+  const metadata = checkoutMetadataPayload({
+    orgId,
+    plan,
+    period,
+    introOffer: introOfferApplied || undefined,
+  })
 
   try {
     const resp = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET}`,
+        Authorization: `Bearer ${secret}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -295,6 +290,7 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
         amount: amountPesewas,
         currency: 'GHS',
         reference: ref,
+        callback_url: callbackUrl,
         metadata,
       }),
     })
@@ -302,9 +298,26 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
     if (!data.status || !data.data?.authorization_url) {
       return res.status(502).json({ error: data.message || 'Paystack initialization failed' })
     }
+    try {
+      await prisma.payment.create({
+        data: {
+          organizationId: orgId,
+          amount: amountGhs,
+          currency: 'GHS',
+          plan,
+          period,
+          reference: ref,
+          status: 'pending',
+        },
+      })
+    } catch (err) {
+      logger.warn({ err, reference: ref }, 'paystack: could not persist pending payment')
+    }
+    logger.info({ orgId, plan, period, reference: ref, callbackUrl }, 'paystack: checkout initialized')
     res.json({
       authorizationUrl: data.data.authorization_url,
       reference: ref,
+      callbackUrl,
       introOfferApplied: introOfferApplied || undefined,
     })
   } catch (err) {
@@ -313,15 +326,86 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
   }
 })
 
-export async function handlePaystackWebhook(req: express.Request, res: express.Response) {
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET || PAYSTACK_SECRET
-  const sig = req.headers['x-paystack-signature'] as string
-  if (!sig || !secret) {
-    return res.status(400).send('Missing signature or webhook secret')
+router.post('/verify', async (req: AuthRequest, res) => {
+  const orgId = req.auth!.orgId
+  const secret = paystackSecret()
+  if (!secret) {
+    return res.status(503).json({ error: 'Billing not configured.' })
   }
-  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from('')
-  const hash = computeWebhookSignature(rawBody, secret)
-  if (hash !== sig) {
+  const parsed = verifySchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Payment reference is required.' })
+  }
+  const { reference } = parsed.data
+  const owned = await prisma.payment.findFirst({
+    where: { reference, organizationId: orgId },
+    select: { id: true, status: true, plan: true, period: true, organizationId: true },
+  })
+  const fromRef = extractCheckoutMetadata(undefined, reference)
+  if (!owned && fromRef.orgId && fromRef.orgId !== orgId) {
+    return res.status(403).json({ error: 'This payment does not belong to your organisation.' })
+  }
+  if (!owned && !fromRef.orgId) {
+    return res.status(404).json({ error: 'Unknown payment reference.' })
+  }
+
+  const tx = await verifyPaystackTransaction(reference, secret)
+  if (!tx) {
+    return res.status(404).json({ error: 'Paystack could not find this transaction.' })
+  }
+  const meta = extractCheckoutMetadata(tx.metadata, reference)
+  const chargeOrgId = meta.orgId || owned?.organizationId
+  if (chargeOrgId && chargeOrgId !== orgId) {
+    return res.status(403).json({ error: 'This payment does not belong to your organisation.' })
+  }
+  if (tx.status !== 'success') {
+    return res.json({
+      status: tx.status || 'pending',
+      reference,
+      plan: owned?.plan ?? meta.plan ?? null,
+      message: 'Payment is not yet successful at Paystack.',
+    })
+  }
+
+  try {
+    const applied = await applyVerifiedPaystackCharge(tx)
+    return res.json({
+      status: 'success',
+      reference,
+      plan: applied.plan,
+      period: applied.period,
+      alreadyApplied: applied.result === 'already_applied',
+    })
+  } catch (err) {
+    const status = (err as { status?: number }).status
+    if (status === 422) {
+      return res.status(422).json({ error: err instanceof Error ? err.message : 'Could not map payment to a plan.' })
+    }
+    throw err
+  }
+})
+
+/** Unauthenticated redirect so a dashboard-configured API callback still returns users to Billing. */
+export function handlePaystackReturnRedirect(req: express.Request, res: express.Response) {
+  const raw = String(req.query.reference || req.query.trxref || '').trim()
+  const billing = `${publicAppOrigin()}/settings/billing`
+  if (!raw) {
+    return res.redirect(302, billing)
+  }
+  const url = new URL(billing)
+  url.searchParams.set('reference', raw)
+  return res.redirect(302, url.toString())
+}
+
+export async function handlePaystackWebhook(req: express.Request, res: express.Response) {
+  const sig = req.headers['x-paystack-signature'] as string | undefined
+  const rawBody = Buffer.isBuffer(req.body)
+    ? req.body
+    : typeof req.body === 'string'
+      ? Buffer.from(req.body, 'utf8')
+      : Buffer.from('')
+  if (!isValidPaystackSignature(rawBody, sig)) {
+    logger.warn('paystack: webhook signature rejected')
     return res.status(400).send('Invalid signature')
   }
   let event: ReturnType<typeof parseWebhookEvent>
@@ -330,41 +414,35 @@ export async function handlePaystackWebhook(req: express.Request, res: express.R
   } catch {
     return res.status(400).send('Invalid JSON payload')
   }
-  if (event.event === 'charge.success' && event.data?.metadata?.orgId) {
-    const { orgId, plan, period, introOffer } = event.data.metadata
-    if (orgId && plan && ['basic', 'standard', 'premium'].includes(plan)) {
-      const amountRaw = event.data.amount ?? 0
-      const amountGhs = amountRaw / 100 // pesewas -> GHS
-      try {
-        await prisma.$transaction([
-          prisma.organization.update({
-            where: { id: orgId },
-            data: { plan },
-          }),
-          prisma.payment.create({
-            data: {
-              organizationId: orgId,
-              amount: amountGhs,
-              currency: event.data.currency ?? 'GHS',
-              plan,
-              period: period ?? 'monthly',
-              reference: event.data.reference ?? null,
-              status: 'success',
-              paystackData: event.data as object,
-            },
-          }),
-        ])
-        if (introOffer) {
-          await recordIntroOfferPayment(orgId)
-        }
-        invalidateOrgSubscriptionCache(orgId)
-      } catch (e) {
-        // Webhooks are retried; duplicate reference should be treated as idempotent success.
-        if (!isUniqueConstraintError(e)) {
-          throw e
-        }
-      }
-    }
+  if (event.event !== 'charge.success') {
+    logger.info({ event: event.event }, 'paystack: webhook ignored')
+    return res.status(200).send('OK')
+  }
+
+  const reference = event.data?.reference
+  const meta = extractCheckoutMetadata(event.data?.metadata, reference)
+  if (!meta.orgId || !isPayablePlan(meta.plan) || !reference) {
+    logger.warn(
+      { reference, orgId: meta.orgId, plan: meta.plan },
+      'paystack: charge.success missing org/plan metadata'
+    )
+    return res.status(200).send('OK')
+  }
+
+  const amountRaw = event.data?.amount ?? 0
+  try {
+    await fulfillSuccessfulCharge({
+      orgId: meta.orgId,
+      plan: meta.plan,
+      period: meta.period || 'monthly',
+      reference,
+      amountGhs: amountRaw / 100,
+      currency: event.data?.currency ?? 'GHS',
+      introOffer: meta.introOffer,
+      paystackData: (event.data ?? {}) as object,
+    })
+  } catch (e) {
+    if (!isUniqueConstraintError(e)) throw e
   }
   res.status(200).send('OK')
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
 import { auth } from '../lib/api'
@@ -9,6 +9,15 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
+
+function safeInternalPath(from: unknown): string | null {
+  if (!from || typeof from !== 'object') return null
+  const loc = from as { pathname?: unknown; search?: unknown }
+  const pathname = typeof loc.pathname === 'string' ? loc.pathname : ''
+  if (!pathname.startsWith('/') || pathname.startsWith('//')) return null
+  const search = typeof loc.search === 'string' ? loc.search : ''
+  return `${pathname}${search}`
+}
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -21,6 +30,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = safeInternalPath((location.state as { from?: unknown } | null)?.from)
   const setAuth = useAuth((s) => s.setAuth)
   const toast = useToast()
 
@@ -43,7 +54,7 @@ export default function Login() {
   }, [inviteToken])
 
   if (isAuthenticated && !sessionExpired) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to={returnTo || '/dashboard'} replace />
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,7 +71,7 @@ export default function Login() {
       if (inviteToken && inviteOrgName) {
         toast.success('Invitation accepted', `You joined ${org.name}.`)
       }
-      navigate(isPlatformAdmin ? '/platform-admin' : '/dashboard')
+      navigate(returnTo || (isPlatformAdmin ? '/platform-admin' : '/dashboard'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed'
       setError(msg)

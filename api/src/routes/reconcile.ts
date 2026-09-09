@@ -6,6 +6,8 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canReconcile, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
 import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
+import { getPlanBySlug } from '../services/plan.js'
+import { planHasFeature } from '../lib/planGate.js'
 import {
   suggestMatches,
   suggestSplitMatches,
@@ -98,6 +100,7 @@ import {
   clearCorroboratedDuplicateWarnings,
 } from '../services/suggestionDuplicateFlags.js'
 import { runProjectAutoComplete } from '../services/autoCompleteMatching.js'
+import { getProjectIngestBlock } from '../services/ingestMeta.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -164,6 +167,15 @@ export function isUniqueConstraintError(e: unknown): boolean {
 export function getMatchConflictErrorBody(e: unknown) {
   if (!isUniqueConstraintError(e)) return null
   return { error: 'One or more transactions are already matched' }
+}
+
+async function ingestChecksumResponse(
+  projectId: string,
+  bankAccountId?: string
+): Promise<{ status: 409; body: Record<string, unknown> } | null> {
+  const block = await getProjectIngestBlock(projectId, bankAccountId)
+  if (!block) return null
+  return { status: 409, body: block }
 }
 
 /**
@@ -289,7 +301,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       organization: { select: { plan: true, branding: true } },
       bankAccounts: true,
       documents: {
-        select: { id: true, type: true, bankAccountId: true, filename: true },
+        select: { id: true, type: true, bankAccountId: true, filename: true, ingestMeta: true },
       },
       matches: { include: { matchItems: true, attachments: true } },
     },
@@ -424,6 +436,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   }
 
   const plan = project.organization?.plan ?? 'basic'
+  await getPlanBySlug(plan)
   const hasAiSuggestions = hasPlanFeature(plan, 'ai_suggestions')
   const hasBankRulesPlan = hasPlanFeature(plan, 'bank_rules')
   const hasSplitMatchingPlan = hasPlanFeature(plan, 'one_to_many')
@@ -1116,6 +1129,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     matchedCashBookIds: Array.from(matchedCbIds),
     matchedBankIds: Array.from(matchedBankIds),
     matches: matchList,
+    ingestBlock: await getProjectIngestBlock(projectId, bankAccountId),
   })
   } catch (e) {
     logger.error(
@@ -1176,6 +1190,8 @@ router.post('/:projectId/match/auto-complete', async (req: AuthRequest, res) => 
   }
   try {
     const bankAccountId = (req.query.bankAccountId as string) || undefined
+    const blocked = await ingestChecksumResponse(projectId, bankAccountId)
+    if (blocked) return res.status(blocked.status).json(blocked.body)
     const useDate = parseBooleanQuery(req.query.useDate, true)
     const useDocRef = parseBooleanQuery(req.query.useDocRef, true)
     const useChequeNo = parseBooleanQuery(req.query.useChequeNo, true)
@@ -1207,7 +1223,7 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'one_to_many') || !hasPlanFeature(org.plan, 'many_to_many')) {
+  if (!org || !(await planHasFeature(org.plan, 'one_to_many')) || !(await planHasFeature(org.plan, 'many_to_many'))) {
     return res.status(403).json({ error: 'One-to-many and many-to-many matching require Premium plan or higher.' })
   }
   const projectId = await resolveProjectId(req.params.projectId, orgId)
@@ -1220,6 +1236,8 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
     return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
+    const blocked = await ingestChecksumResponse(projectId)
+    if (blocked) return res.status(blocked.status).json(blocked.body)
     const body = multiMatchSchema.parse(req.body)
     let type: string
     const matchItems: { transactionId: string; side: string }[] = []
@@ -1277,7 +1295,7 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
 
     const shouldRememberSplit =
       (type === 'one_to_many' || type === 'many_to_one') &&
-      hasPlanFeature(org.plan, 'ai_suggestions')
+      (await planHasFeature(org.plan, 'ai_suggestions'))
     const cbTxs = shouldRememberSplit
       ? matchItems
           .filter((m) => m.side === 'cash_book')
@@ -1376,6 +1394,8 @@ router.post('/:projectId/match', async (req: AuthRequest, res) => {
     return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
+    const blocked = await ingestChecksumResponse(projectId)
+    if (blocked) return res.status(blocked.status).json(blocked.body)
     const body = matchSchema.parse(req.body)
     const cbTx = await prisma.transaction.findFirst({
       where: { id: body.cashBookTransactionId },
@@ -1397,7 +1417,7 @@ router.post('/:projectId/match', async (req: AuthRequest, res) => {
       where: { id: orgId },
       select: { plan: true },
     })
-    const shouldRemember = !!(org && hasPlanFeature(org.plan, 'ai_suggestions'))
+    const shouldRemember = !!(org && (await planHasFeature(org.plan, 'ai_suggestions')))
     const { match, remembered } = await prisma.$transaction(async (tx) => {
       const match = await tx.match.create({
         data: {
@@ -1474,7 +1494,7 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'bulk_match')) {
+  if (!org || !(await planHasFeature(org.plan, 'bulk_match'))) {
     return res.status(403).json({ error: 'Bulk match requires Standard plan or higher.' })
   }
   const projectId = await resolveProjectId(req.params.projectId, orgId)
@@ -1487,6 +1507,8 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     return res.status(403).json({ error: PROJECT_LOCKED_ERROR })
   }
   try {
+    const blocked = await ingestChecksumResponse(projectId)
+    if (blocked) return res.status(blocked.status).json(blocked.body)
     const body = bulkMatchSchema.parse(req.body)
     if (body.matches.length > BULK_MATCH_LIMIT) {
       return res.status(400).json({
@@ -1534,7 +1556,7 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
     }
-    const shouldRemember = hasPlanFeature(org.plan, 'ai_suggestions')
+    const shouldRemember = await planHasFeature(org.plan, 'ai_suggestions')
     const created = await prisma.$transaction(async (tx) => {
       const ids: { id: string }[] = []
       let rememberedCount = 0

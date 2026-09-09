@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canManageBilling } from '../lib/permissions.js'
-import { hasPlanFeature } from '../config/planFeatures.js'
+import { planHasFeature } from '../lib/planGate.js'
 import { generateApiKey, hashApiKey, getKeyPrefix } from '../lib/apiKey.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
@@ -34,7 +34,7 @@ async function requireApiAccessPlan(req: AuthRequest, res: import('express').Res
     where: { id: req.auth!.orgId },
     select: { plan: true },
   })
-  if (!org || !hasPlanFeature(org.plan, 'api_access')) {
+  if (!org || !(await planHasFeature(org.plan, 'api_access'))) {
     res.status(403).json({ error: 'API keys require Firm plan. Contact sales to upgrade.' })
     return false
   }

@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { prisma } from '../lib/prisma.js'
 import { sendOrgInvite } from './email.js'
 import { normalizeOrgMemberRole } from '../lib/orgMemberRole.js'
-import { getUserLimit } from '../config/planFeatures.js'
+import { planUserLimit } from '../lib/planGate.js'
 
 const INVITE_TTL_DAYS = 7
 
@@ -26,7 +26,7 @@ export async function createOrganizationInvite(opts: {
   })
   if (!org) return { ok: false, error: 'Organization not found', status: 404 }
 
-  const limit = getUserLimit(org.plan)
+  const limit = await planUserLimit(org.plan)
   if (limit >= 0) {
     const [memberCount, pendingCount] = await Promise.all([
       prisma.organizationMember.count({ where: { organizationId: opts.orgId } }),

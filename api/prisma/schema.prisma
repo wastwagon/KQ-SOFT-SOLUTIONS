@@ -52,6 +52,11 @@ model Plan {
   transactionsPerMonth Int      @map("transactions_per_month") // -1 = unlimited
   monthlyGhs           Float    @map("monthly_ghs") @default(0)
   yearlyGhs            Float    @map("yearly_ghs") @default(0)
+  quarterlyGhs         Float    @map("quarterly_ghs") @default(0)
+  bankAccounts         Int      @map("bank_accounts") @default(5) // -1 = unlimited
+  cleanExportsPerMonth Int      @map("clean_exports_per_month") @default(5) // -1 = unlimited
+  usersLimit           Int      @map("users_limit") @default(1) // -1 = unlimited
+  features             Json?    // Record<PlanFeature, boolean> — CMS overrides
   active               Boolean  @default(true)
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
@@ -74,6 +79,8 @@ model Organization {
   branding         Json?     // { logoUrl?, primaryColor?, secondaryColor?, letterheadAddress?, reportTitle?, footer? }
   suspendedAt      DateTime? @map("suspended_at") // set = org disabled
   introOfferUsedAt DateTime? @map("intro_offer_used_at") // set when 50% intro offer was applied
+  /// Default statement import locale: { dateOrder: 'dmy'|'mdy', decimalStyle: 'us'|'eu' }. Null = Ghana DMY + US decimals.
+  importLocale     Json?     @map("import_locale")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -319,6 +326,8 @@ model Document {
   excelSheetIndex    Int?      @map("excel_sheet_index")
   /// Canonical field → column index from last successful map.
   columnMapping      Json?     @map("column_mapping")
+  /// Safe ingest: checksum, locale, detected bank, auto-map skip reason.
+  ingestMeta         Json?     @map("ingest_meta")
   createdAt      DateTime     @default(now()) @map("created_at")
 
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -409,7 +418,7 @@ model Payment {
   plan           String
   period         String   // monthly | quarterly | yearly
   reference      String?  @unique
-  status         String   @default("success") // success | failed | refunded
+  status         String   @default("success") // pending | success | failed | refunded
   paystackData   Json?    @map("paystack_data")
   createdAt      DateTime @default(now()) @map("created_at")
 

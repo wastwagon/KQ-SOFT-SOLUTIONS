@@ -28,7 +28,7 @@ import attachmentsRoutes from './routes/attachments.js';
 import documentsRoutes from './routes/documents.js';
 import reconcileRoutes from './routes/reconcile.js';
 import reportRoutes from './routes/report.js';
-import subscriptionRoutes, { handlePaystackWebhook } from './routes/subscription.js';
+import subscriptionRoutes, { handlePaystackReturnRedirect, handlePaystackWebhook } from './routes/subscription.js';
 import bankRulesRoutes from './routes/bank-rules.js';
 import bankAccountsRoutes from './routes/bank-accounts.js';
 import currencyRoutes from './routes/currency.js';
@@ -108,14 +108,20 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', REQUEST_ID_HEADER],
   exposedHeaders: [REQUEST_ID_HEADER],
 }))
-// Paystack webhook — no auth; must be before subscription router
-app.post('/api/v1/subscription/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => {
-  try {
-    await handlePaystackWebhook(req, res)
-  } catch (err) {
-    next(err)
-  }
-});
+// Paystack webhook — no auth; must be before JSON parser so the HMAC uses raw bytes.
+app.post(
+  '/api/v1/subscription/webhook',
+  express.raw({ type: '*/*', limit: '1mb' }),
+  async (req, res, next) => {
+    try {
+      await handlePaystackWebhook(req, res)
+    } catch (err) {
+      next(err)
+    }
+  },
+)
+// If Paystack dashboard callback is pointed at the API, bounce the user to Billing.
+app.get('/api/v1/subscription/callback', handlePaystackReturnRedirect)
 app.use(express.json());
 
 // Liveness / readiness probes.
@@ -180,6 +186,9 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, `BRS API listening`);
+  void import('./services/plan.js')
+    .then(({ refreshPlanCache }) => refreshPlanCache())
+    .catch((err) => logger.warn({ err }, 'plan cache failed to warm'));
   void import('./lib/parseJobQueue.js')
     .then(({ startParseJobWorker, parseJobInApi }) => {
       if (parseJobInApi()) {
