@@ -218,11 +218,16 @@ export function findHeaderRow(data: unknown[][]): number {
   return bestScore === Number.NEGATIVE_INFINITY ? 0 : bestIndex
 }
 
-export function detectFileType(filepath: string): 'excel' | 'csv' | 'pdf' | 'image' {
+export function detectFileType(
+  filepath: string
+): 'excel' | 'csv' | 'pdf' | 'image' | 'ofx' | 'mt940' | 'camt' {
   const ext = path.extname(filepath).toLowerCase()
   if (['.xlsx', '.xls', '.xlsm'].includes(ext)) return 'excel'
   if (ext === '.csv') return 'csv'
   if (ext === '.pdf') return 'pdf'
+  if (ext === '.ofx' || ext === '.qfx') return 'ofx'
+  if (ext === '.mt940' || ext === '.sta' || ext === '.swift') return 'mt940'
+  if (ext === '.xml' || ext === '.camt') return 'camt'
   if (['.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp'].includes(ext)) return 'image'
   throw new Error('Unsupported file type')
 }

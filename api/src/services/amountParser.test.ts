@@ -10,6 +10,10 @@ describe('parseImportedAmount', () => {
     expect(parseImportedAmount('1,234.56')).toBe(1234.56)
   })
 
+  it('parses European decimal amounts when locale is eu', () => {
+    expect(parseImportedAmount('1.234,56', { dateOrder: 'dmy', decimalStyle: 'eu' })).toBe(1234.56)
+  })
+
   it('parses accounting bracket negatives', () => {
     expect(parseImportedAmount('(1,234.56)')).toBe(-1234.56)
   })

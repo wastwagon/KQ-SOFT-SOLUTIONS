@@ -18,6 +18,7 @@ import { applyDocumentMapping, sanitizeMapping, validateMapping } from '../servi
 import {
   buildSuggestedMappingForDocument,
   trimMappingForDocumentType,
+  canAutoMap,
 } from '../services/autoMapDocument.js'
 import { MAP_PREVIEW_ROW_SAMPLE } from '../config/importLimits.js'
 import { inferAdaptiveMapping } from '../services/adaptiveColumnInference.js'
@@ -37,6 +38,15 @@ import { TRANSACTION_DATE_ORDER_BY } from '../lib/transactionDateOrder.js'
 import { isOcrGateError } from '../lib/ocrGate.js'
 import { markDocumentParseReady } from '../lib/documentParseJob.js'
 import { incOpsMetric, observeParseQuality } from '../lib/opsMetrics.js'
+import { parseImportLocale, DEFAULT_IMPORT_LOCALE } from '../services/importLocale.js'
+import { evaluateStatementChecksum } from '../services/statementBalanceChecksum.js'
+import {
+  isUnknownPdfParse,
+  isTrustedAutoMapSource,
+  autoMapSkipMessage,
+  checksumShouldBlockOnFailure,
+} from '../services/ingestSafety.js'
+import { mergeDocumentIngestMeta, acknowledgeIngestChecksum, readIngestMeta } from '../services/ingestMeta.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -94,6 +104,14 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
     if (!doc.type.startsWith('cash_book_')) {
       detectedBankFormat = resolveDetectedBankFormat(result.headers, sample, result.parseMethod)
     }
+    const locale = parseImportLocale(
+      (
+        await prisma.organization.findUnique({
+          where: { id: orgId },
+          select: { importLocale: true },
+        })
+      )?.importLocale
+    )
     let parseSummary: { rowCount: number; sumDebit?: number; sumCredit?: number } | undefined
     if (!doc.type.startsWith('cash_book_') && result.rows.length > 0) {
       const debitCol = result.headers.findIndex((h) => /^debit$/i.test(String(h)))
@@ -102,11 +120,11 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
         rowCount: result.rows.length,
         sumDebit:
           debitCol >= 0
-            ? result.rows.reduce((s, r) => s + parseImportedAmount(r[debitCol]), 0)
+            ? result.rows.reduce((s, r) => s + parseImportedAmount(r[debitCol], locale), 0)
             : undefined,
         sumCredit:
           creditCol >= 0
-            ? result.rows.reduce((s, r) => s + parseImportedAmount(r[creditCol]), 0)
+            ? result.rows.reduce((s, r) => s + parseImportedAmount(r[creditCol], locale), 0)
             : undefined,
       }
     }
@@ -251,6 +269,47 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
       parseQualityScore: result.parseQualityScore,
       ocrRetried: result.ocrRetried || undefined,
       parseQualityNotes: result.parseQualityNotes,
+      ingestSafety: (() => {
+        const policy = { detectedBankFormat, parseMethod: result.parseMethod }
+        const unknownPdf =
+          !doc.type.startsWith('cash_book_') &&
+          isUnknownPdfParse(result.parseMethod, detectedBankFormat)
+        const checksum = doc.type.startsWith('cash_book_')
+          ? undefined
+          : evaluateStatementChecksum({
+              headers: result.headers,
+              rows: result.rows,
+              openingBalance: result.openingBalance,
+              closingBalance: result.closingBalance,
+              locale,
+              blockOnFailure: checksumShouldBlockOnFailure(detectedBankFormat, result.parseMethod),
+            })
+        const wouldAutoMap = canAutoMap(
+          doc.type,
+          result.headers,
+          suggestedMapping,
+          result.rows.slice(0, 250),
+          policy
+        )
+        const skipReason = unknownPdf
+          ? 'unknown_pdf'
+          : wouldAutoMap
+            ? null
+            : isTrustedAutoMapSource(policy)
+              ? 'low_confidence'
+              : 'unknown_requires_high'
+        const stored = readIngestMeta(doc.ingestMeta)
+        return {
+          unknownPdf,
+          trustedSource: isTrustedAutoMapSource(policy),
+          wouldAutoMap,
+          skipReason,
+          skipMessage: skipReason ? autoMapSkipMessage(skipReason) : undefined,
+          checksum,
+          checksumAcknowledged: stored.checksumAcknowledged === true,
+          importLocale: stored.locale || locale || DEFAULT_IMPORT_LOCALE,
+        }
+      })(),
     })
   } catch (e) {
     if (isOcrGateError(e)) {
@@ -260,10 +319,16 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
     const fileType = detectFileType(doc.filepath)
     const hint =
       fileType === 'pdf'
-        ? ' PDF may be scanned—ensure it contains extractable text.'
+        ? ' PDF may be scanned—ensure it contains extractable text, or export Excel, CSV, OFX, MT940, or CAMT.053 from internet banking.'
         : fileType === 'image'
           ? ' Image may be low quality or contains non-Latin text.'
-          : ''
+          : fileType === 'ofx'
+            ? ' OFX/QFX should contain STMTTRN transactions from the bank export.'
+            : fileType === 'mt940'
+              ? ' MT940 should contain :61: transaction lines from the bank export.'
+              : fileType === 'camt'
+                ? ' CAMT XML should be a bank-to-customer statement (camt.053) with Ntry entries.'
+                : ''
     res.status(400).json({ error: msg + hint })
   }
 })
@@ -271,6 +336,13 @@ router.get('/:id/preview', async (req: AuthRequest, res) => {
 const mapSchema = z.object({
   mapping: z.record(z.string(), z.union([z.number(), z.string()])),
   sheetIndex: z.number().optional(),
+  locale: z
+    .object({
+      dateOrder: z.enum(['dmy', 'mdy']).optional(),
+      decimalStyle: z.enum(['us', 'eu']).optional(),
+    })
+    .optional(),
+  saveLocaleAsOrgDefault: z.boolean().optional(),
 })
 
 router.post('/:id/map', async (req: AuthRequest, res) => {
@@ -317,6 +389,7 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
     if (err) return res.status(400).json({ error: err })
 
     const previousTxCount = await prisma.transaction.count({ where: { documentId: id } })
+    const locale = parseImportLocale(body.locale ?? org.importLocale)
     const applied = await applyDocumentMapping(
       id,
       doc.type,
@@ -324,7 +397,8 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
       mapping,
       doc.project.organizationId,
       doc.projectId,
-      org.plan
+      org.plan,
+      { locale }
     )
     await logAudit({
       organizationId: doc.project.organizationId,
@@ -354,9 +428,37 @@ router.post('/:id/map', async (req: AuthRequest, res) => {
         columnMapping: mapping as object,
       },
     })
+    const detectedBank =
+      doc.type.startsWith('cash_book_')
+        ? null
+        : resolveDetectedBankFormat(result.headers, result.rows.slice(0, 20), result.parseMethod)
+    const checksum = doc.type.startsWith('cash_book_')
+      ? undefined
+      : evaluateStatementChecksum({
+          headers: result.headers,
+          rows: result.rows,
+          openingBalance: result.openingBalance,
+          closingBalance: result.closingBalance,
+          locale,
+          blockOnFailure: checksumShouldBlockOnFailure(detectedBank, result.parseMethod),
+        })
+    await mergeDocumentIngestMeta(id, {
+      detectedBankFormat: detectedBank,
+      parseMethod: result.parseMethod,
+      autoMap: { status: 'mapped' },
+      checksum,
+      locale,
+    }).catch(() => undefined)
+    if (body.saveLocaleAsOrgDefault) {
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: { importLocale: locale as object },
+      })
+    }
     await markDocumentParseReady(id, `Mapped ${applied.count} transaction(s)`).catch(() => undefined)
     res.json({
       count: applied.count,
+      checksum,
       importStats: {
         sourceRowCount: applied.sourceRowCount,
         importedCount: applied.count,
@@ -404,6 +506,23 @@ router.get('/:id/parse-status', async (req: AuthRequest, res) => {
     type: doc.type,
     filename: doc.filename,
   })
+})
+
+router.post('/:id/acknowledge-ingest-checksum', async (req: AuthRequest, res) => {
+  const role = req.auth!.role
+  if (!canMapDocuments(role)) {
+    return res.status(403).json({ error: 'Insufficient permission' })
+  }
+  const { id } = req.params
+  const orgId = req.auth!.orgId
+  try {
+    const meta = await acknowledgeIngestChecksum({ documentId: id, organizationId: orgId })
+    res.json({ ok: true, ingestMeta: meta })
+  } catch (e) {
+    const err = e as Error & { status?: number }
+    if (err.status === 404) return res.status(404).json({ error: err.message })
+    res.status(500).json({ error: err.message || 'Could not confirm the extract' })
+  }
 })
 
 const changeTypeSchema = z.object({

@@ -10,7 +10,7 @@ import {
   getSuggestedBankMapping,
   type GhanaBankFormat,
 } from './ghanaBankParsers.js'
-import { buildSmartSuggestedMapping, getMappingConfidence, type MappingConfidence } from './suggestedMapping.js'
+import { buildSmartSuggestedMapping, getMappingConfidence } from './suggestedMapping.js'
 import { applyDocumentMapping, sanitizeMapping } from './applyDocumentMapping.js'
 import { pickBestExcelSheetIndex } from './cashBookExcel.js'
 import { inferAdaptiveMapping } from './adaptiveColumnInference.js'
@@ -30,14 +30,22 @@ import {
   markDocumentParseReady,
 } from '../lib/documentParseJob.js'
 import { incOpsMetric, observeParseQuality } from '../lib/opsMetrics.js'
+import {
+  fieldConfidenceAllowsAutoMap,
+  isTrustedAutoMapSource,
+  isUnknownPdfParse,
+  resolveAutoMapSkipReason,
+  autoMapSkipMessage,
+  checksumShouldBlockOnFailure,
+  type AutoMapPolicy,
+} from './ingestSafety.js'
+import { parseImportLocale } from './importLocale.js'
+import { evaluateStatementChecksum } from './statementBalanceChecksum.js'
+import { mergeDocumentIngestMeta } from './ingestMeta.js'
 
 const AUTO_MAP = process.env.AUTO_MAP_ON_UPLOAD !== 'false'
 /** Opt-in: auto-correct misfiled cash-book ↔ bank uploads (clears bankAccountId when flipping to cash book). */
 const AUTO_CORRECT_DOC_TYPE = process.env.AUTO_CORRECT_DOC_TYPE === 'true'
-
-function isHighOrMedium(c: MappingConfidence | undefined): boolean {
-  return c === 'high' || c === 'medium'
-}
 
 export function buildSuggestedMappingForDocument(
   docType: DocumentType,
@@ -105,8 +113,11 @@ export function canAutoMap(
   docType: DocumentType,
   headers: string[],
   suggested: Record<string, number>,
-  sampleRows: unknown[][] = []
+  sampleRows: unknown[][] = [],
+  policy?: AutoMapPolicy
 ): boolean {
+  if (docType.startsWith('cash_book_')) policy = undefined
+  if (policy && isUnknownPdfParse(policy.parseMethod, policy.detectedBankFormat)) return false
   if (headers.length < 2) return false
   const isCashBook = docType.startsWith('cash_book_')
   const dateField = isCashBook ? 'date' : 'transaction_date'
@@ -123,12 +134,13 @@ export function canAutoMap(
   const adaptive = sampleRows.length
     ? inferAdaptiveMapping(docType, headers, sampleRows)
     : null
+  const requireHigh = Boolean(policy) && !isTrustedAutoMapSource(policy)
   const adaptiveSupports = (field: string): boolean =>
     adaptive?.mapping[field] === suggested[field] &&
-    isHighOrMedium(adaptive.confidence[field])
+    fieldConfidenceAllowsAutoMap(adaptive.confidence[field], requireHigh)
   if (
-    (!isHighOrMedium(confidence[dateField]) && !adaptiveSupports(dateField)) ||
-    (!isHighOrMedium(confidence[amountField]) && !adaptiveSupports(amountField))
+    (!fieldConfidenceAllowsAutoMap(confidence[dateField], requireHigh) && !adaptiveSupports(dateField)) ||
+    (!fieldConfidenceAllowsAutoMap(confidence[amountField], requireHigh) && !adaptiveSupports(amountField))
   ) {
     return false
   }
@@ -154,7 +166,7 @@ export type AutoMapOutcome =
 /** Parse file, apply suggested mapping when safe. Does not throw — for use after upload. */
 export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOutcome> {
   if (!AUTO_MAP) {
-    await markDocumentParseReady(documentId, 'Auto-map disabled — map manually').catch(() => undefined)
+    await markDocumentParseReady(documentId, autoMapSkipMessage('disabled')).catch(() => undefined)
     incOpsMetric('parse.auto_map_skipped', {
       detail: { reason: 'disabled', documentId },
     })
@@ -255,17 +267,43 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
       trimMappingForDocumentType(docType, learned.mapping),
       parsed.headers.length
     )
-    if (!canAutoMap(docType, parsed.headers, mapping, parsed.rows.slice(0, 250))) {
-      await markDocumentParseReady(
-        documentId,
-        'Mapping confidence too low — map manually'
-      ).catch(() => undefined)
+    const policy: AutoMapPolicy = {
+      detectedBankFormat,
+      parseMethod: parsed.parseMethod,
+    }
+    const locale = parseImportLocale(doc.project.organization.importLocale)
+    const checksum = docType.startsWith('cash_book_')
+      ? undefined
+      : evaluateStatementChecksum({
+          headers: parsed.headers,
+          rows: parsed.rows,
+          openingBalance: parsed.openingBalance,
+          closingBalance: parsed.closingBalance,
+          locale,
+          blockOnFailure: checksumShouldBlockOnFailure(detectedBankFormat, parsed.parseMethod),
+        })
+    const mappedOk = canAutoMap(docType, parsed.headers, mapping, parsed.rows.slice(0, 250), policy)
+    const skipReason = docType.startsWith('cash_book_')
+      ? mappedOk
+        ? null
+        : 'low_confidence'
+      : resolveAutoMapSkipReason(mappedOk, policy)
+    if (skipReason) {
+      const message = autoMapSkipMessage(skipReason)
+      await mergeDocumentIngestMeta(documentId, {
+        detectedBankFormat,
+        parseMethod: parsed.parseMethod,
+        autoMap: { status: 'skipped', reason: skipReason },
+        checksum,
+        locale,
+      }).catch(() => undefined)
+      await markDocumentParseReady(documentId, message).catch(() => undefined)
       incOpsMetric('parse.auto_map_skipped', {
-        detail: { reason: 'low_confidence', documentId },
+        detail: { reason: skipReason, documentId },
       })
       return {
         status: 'skipped',
-        reason: 'mapping confidence too low — map manually',
+        reason: message,
         typeCorrected,
         typeInference,
       }
@@ -277,7 +315,8 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
       mapping,
       doc.project.organizationId,
       doc.projectId,
-      doc.project.organization.plan
+      doc.project.organization.plan,
+      { locale }
     )
     if (learned.match) {
       await touchLayoutMemoryUse(learned.match.id).catch(() => undefined)
@@ -289,6 +328,13 @@ export async function tryAutoMapDocument(documentId: string): Promise<AutoMapOut
         columnMapping: mapping as object,
       },
     })
+    await mergeDocumentIngestMeta(documentId, {
+      detectedBankFormat,
+      parseMethod: parsed.parseMethod,
+      autoMap: { status: 'mapped' },
+      checksum,
+      locale,
+    }).catch(() => undefined)
     await markDocumentParseReady(
       documentId,
       `Auto-mapped ${result.count} transaction(s)`

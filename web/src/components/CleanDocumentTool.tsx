@@ -13,6 +13,7 @@ import {
 } from '../lib/api'
 import { getStoredDateOrder, setStoredDateOrder, type DateOrder } from '../lib/transactionDateOrder'
 import DateOrderToggle from './DateOrderToggle'
+import { PROJECT_UPLOAD_ACCEPT } from '../lib/uploadConstraints'
 import { useToast } from './ui/Toast'
 import Alert from './ui/Alert'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from './ui/Table'
@@ -46,13 +47,13 @@ const COPY: Record<
     title: 'Clean bank statement',
     eyebrow: 'Tools',
     blurb: 'Same parsers as project uploads. Download a watermarked sample, or a full Excel/PDF on your plan.',
-    acceptHint: 'PDF, Excel (.xlsx / .xls / .xlsm), CSV, or image',
+    acceptHint: 'PDF, Excel, CSV, OFX/QFX, MT940, CAMT.053, or image',
   },
   'cash-book': {
     title: 'Clean cash book',
     eyebrow: 'Tools',
     blurb: 'Same cash-book parsers as project uploads. Download a watermarked sample, or a full Excel/PDF on your plan.',
-    acceptHint: 'Excel (.xlsx / .xls / .xlsm), CSV, PDF, or image',
+    acceptHint: 'Excel, CSV, PDF, OFX/QFX, or image',
   },
 }
 
@@ -175,7 +176,7 @@ export default function CleanDocumentTool({ kind }: { kind: CleanToolKind }) {
           id={inputId}
           type="file"
           className="sr-only"
-          accept=".pdf,.xlsx,.xls,.xlsm,.csv,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
+          accept={PROJECT_UPLOAD_ACCEPT}
           onChange={(e) => {
             const f = e.target.files?.[0]
             if (f) void runPreview(f)

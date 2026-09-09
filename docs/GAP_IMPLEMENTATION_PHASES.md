@@ -514,7 +514,7 @@ model ApiKey {
 ### Notes
 
 - Ghana Open Banking / bank APIs are limited
-- Options: aggregators (Plaid-style), manual OFX/CSV import improvements, direct bank partnerships
+- Options: aggregators (Plaid-style), direct bank partnerships. **OFX/QFX, MT940, and CAMT.053 file import is already supported** on Upload / Map (no live bank feed).
 - Defer until Phases 1–10 are live and stable
 
 ---

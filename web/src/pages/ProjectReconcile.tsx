@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, ChevronDown } from 'lucide-react'
 import BrsHelp from '../components/BrsHelp'
 import ConfirmedMatchesPanel from '../components/reconcile/ConfirmedMatchesPanel'
@@ -18,6 +18,8 @@ import Button from '../components/ui/Button'
 import Alert from '../components/ui/Alert'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 import { ghanaBankProfileTip } from '../lib/ghanaBankProfileTips'
+import { documents, unlessSubscriptionInactive } from '../lib/api'
+import { useToast } from '../components/ui/Toast'
 
 /**
  * Orchestrator for the reconcile step of the BRS workflow.
@@ -75,6 +77,25 @@ export default function ProjectReconcile({
     reconcileLimit,
     loadMore,
   } = session
+
+  const toast = useToast()
+  const ingestBlock = data?.ingestBlock
+  const matchingAllowed = canReconcile && !ingestBlock?.blocked
+  const ackChecksumMutation = useMutation({
+    mutationFn: async () => {
+      const id = ingestBlock?.documents?.[0]?.id
+      if (!id) throw new Error('No statement to acknowledge')
+      return documents.acknowledgeIngestChecksum(id)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+      toast.success('Extract confirmed — you can match after checking the lines')
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error(e instanceof Error ? e.message : 'Could not confirm the extract')
+      ),
+  })
 
   const matches = useMemo<MatchedPair[]>(() => (data?.matches ?? []) as MatchedPair[], [data?.matches])
   const receipts = useMemo<Tx[]>(() => data?.receipts?.transactions ?? [], [data?.receipts?.transactions])
@@ -160,7 +181,7 @@ export default function ProjectReconcile({
   // Decide which match mutation fires for the current selection.
   const cbArr = Array.from(selectedCbIds)
   const bankArr = Array.from(selectedBankIds)
-  const canMatchInView = view !== 'all'
+  const canMatchInView = view !== 'all' && matchingAllowed
   const hasMultiMatch = !!features.one_to_many && !!features.many_to_many
   const canMatch1to1 = canMatchInView && cbArr.length === 1 && bankArr.length === 1
   const canMatch1toMany = canMatchInView && hasMultiMatch && cbArr.length === 1 && bankArr.length >= 2
@@ -210,6 +231,29 @@ export default function ProjectReconcile({
 
   return (
     <div className="space-y-6">
+      {ingestBlock?.blocked && (
+        <Alert
+          tone="error"
+          title="Matching is paused — opening and closing balances do not tie"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              isLoading={ackChecksumMutation.isPending}
+              onClick={() => ackChecksumMutation.mutate()}
+            >
+              I have checked the extract
+            </Button>
+          }
+        >
+          <p>{ingestBlock.message}</p>
+          {ingestBlock.documents[0]?.message &&
+            ingestBlock.documents[0].message !== ingestBlock.message && (
+              <p className="mt-2 text-xs opacity-90">{ingestBlock.documents[0].message}</p>
+            )}
+        </Alert>
+      )}
       <WorkflowStepIntro
         eyebrow="Match"
         title="Reconcile transactions"
@@ -297,7 +341,7 @@ export default function ProjectReconcile({
         </ReconcileNotices>
       )}
 
-      {canReconcile && (
+      {canReconcile && matchingAllowed && (
         <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 max-w-2xl">
           <summary className="cursor-pointer font-semibold text-slate-800">Matching tips</summary>
           <p className="mt-2 leading-relaxed">
@@ -308,7 +352,7 @@ export default function ProjectReconcile({
         </details>
       )}
 
-      {canReconcile && showCountMatch && (
+      {canReconcile && matchingAllowed && showCountMatch && (
         <CountMatchPanel
           projectId={projectId}
           projectName={(data.project as { name?: string } | undefined)?.name}
@@ -327,7 +371,7 @@ export default function ProjectReconcile({
         />
       )}
 
-      {suggestions.length > 0 && canReconcile && (
+      {suggestions.length > 0 && matchingAllowed && (
         <SuggestedMatchesPanel
           suggestions={suggestions}
           currency={currency}
@@ -352,7 +396,7 @@ export default function ProjectReconcile({
         />
       )}
 
-      {splitSuggestions.length > 0 && canReconcile && (
+      {splitSuggestions.length > 0 && matchingAllowed && (
         <SplitSuggestionsPanel
           suggestions={splitSuggestions}
           currency={currency}
@@ -383,7 +427,7 @@ export default function ProjectReconcile({
         />
       )}
 
-      {canMatch && canReconcile && (
+      {canMatch && matchingAllowed && (
         <MatchActionBar
           cbCount={cbArr.length}
           bankCount={bankArr.length}

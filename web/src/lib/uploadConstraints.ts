@@ -15,6 +15,13 @@ export const PROJECT_DOCUMENT_ALLOWED_EXTENSIONS = [
   '.xlsm',
   '.csv',
   '.pdf',
+  '.ofx',
+  '.qfx',
+  '.mt940',
+  '.sta',
+  '.swift',
+  '.xml',
+  '.camt',
   '.png',
   '.jpg',
   '.jpeg',
@@ -52,3 +59,5 @@ export function validateProjectUploadFiles(
 }
 
 export const PROJECT_UPLOAD_LIMITS_SUMMARY = `Up to ${safeMb} MB per file. Allowed: ${PROJECT_DOCUMENT_ALLOWED_EXTENSIONS.join(', ')}.`
+
+export const PROJECT_UPLOAD_ACCEPT = PROJECT_DOCUMENT_ALLOWED_EXTENSIONS.join(',')

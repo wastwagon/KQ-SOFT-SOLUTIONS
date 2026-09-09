@@ -116,6 +116,12 @@ interface ReconcileApiResponse {
     workbookNetting?: boolean
   } | null
   project?: { currency?: string }
+  ingestBlock?: {
+    blocked: true
+    code: 'INGEST_CHECKSUM_FAILED'
+    message: string
+    documents: { id: string; filename: string; message?: string }[]
+  } | null
 }
 
 export interface ReconcileSession {

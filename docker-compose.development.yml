@@ -37,7 +37,7 @@ services:
         condition: service_started
     # Fresh DBs have no baseline migration; migrate deploy fails on add_project_slug
     # (projects table missing). db push matches production empty-DB bootstrap.
-    command: sh -c "npx prisma generate && npx prisma db push --skip-generate && npm run dev"
+    command: sh -c "./node_modules/.bin/prisma generate && ./node_modules/.bin/prisma db push --skip-generate && npm run dev"
     restart: unless-stopped
 
   parse-worker:
@@ -60,7 +60,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    command: sh -c "npx prisma generate && npm run worker:parse"
+    command: sh -c "./node_modules/.bin/prisma generate && npm run worker:parse"
     restart: unless-stopped
 
   web:

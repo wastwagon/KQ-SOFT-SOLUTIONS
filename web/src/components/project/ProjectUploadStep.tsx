@@ -8,7 +8,7 @@ import {
   isSubscriptionInactiveError,
   unlessSubscriptionInactive,
 } from '../../lib/api'
-import { PROJECT_UPLOAD_LIMITS_SUMMARY, validateProjectUploadFiles } from '../../lib/uploadConstraints'
+import { PROJECT_UPLOAD_LIMITS_SUMMARY, PROJECT_UPLOAD_ACCEPT, validateProjectUploadFiles } from '../../lib/uploadConstraints'
 import { canUploadDocuments } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
 import Button from '../ui/Button'
@@ -233,7 +233,7 @@ export default function ProjectUploadStep({
       <WorkflowStepIntro
         eyebrow="Upload"
         title="Upload documents"
-        subtitle="Upload a cash book and a bank statement (Excel, CSV, PDF, or image). Choose Both if one file has receipts and payments. Map columns next."
+        subtitle="Upload a cash book and a bank statement (Excel, CSV, OFX, MT940, CAMT, PDF, or image). Ghana bank PDFs often map automatically; other layouts are mapped on the next step."
       />
       <p className="text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
       {!canUpload && (
@@ -527,8 +527,6 @@ function SelectField({
   )
 }
 
-const UPLOAD_ACCEPT = '.xlsx,.xls,.xlsm,.csv,.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp'
-
 function FilePickerRow({
   files,
   onFiles,
@@ -554,7 +552,7 @@ function FilePickerRow({
         type="file"
         multiple
         className="sr-only"
-        accept={UPLOAD_ACCEPT}
+        accept={PROJECT_UPLOAD_ACCEPT}
         aria-label={ariaLabel}
         onChange={(e) => {
           onFiles(Array.from(e.target.files || []))

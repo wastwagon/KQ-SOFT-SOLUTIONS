@@ -40,7 +40,7 @@ Use this checklist when onboarding a new customer team:
 KQ BRS helps teams reconcile cash book entries with bank statements and generate professional Bank Reconciliation Statements.
 
 Core capabilities:
-- Upload cash book and bank files (Excel, CSV, PDF, image formats)
+- Upload cash book and bank files (Excel, CSV, OFX/QFX, MT940, CAMT.053, PDF, image formats)
 - Map columns once and extract transactions
 - Reconcile receipts vs credits and payments vs debits
 - Review exceptions and complete sign-off
@@ -332,7 +332,7 @@ Pre-built / auto-detected layouts (examples; generic Excel, CSV, and PDF always 
 | UBA | Header or content |
 | Absa | "absa" / "barclays" |
 
-If your bank is not auto-detected, use the **Map** step to map columns manually. Standard+ includes parser tuning support via your account team.
+If your bank is not auto-detected, use the **Map** step to map columns manually. Unrecognised PDFs are not applied automatically. Prefer Excel, CSV, OFX, MT940, or CAMT.053. Standard+ includes parser tuning support via your account team.
 
 ---
 
@@ -341,7 +341,7 @@ If your bank is not auto-detected, use the **Map** step to map columns manually.
 | Issue | Solution |
 |-------|----------|
 | Cannot log in | Check email/password; use Forgot password if email delivery is configured |
-| Upload fails | Prefer Excel/CSV; confirm file is not corrupted; check size limits |
+| Upload fails | Prefer Excel, CSV, OFX, MT940, or CAMT.053; confirm file is not corrupted; check size limits |
 | Parse / map errors | Fix date and amount columns; use Map step; see [Mapping guide](/mapping-and-matching-manual.md) |
 | No suggested matches | Standard plan or above; check mapping and matching presets |
 | Bank account limit reached | Org-wide seat limit — upgrade or archive unused accounts |

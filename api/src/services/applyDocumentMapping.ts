@@ -13,6 +13,8 @@ import { classifyBySourceSign, summarizeSignBuckets, type SourceDocumentType } f
 import { SIGN_WARNINGS_PREVIEW_MAX } from '../config/importLimits.js'
 import type { ParseResult } from './parser.js'
 import { purgeOrphanMatches } from './purgeOrphanMatches.js'
+import type { ImportLocale } from './importLocale.js'
+import { DEFAULT_IMPORT_LOCALE } from './importLocale.js'
 
 export type MappingInput = Record<string, number>
 
@@ -80,6 +82,10 @@ export type ApplyMappingResult = {
   signFilterSummary: ReturnType<typeof summarizeSignBuckets>
 }
 
+export type ApplyMappingOptions = {
+  locale?: ImportLocale
+}
+
 export async function applyDocumentMapping(
   documentId: string,
   docType: DocumentType,
@@ -87,10 +93,12 @@ export async function applyDocumentMapping(
   mapping: MappingInput,
   organizationId: string,
   projectId: string,
-  orgPlan: string
+  orgPlan: string,
+  options?: ApplyMappingOptions
 ): Promise<ApplyMappingResult> {
   const err = validateMapping(docType, mapping, result.headers.length)
   if (err) throw new Error(err)
+  const locale = options?.locale || DEFAULT_IMPORT_LOCALE
 
   const isCashBook = docType.startsWith('cash_book_')
   const dateField = isCashBook ? 'date' : 'transaction_date'
@@ -132,7 +140,7 @@ export async function applyDocumentMapping(
       const v = row[col]
       return v != null && String(v).trim() !== '' ? v : null
     }
-    const amount = parseImportedAmount(getVal(amountField))
+    const amount = parseImportedAmount(getVal(amountField), locale)
     let normalizedAmount = amount
     let includeRow = Math.abs(amount) > 0
     const tglSignedCol =
@@ -173,7 +181,7 @@ export async function applyDocumentMapping(
       const extracted = extractChqNoFromDescription(details)
       if (extracted) chqNo = extracted
     }
-    const fp = `${i}|${parseImportedDate(getVal(dateField))?.toISOString() ?? 'null'}|${normalizedAmount}|${(getVal('name') ?? '').toString().trim()}|${(details ?? '').trim()}|${(getVal('doc_ref') ?? '').toString().trim()}|${(chqNo ?? '').trim()}`
+    const fp = `${i}|${parseImportedDate(getVal(dateField), locale)?.toISOString() ?? 'null'}|${normalizedAmount}|${(getVal('name') ?? '').toString().trim()}|${(details ?? '').trim()}|${(getVal('doc_ref') ?? '').toString().trim()}|${(chqNo ?? '').trim()}`
     if (duplicateRowFingerprints.has(fp)) {
       skippedDuplicateRows++
       continue
@@ -181,7 +189,7 @@ export async function applyDocumentMapping(
     duplicateRowFingerprints.add(fp)
     transactions.push({
       rowIndex: i + 1,
-      date: parseImportedDate(getVal(dateField)),
+      date: parseImportedDate(getVal(dateField), locale),
       name: getVal('name') != null ? String(getVal('name')) : null,
       details,
       docRef: getVal('doc_ref') != null ? String(getVal('doc_ref')) : null,

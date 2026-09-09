@@ -29,6 +29,20 @@ describe('detectGhanaBankFormat', () => {
     expect(format).toBeNull()
   })
 
+  it('does not treat generic Date/Description/Debit/Credit as Ecobank', () => {
+    const headers = ['Date', 'Description', 'Debit', 'Credit', 'Reference']
+    const rows = [['2026-01-02', 'Salary January', '', 200, 'SALJAN']]
+    expect(detectGhanaBankFormat(headers, rows)).toBeNull()
+  })
+
+  it('does not tag OFX/MT940/CAMT as a Ghana bank', () => {
+    const headers = ['Date', 'Description', 'Debit', 'Credit', 'Reference']
+    const rows = [['2026-01-02', 'FUNDS TRANSFER - INWARD SALARY', '', 200, 'SALJAN']]
+    expect(resolveDetectedBankFormat(headers, rows, 'mt940')).toBeNull()
+    expect(resolveDetectedBankFormat(headers, rows, 'ofx')).toBeNull()
+    expect(resolveDetectedBankFormat(headers, rows, 'camt')).toBeNull()
+  })
+
   it('detects Stanbic from header/content', () => {
     const headers = ['Value Date', 'Description', 'Credit', 'Debit']
     const rows = [['2025-01-06', 'Stanbic Bank transfer - SALARY PAYROLL', 50000, 0]]

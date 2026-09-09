@@ -33,7 +33,7 @@
 
 The Bank Reconciliation System (BRS) is a web-based SaaS application for accounting firms and finance teams. It helps you:
 
-- Upload cash books and bank statements (Excel, CSV, PDF, images)
+- Upload cash books and bank statements (Excel, CSV, OFX/QFX, MT940, CAMT.053, PDF, images)
 - Map columns to the correct fields
 - Reconcile receipts vs credits and payments vs debits with intelligent matching
 - Generate professional Bank Reconciliation Statements (BRS) with your branding
@@ -49,7 +49,7 @@ The system ships pre-built parsers for many regional bank statement layouts (wit
 
 | Feature | Description |
 |---------|-------------|
-| **Document upload** | Upload cash book and bank statement in Excel (.xlsx), CSV, PDF, or images (PNG, JPG, TIFF) |
+| **Document upload** | Upload cash book and bank statement in Excel (.xlsx), CSV, OFX/QFX, MT940, CAMT.053, PDF, or images (PNG, JPG, TIFF) |
 | **Multi-bank support** | One project can have multiple bank accounts; filter by account during reconcile and report |
 | **Column mapping** | Map your document columns to date, amount, description, reference, cheque number |
 | **1-to-1 matching** | Match a single cash book line to a single bank line |
@@ -224,7 +224,7 @@ Upload your cash book and bank statement.
 - **Payments** — Money paid out (expenses)
 - **Both** — If one file contains both, select "Both" and upload once
 
-**Supported formats:** Excel (.xlsx), CSV, PDF, images (PNG, JPG, TIFF).
+**Supported formats:** Excel (.xlsx), CSV, OFX/QFX, MT940, CAMT.053, PDF, images (PNG, JPG, TIFF).
 
 #### Bank Statement
 
@@ -236,8 +236,9 @@ Upload your cash book and bank statement.
 
 #### Tips
 
-- Use Excel or CSV for best parsing results.
-- Ghana bank formats (Ecobank, GCB, Access, etc.) are auto-detected.
+- Prefer Excel, CSV, OFX, MT940, or CAMT.053 for best results. Ghana bank PDFs (Ecobank, GCB, Access, and others listed below) are auto-detected.
+- Other bank PDFs are not applied automatically — map columns on the Map step, or export Excel/CSV/OFX/MT940/CAMT from internet banking.
+- On Map, set date format (DD/MM vs MM/DD) and amount format if the file is not Ghana style.
 - Ensure dates and amounts are in clear columns.
 
 ---
@@ -251,8 +252,9 @@ If any document has unmapped columns, the Map step will show them.
    - Select which column maps to **Amount Received** (amt_received) or **Amount Paid** (amt_paid) for cash book; **Credit** or **Debit** for bank
    - Select which column maps to **Description** (or Particulars, Narrative)
    - Optionally map **Reference** and **Cheque number**
-2. Click **Save mapping**. Similar files can reuse that column map; **Forget layout** on the Map banner stops suggesting it for future uploads (it does not unmap the current file).
-3. Proceed to **Reconcile**.
+2. If the file is not Ghana DD/MM, set **Date format** and **Amount format** before applying.
+3. Click **Save mapping**. Similar files can reuse that column map; **Forget layout** on the Map banner stops suggesting it for future uploads (it does not unmap the current file).
+4. Proceed to **Reconcile**. If opening and closing balances on an unrecognised statement do not tie, matching stays paused until you remap or confirm the extract.
 
 ---
 
@@ -479,7 +481,7 @@ The system auto-detects these bank statement formats (examples; generic CSV/Exce
 | UBA Ghana | Header or content contains "uba" |
 | Absa Ghana | Header or content contains "absa" or "barclays" |
 
-If your bank is not auto-detected, use the **Map** step to manually map columns.
+If your bank is not auto-detected, use the **Map** step to manually map columns. Unrecognised PDFs will not be applied automatically.
 
 ---
 

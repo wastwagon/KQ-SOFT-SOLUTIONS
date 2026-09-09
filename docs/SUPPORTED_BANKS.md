@@ -28,7 +28,9 @@ The BRS platform auto-detects bank statement formats for the following Ghanaian 
 
 ## Auto-mapping on upload
 
-When date and amount columns are detected with medium or high confidence, mapping is applied automatically after upload (`AUTO_MAP_ON_UPLOAD`, default on). Supported specimens in `corrected-bank-specimens-for-user/` are tested for this path.
+Recognised Ghana bank layouts (the table above) still auto-map when date and amount columns are medium or high confidence. Unrecognised PDFs are never auto-mapped. Unrecognised Excel/CSV auto-maps only at high confidence. OFX/QFX, SWIFT MT940, and ISO 20022 CAMT.053 are treated as structured bank exports.
+
+Supported Ghana specimens in `corrected-bank-specimens-for-user/` are tested for the Ghana auto-map path.
 
 ## Manual mapping
 
@@ -37,4 +39,8 @@ If your bank is not auto-detected, map columns manually in the Mapping step. The
 - **Credits**: Date, Description/Narrative/Particulars, Credit amount
 - **Debits**: Date, Description/Narrative/Particulars, Debit amount
 
-Export statements as Excel (`.xlsx`) or CSV for best results. PDF uploads are supported for the banks listed above with dedicated parsers.
+Export statements as Excel (`.xlsx`), CSV, **OFX/QFX**, **MT940** (`.mt940`, `.sta`, `.swift`), or **CAMT.053** (`.xml`, `.camt`) for best results. PDF uploads are auto-mapped only for the Ghana banks listed above with dedicated parsers. Unrecognised PDFs (including foreign banks) are not auto-mapped — map columns yourself, or export a structured file from internet banking.
+
+On Map you can set **date format** (DD/MM vs MM/DD) and **amount format** (1,234.56 vs 1.234,56). Ghana defaults stay in place unless you change them.
+
+If the file prints opening and closing balances, the platform checks that opening + credits − debits equals closing. A failed check on an unrecognised layout pauses matching until you remap or acknowledge the extract. Recognised Ghana parsers warn only — they do not block reconcile.

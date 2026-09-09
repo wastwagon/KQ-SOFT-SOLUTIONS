@@ -15,6 +15,7 @@
 # Disable P3009 auto-resolve: PRISMA_AUTO_RESOLVE_MIGRATIONS="" (empty)
 set -eu
 SCHEMA="./prisma/schema.prisma"
+PRISMA_BIN="${PRISMA_BIN:-./node_modules/.bin/prisma}"
 MAX_ROUNDS=8
 
 if [ "${NODE_ENV:-}" = "production" ]; then
@@ -32,7 +33,7 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 
 run_migrate() {
-  npx prisma migrate deploy --schema="$SCHEMA"
+  "$PRISMA_BIN" migrate deploy --schema="$SCHEMA"
 }
 
 # Prisma / Postgres wording varies slightly; keep patterns tight enough to avoid false positives.
@@ -44,15 +45,15 @@ log_suggests_missing_projects_table() {
 bootstrap_empty_schema() {
   echo "start-api: empty database (no projects table) — prisma db push + migrate resolve --applied (all)" >&2
   echo "start-api: set PRISMA_BOOTSTRAP_EMPTY_DB=0 to disable. Do not use on DBs with real data you need." >&2
-  printf '%s\n' 'DELETE FROM "_prisma_migrations";' | npx prisma db execute --stdin --schema="$SCHEMA" >&2 || true
-  npx prisma db push --schema="$SCHEMA" --skip-generate >&2
+  printf '%s\n' 'DELETE FROM "_prisma_migrations";' | "$PRISMA_BIN" db execute --stdin --schema="$SCHEMA" >&2 || true
+  "$PRISMA_BIN" db push --schema="$SCHEMA" --skip-generate >&2
   for name in $(ls -1 prisma/migrations 2>/dev/null | LC_ALL=C sort); do
     case "$name" in 20*) ;;
     *) continue ;;
     esac
     [ -d "prisma/migrations/$name" ] || continue
     echo "start-api: migrate resolve --applied $name" >&2
-    npx prisma migrate resolve --applied "$name" --schema="$SCHEMA" >&2
+    "$PRISMA_BIN" migrate resolve --applied "$name" --schema="$SCHEMA" >&2
   done
 }
 
@@ -124,12 +125,12 @@ try_p3009_recover() {
     # Partial apply: table already there → mark applied. Else roll back so deploy can re-run SQL.
     if migration_object_exists "$m"; then
       echo "start-api: P3009 — $m objects already exist; migrate resolve --applied" >&2
-      if npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
+      if "$PRISMA_BIN" migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
         resolved_any=1
       fi
     else
       echo "start-api: P3009 — resolving failed migration $m as rolled-back (will retry deploy)" >&2
-      if npx prisma migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2; then
+      if "$PRISMA_BIN" migrate resolve --rolled-back "$m" --schema="$SCHEMA" >&2; then
         resolved_any=1
       else
         # Never mark --applied when the migration object is missing — that leaves
@@ -198,7 +199,7 @@ ensure_organization_match_memories() {
   fi
 
   echo "start-api: organization_match_memories missing after migrate OK — applying $SQL_FILE" >&2
-  if ! npx prisma db execute --file "$SQL_FILE" --schema="$SCHEMA" >&2; then
+  if ! "$PRISMA_BIN" db execute --file "$SQL_FILE" --schema="$SCHEMA" >&2; then
     echo "start-api: WARN — db execute failed for organization_match_memories; continuing (soft-fail in API)" >&2
     return 0
   fi
@@ -214,12 +215,12 @@ ensure_organization_match_memories() {
     '      FOREIGN KEY ("organization_id") REFERENCES "organizations"("id")' \
     '      ON DELETE CASCADE ON UPDATE CASCADE;' \
     '  END IF;' \
-    'END $$;' | npx prisma db execute --stdin --schema="$SCHEMA" >&2 || true
+    'END $$;' | "$PRISMA_BIN" db execute --stdin --schema="$SCHEMA" >&2 || true
 
   if pg_table_exists organization_match_memories; then
     echo "start-api: organization_match_memories created" >&2
-    npx prisma migrate resolve --applied 20260727090000_ensure_organization_match_memories --schema="$SCHEMA" >&2 || true
-    npx prisma migrate resolve --applied 20260718110000_organization_match_memory --schema="$SCHEMA" >&2 || true
+    "$PRISMA_BIN" migrate resolve --applied 20260727090000_ensure_organization_match_memories --schema="$SCHEMA" >&2 || true
+    "$PRISMA_BIN" migrate resolve --applied 20260718110000_organization_match_memory --schema="$SCHEMA" >&2 || true
     return 0
   fi
 
@@ -239,7 +240,7 @@ try_mark_applied_on_already_exists() {
   resolved_any=0
   for m in $from_log; do
     echo "start-api: schema object already exists — migrate resolve --applied $m" >&2
-    if npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
+    if "$PRISMA_BIN" migrate resolve --applied "$m" --schema="$SCHEMA" >&2; then
       resolved_any=1
     fi
   done
@@ -275,8 +276,8 @@ while [ "$round" -lt "$MAX_ROUNDS" ]; do
   if [ "$progressed" -eq 0 ]; then
     echo "start-api: no automatic recovery applied; fix DB/migrations or env and redeploy." >&2
     echo "start-api: For P3009 on match_memory, in Coolify Terminal (api) run:" >&2
-    echo "start-api:   npx prisma migrate resolve --rolled-back 20260718110000_organization_match_memory --schema=./prisma/schema.prisma" >&2
-    echo "start-api:   npx prisma migrate deploy --schema=./prisma/schema.prisma" >&2
+    echo "start-api:   "$PRISMA_BIN" migrate resolve --rolled-back 20260718110000_organization_match_memory --schema=./prisma/schema.prisma" >&2
+    echo "start-api:   "$PRISMA_BIN" migrate deploy --schema=./prisma/schema.prisma" >&2
     exit 1
   fi
 

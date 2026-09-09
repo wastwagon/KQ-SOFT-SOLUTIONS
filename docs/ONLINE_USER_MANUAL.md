@@ -12,7 +12,7 @@
 KQ BRS helps your team reconcile cash book transactions against bank statements and produce professional Bank Reconciliation Statements (BRS).
 
 With this platform, you can:
-- upload cash book and bank files (Excel, CSV, PDF, image formats)
+- upload cash book and bank files (Excel, CSV, OFX/QFX, MT940, CAMT.053, PDF, image formats)
 - map columns once and reuse that setup
 - reconcile receipts vs credits, and payments vs debits
 - review exceptions and complete approval workflow

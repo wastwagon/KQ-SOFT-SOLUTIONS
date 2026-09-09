@@ -3,7 +3,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import * as XLSX from 'xlsx'
-import { parseCsv, parseExcel } from './parser.js'
+import { parseCsv, parseExcel, detectFileType } from './parser.js'
 
 const tempFiles: string[] = []
 
@@ -162,5 +162,17 @@ describe('parseCsv multi-row headers', () => {
     expect(parsed.headers.some((h) => /date/i.test(h))).toBe(true)
     expect(parsed.headers.some((h) => /debit/i.test(h))).toBe(true)
     expect(parsed.rows).toHaveLength(2)
+  })
+})
+
+describe('detectFileType', () => {
+  it('classifies structured interchange by extension', () => {
+    expect(detectFileType('stmt.ofx')).toBe('ofx')
+    expect(detectFileType('stmt.qfx')).toBe('ofx')
+    expect(detectFileType('stmt.mt940')).toBe('mt940')
+    expect(detectFileType('stmt.sta')).toBe('mt940')
+    expect(detectFileType('stmt.swift')).toBe('mt940')
+    expect(detectFileType('stmt.xml')).toBe('camt')
+    expect(detectFileType('stmt.camt')).toBe('camt')
   })
 })

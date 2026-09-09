@@ -136,7 +136,7 @@ export function getMappingIssues(
       issues.push({
         severity: 'warning',
         message: 'Ecobank Payments/Deposits layout detected.',
-        fix: 'Prefer Excel (.xlsx) bank exports, or re-upload — we normalize Payments→Debit and Deposits→Credit. Map Debit for bank debits doc and Credit for bank credits doc.',
+        fix: 'Prefer Excel (.xlsx), CSV, OFX, MT940, or CAMT.053 bank exports, or re-upload — we normalize Payments→Debit and Deposits→Credit. Map Debit for bank debits and Credit for bank credits.',
       })
     }
     if (isScbHeaders(h)) {

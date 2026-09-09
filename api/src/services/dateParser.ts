@@ -1,7 +1,11 @@
 /**
- * Parse dates from imports: ISO, DD/MM/YYYY, DD-Mon-YYYY, Excel serial numbers.
+ * Parse dates from imports: ISO, DD/MM/YYYY (default), MM/DD/YYYY, DD-Mon-YYYY, Excel serial.
+ * Ambiguous numeric dates (both parts ≤ 12) follow locale.dateOrder; default is Ghana DMY.
  */
-export function parseImportedDate(v: unknown): Date | null {
+import type { ImportLocale } from './importLocale.js'
+import { DEFAULT_IMPORT_LOCALE } from './importLocale.js'
+
+export function parseImportedDate(v: unknown, locale: ImportLocale = DEFAULT_IMPORT_LOCALE): Date | null {
   if (!v) return null
   if (v instanceof Date) return isNaN(v.getTime()) ? null : v
   const s = String(v).trim()
@@ -9,14 +13,31 @@ export function parseImportedDate(v: unknown): Date | null {
 
   const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/)
   if (dmy) {
-    const [, day, month, year, hh, mm, ss] = dmy
+    const a = parseInt(dmy[1]!, 10)
+    const b = parseInt(dmy[2]!, 10)
+    const year = parseInt(dmy[3]!, 10)
+    let day: number
+    let month: number
+    if (a > 12 && b <= 12) {
+      day = a
+      month = b
+    } else if (b > 12 && a <= 12) {
+      month = a
+      day = b
+    } else if (locale.dateOrder === 'mdy') {
+      month = a
+      day = b
+    } else {
+      day = a
+      month = b
+    }
     const d = new Date(
-      parseInt(year!, 10),
-      parseInt(month!, 10) - 1,
-      parseInt(day!, 10),
-      parseInt(hh || '0', 10),
-      parseInt(mm || '0', 10),
-      parseInt(ss || '0', 10)
+      year,
+      month - 1,
+      day,
+      parseInt(dmy[4] || '0', 10),
+      parseInt(dmy[5] || '0', 10),
+      parseInt(dmy[6] || '0', 10)
     )
     return isNaN(d.getTime()) ? null : d
   }

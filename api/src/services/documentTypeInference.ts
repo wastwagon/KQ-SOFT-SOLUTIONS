@@ -83,7 +83,9 @@ export function inferDocumentFamily(
     bank += 12
   }
 
-  const bankFormat = detectGhanaBankFormat(headers, options.sampleRows || [])
+  const method = (options.parseMethod || '').toLowerCase()
+  const structured = method === 'ofx' || method === 'mt940' || method === 'camt'
+  const bankFormat = structured ? null : detectGhanaBankFormat(headers, options.sampleRows || [])
   // detectGhanaBankFormat can false-positive on generic Date/Description layouts —
   // only trust it when headers already look bank-like.
   if (
@@ -96,10 +98,12 @@ export function inferDocumentFamily(
     reasons.push(`detected bank format: ${bankFormat}`)
   }
 
-  const method = (options.parseMethod || '').toLowerCase()
-  if (/_pdf$/.test(method) && method !== 'native_text') {
+  if (structured) {
+    bank += 50
+    reasons.push(`parse method ${method}`)
+  } else if (/_pdf$/.test(method) && method !== 'native_text') {
     // Dedicated bank PDF parsers
-    if (/ecobank|gcb|absa|prudential|uba|nib|adb|umb/.test(method)) {
+    if (/ecobank|gcb|absa|prudential|uba|nib|adb|umb|scb/.test(method)) {
       bank += 50
       reasons.push(`parse method ${method}`)
     }

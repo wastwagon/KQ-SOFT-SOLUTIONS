@@ -49,6 +49,15 @@ describe('documentTypeInference', () => {
     expect(result.confidence).toMatch(/high|medium/)
   })
 
+  it('treats OFX/MT940/CAMT as bank statements, not Ghana layouts', () => {
+    const headers = ['Date', 'Description', 'Debit', 'Credit', 'Reference']
+    const rows = [['2026-01-02', 'Salary January', '', 200, 'SALJAN']]
+    const result = inferDocumentFamily(headers, { sampleRows: rows, parseMethod: 'mt940' })
+    expect(result.family).toBe('bank_statement')
+    expect(result.reasons.some((r) => /mt940/.test(r))).toBe(true)
+    expect(result.reasons.some((r) => /detected bank format/.test(r))).toBe(false)
+  })
+
   it('remaps type while preserving receipt/payment side', () => {
     expect(remapDocumentTypeToFamily('cash_book_receipts', 'bank_statement')).toBe('bank_credits')
     expect(remapDocumentTypeToFamily('cash_book_payments', 'bank_statement')).toBe('bank_debits')

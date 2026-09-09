@@ -45,7 +45,7 @@ When creating a project, capture the **business name as on the bank statement**,
 Good source data makes mapping and matching much easier:
 
 - Use **one reporting period** per project (e.g. January 2026 only).
-- Prefer **Excel (.xlsx)** or **CSV** for highest accuracy. PDF and scanned images are supported but may need more review.
+- Prefer **Excel (.xlsx)**, **CSV**, **OFX/QFX**, **MT940**, or **CAMT.053** for highest accuracy. Ghana bank PDFs with dedicated parsers are also supported. Other PDFs and scans need a manual Map step.
 - Keep **dates** and **amounts** in dedicated columns.
 - Put **cheque numbers** and **references** in their own columns when possible.
 - Avoid duplicate header rows inside the data.
@@ -165,7 +165,7 @@ For supported banks, the system may:
 
 - Detect the bank format automatically (green badge on preview).
 - Suggest normalized column mappings.
-- Apply mapping on upload when confidence is medium or high.
+- Apply mapping on upload for recognised Ghana banks when confidence is medium or high. Unrecognised PDFs are not auto-mapped.
 
 **Supported banks include:** Ecobank, GCB, Standard Chartered (SCB), NIB, ADB, Bank of Africa, Bank of Ghana (BOG), Prudential, UMB, Access, Stanbic, Fidelity, UBA, and Absa. See [Supported Ghana Banks](../docs/SUPPORTED_BANKS.md) for column layouts.
 
@@ -188,6 +188,8 @@ For supported banks, the system may:
 | **Skipped duplicate rows** | Identical date + amount + narrative rows were deduplicated |
 | **Skipped zero-amount rows** | Empty or zero lines ignored |
 | **PDF truncation** | Only the first N pages were processed — split the PDF or raise the page limit |
+| **Unrecognised bank PDF** | Layout is not a Ghana parser — export Excel/CSV/OFX/MT940/CAMT or map columns here |
+| **Opening and closing balances do not tie** | Printed totals do not match imported lines — remap or confirm after review |
 | **Some files have no extracted transactions** | That document still needs mapping or contains no data |
 
 **Sign summary buckets:**

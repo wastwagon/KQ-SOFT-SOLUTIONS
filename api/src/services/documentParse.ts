@@ -6,6 +6,9 @@ import path from 'path'
 import { createRequire } from 'module'
 import type { DocumentType } from '@prisma/client'
 import { parseExcel, parseCsv, detectFileType, type ParseResult } from './parser.js'
+import { parseOfxFile } from './ofxStatement.js'
+import { parseMt940File } from './mt940Statement.js'
+import { parseCamtFile } from './camtStatement.js'
 import { textToTableFromOcrText } from './ocrLineSplit.js'
 import {
   looksLikeEcobankStatementText,
@@ -78,13 +81,15 @@ export type ParsedDocument = ParseResult & {
   pdfTruncated?: boolean
   pdfPagesProcessed?: number
   pdfTotalPages?: number
-  parseMethod?: 'ecobank_pdf' | 'gcb_pdf' | 'absa_pdf' | 'prudential_pdf' | 'uba_pdf' | 'nib_pdf' | 'adb_pdf' | 'umb_pdf' | 'scb_pdf' | 'ecobank_excel' | 'native_text' | 'ocr' | 'ocr_geometry' | 'excel' | 'csv' | 'image'
+  parseMethod?: 'ecobank_pdf' | 'gcb_pdf' | 'absa_pdf' | 'prudential_pdf' | 'uba_pdf' | 'nib_pdf' | 'adb_pdf' | 'umb_pdf' | 'scb_pdf' | 'ecobank_excel' | 'native_text' | 'ocr' | 'ocr_geometry' | 'excel' | 'csv' | 'image' | 'ofx' | 'mt940' | 'camt'
   /** 0–100 parse quality score (OCR / generic native tables). */
   parseQualityScore?: number
   /** True when a higher-resolution OCR retry was attempted. */
   ocrRetried?: boolean
   /** Human-readable quality notes for Map UI. */
   parseQualityNotes?: string[]
+  openingBalance?: number | null
+  closingBalance?: number | null
 }
 
 export async function extractPdfTextNative(buffer: Buffer): Promise<{ text: string; numpages: number } | null> {
@@ -538,6 +543,18 @@ export async function parseDocumentFile(
     throw new Error('File not found')
   }
   const ft = detectFileType(localPath)
+  if (ft === 'ofx') {
+    const r = parseOfxFile(localPath)
+    return { ...r, parseMethod: 'ofx' }
+  }
+  if (ft === 'mt940') {
+    const r = parseMt940File(localPath)
+    return { ...r, parseMethod: 'mt940' }
+  }
+  if (ft === 'camt') {
+    const r = parseCamtFile(localPath)
+    return { ...r, parseMethod: 'camt' }
+  }
   if (ft === 'excel') {
     const r = parseExcel(localPath, sheetIndex)
     // Ecobank normalize emits Title-Case "Debit"; BOA does too — don't mis-tag BOA.

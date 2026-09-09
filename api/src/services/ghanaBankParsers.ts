@@ -11,6 +11,7 @@ import { looksLikeEcobankStatementText } from './ecobankStatement.js'
 import { looksLikeUmbStatementText } from './umbStatement.js'
 import { looksLikeUbaStatementText } from './ubaStatement.js'
 import { looksLikeScbStatementText } from './scbStatement.js'
+import { isStructuredParseMethod } from './ingestSafety.js'
 
 export type GhanaBankFormat =
   | 'ecobank'
@@ -247,14 +248,20 @@ export function detectGhanaBankFormat(
     return 'ecobank'
   }
 
-  // Check for Ecobank by header + description content
+  // Check for Ecobank by header + description content.
+  // Description + Debit + Credit alone is every bank statement — require Transaction Date
+  // for the high header-score shortcut, or real Ecobank narration patterns.
   const ecobankHeaderScore = ECOBANK_HEADERS.filter((re) => headers.some((h) => re.test(h))).length
+  const hasTransactionDateHeader = headers.some((h) => /transaction[\s_-]?date/i.test(h))
   let ecobankContentScore = 0
   for (const row of sampleRows.slice(0, 5)) {
     const rowStr = (row as unknown[]).map((c) => String(c ?? '')).join(' ')
     if (ECOBANK_DESC_PATTERNS.some((re) => re.test(rowStr))) ecobankContentScore++
   }
-  if (ecobankHeaderScore >= 2 && (ecobankContentScore >= 1 || ecobankHeaderScore >= 3)) {
+  if (
+    ecobankHeaderScore >= 2 &&
+    (ecobankContentScore >= 1 || (ecobankHeaderScore >= 3 && hasTransactionDateHeader))
+  ) {
     return 'ecobank'
   }
 
@@ -307,6 +314,7 @@ export function resolveDetectedBankFormat(
 ): GhanaBankFormat {
   const fromParser = bankFormatFromParseMethod(parseMethod)
   if (fromParser) return fromParser
+  if (isStructuredParseMethod(parseMethod)) return null
   return detectGhanaBankFormat(headers, sampleRows)
 }
 

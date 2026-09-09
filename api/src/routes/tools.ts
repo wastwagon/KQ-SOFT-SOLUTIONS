@@ -47,7 +47,7 @@ const storage = multer.diskStorage({
   },
 })
 
-const ALLOWED = ['.xlsx', '.xls', '.xlsm', '.csv', '.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp']
+const ALLOWED = ['.xlsx', '.xls', '.xlsm', '.csv', '.pdf', '.ofx', '.qfx', '.mt940', '.sta', '.swift', '.xml', '.camt', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp']
 const upload = multer({
   storage,
   limits: { fileSize: resolveMaxUploadSizeBytes() },

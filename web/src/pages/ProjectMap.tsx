@@ -100,6 +100,11 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   const [previewSheetIndex, setPreviewSheetIndex] = useState(0)
   const [sheetIndexExplicit, setSheetIndexExplicit] = useState(false)
   const [mapping, setMapping] = useState<Record<string, number>>({})
+  const [importLocale, setImportLocale] = useState<{ dateOrder: 'dmy' | 'mdy'; decimalStyle: 'us' | 'eu' }>({
+    dateOrder: 'dmy',
+    decimalStyle: 'us',
+  })
+  const [saveLocaleAsOrgDefault, setSaveLocaleAsOrgDefault] = useState(false)
   const [error, setError] = useState('')
   const [mapResult, setMapResult] = useState<MapDocumentResponse | null>(null)
   /** Bumps when the user picks another document so stale worksheet auto-pick async exits early. */
@@ -136,12 +141,26 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
     isError: previewQueryFailed,
   } = previewQuery
 
+  useEffect(() => {
+    const loc = preview?.ingestSafety?.importLocale
+    if (!loc) return
+    setImportLocale({
+      dateOrder: loc.dateOrder === 'mdy' ? 'mdy' : 'dmy',
+      decimalStyle: loc.decimalStyle === 'eu' ? 'eu' : 'us',
+    })
+  }, [preview?.ingestSafety?.importLocale?.dateOrder, preview?.ingestSafety?.importLocale?.decimalStyle])
+
   const paywallBlocked =
     isSubscriptionInactiveError(projectError) || isSubscriptionInactiveError(previewError)
 
   const mapMutation = useMutation({
     mutationFn: (docId: string) =>
-      documents.map(docId, { mapping, sheetIndex: previewSheetIndex }),
+      documents.map(docId, {
+        mapping,
+        sheetIndex: previewSheetIndex,
+        locale: importLocale,
+        saveLocaleAsOrgDefault: saveLocaleAsOrgDefault || undefined,
+      }),
     onSuccess: (data: MapDocumentResponse) => {
       queryClient.invalidateQueries({ queryKey: ['project', id] })
       queryClient.invalidateQueries({ queryKey: ['subscription', 'usage'] })
@@ -256,7 +275,11 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         const isCashBook = doc.type.startsWith('cash_book_')
         const { chosenSheet, preview: pre } = await resolveBestSheetPreview(doc.id, isCashBook)
         const suggested = mergedSuggestedFromPreview(pre.headers || [], isCashBook, pre)
-        const result = await documents.map(doc.id, { mapping: suggested, sheetIndex: chosenSheet })
+        const result = await documents.map(doc.id, {
+          mapping: suggested,
+          sheetIndex: chosenSheet,
+          locale: importLocale,
+        })
         totalTransactions += result.count
         totalWarnings += result.signWarningsCount || 0
         totalSkippedDup += result.skippedDuplicateRows || 0
@@ -437,7 +460,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       <WorkflowStepIntro
         eyebrow="Map"
         title="Map columns"
-        subtitle="Match each file’s headers to date and amount columns, then apply. Tick files for a bulk run, or map one document at a time. Reconcile starts after mapping."
+        subtitle="Match each file’s date and amount columns, then apply. Unrecognised bank PDFs are not applied automatically — export Excel, CSV, OFX, MT940, or CAMT.053, or map them here. Set date and amount format if the file is not Ghana DD/MM."
       />
       <Alert tone="info" title="Date column is required">
         Confirm date and amount columns before applying. If one amount column mixes signs, positives are
@@ -631,6 +654,20 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                       Failed
                     </Badge>
                   )}
+                  {d.parseStatus === 'ready' &&
+                    d.parseStatusMessage &&
+                    /map them on this page|map manually|not a recognised|not certain/i.test(
+                      d.parseStatusMessage
+                    ) && (
+                    <Badge
+                      tone="warning"
+                      size="sm"
+                      className="ml-2 uppercase tracking-wide"
+                      title={d.parseStatusMessage}
+                    >
+                      Map needed
+                    </Badge>
+                  )}
                 </span>
               </li>
             ))}
@@ -754,6 +791,30 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                       : '—'}
                   </p>
                 )}
+              {preview.ingestSafety?.unknownPdf && (
+                <Alert tone="warning" title="Unrecognised bank PDF">
+                  {preview.ingestSafety.skipMessage ||
+                    'This layout is not a recognised Ghana bank PDF. Export Excel, CSV, OFX, MT940, or CAMT.053 from internet banking, or map the columns below.'}
+                </Alert>
+              )}
+              {preview.ingestSafety?.checksum?.status === 'failed' && (
+                <Alert
+                  tone={preview.ingestSafety.checksum.blocksReconcile ? 'error' : 'warning'}
+                  title={
+                    preview.ingestSafety.checksum.blocksReconcile
+                      ? 'Opening and closing balances do not tie — matching will be paused'
+                      : 'Opening and closing balances do not tie'
+                  }
+                >
+                  {preview.ingestSafety.checksum.message}
+                  {preview.ingestSafety.checksumAcknowledged ? ' Confirmed after review.' : ''}
+                </Alert>
+              )}
+              {preview.ingestSafety?.checksum?.status === 'passed' && (
+                <Alert tone="info" title="Opening and closing balances tie">
+                  Opening + credits − debits matches the closing balance printed on this file.
+                </Alert>
+              )}
               {(preview as { pdfTruncated?: boolean }).pdfTruncated && (
                 <Alert tone="warning" title="PDF truncation">
                   This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first{' '}
@@ -979,6 +1040,37 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                       {Object.keys(mapping).length === 1 ? '' : 's'} mapped
                     </Badge>
                   )}
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3 rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+                  <Select
+                    label="Date format"
+                    value={importLocale.dateOrder}
+                    onChange={(e) =>
+                      setImportLocale((l) => ({ ...l, dateOrder: e.target.value === 'mdy' ? 'mdy' : 'dmy' }))
+                    }
+                  >
+                    <option value="dmy">Day first (DD/MM/YYYY) — Ghana / UK</option>
+                    <option value="mdy">Month first (MM/DD/YYYY) — US</option>
+                  </Select>
+                  <Select
+                    label="Amount format"
+                    value={importLocale.decimalStyle}
+                    onChange={(e) =>
+                      setImportLocale((l) => ({ ...l, decimalStyle: e.target.value === 'eu' ? 'eu' : 'us' }))
+                    }
+                  >
+                    <option value="us">1,234.56 (comma thousands)</option>
+                    <option value="eu">1.234,56 (comma decimal)</option>
+                  </Select>
+                  <label className="sm:col-span-2 flex items-center gap-2 text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                      checked={saveLocaleAsOrgDefault}
+                      onChange={(e) => setSaveLocaleAsOrgDefault(e.target.checked)}
+                    />
+                    Save as organisation default for future uploads
+                  </label>
                 </div>
                 {canonicalFields.map((field: string) => (
                   <div
