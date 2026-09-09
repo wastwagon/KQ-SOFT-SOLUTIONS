@@ -15,8 +15,9 @@ describe('subscription webhook helpers', () => {
     const raw = Buffer.from('{"event":"charge.success","data":{"metadata":{"orgId":"org1","plan":"standard"}}}', 'utf8')
     const parsed = parseWebhookEvent(raw)
     expect(parsed.event).toBe('charge.success')
-    expect(parsed.data?.metadata?.orgId).toBe('org1')
-    expect(parsed.data?.metadata?.plan).toBe('standard')
+    const metadata = parsed.data?.metadata as { orgId?: string; plan?: string }
+    expect(metadata.orgId).toBe('org1')
+    expect(metadata.plan).toBe('standard')
   })
 
   it('detects prisma unique constraint error', () => {
