@@ -471,7 +471,9 @@ export default function ProjectReconcile({
             setSelectedBankIds(new Set(bankIds))
           }}
           canPairCancelBatch={!!features.bulk_match}
-          onPairCancelBatch={(pairs) => pairCancelBatchMutation.mutateAsync(pairs)}
+          onPairCancelBatch={async (pairs) => {
+            await pairCancelBatchMutation.mutateAsync(pairs)
+          }}
         />
       )}
 
