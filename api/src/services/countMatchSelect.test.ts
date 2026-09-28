@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { COUNT_MATCH_SELECT_CAP, countMatchSelection, leftoverOnlyListKey } from './countMatchSelect.js'
+import {
+  COUNT_MATCH_SELECT_CAP,
+  cancelEqualCountPairs,
+  chunkCountCancelPairs,
+  countMatchSelection,
+  leftoverOnlyListKey,
+} from './countMatchSelect.js'
 
 describe('countMatchSelection', () => {
   it('overlap on an open row selects min(CB, bank) on each side and reports leftovers', () => {
@@ -50,6 +56,37 @@ describe('countMatchSelection', () => {
     expect(all.cashBookTxIds).toHaveLength(COUNT_MATCH_SELECT_CAP)
     expect(all.bankTxIds).toHaveLength(COUNT_MATCH_SELECT_CAP)
     expect(all.capped).toBe(true)
+  })
+})
+
+describe('cancelEqualCountPairs', () => {
+  it('pairs equal Cancel-out counts in list order', () => {
+    const pairs = cancelEqualCountPairs(['c1', 'c2', 'c3'], ['b1', 'b2', 'b3'])
+    expect(pairs).toEqual([
+      { cashBookTransactionId: 'c1', bankTransactionId: 'b1' },
+      { cashBookTransactionId: 'c2', bankTransactionId: 'b2' },
+      { cashBookTransactionId: 'c3', bankTransactionId: 'b3' },
+    ])
+  })
+
+  it('refuses an unequal or empty count', () => {
+    expect(cancelEqualCountPairs(['c1', 'c2'], ['b1'])).toBeNull()
+    expect(cancelEqualCountPairs([], [])).toBeNull()
+  })
+
+  it('chunks a large Cancel-out batch at the bulk-match limit', () => {
+    const n = COUNT_MATCH_SELECT_CAP + 20
+    const pairs = cancelEqualCountPairs(
+      Array.from({ length: n }, (_, i) => `c${i}`),
+      Array.from({ length: n }, (_, i) => `b${i}`)
+    )
+    expect(pairs).not.toBeNull()
+    const chunks = chunkCountCancelPairs(pairs!)
+    expect(chunks.map((c) => c.length)).toEqual([COUNT_MATCH_SELECT_CAP, 20])
+    expect(chunks[1]![0]).toEqual({
+      cashBookTransactionId: `c${COUNT_MATCH_SELECT_CAP}`,
+      bankTransactionId: `b${COUNT_MATCH_SELECT_CAP}`,
+    })
   })
 })
 

@@ -27,6 +27,11 @@ export function resolveCanonicalTimingSchedule(input: {
   broughtForwardUnpresentedTotal: number
   gtBankEur: boolean
   ecobank: boolean
+  /**
+   * Match-first banks (GT Bank cedis): face timing is the unmatched cash-book
+   * list. Do not drop a cheque because another bank line shares the amount.
+   */
+  rawUnmatchedTiming?: boolean
   /** Post workbook-netting / working-paper rows (Ecobank only). */
   ecobankUnpresentedRows?: BrsTimingTx[]
   /** Post workbook-netting / working-paper total, already includes brought-forward. */
@@ -55,6 +60,19 @@ export function resolveCanonicalTimingSchedule(input: {
       unpresentedRows: gt.unpresentedRows,
       uncreditedLodgmentsTimingTotal: gt.uncreditedLodgmentsTimingTotal,
       unpresentedChequesTotal: gt.unpresentedChequesTotal,
+    }
+  }
+
+  if (input.rawUnmatchedTiming) {
+    const uncreditedRows = input.unmatchedReceipts
+    const unpresentedRows = input.unmatchedPayments
+    return {
+      uncreditedRows,
+      unpresentedRows,
+      uncreditedLodgmentsTimingTotal:
+        sumAmounts(uncreditedRows) + input.broughtForwardReceiptLodgmentsTotal,
+      unpresentedChequesTotal:
+        sumAmounts(unpresentedRows) + input.broughtForwardUnpresentedTotal,
     }
   }
 

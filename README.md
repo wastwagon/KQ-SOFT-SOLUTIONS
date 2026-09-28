@@ -118,10 +118,10 @@ cd api && npx prisma db seed
 | Account | Org plan | Purpose |
 |--------|----------|--------|
 | admin@kqsoftwaresolutions.com | firm | Admin role, full access (new seeds; legacy: `admin@qsoft.com`) |
-| basic@test.com | basic | Test Basic limits (10 projects, 1,000 tx/month, 5 bank accounts) |
-| standard@test.com | standard | Test Standard (30 projects, 5,000 tx/month, 10 bank accounts) |
-| premium@test.com | premium | Test Premium (100 projects, 20,000 tx/month, 30 bank accounts) |
-| firm@test.com | firm | Test Custom / firm (unlimited) |
+| basic@test.com | basic | Test Solo limits (12 projects, 3,000 tx/month, 3 bank accounts) |
+| standard@test.com | standard | Test Team (40 projects, 15,000 tx/month, 10 bank accounts) |
+| premium@test.com | premium | Test Firm (100 projects, 40,000 tx/month, 30 bank accounts) |
+| firm@test.com | firm | Test Custom (unlimited) |
 
 Seed now also syncs realistic subscription samples:
 - `basic@test.com`: no payment (trial/free lifecycle testing)

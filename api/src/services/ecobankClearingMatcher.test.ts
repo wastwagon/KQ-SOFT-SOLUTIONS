@@ -546,6 +546,8 @@ describe('resolveGhanaBankFormatLabel', () => {
     expect(resolveGhanaBankFormatLabel([{ name: 'Prudential Ring Road' }])).toBe('prudential')
     expect(resolveGhanaBankFormatLabel([{ name: 'NIB Accra Main' }])).toBe('nib')
     expect(resolveGhanaBankFormatLabel([{ name: 'Bank of Africa COCOBOD' }])).toBe('boa')
+    expect(resolveGhanaBankFormatLabel([{ bankName: 'GT Bank', name: 'Cedis Transactions' }])).toBe('gt_bank')
+    expect(resolveGhanaBankFormatLabel([{ name: 'GTBank Cedis 110' }])).toBe('gt_bank')
   })
 })
 

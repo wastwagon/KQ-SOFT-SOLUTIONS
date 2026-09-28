@@ -56,7 +56,7 @@ Core capabilities:
 - **Clean bank statement** / **Clean cash book**: validate parsers → sample (watermarked) or full export (plan quota)
 - **Reports**: completed jobs and exports
 - **Clients**: client directory
-- **Audit log**: activity records (Standard+)
+- **Audit log**: activity records (Team+)
 - **Settings**: branding, billing, members, connections, API keys, bank rules (plan-based)
 - **User manual**: this documentation page
 
@@ -125,7 +125,7 @@ Go to **Projects → New project**, then set:
 - client (optional)
 - reconciliation date
 - currency (`GHS`, `USD`, `EUR`) — this is the **project reporting currency** for the BRS and workbook amounts
-- optional roll-forward source (Premium+)
+- optional roll-forward source (Firm+)
 
 **Billing vs project currency:** Organisation subscriptions are charged in **GHS** via Paystack. Project currency is independent and can be **GHS**, **USD**, or **EUR** per reconciliation job.
 
@@ -189,8 +189,8 @@ Matching settings presets:
 
 Available actions:
 - manual matching (select rows → **Confirm Match**)
-- suggested matching (Standard+)
-- bulk matching and auto-match (Standard+)
+- suggested matching (Team+)
+- bulk matching and auto-match (Team+)
 - split suggestions for bulk deposits (all plans)
 - unmatch
 - bank account filtering
@@ -227,14 +227,14 @@ Actions:
 - print
 - submit for review
 - approve/reopen (role-based)
-- roll-forward (Premium+)
+- roll-forward (Firm+)
 
 ---
 
 ## 10) Settings
 
 ### Branding (Admin)
-Logo, primary/secondary colours, letterhead, report title, footer. Full branding on PDF/Excel is Standard+.
+Logo, primary/secondary colours, letterhead, report title, footer. Full branding on PDF/Excel is Team+.
 
 ### Billing (Admin)
 - Current plan and subscription status (trial / active / expired)
@@ -249,10 +249,10 @@ Invite by email; assign Admin / Reviewer / Preparer / Viewer. Seat limits follow
 ### Connections
 Configure how statements arrive (manual upload path today; bank-feed waitlist where offered).
 
-### Bank Rules (Admin/Reviewer, Standard+)
+### Bank Rules (Admin/Reviewer, Team+)
 Conditions on description/amount/date → suggest match or flag for review.
 
-### API Keys (Custom / firm, Admin)
+### API Keys (Custom, Admin)
 Create and revoke keys for programmatic access.
 
 ---
@@ -281,20 +281,20 @@ Create and revoke keys for programmatic access.
 
 | Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Users |
 |------|-------------|-----------------|--------------------------|-------|
-| Basic | 10 | 1,000 | 5 | 1 |
-| Standard | 30 | 5,000 | 10 | 3 |
-| Premium | 100 | 20,000 | 30 | 5 |
-| Custom (firm) | Unlimited | Unlimited | Unlimited | Unlimited |
+| Solo | 12 | 3,000 | 3 | 1 |
+| Team | 40 | 15,000 | 10 | 5 |
+| Firm | 100 | 40,000 | 30 | 10 |
+| Custom | Unlimited | Unlimited | Unlimited | Unlimited |
 
 | Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
 |------|---------------|-----------------|--------------|
-| Basic | 300 | 855 | 3,000 |
-| Standard | 900 | 2,565 | 9,000 |
-| Premium | 1,500 | 4,275 | 15,000 |
-| Custom | Contract | — | — |
+| Solo | 199 | 567 | 1,990 |
+| Team | 399 | 1,137 | 3,990 |
+| Firm | 990 | 2,822 | 9,900 |
+| Custom | From 1,800 | — | Contract |
 
 - **Trial:** 14 days on signup; renew via Paystack when the paywall is enabled.
-- **Basic** includes bookkeeping consultancy / advisory messaging.
+- **Solo** includes bookkeeping consultancy / advisory messaging.
 - **Bank account seats** are counted across the **whole organisation** (all projects), not per project.
 - **Intro offer:** 50% off the first 2 billing periods when enabled (`INTRO_OFFER_ENABLED` on the server).
 - **Billing periods:** monthly, quarterly (~5% off), yearly (~17% off vs paying monthly).
@@ -303,14 +303,14 @@ Create and revoke keys for programmatic access.
 
 | Capability | From |
 |------------|------|
-| 1:1 match, BRS export, OCR | Basic+ |
-| Clean tools preview + sample (watermarked) download | Basic+ |
-| Full clean Excel/PDF export | Basic+ with monthly quota (Basic 5 / Standard 20 / Premium 60 / Custom unlimited) |
+| 1:1 match, BRS export, OCR | Solo+ |
+| Clean tools preview + sample (watermarked) download | Solo+ |
+| Full clean Excel/PDF export | Solo+ with monthly quota (Solo 5 / Team 20 / Firm 60 / Custom unlimited) |
 | Suggested matches, bulk / auto-match, AI ranking | All tiers |
 | Match by counting (diagnostic lists / cancel schedule; never auto-clears) | All tiers |
-| Bank rules, audit, discrepancy | Standard+ |
+| Bank rules, audit, discrepancy | Team+ |
 | 1:many / many:many, split suggestions | All tiers |
-| Roll-forward, threshold approval, priority support | Premium+ |
+| Roll-forward, threshold approval, priority support | Firm+ |
 | Multi-client workspace, public API, custom contract | Custom |
 
 ---
@@ -333,7 +333,7 @@ Pre-built / auto-detected layouts (examples; generic Excel, CSV, and PDF always 
 | UBA | Header or content |
 | Absa | "absa" / "barclays" |
 
-If your bank is not auto-detected, use the **Map** step to map columns manually. Unrecognised PDFs are not applied automatically. Prefer Excel, CSV, OFX, MT940, or CAMT.053. Standard+ includes parser tuning support via your account team.
+If your bank is not auto-detected, use the **Map** step to map columns manually. Unrecognised PDFs are not applied automatically. Prefer Excel, CSV, OFX, MT940, or CAMT.053. Team+ includes parser tuning support via your account team.
 
 ---
 
@@ -344,7 +344,7 @@ If your bank is not auto-detected, use the **Map** step to map columns manually.
 | Cannot log in | Check email/password; use Forgot password if email delivery is configured |
 | Upload fails | Prefer Excel, CSV, OFX, MT940, or CAMT.053; confirm file is not corrupted; check size limits |
 | Parse / map errors | Fix date and amount columns; use Map step; see [Mapping guide](/mapping-and-matching-manual.md) |
-| No suggested matches | Standard plan or above; check mapping and matching presets |
+| No suggested matches | Team plan or above; check mapping and matching presets |
 | Bank account limit reached | Org-wide seat limit — upgrade or archive unused accounts |
 | Export delay | Large reports (200+ lines) may take 30–60 seconds |
 | Billing unavailable | Ask an admin; Paystack may not be configured in that environment |

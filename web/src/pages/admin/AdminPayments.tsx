@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
+import { publicPlanName } from '../../lib/plans'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
@@ -63,7 +64,7 @@ export default function AdminPayments() {
       if (result.status === 'success') {
         toast.success(
           result.alreadyApplied ? 'Already applied' : 'Payment applied',
-          result.plan ? `Organisation plan is now ${result.plan}.` : 'Subscription updated from Paystack.'
+          result.plan ? `Organisation plan is now ${publicPlanName(result.plan)}.` : 'Subscription updated from Paystack.'
         )
         setVerifyReference('')
         void queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] })
@@ -195,7 +196,7 @@ export default function AdminPayments() {
                       {pay.organization.name}
                     </Link>
                   </TableTd>
-                  <TableTd className="capitalize">{pay.plan}</TableTd>
+                  <TableTd>{publicPlanName(pay.plan)}</TableTd>
                   <TableTd className="capitalize">{pay.period}</TableTd>
                   <TableTd className="text-right font-medium text-gray-900">
                     {fmt(Number(pay.amount), pay.currency)}

@@ -121,6 +121,7 @@ export function resolveGhanaBankFormatLabel(
   if (/absa|barclays/.test(text)) return 'absa'
   if (/bank of africa|\bboa\b/.test(text)) return 'boa'
   if (/access bank/.test(text)) return 'access'
+  if (/gt\s*bank|gtbank/.test(text)) return 'gt_bank'
   return null
 }
 

@@ -38,8 +38,8 @@ export default function SettingsBrandingTab({ role, features, branding: b }: Set
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">Logo</label>
           {!features.full_branding && (
-            <Alert tone="warning" title="Logo requires Standard plan or higher" className="mb-2">
-              The Basic plan can customise colours and text only —{' '}
+            <Alert tone="warning" title="Logo requires Team plan or higher" className="mb-2">
+              The Solo plan can customise colours and text only —{' '}
               <Link to="/settings/billing" className="font-semibold underline hover:no-underline">
                 upgrade your subscription
               </Link>{' '}

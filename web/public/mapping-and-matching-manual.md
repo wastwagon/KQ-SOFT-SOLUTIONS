@@ -18,7 +18,7 @@ This guide explains how to **map** uploaded files to the correct columns and **m
 3. [Step 2 — Map columns](#3-step-2--map-columns)
 4. [Step 3 — Match transactions](#4-step-3--match-transactions)
 5. [What to leave unmatched](#5-what-to-leave-unmatched)
-6. [Bank rules (Standard plan and above)](#6-bank-rules-standard-plan-and-above)
+6. [Bank rules (Team plan and above)](#6-bank-rules-team-plan-and-above)
 7. [Plan features for mapping & matching](#7-plan-features-for-mapping--matching)
 8. [Troubleshooting](#8-troubleshooting)
 9. [Quick reference](#9-quick-reference)
@@ -277,7 +277,7 @@ The **Suggested matches** panel lists likely pairs the system found using amount
 **To use a suggestion:**
 
 - **Click** a suggestion to pre-select both rows, then **Confirm Match**, or  
-- **Tick** suggestions and use bulk actions (Standard plan and above).
+- **Tick** suggestions and use bulk actions (Team plan and above).
 
 **Matching Settings** (gear icon) control how suggestions are generated:
 
@@ -293,7 +293,7 @@ The **Suggested matches** panel lists likely pairs the system found using amount
 
 Settings are saved per project in your browser.
 
-### Bulk and auto actions (Standard plan and above)
+### Bulk and auto actions (Team plan and above)
 
 | Button | What it does |
 |--------|----------------|
@@ -376,7 +376,7 @@ Not every row should be matched in the current period. These are **normal except
 
 ---
 
-## 6. Bank rules (Standard plan and above)
+## 6. Bank rules (Team plan and above)
 
 **Settings → Bank rules** lets admins and reviewers define automatic behaviour:
 
@@ -392,7 +392,7 @@ Rules influence suggestions during Reconcile — they do not replace your review
 
 ## 7. Plan features for mapping & matching
 
-| Feature | Basic | Standard | Premium | Firm |
+| Feature | Solo | Team | Firm | Custom |
 |---------|-------|----------|---------|------|
 | Column mapping | ✓ | ✓ | ✓ | ✓ |
 | 1-to-1 manual match | ✓ | ✓ | ✓ | ✓ |
@@ -426,7 +426,7 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 
 | Problem | Likely cause | Fix |
 |---------|--------------|-----|
-| No suggestions | Standard plan required; or settings too strict | Upgrade plan or relax Matching Settings |
+| No suggestions | Team plan required; or settings too strict | Upgrade plan or relax Matching Settings |
 | Too many wrong suggestions | Amount-only mode too broad | Use Strict or Amount + Date |
 | Cannot match in Cash book (all) view | Matching disabled in overview | Switch to Receipts or Payments view |
 | “Already matched” error | Row linked in another pair | Unmatch first, or pick a different row |

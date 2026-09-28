@@ -1,5 +1,6 @@
 /**
- * Subscription tier limits - matches PLANNING_DATA.json / Jul 2026 pricing
+ * Subscription tier limits — Sep 2026 catalogue (Solo / Team / Firm / Custom).
+ * Slugs stay basic / standard / premium / firm so existing subscriptions resolve.
  * -1 = unlimited
  *
  * Primary commercial quotas: org-wide bank accounts + monthly transactions.
@@ -19,13 +20,13 @@ export const TIER_LIMITS: Record<
   }
 > = {
   basic: {
-    projectsPerMonth: 10,
+    projectsPerMonth: 12,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.basic,
-    bankAccounts: 5,
+    bankAccounts: 3,
     cleanExportsPerMonth: 5,
   },
   standard: {
-    projectsPerMonth: 30,
+    projectsPerMonth: 40,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.standard,
     bankAccounts: 10,
     cleanExportsPerMonth: 20,
@@ -52,10 +53,18 @@ export const PLAN_PRICES: Record<
   string,
   { monthlyGhs: number; yearlyGhs: number; quarterlyGhs: number }
 > = {
-  basic: { monthlyGhs: 300, yearlyGhs: 3000, quarterlyGhs: 855 },
-  standard: { monthlyGhs: 900, yearlyGhs: 9000, quarterlyGhs: 2565 },
-  premium: { monthlyGhs: 1500, yearlyGhs: 15000, quarterlyGhs: 4275 },
-  firm: { monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0 }, // custom contract
+  basic: { monthlyGhs: 199, yearlyGhs: 1990, quarterlyGhs: 567 },
+  standard: { monthlyGhs: 399, yearlyGhs: 3990, quarterlyGhs: 1137 },
+  premium: { monthlyGhs: 990, yearlyGhs: 9900, quarterlyGhs: 2822 },
+  firm: { monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0 }, // custom contract, from GHS 1,800
+}
+
+/** Public names. Slugs are unchanged. */
+export const PLAN_DISPLAY_NAMES: Record<string, string> = {
+  basic: 'Solo',
+  standard: 'Team',
+  premium: 'Firm',
+  firm: 'Custom',
 }
 
 /** Intro: 50% off first N paid periods (self-serve tiers). */
@@ -84,9 +93,9 @@ export function planAmountForPeriod(
  * Used to auto-heal public/billing prices until FORCE_PLAN_RESET is run.
  */
 const LEGACY_MONTHLY_GHS: Record<string, ReadonlySet<number>> = {
-  basic: new Set([0, 150]),
-  standard: new Set([50, 400]),
-  premium: new Set([100, 900]),
+  basic: new Set([0, 150, 300]),
+  standard: new Set([50, 400, 900]),
+  premium: new Set([100, 900, 1500]),
 }
 
 export function isLegacyMonthlyPrice(slug: string, monthlyGhs: number): boolean {

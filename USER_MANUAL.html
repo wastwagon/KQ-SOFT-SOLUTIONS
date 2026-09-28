@@ -123,7 +123,7 @@
     <tr><td>Currency</td><td>GHS, USD, EUR per project</td></tr>
   </table>
 
-  <h3>Standard Plan and Above</h3>
+  <h3>Team plan and above</h3>
   <table>
     <tr><th>Feature</th><th>Description</th></tr>
     <tr><td>Bank rules</td><td>Custom rules for auto-suggest matching</td></tr>
@@ -134,7 +134,7 @@
     <tr><td>Missing cheques report</td><td>Track unpresented cheques</td></tr>
   </table>
 
-  <h3>Premium Plan and Above</h3>
+  <h3>Firm plan and above</h3>
   <table>
     <tr><th>Feature</th><th>Description</th></tr>
     <tr><td>1-to-many / many-to-many</td><td>Match one cash book line to multiple bank lines (or vice versa)</td></tr>
@@ -143,7 +143,7 @@
     <tr><td>Full branding</td><td>Logo, colours, letterhead, report title, footer</td></tr>
   </table>
 
-  <h3>Firm Plan</h3>
+  <h3>Custom plan</h3>
   <table>
     <tr><th>Feature</th><th>Description</th></tr>
     <tr><td>API access</td><td>Create API keys for programmatic access</td></tr>
@@ -198,7 +198,7 @@
   <p>Map columns to Date, Amount, Description, Reference, Cheque number. Save mapping.</p>
 
   <h3>Step 3: Reconcile</h3>
-  <p>Match receipts vs credits and payments vs debits. Single match, Bulk match (Standard+), or 1-to-many (Premium+). Unmatched items: uncredited lodgments and unpresented cheques appear on the BRS.</p>
+  <p>Match receipts vs credits and payments vs debits. Single match, Bulk match (Team plan and above), or 1-to-many (Firm plan and above). Unmatched items: uncredited lodgments and unpresented cheques appear on the BRS.</p>
 
   <h3>Step 4: Review</h3>
   <p>Submit for review → Reviewer or Admin approves or sends back.</p>
@@ -210,14 +210,14 @@
   <p>Clients → Add client → Enter name (max 200 chars) → Save. Select client when creating or editing a project.</p>
 
   <h2 id="settings">9. Settings</h2>
-  <p><strong>Branding:</strong> Logo, colours, letterhead, report title, footer, approval threshold (Premium+).</p>
+  <p><strong>Branding:</strong> Logo, colours, letterhead, report title, footer, approval threshold (Firm plan and above).</p>
   <p><strong>Billing:</strong> Current plan, upgrade via Paystack (GHS); intro offer 50% off.</p>
   <p><strong>Members:</strong> Add by email, assign role (Admin, Reviewer, Preparer, Viewer).</p>
-  <p><strong>API keys:</strong> Create/revoke (Firm plan).</p>
+  <p><strong>API keys:</strong> Create/revoke (Custom plan).</p>
   <p><strong>Bank rules:</strong> Conditions and actions for auto-suggest matches.</p>
 
   <h2 id="audit">10. Audit Log</h2>
-  <p>(Standard plan and above) View who did what and when. Export if supported.</p>
+  <p>(Team plan and above) View who did what and when. Export if supported.</p>
 
   <h2 id="reports">11. Reports</h2>
   <p>Reports menu shows completed projects. Click to open Report step and export PDF or Excel.</p>
@@ -225,10 +225,10 @@
   <h2 id="plans">12. Subscription Plans & Limits</h2>
   <table>
     <tr><th>Plan</th><th>Projects/mo</th><th>Transactions/mo</th><th>Users</th></tr>
-    <tr><td>Basic</td><td>5</td><td>500</td><td>1</td></tr>
-    <tr><td>Standard</td><td>20</td><td>2,000</td><td>3</td></tr>
-    <tr><td>Premium</td><td>100</td><td>10,000</td><td>5+</td></tr>
-    <tr><td>Firm</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+    <tr><td>Solo</td><td>12</td><td>3,000</td><td>1</td></tr>
+    <tr><td>Team</td><td>40</td><td>15,000</td><td>5</td></tr>
+    <tr><td>Firm</td><td>100</td><td>40,000</td><td>10</td></tr>
+    <tr><td>Custom</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
   </table>
 
   <h2 id="banks">13. Supported Banks</h2>
@@ -258,7 +258,7 @@
     <tr><td>Cannot log in / 401</td><td>Check API is running; ensure VITE_API_URL points to API</td></tr>
     <tr><td>Upload fails</td><td>Use Excel or CSV; ensure file not corrupted</td></tr>
     <tr><td>Parse errors</td><td>Check column headers; use Map step</td></tr>
-    <tr><td>No suggested matches</td><td>Ensure Standard plan or above; check bank rules</td></tr>
+    <tr><td>No suggested matches</td><td>Ensure Team plan or above; check bank rules</td></tr>
     <tr><td>Export fails</td><td>For large reports (200+ tx), wait 30–60 seconds</td></tr>
     <tr><td>Password reset not received</td><td>Configure RESEND_API_KEY and APP_URL in production</td></tr>
   </table>

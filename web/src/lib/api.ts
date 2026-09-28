@@ -243,7 +243,7 @@ export interface ReportBranding {
   primaryColor?: string
   secondaryColor?: string
   footer?: string
-  /** Org default for Ghana BRS workbook netting (Premium+ roll-forward plans). */
+  /** Org default for Ghana BRS workbook netting (Firm plan and above). */
   ghanaBrsWorkbookNettingDefault?: boolean
 }
 
@@ -1154,8 +1154,13 @@ export const reconcile = {
       | { cashBookTransactionIds: string[]; bankTransactionId: string }
       | { cashBookTransactionIds: string[]; bankTransactionIds: string[] }
   ) => api(`/reconcile/${projectId}/match/multi`, { method: 'POST', body: JSON.stringify(body) }),
-  createMatchBulk: (projectId: string, body: { matches: { cashBookTransactionId: string; bankTransactionId: string }[] }) =>
-    api(`/reconcile/${projectId}/match/bulk`, { method: 'POST', body: JSON.stringify(body) }),
+  createMatchBulk: (
+    projectId: string,
+    body: {
+      matches: { cashBookTransactionId: string; bankTransactionId: string }[]
+      remember?: boolean
+    }
+  ) => api(`/reconcile/${projectId}/match/bulk`, { method: 'POST', body: JSON.stringify(body) }),
   createMatchAutoComplete: (
     projectId: string,
     params?: { bankAccountId?: string; useDate?: boolean; useDocRef?: boolean; useChequeNo?: boolean }

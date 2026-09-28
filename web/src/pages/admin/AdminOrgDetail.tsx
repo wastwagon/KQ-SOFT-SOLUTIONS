@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Pencil, Trash2, Building2, Ban, BadgeCheck, LogIn } from 'lucide-react'
 import { api } from '../../lib/api'
+import { publicPlanName } from '../../lib/plans'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -325,8 +326,8 @@ export default function AdminOrgDetail() {
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
       {suspended && <Badge tone="danger">Suspended</Badge>}
-      <Badge tone="brand" className="capitalize">
-        {org.plan}
+      <Badge tone="brand">
+        {publicPlanName(org.plan)}
       </Badge>
       <Button
         variant="primary"
@@ -547,7 +548,7 @@ export default function AdminOrgDetail() {
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            Downgrade to basic = cancel paid subscription. Org keeps access with basic limits.
+            Downgrade to Solo cancels the paid subscription. The org keeps access with Solo limits.
           </p>
         </Card>
 
@@ -602,7 +603,7 @@ export default function AdminOrgDetail() {
             <Button
               className="shrink-0"
               onClick={async () => {
-                const planChange = org.plan !== 'premium' ? ` Plan will change from ${org.plan} to premium.` : ''
+                const planChange = org.plan !== 'premium' ? ` Plan will change from ${publicPlanName(org.plan)} to Firm.` : ''
                 const ok = await confirm({
                   title: 'Grant complimentary access?',
                   description: `Subscription will be set to active without payment.${planChange} Reason: "${COMPLIMENTARY_ACCESS_REASON}".`,
@@ -621,10 +622,10 @@ export default function AdminOrgDetail() {
           )
         }
       >
-        One-click setup for internal or partner orgs: sets plan to <strong>Premium</strong> and subscription
+        One-click setup for internal or partner orgs: sets plan to <strong>Firm</strong> and subscription
         status to <strong>Active</strong> without payment. Removes inactive banners in the app immediately.
         {hasComplimentaryAccess ? (
-          <p className="mt-1">This org already has Premium plan and Active subscription.</p>
+          <p className="mt-1">This org already has the Firm plan and an active subscription.</p>
         ) : null}
       </Alert>
 
@@ -785,7 +786,7 @@ export default function AdminOrgDetail() {
                   <TableTd>
                     {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </TableTd>
-                  <TableTd className="capitalize">{p.plan}</TableTd>
+                  <TableTd>{publicPlanName(p.plan)}</TableTd>
                   <TableTd>{p.period}</TableTd>
                   <TableTd className="text-right font-medium text-gray-900">
                     {fmt(Number(p.amount))}

@@ -105,7 +105,7 @@ router.post('/', async (req: AuthRequest, res) => {
     let rollForwardId: string | null = null
     if (body.rollForwardFromProjectId) {
       if (!(await planHasFeature(org.plan, 'roll_forward'))) {
-        return res.status(403).json({ error: 'Roll-forward requires Premium plan or higher.' })
+        return res.status(403).json({ error: 'Roll-forward requires the Firm plan or higher.' })
       }
       rollForwardId = await resolveProjectId(body.rollForwardFromProjectId, orgId)
       const prev = rollForwardId ? await prisma.project.findFirst({
@@ -400,7 +400,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res) => {
     return res.status(400).json({ error: 'Project must be submitted for review to approve' })
   }
 
-  // Threshold approval (Premium+): reviewers cannot approve when discrepancy exceeds threshold
+  // Threshold approval (Firm plan and above): reviewers cannot approve when discrepancy exceeds threshold
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { plan: true, branding: true },

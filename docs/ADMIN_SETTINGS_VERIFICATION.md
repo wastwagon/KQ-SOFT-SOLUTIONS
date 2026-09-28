@@ -48,7 +48,7 @@ Verified and improved consistency between super admin dashboard settings and use
 | Billing | Current plan, upgrade (Paystack) |
 | Members | Team members, roles |
 | API keys | (Firm plan) |
-| Bank rules | (Standard+ plan) |
+| Bank rules | (Team plan and above) |
 
 ### Branding ↔ Platform Defaults
 

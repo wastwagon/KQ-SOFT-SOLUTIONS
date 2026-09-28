@@ -1248,7 +1248,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         )}
 
         <div id="brs-summary" className="mb-6 scroll-mt-4 text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{data.summary?.matchedCount || 0} matched</span>
+          <span className="font-medium text-slate-900">{data.summary?.matchedCount || 0} cash-book lines matched</span>
           {' · '}
           {data.summary?.unmatchedReceipts || 0} unmatched receipts
           {' · '}
@@ -1424,7 +1424,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           ) : (
             <>
               <h3 className="text-base font-semibold mb-3 text-blue-900">Missing Cheques Report</h3>
-              <Alert tone="warning" title="Standard plan or higher required">
+              <Alert tone="warning" title="Team plan or higher required">
                 Upgrade to see unpresented cheques with ageing bands.
               </Alert>
             </>
@@ -1884,7 +1884,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 <p className="text-sm text-gray-500 italic">No amount or date variances in matched pairs.</p>
               )
             ) : (
-              <Alert tone="warning" title="Standard plan or higher required">
+              <Alert tone="warning" title="Team plan or higher required">
                 Upgrade to see the discrepancy report.
               </Alert>
             )}

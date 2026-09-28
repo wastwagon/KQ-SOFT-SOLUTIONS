@@ -32,7 +32,7 @@ router.get('/', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'audit_trail'))) {
-    return res.status(403).json({ error: 'Audit trail requires Standard plan or higher.' })
+    return res.status(403).json({ error: 'Audit trail requires the Team plan or higher.' })
   }
   const projectId = req.query.projectId as string | undefined
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
@@ -66,7 +66,7 @@ router.get('/export', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'audit_trail'))) {
-    return res.status(403).json({ error: 'Audit trail requires Standard plan or higher.' })
+    return res.status(403).json({ error: 'Audit trail requires the Team plan or higher.' })
   }
   const projectId = req.query.projectId as string | undefined
   const format = (req.query.format as string)?.toLowerCase() || 'csv'

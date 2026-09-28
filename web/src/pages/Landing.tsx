@@ -182,7 +182,7 @@ const TESTIMONIALS = [
 const FAQS = [
   {
     q: 'Which banks or statement formats are supported?',
-    a: 'We ship parsers tuned for major regional banks (for example Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB) plus generic Excel, CSV, and PDF layouts. Scanned statements are supported with OCR. Non-standard files can be mapped; Standard tier and above includes parser tuning support.',
+    a: 'We ship parsers tuned for major regional banks (for example Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB) plus generic Excel, CSV, and PDF layouts. Scanned statements are supported with OCR. Non-standard files can be mapped; Team and above includes parser tuning support.',
   },
   {
     q: 'Do I need to install anything?',
@@ -198,7 +198,7 @@ const FAQS = [
   },
   {
     q: 'What are the plan limits?',
-    a: 'Basic covers 5 bank accounts and 1,000 transactions per month (with bookkeeping advisory). Standard is 10 accounts / 5,000 transactions. Premium is 30 accounts / 20,000 transactions. Custom (firm) is unlimited under contract. Bank account seats are counted across your whole organisation.',
+    a: 'Solo covers 3 bank accounts and 3,000 transactions per month (with bookkeeping advisory). Team is 10 accounts / 15,000 transactions and 5 people. Firm is 30 accounts / 40,000 transactions and 10 people. Custom is unlimited under contract, from GHS 1,800 a month. Bank account seats are counted across your whole organisation.',
   },
   {
     q: 'Is my data secure?',
@@ -206,7 +206,7 @@ const FAQS = [
   },
   {
     q: 'Can I export BRS reports with my own logo and colours?',
-    a: 'Yes. Standard and above include full branding — logo, palette, report title, and footer — so deliverables match your firm template.',
+    a: 'Yes. Team and above include full branding — logo, palette, report title, and footer — so deliverables match your firm template.',
   },
 ] as const
 
@@ -601,7 +601,7 @@ function Hero() {
             <p className="mt-5 text-sm text-slate-300/90">
               {isAuthed
                 ? 'Signed in — open your workspace to continue reconciliations.'
-                : '14-day free trial · From GHS 300/mo · No card required to start'}
+                : '14-day free trial · From GHS 199/mo · No card required to start'}
             </p>
           </div>
 
@@ -1509,7 +1509,7 @@ function FinalCta() {
               <p className="mt-3 text-base sm:text-lg text-white/85 leading-relaxed max-w-xl">
                 Start a 14-day free trial, drop in a real cash book and bank extract, and
                 watch suggestions populate. First two months at 50% off when you upgrade —
-                plans from GHS 300/mo.
+                plans from GHS 199/mo.
               </p>
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">

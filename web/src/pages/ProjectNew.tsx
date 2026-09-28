@@ -306,7 +306,7 @@ export default function ProjectNew() {
         {features.roll_forward && (
           <Select
             label="Previous period BRS / Roll forward from (optional)"
-            hint="Select a completed project to use as previous period BRS; unpresented cheques will be carried forward. Requires Premium plan."
+            hint="Select a completed project to use as previous period BRS; unpresented cheques will be carried forward. Requires the Firm plan."
             value={rollForwardFromProjectId}
             onChange={(e) => setRollForwardFromProjectId(e.target.value)}
           >

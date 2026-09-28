@@ -16,9 +16,9 @@ async function main() {
 
   // Plans (subscription tiers) — Jul 2026 catalogue
   const plans = [
-    { slug: 'basic', name: 'Basic', projectsPerMonth: 10, transactionsPerMonth: 1000, monthlyGhs: 300, yearlyGhs: 3000, quarterlyGhs: 855, bankAccounts: 5, cleanExportsPerMonth: 5, usersLimit: 1 },
-    { slug: 'standard', name: 'Standard', projectsPerMonth: 30, transactionsPerMonth: 5000, monthlyGhs: 900, yearlyGhs: 9000, quarterlyGhs: 2565, bankAccounts: 10, cleanExportsPerMonth: 20, usersLimit: 3 },
-    { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 20000, monthlyGhs: 1500, yearlyGhs: 15000, quarterlyGhs: 4275, bankAccounts: 30, cleanExportsPerMonth: 60, usersLimit: 5 },
+    { slug: 'basic', name: 'Solo', projectsPerMonth: 12, transactionsPerMonth: 3000, monthlyGhs: 199, yearlyGhs: 1990, quarterlyGhs: 567, bankAccounts: 3, cleanExportsPerMonth: 5, usersLimit: 1 },
+    { slug: 'standard', name: 'Team', projectsPerMonth: 40, transactionsPerMonth: 15000, monthlyGhs: 399, yearlyGhs: 3990, quarterlyGhs: 1137, bankAccounts: 10, cleanExportsPerMonth: 20, usersLimit: 5 },
+    { slug: 'premium', name: 'Firm', projectsPerMonth: 100, transactionsPerMonth: 40000, monthlyGhs: 990, yearlyGhs: 9900, quarterlyGhs: 2822, bankAccounts: 30, cleanExportsPerMonth: 60, usersLimit: 10 },
     { slug: 'firm', name: 'Custom', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0, bankAccounts: -1, cleanExportsPerMonth: -1, usersLimit: -1 },
   ]
   for (const p of plans) {

@@ -20,6 +20,19 @@
 
 export type PlanSlug = 'basic' | 'standard' | 'premium' | 'firm'
 
+/** Public names for the stable slugs. Unknown values are returned unchanged. */
+const PUBLIC_PLAN_NAMES: Record<string, string> = {
+  basic: 'Solo',
+  standard: 'Team',
+  premium: 'Firm',
+  firm: 'Custom',
+}
+
+export function publicPlanName(slug: string | null | undefined): string {
+  if (!slug) return 'Solo'
+  return PUBLIC_PLAN_NAMES[slug] ?? slug
+}
+
 export type BillingPeriod = 'monthly' | 'quarterly' | 'yearly'
 
 export interface MarketingPlan {
@@ -46,7 +59,7 @@ export interface MarketingPlan {
   cleanExportsPerMonth?: number
   /** Concise bullets shown directly on the plan card. */
   bullets: string[]
-  /** Inherits-from copy for the card, e.g. "Everything in Standard, plus:". */
+  /** Inherits-from copy for the card, e.g. "Everything in Solo, plus:". */
   inheritsFromLabel?: string
   /** Per-feature value used by the comparison matrix. */
   features: Record<string, boolean | string>
@@ -141,26 +154,27 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
 ]
 
 /* -------------------------------------------------------------------------
- * Jul 2026 catalogue — keep in sync with api/src/config/subscription.ts
+ * Sep 2026 catalogue — keep in sync with api/src/config/subscription.ts
+ * Slugs stay basic / standard / premium / firm. Public names are Solo / Team / Firm / Custom.
  * ----------------------------------------------------------------------- */
 
 export const MARKETING_PLANS: MarketingPlan[] = [
   {
     slug: 'basic',
-    name: 'Basic',
-    tagline: 'For solo accountants getting started — with advisory support.',
-    audience: 'Solo practitioner',
-    monthlyGhs: 300,
-    yearlyGhs: 3000,
-    quarterlyGhs: 855,
-    projectsPerMonth: 10,
-    transactionsPerMonth: 1_000,
-    bankAccounts: 5,
+    name: 'Solo',
+    tagline: 'For one accountant working a full monthly statement.',
+    audience: 'Solo accountant',
+    monthlyGhs: 199,
+    yearlyGhs: 1990,
+    quarterlyGhs: 567,
+    projectsPerMonth: 12,
+    transactionsPerMonth: 3_000,
+    bankAccounts: 3,
     users: 1,
     cleanExportsPerMonth: 5,
     bullets: [
-      '5 bank accounts · 1,000 transactions / month',
-      'Up to 10 projects / month · 1 team member',
+      '3 bank accounts · 3,000 transactions / month',
+      'Up to 12 projects / month · 1 team member',
       '5 full clean exports / month (sample downloads free)',
       '14-day free trial',
       '50% off your first 2 months',
@@ -174,9 +188,9 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       'Email support',
     ],
     features: {
-      bank_accounts: '5',
-      projects: '10 / month',
-      transactions: '1,000 / month',
+      bank_accounts: '3',
+      projects: '12 / month',
+      transactions: '3,000 / month',
       users: '1',
       imports: true,
       ocr: true,
@@ -207,23 +221,23 @@ export const MARKETING_PLANS: MarketingPlan[] = [
   },
   {
     slug: 'standard',
-    name: 'Standard',
-    tagline: 'For small teams and growing practices.',
+    name: 'Team',
+    tagline: 'For a small team that needs a full statement, not an 800-row cap.',
     audience: 'Small finance team',
     badge: 'Most popular',
     highlight: true,
-    monthlyGhs: 900,
-    yearlyGhs: 9000,
-    quarterlyGhs: 2565,
-    projectsPerMonth: 30,
-    transactionsPerMonth: 5_000,
+    monthlyGhs: 399,
+    yearlyGhs: 3990,
+    quarterlyGhs: 1137,
+    projectsPerMonth: 40,
+    transactionsPerMonth: 15_000,
     bankAccounts: 10,
-    users: 3,
+    users: 5,
     cleanExportsPerMonth: 20,
-    inheritsFromLabel: 'Everything in Basic, plus:',
+    inheritsFromLabel: 'Everything in Solo, plus:',
     bullets: [
-      '10 bank accounts · 5,000 transactions / month',
-      'Up to 30 projects / month · 3 team members',
+      '10 bank accounts · 15,000 transactions / month',
+      'Up to 40 projects / month · 5 team members',
       '20 full clean exports / month (sample downloads free)',
       'Bulk match (up to 50 pairs)',
       'AI-powered match ranking',
@@ -233,9 +247,9 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     ],
     features: {
       bank_accounts: '10',
-      projects: '30 / month',
-      transactions: '5,000 / month',
-      users: '3',
+      projects: '40 / month',
+      transactions: '15,000 / month',
+      users: '5',
       imports: true,
       ocr: true,
       bank_parsers: true,
@@ -265,21 +279,21 @@ export const MARKETING_PLANS: MarketingPlan[] = [
   },
   {
     slug: 'premium',
-    name: 'Premium',
-    tagline: 'For firms reconciling at scale.',
-    audience: 'Established firm',
-    monthlyGhs: 1500,
-    yearlyGhs: 15000,
-    quarterlyGhs: 4275,
+    name: 'Firm',
+    tagline: 'For a practice that has outgrown an eight-person file tool.',
+    audience: 'Established practice',
+    monthlyGhs: 990,
+    yearlyGhs: 9900,
+    quarterlyGhs: 2822,
     projectsPerMonth: 100,
-    transactionsPerMonth: 20_000,
+    transactionsPerMonth: 40_000,
     bankAccounts: 30,
-    users: 5,
+    users: 10,
     cleanExportsPerMonth: 60,
-    inheritsFromLabel: 'Everything in Standard, plus:',
+    inheritsFromLabel: 'Everything in Team, plus:',
     bullets: [
-      '30 bank accounts · 20,000 transactions / month',
-      'Up to 100 projects / month · 5 team members',
+      '30 bank accounts · 40,000 transactions / month',
+      'Up to 100 projects / month · 10 team members',
       '60 full clean exports / month (sample downloads free)',
       'Roll forward across periods',
       'Threshold approval workflow',
@@ -288,8 +302,8 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     features: {
       bank_accounts: '30',
       projects: '100 / month',
-      transactions: '20,000 / month',
-      users: '5',
+      transactions: '40,000 / month',
+      users: '10',
       imports: true,
       ocr: true,
       bank_parsers: true,
@@ -320,7 +334,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
   {
     slug: 'firm',
     name: 'Custom',
-    tagline: 'Unlimited seats for firms and enterprises.',
+    tagline: 'From GHS 1,800 / month. Unlimited seats for multi-client firms.',
     audience: 'Accounting firm / enterprise',
     badge: 'Best for firms',
     monthlyGhs: 0,
@@ -331,7 +345,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     bankAccounts: -1,
     users: -1,
     cleanExportsPerMonth: -1,
-    inheritsFromLabel: 'Everything in Premium, plus:',
+    inheritsFromLabel: 'Everything in Firm, plus:',
     bullets: [
       'Unlimited bank accounts, transactions & members',
       'Unlimited full clean exports (sample downloads free)',

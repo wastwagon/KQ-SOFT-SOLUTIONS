@@ -438,7 +438,7 @@ export async function runProjectAutoComplete(
   const orgPlan = project.organization?.plan ?? 'basic'
   await getPlanBySlug(orgPlan)
   if (!hasPlanFeature(orgPlan, 'bulk_match')) {
-    throw new Error('Bulk match requires Standard plan or higher.')
+    throw new Error('Bulk match requires the Team plan or higher.')
   }
 
   const platformDefaults = await getPlatformDefaults()

@@ -28,6 +28,24 @@ describe('resolveCanonicalTimingSchedule', () => {
     expect(result.unpresentedChequesTotal).toBeCloseTo(47, 2)
   })
 
+  it('GT Bank cedis: a same-amount bank debit does not remove an unmatched cheque', () => {
+    const result = resolveCanonicalTimingSchedule({
+      unmatchedReceipts: [],
+      unmatchedPayments: [tx('p373', 375.62, 'GRA', '2016-12-12')],
+      unmatchedDebits: [],
+      unmatchedCredits: [],
+      allBankDebits: [tx('d369', 375.62, 'CLEARING WITHDRAWAL CHQ#369', '2016-12-13')],
+      allBankCredits: [],
+      broughtForwardReceiptLodgmentsTotal: 0,
+      broughtForwardUnpresentedTotal: 0,
+      gtBankEur: false,
+      ecobank: false,
+      rawUnmatchedTiming: true,
+    })
+    expect(result.unpresentedRows.map((r) => r.id)).toEqual(['p373'])
+    expect(result.unpresentedChequesTotal).toBeCloseTo(375.62, 2)
+  })
+
   it('GT EUR: CANBNK receipts land on uncredited, not unpresented, and lists sum to the face', () => {
     const result = resolveCanonicalTimingSchedule({
       unmatchedReceipts: [

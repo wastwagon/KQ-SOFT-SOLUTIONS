@@ -385,7 +385,7 @@ function PlanForm({
             <option value="firm">firm</option>
           </Select>
         )}
-        <Input label="Display name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Basic" />
+        <Input label="Display name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Solo" />
         <Input type="number" step="0.01" label="Monthly (GHS)" value={monthlyGhs} onChange={(e) => setMonthlyGhs(e.target.value)} />
         <Input type="number" step="0.01" label="Quarterly (GHS)" value={quarterlyGhs} onChange={(e) => setQuarterlyGhs(e.target.value)} />
         <Input type="number" step="0.01" label="Yearly (GHS)" value={yearlyGhs} onChange={(e) => setYearlyGhs(e.target.value)} />

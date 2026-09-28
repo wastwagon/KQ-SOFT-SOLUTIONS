@@ -6,7 +6,7 @@ import MetricCard from '../ui/MetricCard'
 import { canManageBilling } from '../../lib/permissions'
 import type { OrgRole } from '../../lib/permissions'
 import { formatYearlyDiscountLabel } from '../../lib/planPricing'
-import type { BillingPeriod } from '../../lib/plans'
+import { publicPlanName, type BillingPeriod } from '../../lib/plans'
 
 /** Minimal shapes from subscription API — kept loose for forward compatibility. */
 interface BillingPlanRow {
@@ -89,8 +89,8 @@ export default function SettingsBillingTab({
       )}
       <p className="text-sm text-gray-600 mb-4 flex flex-wrap items-center gap-2">
         Current plan:{' '}
-        <Badge tone="brand" size="sm" className="capitalize">
-          {usageData?.organization?.plan || 'basic'}
+        <Badge tone="brand" size="sm">
+          {publicPlanName(usageData?.organization?.plan)}
         </Badge>
       </p>
       {usageData?.usage && (

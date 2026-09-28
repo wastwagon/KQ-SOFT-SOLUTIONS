@@ -917,7 +917,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         : standardPaymentSuggestions
   const duplicateChequeWarnings = detectDuplicateChequePayments(paymentsFull)
 
-  // Apply bank rules for rule-based suggestions and flagged txs (Standard+ only)
+  // Apply bank rules for rule-based suggestions and flagged txs (Team plan and above)
   const bankRules = hasBankRulesPlan ? await prisma.bankRule.findMany({
     where: { organizationId: orgId },
     orderBy: { priority: 'asc' },
@@ -1125,7 +1125,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     }),
     duplicateChequeWarnings,
     flaggedBankIds,
-    existingMatches: project.matches.length,
+    /** Cash-book lines in a confirmed match (a 2→1 batch counts as 2). */
+    existingMatches: matchedCbIds.size,
     matchedCashBookIds: Array.from(matchedCbIds),
     matchedBankIds: Array.from(matchedBankIds),
     matches: matchList,
@@ -1156,6 +1157,8 @@ const bulkMatchSchema = z.object({
       bankTransactionId: z.string(),
     })
   ).min(1).max(100),
+  /** Default true. Cancel-out batch pairing sends false so amount-only pairs are not learned. */
+  remember: z.boolean().optional(),
 })
 
 const multiMatchSchema = z.union([
@@ -1205,7 +1208,7 @@ router.post('/:projectId/match/auto-complete', async (req: AuthRequest, res) => 
     res.status(201).json(result)
   } catch (e) {
     const msg = (e as Error).message
-    if (msg.includes('Standard plan')) {
+    if (msg.includes('Team plan')) {
       return res.status(403).json({ error: msg })
     }
     logger.error({ err: e, projectId }, 'auto-complete matching failed')
@@ -1495,7 +1498,7 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'bulk_match'))) {
-    return res.status(403).json({ error: 'Bulk match requires Standard plan or higher.' })
+    return res.status(403).json({ error: 'Bulk match requires the Team plan or higher.' })
   }
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
@@ -1556,7 +1559,20 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
     }
-    const shouldRemember = await planHasFeature(org.plan, 'ai_suggestions')
+    const remember = body.remember !== false
+    if (!remember) {
+      const platformDefaults = await getPlatformDefaults()
+      const pairTol = platformDefaults.amountTolerance ?? 0.01
+      for (const { cbTx, bankTx } of toCreate) {
+        if (!amountsWithinTolerance(Number(cbTx.amount), Number(bankTx.amount), pairTol)) {
+          return res.status(400).json({
+            error: 'Each pair must be the same amount',
+            tolerance: pairTol,
+          })
+        }
+      }
+    }
+    const shouldRemember = remember && (await planHasFeature(org.plan, 'ai_suggestions'))
     const created = await prisma.$transaction(async (tx) => {
       const ids: { id: string }[] = []
       let rememberedCount = 0
@@ -1621,7 +1637,9 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
         userId: req.auth!.userId,
         projectId,
         action: 'match_bulk',
-        details: { count: created.ids.length },
+        details: remember
+          ? { count: created.ids.length }
+          : { count: created.ids.length, source: 'count_cancel' },
       })
     }
     res.status(201).json({

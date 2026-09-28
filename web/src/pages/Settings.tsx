@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
 import { subscription, unlessSubscriptionInactive } from '../lib/api'
+import { publicPlanName } from '../lib/plans'
 import {
   canEditBankRules,
   canManageBilling,
@@ -114,7 +115,7 @@ export default function Settings() {
       .then((result) => {
         if (cancelled) return
         if (result.status === 'success') {
-          const planLabel = result.plan ? ` ${result.plan}` : ''
+          const planLabel = result.plan ? ` ${publicPlanName(result.plan)}` : ''
           setCheckoutNotice({
             tone: 'success',
             title: result.alreadyApplied ? 'Subscription already active' : 'Payment confirmed',
@@ -288,7 +289,7 @@ export default function Settings() {
             sublabel='Auto-suggest or flag bank transactions that match your rules (e.g. "Bank charges" when description contains "BANK CHARGES").'
           >
             {!features.bank_rules && (
-              <Alert tone="warning" title="Standard plan or higher required" className="mb-4">
+              <Alert tone="warning" title="Team plan or higher required" className="mb-4">
                 Upgrade to use auto-suggest and flag rules.
               </Alert>
             )}

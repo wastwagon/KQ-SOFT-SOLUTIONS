@@ -306,7 +306,7 @@ router.post('/attachments/:projectId', upload.single('file'), async (req: AuthRe
   res.status(201).json(attachment)
 })
 
-// Branding logo upload (org-level) — Standard+ (full_branding)
+// Branding logo upload (org-level) — Team plan and above (full_branding)
 router.post('/branding-logo', logoUpload.single('file'), async (req: AuthRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
   const role = req.auth!.role
@@ -321,7 +321,7 @@ router.post('/branding-logo', logoUpload.single('file'), async (req: AuthRequest
   })
   const { planHasFeature } = await import('../lib/planGate.js')
   if (!org || !(await planHasFeature(org.plan, 'full_branding'))) {
-    return res.status(403).json({ error: 'Logo upload requires Standard plan or higher.' })
+    return res.status(403).json({ error: 'Logo upload requires the Team plan or higher.' })
   }
   const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 9001}`
   const logoUrl = `${baseUrl}/api/v1/uploads/branding/${path.basename(req.file.path)}`

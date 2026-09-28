@@ -19,7 +19,8 @@ import Alert from '../components/ui/Alert'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 import { ghanaBankProfileTip } from '../lib/ghanaBankProfileTips'
 import { reconcileSelectionKind } from '../lib/reconcileSelectionKind'
-import { documents, unlessSubscriptionInactive } from '../lib/api'
+import { documents, reconcile, unlessSubscriptionInactive } from '../lib/api'
+import { chunkCountCancelPairs, type CountCancelPair } from '../lib/countMatchSelect'
 import { useToast } from '../components/ui/Toast'
 
 /**
@@ -80,6 +81,38 @@ export default function ProjectReconcile({
   } = session
 
   const toast = useToast()
+  const pairCancelBatchMutation = useMutation({
+    mutationFn: async (pairs: CountCancelPair[]) => {
+      const chunks = chunkCountCancelPairs(pairs)
+      let created = 0
+      for (const matches of chunks) {
+        const resp = (await reconcile.createMatchBulk(projectId, {
+          matches,
+          remember: false,
+        })) as { created?: number }
+        created += resp?.created ?? matches.length
+      }
+      return created
+    },
+    onSuccess: (created) => {
+      toast.success(
+        `Paired ${created} Cancel-out line${created === 1 ? '' : 's'}`
+      )
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error(
+          'Could not pair the full Cancel-out batch',
+          e instanceof Error ? e.message : 'Some pairs may already be saved. Pair batch again for what is still unmatched.'
+        )
+      ),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['reconcile-count-match', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
   const ingestBlock = data?.ingestBlock
   const matchingAllowed = canReconcile && !ingestBlock?.blocked
   const ackChecksumMutation = useMutation({
@@ -275,8 +308,8 @@ export default function ProjectReconcile({
       <div className="sticky top-0 z-20 -mx-1 border-b border-border-muted bg-surface/95 px-1 py-3 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-gray-700">
-            <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> matches
-            confirmed
+            <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> cash-book
+            lines matched
             {view === 'all'
               ? '. Tick matching rows, then Confirm match at the bottom.'
               : canReconcile
@@ -437,6 +470,8 @@ export default function ProjectReconcile({
             setSelectedCbIds(new Set(cbIds))
             setSelectedBankIds(new Set(bankIds))
           }}
+          canPairCancelBatch={!!features.bulk_match}
+          onPairCancelBatch={(pairs) => pairCancelBatchMutation.mutateAsync(pairs)}
         />
       )}
 

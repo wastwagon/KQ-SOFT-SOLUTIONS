@@ -27,12 +27,12 @@ describe('buildPublicPlans', () => {
 
     const basic = plans.find((p) => p.id === 'basic')
     expect(basic).toMatchObject({
-      monthlyGhs: 300,
-      yearlyGhs: 3000,
-      quarterlyGhs: 855,
-      projectsPerMonth: 10,
-      transactionsPerMonth: 1000,
-      bankAccounts: 5,
+      monthlyGhs: 199,
+      yearlyGhs: 1990,
+      quarterlyGhs: 567,
+      projectsPerMonth: 12,
+      transactionsPerMonth: 3000,
+      bankAccounts: 3,
     })
 
     const firm = plans.find((p) => p.id === 'firm')
@@ -103,7 +103,7 @@ describe('buildPublicPlans', () => {
     const plans = await buildPublicPlans()
     expect(plans).toHaveLength(4)
     const premium = plans.find((p) => p.id === 'premium')
-    expect(premium).toMatchObject({ monthlyGhs: 1500, yearlyGhs: 15000, projectsPerMonth: 100, bankAccounts: 30 })
+    expect(premium).toMatchObject({ monthlyGhs: 990, yearlyGhs: 9900, projectsPerMonth: 100, bankAccounts: 30 })
     const firm = plans.find((p) => p.id === 'firm')
     expect(firm).toMatchObject({ monthlyGhs: 0, yearlyGhs: 0, projectsPerMonth: -1, bankAccounts: -1 })
   })

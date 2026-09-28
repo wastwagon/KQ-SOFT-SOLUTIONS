@@ -159,7 +159,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       <div className="sticky top-0 z-20 -mx-1 border-b border-border-muted bg-white/95 px-1 py-3 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">{data.existingMatches ?? 0} matched</span>
+            <span className="font-semibold text-gray-900">{data.existingMatches ?? 0} cash-book lines matched</span>
             {' · '}
             {unmatchedReceipts.length + unmatchedPayments.length} unmatched cash book
             {' · '}

@@ -16,7 +16,7 @@ async function requireBankRulesPlan(req: AuthRequest, res: import('express').Res
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'bank_rules'))) {
-    res.status(403).json({ error: 'Bank rules require Standard plan or higher. Upgrade to unlock.' })
+    res.status(403).json({ error: 'Bank rules require the Team plan or higher. Upgrade to unlock.' })
     return false
   }
   return true

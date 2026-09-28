@@ -4,10 +4,14 @@ import { ChevronDown, ChevronRight, Download, FileText, Hash } from 'lucide-reac
 import { reconcile } from '../../lib/api'
 import { exportCountMatchExcel, exportCountMatchPdf } from '../../lib/countMatchExport'
 import {
+  cancelEqualCountPairs,
   countMatchSelection,
   leftoverOnlyListKey,
+  type CountCancelPair,
   type CountSelectMode,
 } from '../../lib/countMatchSelect'
+import { COUNT_MATCH_SELECT_CAP } from '../../lib/countMatchExport'
+import { useConfirm } from '../ui/ConfirmDialog'
 import { formatAmount } from '../../lib/format'
 import Button from '../ui/Button'
 import Alert from '../ui/Alert'
@@ -164,6 +168,9 @@ interface CountMatchPanelProps {
   currency: string
   bankAccountId?: string
   onSelectAmountRows?: (cashBookTxIds: string[], bankTxIds: string[]) => void
+  /** Cancel-out only. Omitted leaves Select lines as the only action on that list. */
+  canPairCancelBatch?: boolean
+  onPairCancelBatch?: (pairs: CountCancelPair[]) => Promise<void>
 }
 
 export default function CountMatchPanel({
@@ -173,8 +180,11 @@ export default function CountMatchPanel({
   currency,
   bankAccountId,
   onSelectAmountRows,
+  canPairCancelBatch = false,
+  onPairCancelBatch,
 }: CountMatchPanelProps) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [open, setOpen] = useState(true)
   const [scope, setScope] = useState<CountScope>('unmatched')
   const [listKey, setListKey] = useState<ListKey>('cancel_recv')
@@ -186,6 +196,7 @@ export default function CountMatchPanel({
     seenUpdatedAt: number
   } | null>(null)
   const [highlightAmountKey, setHighlightAmountKey] = useState<string | null>(null)
+  const [pairingAmountKey, setPairingAmountKey] = useState<string | null>(null)
 
   const query = useQuery({
     queryKey: ['reconcile-count-match', projectId, bankAccountId || null, scope],
@@ -313,6 +324,28 @@ export default function CountMatchPanel({
         'Lines selected',
         `${sel.cashBookTxIds.length} cash book · ${sel.bankTxIds.length} bank. Confirm with Match or review suggested pairs — counting does not clear.`
       )
+    }
+  }
+
+  async function handlePairBatch(r: CountAmountRow) {
+    if (!onPairCancelBatch || pairingAmountKey) return
+    const pairs = cancelEqualCountPairs(r.cashBookTxIds, r.bankTxIds)
+    if (!pairs) return
+    const batches = Math.ceil(pairs.length / COUNT_MATCH_SELECT_CAP)
+    const ok = await confirm({
+      title: 'Pair this Cancel-out amount?',
+      description: `Match ${pairs.length} cash-book line${pairs.length === 1 ? '' : 's'} with ${pairs.length} bank line${pairs.length === 1 ? '' : 's'} at this amount, one-to-one${
+        batches > 1 ? `, in ${batches} batches of up to ${COUNT_MATCH_SELECT_CAP}` : ''
+      }. Select lines stays available for a manual match.`,
+      confirmLabel: 'Pair batch',
+      tone: 'info',
+    })
+    if (!ok) return
+    setPairingAmountKey(r.amountKey)
+    try {
+      await onPairCancelBatch(pairs)
+    } finally {
+      setPairingAmountKey(null)
     }
   }
 
@@ -589,9 +622,29 @@ export default function CountMatchPanel({
                                       : 'Select these lines for manual or suggested matching'
                                   }
                                   onClick={() => handleSelectRow(r, 'all')}
+                                  disabled={pairingAmountKey === r.amountKey}
                                 >
                                   {listKey.startsWith('open_') ? 'Select all' : 'Select lines'}
                                 </Button>
+                                {canPairCancelBatch &&
+                                  onPairCancelBatch &&
+                                  scope === 'unmatched' &&
+                                  (listKey === 'cancel_recv' || listKey === 'cancel_pay') &&
+                                  r.cashBookCount > 0 &&
+                                  r.cashBookCount === r.bankCount && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="xs"
+                                      className="text-primary-700"
+                                      title="Pair each cash-book line with a bank line at this amount. Saved in batches of 50. One-to-one via Select lines stays available."
+                                      onClick={() => void handlePairBatch(r)}
+                                      disabled={pairingAmountKey != null}
+                                      isLoading={pairingAmountKey === r.amountKey}
+                                    >
+                                      Pair batch
+                                    </Button>
+                                  )}
                               </div>
                             )}
                         </TableTd>

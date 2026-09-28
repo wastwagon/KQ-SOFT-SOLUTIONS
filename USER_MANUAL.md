@@ -61,7 +61,7 @@ The system ships pre-built parsers for many regional bank statement layouts (wit
 | **Clean tools** | Validate bank / cash-book parsers without a project: free preview + watermarked sample downloads; full Excel/PDF on monthly plan quota |
 | **Match by counting** | Diagnostic amount-frequency lists on Reconcile (never auto-clears) |
 
-### Standard Plan and Above
+### Team plan and above
 
 | Feature | Description |
 |---------|-------------|
@@ -72,7 +72,7 @@ The system ships pre-built parsers for many regional bank statement layouts (wit
 | **Discrepancy report** | Identify variances and exceptions |
 | **Missing cheques report** | Track unpresented cheques |
 
-### Premium Plan and Above
+### Firm plan and above
 
 | Feature | Description |
 |---------|-------------|
@@ -81,7 +81,7 @@ The system ships pre-built parsers for many regional bank statement layouts (wit
 | **Threshold approval** | Set an approval threshold amount (e.g. above GH₵10,000 needs reviewer) |
 | **Full branding** | Logo, primary/secondary colours, letterhead, report title, footer |
 
-### Firm Plan
+### Custom plan
 
 | Feature | Description |
 |---------|-------------|
@@ -173,7 +173,7 @@ Use the main navigation menu:
 - **Clean bank statement** / **Clean cash book** — Tools (preview free; sample watermarked; full on quota)
 - **Reports** — Completed projects (ready for export)
 - **Clients** — Manage clients
-- **Audit** — Action history (Standard plan and above)
+- **Audit** — Action history (Team plan and above)
 - **Settings** — Branding, billing, members, API keys, bank rules
 
 ---
@@ -187,7 +187,7 @@ Use the main navigation menu:
    - **Name** — e.g. "Ecobank Jan 2025"
    - **Client** (optional) — Select from your clients or leave blank
    - **Currency** — GHS (default), USD, or EUR (reporting currency for this project’s BRS only; workspace subscription remains GHS via Paystack — see Settings → Billing)
-   - **Roll-forward from** (optional) — Select a completed project to carry unpresented cheques forward (Premium+)
+   - **Roll-forward from** (optional) — Select a completed project to carry unpresented cheques forward (Firm plan and above)
 3. Click **Create**.
 
 ### Project List
@@ -301,14 +301,14 @@ Match each payment to its corresponding bank debit (or leave unmatched if it is 
 #### How to Match
 
 1. **Single match:** Select one cash book line and one bank line, then click **Match**.
-2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all (safe → patterns)** for phased high-confidence suggestions (90%+ any safe pair, then bank-pattern suggestions at 85%+). Available on Standard+ with bulk match.
+2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all (safe → patterns)** for phased high-confidence suggestions (90%+ any safe pair, then bank-pattern suggestions at 85%+). Available on the Team plan and above with bulk match.
 3. **1-to-many / many-to-many:** Select one cash book line and multiple bank lines (or vice versa), then match. Many-to-many requires both sides to sum to the same total.
 
 #### Suggestions
 
 - Suggested matches appear on all tiers (amount, date, reference/cheque, narration). Missing dates do not count as a date match. Review and accept or ignore.
 - Bank pattern layers (Ecobank, SCB, GCB, NIB, Prudential, Absa, Bank of Africa) rank ahead of generic pairs when the profile is detected.
-- Bank rules (Settings → Bank rules, Standard+) need amount **plus** date, ref/chq, or narration corroboration — amount alone is never enough.
+- Bank rules (Settings → Bank rules, Team plan and above) need amount **plus** date, ref/chq, or narration corroboration — amount alone is never enough.
 - AI ranking from previously confirmed pairs also runs when match memory is available.
 - **Match by counting:** On Reconcile, use the counting panel in order: **Cancel** → **Open** (Select overlap, then confirm) → **Only**. There is no Open — less list (more on one side is less on the other). After an Open overlap is matched, leftovers appear on Only if scope is Unmatched. Export Excel or PDF if needed. Selection is capped at 50 per side. Counts never auto-clear — confirm matches as usual.
 - **Limits:** one currency per project (no FX conversion in matching); no pro-rata partial amounts — use 1-to-many / many-to-1 when several lines sum to a full amount.
@@ -358,7 +358,7 @@ View and export the Bank Reconciliation Statement.
 - **Print** — Print the report
 - **Approve** (Reviewer/Admin) — Mark project as completed
 - **Reopen** (Reviewer/Admin) — Return to Reconcile for changes
-- **Roll-forward** (Premium+) — Create a new project with unpresented cheques carried forward
+- **Roll-forward** (Firm plan and above) — Create a new project with unpresented cheques carried forward
 
 ---
 
@@ -392,7 +392,7 @@ Access **Settings** from the main menu. Tabs: **Branding**, **Billing**, **Membe
 - **Letterhead address** — Address shown on reports
 - **Report title** — Default "Bank Reconciliation Statement" or custom
 - **Footer** — Text at bottom of reports
-- **Approval threshold** (Premium+) — Amount above which reviewer approval is required
+- **Approval threshold** (Firm plan and above) — Amount above which reviewer approval is required
 
 Click **Reset to platform default** to restore platform defaults.
 
@@ -426,7 +426,7 @@ Create rules to auto-suggest matches:
 
 ## 10. Audit Log
 
-(Standard plan and above)
+(Team plan and above)
 
 - View **Audit** to see who did what and when.
 - Actions logged: login, project create/edit/delete, upload, match, submit, approve, reopen, etc.
@@ -445,20 +445,20 @@ Create rules to auto-suggest matches:
 
 | Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Full clean exports/mo | Users |
 |------|-------------|-----------------|--------------------------|------------------------|-------|
-| Basic | 10 | 1,000 | 5 | 5 | 1 |
-| Standard | 30 | 5,000 | 10 | 20 | 3 |
-| Premium | 100 | 20,000 | 30 | 60 | 5 |
-| Custom (firm) | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited |
+| Solo | 12 | 3,000 | 3 | 5 | 1 |
+| Team | 40 | 15,000 | 10 | 20 | 5 |
+| Firm | 100 | 40,000 | 30 | 60 | 10 |
+| Custom | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited |
 
 | Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
 |------|---------------|-----------------|--------------|
-| Basic | 300 | 855 | 3,000 |
-| Standard | 900 | 2,565 | 9,000 |
-| Premium | 1,500 | 4,275 | 15,000 |
-| Custom | Contract | — | — |
+| Solo | 199 | 567 | 1,990 |
+| Team | 399 | 1,137 | 3,990 |
+| Firm | 990 | 2,822 | 9,900 |
+| Custom | From 1,800 | — | Contract |
 
 - **Trial:** 14 days on signup; subscribe via Paystack to continue when paywall is enabled.
-- **Basic** is a paid tier (not free after trial) and includes bookkeeping consultancy / advisory.
+- **Solo** is a paid tier (not free after trial) and includes bookkeeping consultancy / advisory.
 - **Excel export** includes mapped bank lines on sheets `BANK CREDITS (MAPPED)` and `BANK DEBITS (MAPPED)`.
 - **Intro offer:** 50% off your first 2 months when enabled by the platform.
 - **Billing periods:** monthly, quarterly (~5% off), or yearly (~17% off vs monthly).
@@ -513,7 +513,7 @@ If your bank is not auto-detected, use the **Map** step to manually map columns.
 | Cannot log in / 401 | Check API is running; ensure `VITE_API_URL` points to the API |
 | Upload fails | Use Excel or CSV for testing; ensure file is not corrupted |
 | Parse errors | Check column headers; use Map step to correct mapping |
-| No suggested matches | Ensure you have Standard plan or above; check bank rules |
+| No suggested matches | Ensure you have the Team plan or above; check bank rules |
 | Export fails | For large reports (200+ transactions), wait 30–60 seconds |
 | CORS errors | Ensure frontend URL is in `CORS_ORIGIN` (production) |
 | Password reset not received | Configure `RESEND_API_KEY` and `APP_URL` in production |

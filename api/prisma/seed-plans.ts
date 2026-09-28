@@ -36,43 +36,43 @@ interface PlanSeed {
   usersLimit: number
 }
 
-/** Jul 2026 catalogue: bank seats + txn caps; annual ≈ 10× monthly. */
+/** Sep 2026 catalogue: Solo / Team / Firm. Annual = 10× monthly. */
 const PLANS: PlanSeed[] = [
   {
     slug: 'basic',
-    name: 'Basic',
-    projectsPerMonth: 10,
-    transactionsPerMonth: 1_000,
-    monthlyGhs: 300,
-    yearlyGhs: 3000,
-    quarterlyGhs: 855,
-    bankAccounts: 5,
+    name: 'Solo',
+    projectsPerMonth: 12,
+    transactionsPerMonth: 3_000,
+    monthlyGhs: 199,
+    yearlyGhs: 1990,
+    quarterlyGhs: 567,
+    bankAccounts: 3,
     cleanExportsPerMonth: 5,
     usersLimit: 1,
   },
   {
     slug: 'standard',
-    name: 'Standard',
-    projectsPerMonth: 30,
-    transactionsPerMonth: 5_000,
-    monthlyGhs: 900,
-    yearlyGhs: 9000,
-    quarterlyGhs: 2565,
+    name: 'Team',
+    projectsPerMonth: 40,
+    transactionsPerMonth: 15_000,
+    monthlyGhs: 399,
+    yearlyGhs: 3990,
+    quarterlyGhs: 1137,
     bankAccounts: 10,
     cleanExportsPerMonth: 20,
-    usersLimit: 3,
+    usersLimit: 5,
   },
   {
     slug: 'premium',
-    name: 'Premium',
+    name: 'Firm',
     projectsPerMonth: 100,
-    transactionsPerMonth: 20_000,
-    monthlyGhs: 1500,
-    yearlyGhs: 15000,
-    quarterlyGhs: 4275,
+    transactionsPerMonth: 40_000,
+    monthlyGhs: 990,
+    yearlyGhs: 9900,
+    quarterlyGhs: 2822,
     bankAccounts: 30,
     cleanExportsPerMonth: 60,
-    usersLimit: 5,
+    usersLimit: 10,
   },
   {
     slug: 'firm',
@@ -92,9 +92,9 @@ async function main() {
   const force = process.env.FORCE_PLAN_RESET === '1'
   /** Known pre–Jul 2026 monthly amounts — auto-sync without requiring FORCE_PLAN_RESET. */
   const legacyMonthly: Record<string, number[]> = {
-    basic: [0, 150],
-    standard: [50, 400],
-    premium: [100, 900],
+    basic: [0, 150, 300],
+    standard: [50, 400, 900],
+    premium: [100, 900, 1500],
   }
   for (const plan of PLANS) {
     const existing = await prisma.plan.findUnique({ where: { slug: plan.slug } })

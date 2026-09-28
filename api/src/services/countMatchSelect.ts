@@ -50,6 +50,39 @@ export function leftoverOnlyListKey(
 
 export const COUNT_MATCH_SELECT_CAP = 50
 
+export type CountCancelPair = {
+  cashBookTransactionId: string
+  bankTransactionId: string
+}
+
+/**
+ * One-to-one pairs for a Cancel-out amount, in list order.
+ * Null unless both sides have the same non-zero count.
+ */
+export function cancelEqualCountPairs(
+  cashBookTxIds: string[],
+  bankTxIds: string[]
+): CountCancelPair[] | null {
+  if (cashBookTxIds.length === 0 || cashBookTxIds.length !== bankTxIds.length) return null
+  return cashBookTxIds.map((cashBookTransactionId, i) => ({
+    cashBookTransactionId,
+    bankTransactionId: bankTxIds[i]!,
+  }))
+}
+
+/** Split Cancel-out pairs into bulk-match sized batches. */
+export function chunkCountCancelPairs(
+  pairs: CountCancelPair[],
+  size = COUNT_MATCH_SELECT_CAP
+): CountCancelPair[][] {
+  const step = size > 0 ? size : COUNT_MATCH_SELECT_CAP
+  const chunks: CountCancelPair[][] = []
+  for (let i = 0; i < pairs.length; i += step) {
+    chunks.push(pairs.slice(i, i + step))
+  }
+  return chunks
+}
+
 export function countMatchSelection(
   cashBookTxIds: string[],
   bankTxIds: string[],

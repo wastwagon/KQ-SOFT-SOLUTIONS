@@ -22,6 +22,7 @@ import { hasPlanFeature } from '../config/planFeatures.js'
 import { getPlanBySlug } from '../services/plan.js'
 import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
+import { detectReversalCandidates, withoutOffsettingReturnedChequePairs } from '../services/reversalCandidates.js'
 import { detectFileType, parseCsv, parseExcel } from '../services/parser.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { heavyOrgRouteLimiter } from '../middleware/heavyRouteLimiter.js'
@@ -387,68 +388,6 @@ export function extractSourceClosingBalanceFromDocs(filepaths: string[]): number
     if (value != null) return value
   }
   return null
-}
-
-function detectReversalCandidates(
-  receipts: TxLike[],
-  payments: TxLike[],
-  credits: TxLike[],
-  debits: TxLike[]
-) {
-  type Candidate = {
-    key: string
-    incoming: TxLike
-    outgoing: TxLike
-    stream: 'cash_book' | 'bank'
-    dayDiff: number
-  }
-  const candidates: Candidate[] = []
-  const keyFor = (t: TxLike) => {
-    const ref = (t.docRef || '').trim()
-    if (ref) return `ref:${ref.toLowerCase()}`
-    const chq = (t.chqNo || '').trim()
-    if (chq) return `chq:${chq.toLowerCase()}`
-    const desc = (t.details || t.name || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 24)
-    return desc ? `desc:${desc}` : ''
-  }
-  const collectPairs = (
-    incoming: TxLike[],
-    outgoing: TxLike[],
-    stream: 'cash_book' | 'bank'
-  ) => {
-    const outSorted = [...outgoing].sort((a, b) => {
-      const ad = a.date ? new Date(a.date).getTime() : 0
-      const bd = b.date ? new Date(b.date).getTime() : 0
-      return ad - bd
-    })
-    for (const inc of incoming) {
-      const keyInc = keyFor(inc)
-      if (!keyInc || Math.abs(inc.amount) <= 0) continue
-      for (const out of outSorted) {
-        const keyOut = keyFor(out)
-        if (keyInc !== keyOut || Math.abs(out.amount) <= 0) continue
-        if (Math.abs(Math.abs(inc.amount) - Math.abs(out.amount)) > 0.01) continue
-        const da = inc.date ? new Date(inc.date) : null
-        const db = out.date ? new Date(out.date) : null
-        const dayDiff = da && db ? Math.abs((da.getTime() - db.getTime()) / (1000 * 60 * 60 * 24)) : 0
-        if (dayDiff > 31) continue
-        candidates.push({ key: keyInc, incoming: inc, outgoing: out, stream, dayDiff })
-        break
-      }
-    }
-  }
-  collectPairs(receipts, payments, 'cash_book')
-  collectPairs(credits, debits, 'bank')
-  return candidates.slice(0, 100).map((c) => ({
-    reference: c.key,
-    stream: c.stream,
-    amount: Math.abs(c.incoming.amount),
-    incomingDate: c.incoming.date ? new Date(c.incoming.date).toISOString() : null,
-    outgoingDate: c.outgoing.date ? new Date(c.outgoing.date).toISOString() : null,
-    incomingNarration: c.incoming.details || c.incoming.name || '',
-    outgoingNarration: c.outgoing.details || c.outgoing.name || '',
-    dayDiff: Math.round(c.dayDiff),
-  }))
 }
 
 function resolveBrandingLogoPath(logoUrl: unknown): string | null {
@@ -853,6 +792,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         )
       : undefined
   const bankOnlyDebitsCtx = ecobankProfile.workbookNetting ? { workbookNetting: true } : undefined
+  const gtBankCedisFace = ghanaBankFormat === 'gt_bank' && !gtBankEurProfile.active
+  const cedisFaceBankOnly = gtBankCedisFace
+    ? withoutOffsettingReturnedChequePairs(unmatchedCredits as TxLike[], unmatchedDebits as TxLike[])
+    : null
   let bankOnlyDebitsNotInCashBookTotal = gtBankEurProfile.active
     ? computeGtBankEurBankOnlyDebitsTotal({
         unmatchedDebits: unmatchedDebits as TxLike[],
@@ -862,6 +805,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         matchedPaymentIds,
         excludeBankIds: workbookBankOnlyExcludeIds,
       })
+    : gtBankCedisFace
+      ? cedisFaceBankOnly!.debits.reduce((s, t) => s + t.amount, 0)
     : computeBankOnlyDebitsTotal(
         unmatchedDebits as TxLike[],
         unmatchedCredits as TxLike[],
@@ -875,12 +820,14 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebitsTotal - bankOnlyDebitsNotInCashBookTotal
   let asAtUncreditedTotal = unmatchedReceiptsTotal
   let asAtUnpresentedTotal = unpresentedChequesTotal
-  const bankOnlyCreditsNotInCashBookTotal = computeBankOnlyCreditsTotal(
-    unmatchedCredits as TxLike[],
-    payments as TxLike[],
-    receipts as TxLike[],
-    broughtForwardBankCreditsTotal
-  )
+  const bankOnlyCreditsNotInCashBookTotal = gtBankCedisFace
+    ? cedisFaceBankOnly!.credits.reduce((s, t) => s + t.amount, 0) + broughtForwardBankCreditsTotal
+    : computeBankOnlyCreditsTotal(
+        unmatchedCredits as TxLike[],
+        payments as TxLike[],
+        receipts as TxLike[],
+        broughtForwardBankCreditsTotal
+      )
   const bankOnlySchedule = buildBankOnlyScheduleRows(
     unmatchedDebits as TxLike[],
     unmatchedCredits as TxLike[],
@@ -891,7 +838,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     workbookBankOnlyExcludeIds,
     bankOnlyDebitsCtx
   )
-  if (gtBankEurProfile.active) {
+  if (gtBankCedisFace) {
+    bankOnlySchedule.debits = cedisFaceBankOnly!.debits
+    bankOnlySchedule.credits = cedisFaceBankOnly!.credits
+  } else if (gtBankEurProfile.active) {
     bankOnlySchedule.debits = buildGtBankEurBankOnlyDebitRows({
       unmatchedDebits: unmatchedDebits as TxLike[],
       unmatchedCredits: unmatchedCredits as TxLike[],
@@ -929,6 +879,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     broughtForwardUnpresentedTotal: broughtForwardTotal,
     gtBankEur: gtBankEurProfile.active,
     ecobank: ecobankProfile.active,
+    rawUnmatchedTiming: ghanaBankFormat === 'gt_bank' && !gtBankEurProfile.active,
     ecobankUnpresentedRows: unpresentedChequeRowsForBrs as TxLike[],
     ecobankUnpresentedTotal: unpresentedChequesTotal,
   })
@@ -1004,7 +955,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const timingUncreditedCurrentPeriod = currentPeriodTimingTotal(uncreditedRowsForBrs)
   const timingUncreditedBroughtForwardPrior = broughtForwardReceiptLodgmentsTotal
   const unpresentedBroughtForwardPrior = broughtForwardTotal
-  const bankOnlyCreditsCurrentPeriod = unmatchedCreditsTotal
+  const bankOnlyCreditsCurrentPeriod = cedisFaceBankOnly
+    ? cedisFaceBankOnly.credits.reduce((s, t) => s + t.amount, 0)
+    : unmatchedCreditsTotal
   const bankOnlyCreditsBroughtForwardPrior = broughtForwardBankCreditsTotal
   const workbookScheduleDerivedCashBook = deriveCashBookFromWorkbookSchedule({
     bankClosingBalance,
@@ -1196,7 +1149,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     reportEntityName,
     organization: { name: project.organization.name, branding },
     summary: {
-      matchedCount: project.matches.length,
+      matchedCount: matchedCbIds.size,
       matchedReceiptsCreditsCount: matchedReceiptsVsCredits.length,
       matchedPaymentsDebitsCount: matchedPaymentsVsDebits.length,
       unmatchedReceipts: unmatchedReceipts.length,
@@ -1767,6 +1720,16 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     workbookNetting: workbookNettingRequestedExport,
   })
   const gtBankEurProfileExport = isGtBankEurScope(project, project.bankAccounts || [], sampleBankTextExport)
+  const ghanaBankFormatExport = ecobankProfileExport.active
+    ? 'ecobank'
+    : resolveGhanaBankFormatLabel(project.bankAccounts || [], bankAccountId)
+  const gtBankCedisFaceExport = ghanaBankFormatExport === 'gt_bank' && !gtBankEurProfileExport.active
+  const cedisFaceBankOnlyExport = gtBankCedisFaceExport
+    ? withoutOffsettingReturnedChequePairs(
+        unmatchedCreditsOnlyExport as TxLike[],
+        unmatchedDebitsOnlyExport as TxLike[]
+      )
+    : null
   const matchedPaymentsVsDebitsExport = matchPairs.filter((p) => !receiptIds.has(p.cb.id))
   const debitIdsExport = new Set(debits.map((t) => t.id))
   const creditIdsExport = new Set(credits.map((t) => t.id))
@@ -1833,6 +1796,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         matchedPaymentIds: matchedPaymentIdsExport,
         excludeBankIds: workbookBankOnlyExcludeIdsExport,
       })
+    : gtBankCedisFaceExport
+      ? cedisFaceBankOnlyExport!.debits.reduce((s, t) => s + t.amount, 0)
     : computeBankOnlyDebitsTotal(
         unmatchedDebitsOnlyExport as TxLike[],
         unmatchedCreditsOnlyExport as TxLike[],
@@ -1845,12 +1810,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const faceBankOnlyDebitsExport = bankOnlyDebitsNotInCashBookTotalExport
   const unmatchedDebitsLinkedToCashBookTotalExport =
     unmatchedDebitsTotalExport - bankOnlyDebitsNotInCashBookTotalExport
-  const bankOnlyCreditsNotInCashBookTotalExport = computeBankOnlyCreditsTotal(
-    unmatchedCreditsOnlyExport as TxLike[],
-    payments as TxLike[],
-    receipts as TxLike[],
-    broughtForwardBankCreditsTotalExport
-  )
+  const bankOnlyCreditsNotInCashBookTotalExport = gtBankCedisFaceExport
+    ? cedisFaceBankOnlyExport!.credits.reduce((s, t) => s + t.amount, 0) +
+      broughtForwardBankCreditsTotalExport
+    : computeBankOnlyCreditsTotal(
+        unmatchedCreditsOnlyExport as TxLike[],
+        payments as TxLike[],
+        receipts as TxLike[],
+        broughtForwardBankCreditsTotalExport
+      )
   const bankStatementClosingBalanceExportEarly =
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
@@ -1876,6 +1844,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     broughtForwardUnpresentedTotal: broughtForwardChequesTotalExport,
     gtBankEur: gtBankEurProfileExport.active,
     ecobank: ecobankProfileExport.active,
+    rawUnmatchedTiming: gtBankCedisFaceExport,
     ecobankUnpresentedRows: unpresentedChequeRowsForBrsExport as TxLike[],
     ecobankUnpresentedTotal: unpresentedChequesTotal,
   })
@@ -1970,7 +1939,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     workbookBankOnlyExcludeIdsExport,
     bankOnlyDebitsCtxExport
   )
-  if (gtBankEurProfileExport.active) {
+  if (gtBankCedisFaceExport) {
+    bankOnlyScheduleExport.debits = cedisFaceBankOnlyExport!.debits
+    bankOnlyScheduleExport.credits = cedisFaceBankOnlyExport!.credits
+  } else if (gtBankEurProfileExport.active) {
     bankOnlyScheduleExport.debits = buildGtBankEurBankOnlyDebitRows({
       unmatchedDebits: unmatchedDebitsOnlyExport as TxLike[],
       unmatchedCredits: unmatchedCreditsOnlyExport as TxLike[],
@@ -2022,7 +1994,9 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const timingUncreditedCurrentPeriodExport = currentPeriodTimingTotal(uncreditedRowsForBrsExport)
   const timingUncreditedBroughtForwardPriorExport = broughtForwardReceiptLodgmentsTotalExport
   const unpresentedBroughtForwardPriorExport = broughtForwardChequesTotalExport
-  const bankOnlyCreditsCurrentPeriodExport = unmatchedCreditsTotalExport
+  const bankOnlyCreditsCurrentPeriodExport = cedisFaceBankOnlyExport
+    ? cedisFaceBankOnlyExport.credits.reduce((s, t) => s + t.amount, 0)
+    : unmatchedCreditsTotalExport
   const bankOnlyCreditsBroughtForwardPriorExport = broughtForwardBankCreditsTotalExport
   const workbookScheduleDerivedCashBookExport = deriveCashBookFromWorkbookSchedule({
     bankClosingBalance,

@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js'
 import {
   getLimits as getConfigLimits,
+  PLAN_DISPLAY_NAMES,
   PLAN_PRICES,
   resolvePlanPrices,
   TIER_LIMITS,
@@ -8,6 +9,7 @@ import {
 import {
   mergePlanFeatures,
   replacePlanRuntimeEntitlements,
+  USER_LIMIT_BY_PLAN,
   type PlanFeature,
   type PlanRuntimeEntitlements,
 } from '../config/planFeatures.js'
@@ -76,7 +78,7 @@ async function loadPlansFromDb(): Promise<Map<string, PlanData>> {
       bankAccounts: typeof p.bankAccounts === 'number' ? p.bankAccounts : catalogue.bankAccounts,
       cleanExportsPerMonth:
         typeof p.cleanExportsPerMonth === 'number' ? p.cleanExportsPerMonth : catalogue.cleanExportsPerMonth,
-      usersLimit: typeof p.usersLimit === 'number' ? p.usersLimit : p.slug === 'firm' ? -1 : p.slug === 'premium' ? 5 : p.slug === 'standard' ? 3 : 1,
+      usersLimit: typeof p.usersLimit === 'number' ? p.usersLimit : (USER_LIMIT_BY_PLAN[p.slug] ?? 1),
       features: mergePlanFeatures(p.slug, p.features),
       active: p.active !== false,
     })
@@ -126,7 +128,7 @@ export async function getPlanBySlug(slug: string): Promise<PlanData | null> {
   if (!prices) return null
   return {
     slug,
-    name: slug === 'firm' ? 'Custom' : slug.charAt(0).toUpperCase() + slug.slice(1),
+    name: PLAN_DISPLAY_NAMES[slug] ?? slug,
     projectsPerMonth: limits.projectsPerMonth,
     transactionsPerMonth: limits.transactionsPerMonth,
     monthlyGhs: prices.monthlyGhs,
@@ -134,7 +136,7 @@ export async function getPlanBySlug(slug: string): Promise<PlanData | null> {
     quarterlyGhs: prices.quarterlyGhs,
     bankAccounts: limits.bankAccounts,
     cleanExportsPerMonth: limits.cleanExportsPerMonth,
-    usersLimit: slug === 'firm' ? -1 : slug === 'premium' ? 5 : slug === 'standard' ? 3 : 1,
+    usersLimit: USER_LIMIT_BY_PLAN[slug] ?? 1,
     features: mergePlanFeatures(slug, null),
     active: true,
   }

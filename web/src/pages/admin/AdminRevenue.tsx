@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { DollarSign, TrendingUp, CreditCard, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '../../lib/api'
+import { publicPlanName } from '../../lib/plans'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import MetricCard from '../../components/ui/MetricCard'
@@ -90,7 +91,7 @@ export default function AdminRevenue() {
             ) : (
               data.byPlan.map((p) => (
                 <div key={p.plan} className="flex justify-between items-center py-2 border-b border-border-muted last:border-0">
-                  <span className="font-medium text-gray-900 capitalize">{p.plan}</span>
+                  <span className="font-medium text-gray-900">{publicPlanName(p.plan)}</span>
                   <span className="text-sm text-gray-600">{fmt(p.total)} ({p.count} payments)</span>
                 </div>
               ))
@@ -106,7 +107,7 @@ export default function AdminRevenue() {
                 <div key={p.id} className="flex justify-between items-center py-2 border-b border-border-muted last:border-0 text-sm">
                   <div>
                     <p className="font-medium text-gray-900">{p.orgName}</p>
-                    <p className="text-gray-500 text-xs">{p.plan} • {p.period} • {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-gray-500 text-xs">{publicPlanName(p.plan)} • {p.period} • {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                   <span className="font-medium text-gray-900">{fmt(p.amount)}</span>
                 </div>

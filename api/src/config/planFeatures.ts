@@ -89,8 +89,8 @@ const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
 /** User limit per plan (-1 = unlimited) */
 export const USER_LIMIT_BY_PLAN: Record<string, number> = {
   basic: 1,
-  standard: 3,
-  premium: 5,
+  standard: 5,
+  premium: 10,
   firm: -1,
 }
 

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, Download, LogIn } from 'lucide-react'
 import { api } from '../../lib/api'
+import { publicPlanName } from '../../lib/plans'
 import { useAuth } from '../../store/auth'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -188,10 +189,10 @@ export default function AdminSubscribers() {
                 aria-label="Filter by plan"
               >
                 <option value="">All plans</option>
-                <option value="basic">Basic</option>
-                <option value="standard">Standard</option>
-                <option value="premium">Premium</option>
-                <option value="firm">Firm</option>
+                <option value="basic">Solo</option>
+                <option value="standard">Team</option>
+                <option value="premium">Firm</option>
+                <option value="firm">Custom</option>
                 <option value="paid">Paid (excl. free/trial-only)</option>
               </Select>
             </div>
@@ -272,7 +273,7 @@ export default function AdminSubscribers() {
                     {o.subscriptionStatus}
                   </Badge>
                 </TableTd>
-                <TableTd className="capitalize">{o.plan}</TableTd>
+                <TableTd>{publicPlanName(o.plan)}</TableTd>
                 <TableTd className="text-right font-medium text-gray-900">{fmt(o.totalPaid)}</TableTd>
                 <TableTd className="text-right">{o._count.members}</TableTd>
                 <TableTd className="text-right">

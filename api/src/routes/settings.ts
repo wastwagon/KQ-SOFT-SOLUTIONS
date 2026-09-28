@@ -37,7 +37,7 @@ export interface BrandingPayload {
   letterheadAddress?: string
   reportTitle?: string
   footer?: string
-  /** Premium+ only: max discrepancy (GH₵) that reviewers can approve; above this, admin required */
+  /** Firm plan and above: max discrepancy (GH₵) that reviewers can approve; above this, admin required */
   approvalThresholdAmount?: number | null
   /** Org default for Ecobank Ghana BRS workbook Groups 2–3 netting on reports/reconcile */
   ghanaBrsWorkbookNettingDefault?: boolean
@@ -70,7 +70,7 @@ router.patch('/branding', async (req: AuthRequest, res) => {
       select: { plan: true },
     })
     if (!org || !(await planHasFeature(org.plan, 'full_branding'))) {
-      return res.status(403).json({ error: 'Logo requires Standard plan or higher.' })
+      return res.status(403).json({ error: 'Logo requires the Team plan or higher.' })
     }
   }
   const orgForPlan = await prisma.organization.findUnique({
@@ -336,7 +336,7 @@ router.delete('/match-memory/:id', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'ai_suggestions'))) {
-    return res.status(403).json({ error: 'Organisation match memory requires Standard plan or higher.' })
+    return res.status(403).json({ error: 'Organisation match memory requires the Team plan or higher.' })
   }
   const { forgetOrganisationMatchMemory } = await import('../services/organizationMatchMemory.js')
   const ok = await forgetOrganisationMatchMemory(orgId, req.params.id)
