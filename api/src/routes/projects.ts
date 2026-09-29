@@ -11,6 +11,7 @@ import { getProjectVariance } from '../lib/reconcile-variance.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
 import { isExistingProjectSourceLocked } from '../services/projectSourceLock.js'
+import { composeProjectDisplayName } from '../lib/projectIdentity.js'
 
 const router = Router()
 
