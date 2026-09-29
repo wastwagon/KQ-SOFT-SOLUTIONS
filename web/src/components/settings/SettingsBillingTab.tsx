@@ -192,7 +192,7 @@ export default function SettingsBillingTab({
             No self-serve packages are currently active. Contact support to change your plan.
           </Alert>
         ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {(plansData.plans || []).map((p) => {
             const introEligible = plansData?.introOffer?.eligible
             const q = p.quarterlyGhs ?? Math.round(p.monthlyGhs * 2.85)
@@ -203,25 +203,27 @@ export default function SettingsBillingTab({
             return (
               <Card
                 key={p.id}
-                className="flex flex-col min-w-0 hover:shadow-card-hover"
+                noPadding
+                className="flex flex-col min-w-0"
               >
-                <h3 className="font-semibold tracking-tight text-gray-900">{p.name}</h3>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+                <div className="p-3.5 flex flex-col">
+                <h3 className="text-sm font-semibold text-gray-900">{p.name}</h3>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">
                   GH₵{p.monthlyGhs}
-                  <span className="text-sm font-normal text-gray-500">/mo</span>
+                  <span className="text-xs font-normal text-gray-500">/mo</span>
                   {firstMonthGhs != null && (
-                    <span className="ml-2 text-base font-normal text-green-700">
+                    <span className="ml-1.5 text-xs font-normal text-green-700">
                       Intro: GH₵{firstMonthGhs}
                     </span>
                   )}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs text-gray-500">
                   GH₵{q}/qtr · GH₵{p.yearlyGhs}/yr ({formatYearlyDiscountLabel(p.monthlyGhs, p.yearlyGhs)})
                 </p>
-                <div className="mt-5 flex flex-col gap-3 flex-1 justify-end">
+                <div className="mt-3 flex flex-col gap-1.5">
                   <Button
                     type="button"
-                    size="lg"
+                    size="sm"
                     className="w-full"
                     onClick={() => onUpgrade(p.id, 'monthly')}
                     isLoading={initializing === `${p.id}-monthly`}
@@ -236,9 +238,9 @@ export default function SettingsBillingTab({
                   </Button>
                   <Button
                     type="button"
+                    size="sm"
                     variant="outline"
-                    size="lg"
-                    className="w-full leading-snug"
+                    className="w-full"
                     onClick={() => onUpgrade(p.id, 'quarterly')}
                     isLoading={initializing === `${p.id}-quarterly`}
                   >
@@ -248,9 +250,9 @@ export default function SettingsBillingTab({
                   </Button>
                   <Button
                     type="button"
+                    size="sm"
                     variant="outline"
-                    size="lg"
-                    className="w-full leading-snug"
+                    className="w-full"
                     onClick={() => onUpgrade(p.id, 'yearly')}
                     isLoading={initializing === `${p.id}-yearly`}
                   >
@@ -260,6 +262,7 @@ export default function SettingsBillingTab({
                         ? `Renew yearly (GH₵${p.yearlyGhs})`
                         : `Pay yearly (GH₵${p.yearlyGhs})`}
                   </Button>
+                </div>
                 </div>
               </Card>
             )

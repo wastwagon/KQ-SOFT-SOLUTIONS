@@ -676,7 +676,7 @@ export default function AdminOrgDetail() {
                 if (clearTrialReason.trim().length < 3) return
                 const ok = await confirm({
                   title: 'Clear trial override?',
-                  description: 'The computed trial window will be restored. This action will be audit-logged.',
+                  description: 'The override will be cleared. The Free plan stays active. A paid plan without a current payment is unpaid. This action will be audit-logged.',
                   confirmLabel: 'Clear override',
                   tone: 'warning',
                 })
@@ -700,7 +700,7 @@ export default function AdminOrgDetail() {
               </Alert>
             ) : (
               <p className="text-xs text-gray-500">
-                Effective status is computed from payments and trial window. Select a value below and apply to override.
+                Effective status is computed from the plan and payments. Select a value below and apply to override.
               </p>
             )}
             <Select

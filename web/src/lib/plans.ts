@@ -18,10 +18,11 @@
  * Keep this file aligned with those when prices/limits change.
  */
 
-export type PlanSlug = 'basic' | 'standard' | 'premium' | 'firm'
+export type PlanSlug = 'free' | 'basic' | 'standard' | 'premium' | 'firm'
 
 /** Public names for the stable slugs. Unknown values are returned unchanged. */
 const PUBLIC_PLAN_NAMES: Record<string, string> = {
+  free: 'Free',
   basic: 'Solo',
   standard: 'Team',
   premium: 'Firm',
@@ -155,14 +156,66 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
 
 /* -------------------------------------------------------------------------
  * Sep 2026 catalogue — keep in sync with api/src/config/subscription.ts
- * Slugs stay basic / standard / premium / firm. Public names are Solo / Team / Firm / Custom.
+ * Slugs stay free / basic / standard / premium / firm. Public names are Free / Solo / Team / Firm / Custom.
+ * Paid plans have no trial. New workspaces start on Free.
  * ----------------------------------------------------------------------- */
 
 export const MARKETING_PLANS: MarketingPlan[] = [
   {
+    slug: 'free',
+    name: 'Free',
+    tagline: '1 bank account, 500 transactions, and 5 projects a month.',
+    audience: 'Getting started',
+    monthlyGhs: 0,
+    yearlyGhs: 0,
+    quarterlyGhs: 0,
+    projectsPerMonth: 5,
+    transactionsPerMonth: 500,
+    bankAccounts: 1,
+    users: 1,
+    cleanExportsPerMonth: 0,
+    bullets: [
+      '5 projects / month · 1 team member',
+      'Watermarked sample downloads',
+      'Excel, CSV and PDF imports, plus OCR',
+      'Auto-match suggestions and BRS export',
+    ],
+    features: {
+      bank_accounts: '1',
+      projects: '5 / month',
+      transactions: '500 / month',
+      users: '1',
+      imports: true,
+      ocr: true,
+      bank_parsers: true,
+      one_to_one: true,
+      bulk_match: false,
+      ai_suggestions: false,
+      one_to_many: true,
+      many_to_many: true,
+      bank_rules: false,
+      brs_export: true,
+      discrepancy: false,
+      audit_trail: false,
+      roll_forward: false,
+      threshold_approval: false,
+      basic_branding: true,
+      full_branding: false,
+      firm_dashboard: false,
+      multi_client: false,
+      api_access: false,
+      email_support: true,
+      priority_support: false,
+      advisory: false,
+      onboarding: false,
+    },
+    ctaLabel: 'Start free',
+    ctaHref: '/register',
+  },
+  {
     slug: 'basic',
     name: 'Solo',
-    tagline: 'For one accountant working a full monthly statement.',
+    tagline: '1 person, 3 bank accounts, and 3,000 transactions a month.',
     audience: 'Solo accountant',
     monthlyGhs: 199,
     yearlyGhs: 1990,
@@ -172,20 +225,13 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     bankAccounts: 3,
     users: 1,
     cleanExportsPerMonth: 5,
+    inheritsFromLabel: 'Everything in Free, plus:',
     bullets: [
-      '3 bank accounts · 3,000 transactions / month',
-      'Up to 12 projects / month · 1 team member',
-      '5 full clean exports / month (sample downloads free)',
-      '14-day free trial',
-      '50% off your first 2 months',
-      'Bookkeeping consultancy / advisory',
-      'Excel, CSV & PDF imports + OCR',
-      'Pre-built regional bank statement layouts',
-      'Auto-match suggestions + bulk confirm (up to 50)',
-      '1:1, many-to-1 and many-to-many matching',
-      'AI-assisted match ranking from confirmed pairs',
-      'BRS export (Excel + PDF)',
-      'Email support',
+      '12 projects / month',
+      '5 full clean exports / month',
+      'Bulk confirm up to 50 pairs',
+      'AI match ranking',
+      'Bookkeeping advisory',
     ],
     features: {
       bank_accounts: '3',
@@ -216,13 +262,13 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       advisory: true,
       onboarding: false,
     },
-    ctaLabel: 'Start 14-day trial',
+    ctaLabel: 'Subscribe',
     ctaHref: '/register',
   },
   {
     slug: 'standard',
     name: 'Team',
-    tagline: 'For a small team that needs a full statement, not an 800-row cap.',
+    tagline: '5 people, 10 bank accounts, and 15,000 transactions a month.',
     audience: 'Small finance team',
     badge: 'Most popular',
     highlight: true,
@@ -236,14 +282,11 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     cleanExportsPerMonth: 20,
     inheritsFromLabel: 'Everything in Solo, plus:',
     bullets: [
-      '10 bank accounts · 15,000 transactions / month',
-      'Up to 40 projects / month · 5 team members',
-      '20 full clean exports / month (sample downloads free)',
-      'Bulk match (up to 50 pairs)',
-      'AI-powered match ranking',
+      '40 projects / month',
+      '20 full clean exports / month',
       'Bank rules engine',
-      'Discrepancy report & full audit trail',
-      'Logo & full report branding on PDF exports',
+      'Discrepancy report and audit trail',
+      'Logo and report branding',
     ],
     features: {
       bank_accounts: '10',
@@ -274,13 +317,13 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       advisory: true,
       onboarding: false,
     },
-    ctaLabel: 'Start free trial',
+    ctaLabel: 'Subscribe',
     ctaHref: '/register',
   },
   {
     slug: 'premium',
     name: 'Firm',
-    tagline: 'For a practice that has outgrown an eight-person file tool.',
+    tagline: '10 people, 30 bank accounts, and 40,000 transactions a month.',
     audience: 'Established practice',
     monthlyGhs: 990,
     yearlyGhs: 9900,
@@ -292,11 +335,10 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     cleanExportsPerMonth: 60,
     inheritsFromLabel: 'Everything in Team, plus:',
     bullets: [
-      '30 bank accounts · 40,000 transactions / month',
-      'Up to 100 projects / month · 10 team members',
-      '60 full clean exports / month (sample downloads free)',
+      '100 projects / month',
+      '60 full clean exports / month',
       'Roll forward across periods',
-      'Threshold approval workflow',
+      'Threshold approval',
       'Priority support',
     ],
     features: {
@@ -328,13 +370,13 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       advisory: true,
       onboarding: false,
     },
-    ctaLabel: 'Start free trial',
+    ctaLabel: 'Subscribe',
     ctaHref: '/register',
   },
   {
     slug: 'firm',
     name: 'Custom',
-    tagline: 'From GHS 1,800 / month. Unlimited seats for multi-client firms.',
+    tagline: 'Unlimited accounts and seats, with a multi-client workspace. From GHS 1,800 / month.',
     audience: 'Accounting firm / enterprise',
     badge: 'Best for firms',
     monthlyGhs: 0,
@@ -347,13 +389,11 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     cleanExportsPerMonth: -1,
     inheritsFromLabel: 'Everything in Firm, plus:',
     bullets: [
-      'Unlimited bank accounts, transactions & members',
-      'Unlimited full clean exports (sample downloads free)',
-      'Multi-client workspace',
-      'Public REST API access',
+      'Unlimited projects and clean exports',
+      'Public REST API',
       'Personalised onboarding',
       'Priority support (4-hour SLA)',
-      'Custom contract & billing',
+      'Custom contract',
     ],
     features: {
       bank_accounts: 'Unlimited',
@@ -392,43 +432,6 @@ export const MARKETING_PLANS: MarketingPlan[] = [
 /* -------------------------------------------------------------------------
  * Helpers
  * ----------------------------------------------------------------------- */
-
-export function isQuotaBullet(text: string): boolean {
-  return /bank accounts|transactions\s*\/\s*month|projects\s*\/\s*month|team member|clean export/i.test(
-    text
-  )
-}
-
-export function quotaSummaryBullets(plan: {
-  bankAccounts: number
-  transactionsPerMonth: number
-  projectsPerMonth: number
-  users: number
-  cleanExportsPerMonth?: number
-}): string[] {
-  const banks =
-    plan.bankAccounts < 0
-      ? 'Unlimited bank accounts'
-      : `${plan.bankAccounts.toLocaleString('en-GH')} bank accounts`
-  const tx =
-    plan.transactionsPerMonth < 0
-      ? 'unlimited transactions / month'
-      : `${plan.transactionsPerMonth.toLocaleString('en-GH')} transactions / month`
-  const projects =
-    plan.projectsPerMonth < 0
-      ? 'Unlimited projects'
-      : `Up to ${plan.projectsPerMonth.toLocaleString('en-GH')} projects / month`
-  const users =
-    plan.users < 0 ? 'unlimited members' : `${plan.users} team member${plan.users === 1 ? '' : 's'}`
-  const bullets = [`${banks} · ${tx}`, `${projects} · ${users}`]
-  if (plan.cleanExportsPerMonth == null) return bullets
-  bullets.push(
-    plan.cleanExportsPerMonth < 0
-      ? 'Unlimited full clean exports (sample downloads free)'
-      : `${plan.cleanExportsPerMonth.toLocaleString('en-GH')} full clean exports / month (sample downloads free)`
-  )
-  return bullets
-}
 
 /**
  * Merge live data from the API into the static catalogue.
@@ -496,8 +499,7 @@ export function mergeWithApiPlans(
         if (target in merged.features) merged.features[target] = value
       }
     }
-    const marketing = p.bullets.filter((b) => !isQuotaBullet(b))
-    merged.bullets = [...quotaSummaryBullets(merged), ...marketing]
+    merged.bullets = p.bullets
     return merged
   })
 }

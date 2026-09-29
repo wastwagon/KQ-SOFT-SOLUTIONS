@@ -4,13 +4,13 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canCreateProject, incrementProjects } from '../services/usage.js'
-import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProject, canReopenProject, canSubmitForReview, canApprove, isProjectEditable, canExportReport, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
+import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProject, canReopenProject, canSubmitForReview, canApprove, isProjectEditable, canExportReport, PROJECT_LOCKED_ERROR, PROJECT_NAME_LOCKED_ERROR } from '../lib/permissions.js'
 import { logAudit } from '../services/audit.js'
 import { planHasFeature } from '../lib/planGate.js'
 import { getProjectVariance } from '../lib/reconcile-variance.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
-import { composeProjectDisplayName } from '../lib/projectIdentity.js'
+import { isExistingProjectSourceLocked } from '../services/projectSourceLock.js'
 
 const router = Router()
 
@@ -205,6 +205,13 @@ router.patch('/:id', async (req: AuthRequest, res) => {
   }
   try {
     const body = updateSchema.parse(req.body)
+    if (
+      body.name !== undefined &&
+      body.name.trim() !== project.name &&
+      (await isExistingProjectSourceLocked(projectId, project.status))
+    ) {
+      return res.status(403).json({ error: PROJECT_NAME_LOCKED_ERROR })
+    }
     const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } })
     const multiClient = org ? await planHasFeature(org.plan, 'multi_client') : false
     if (body.clientId !== undefined && body.clientId != null && !multiClient) {

@@ -295,6 +295,7 @@ router.post('/register', async (req, res) => {
         data: {
           name: body.orgName!,
           slug: uniqueSlug,
+          plan: 'free',
           branding: {
             reportTitle: platformDefaults.defaultReportTitle,
             footer: platformDefaults.defaultFooter,

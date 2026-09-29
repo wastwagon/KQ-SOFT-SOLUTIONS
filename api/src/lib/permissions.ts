@@ -79,6 +79,28 @@ export const LOCKED_STATUSES = ['submitted_for_review', 'approved', 'completed']
 export const PROJECT_LOCKED_ERROR =
   'Project is locked (completed, submitted for review, or approved). Reopen to edit.'
 
+export const PROJECT_NAME_LOCKED_ERROR =
+  'Project name cannot be changed after this project leaves upload.'
+
+export const SOURCE_FILES_LOCKED_ERROR =
+  'Source files cannot be added or replaced after this project leaves upload.'
+
 export function isProjectEditable(status: string | null | undefined): boolean {
   return !!status && !LOCKED_STATUSES.includes(status)
+}
+
+/** Name changes and new source files are only allowed while the project is still on upload. */
+export function isProjectInUploadStage(status: string | null | undefined): boolean {
+  return status === 'draft'
+}
+
+/**
+ * Existing projects are locked once they have left upload, or once source
+ * files have already been mapped (even if status was never moved off draft).
+ */
+export function isProjectSourceIdentityLocked(
+  status: string | null | undefined,
+  hasMappedSourceData: boolean
+): boolean {
+  return !isProjectInUploadStage(status) || hasMappedSourceData
 }

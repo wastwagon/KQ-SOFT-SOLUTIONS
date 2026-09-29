@@ -6,7 +6,6 @@ describe('getSubscriptionSnapshot', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
-    process.env.TRIAL_DAYS = '14'
   })
 
   afterEach(() => {
@@ -34,7 +33,25 @@ describe('getSubscriptionSnapshot', () => {
     expect(snapshot.latestPaymentAmount).toBe(120)
   })
 
-  it('returns free when trial expires with no payments', () => {
+  it('returns unpaid when a paid plan has no payment', () => {
+    const snapshot = getSubscriptionSnapshot(
+      { createdAt: new Date('2026-04-10T00:00:00.000Z'), plan: 'basic' },
+      null
+    )
+    expect(snapshot.status).toBe('free')
+    expect(snapshot.trialEndsAt).toBeNull()
+  })
+
+  it('keeps the free plan active with no payment', () => {
+    const snapshot = getSubscriptionSnapshot(
+      { createdAt: new Date('2026-04-01T00:00:00.000Z'), plan: 'free' },
+      null
+    )
+    expect(snapshot.status).toBe('active')
+    expect(snapshot.trialEndsAt).toBeNull()
+  })
+
+  it('returns unpaid when there is no payment and no admin trial date', () => {
     const snapshot = getSubscriptionSnapshot(
       { createdAt: new Date('2026-03-01T00:00:00.000Z') },
       null

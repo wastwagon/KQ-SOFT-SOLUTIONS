@@ -1,6 +1,6 @@
 /**
- * Subscription tier limits — Sep 2026 catalogue (Solo / Team / Firm / Custom).
- * Slugs stay basic / standard / premium / firm so existing subscriptions resolve.
+ * Subscription tier limits — Sep 2026 catalogue (Free / Solo / Team / Firm / Custom).
+ * Slugs stay free / basic / standard / premium / firm so existing subscriptions resolve.
  * -1 = unlimited
  *
  * Primary commercial quotas: org-wide bank accounts + monthly transactions.
@@ -19,6 +19,12 @@ export const TIER_LIMITS: Record<
     cleanExportsPerMonth: number
   }
 > = {
+  free: {
+    projectsPerMonth: 5,
+    transactionsPerMonth: TIER_TRANSACTION_LIMITS.free,
+    bankAccounts: 1,
+    cleanExportsPerMonth: 0,
+  },
   basic: {
     projectsPerMonth: 12,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.basic,
@@ -53,6 +59,7 @@ export const PLAN_PRICES: Record<
   string,
   { monthlyGhs: number; yearlyGhs: number; quarterlyGhs: number }
 > = {
+  free: { monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0 },
   basic: { monthlyGhs: 199, yearlyGhs: 1990, quarterlyGhs: 567 },
   standard: { monthlyGhs: 399, yearlyGhs: 3990, quarterlyGhs: 1137 },
   premium: { monthlyGhs: 990, yearlyGhs: 9900, quarterlyGhs: 2822 },
@@ -61,6 +68,7 @@ export const PLAN_PRICES: Record<
 
 /** Public names. Slugs are unchanged. */
 export const PLAN_DISPLAY_NAMES: Record<string, string> = {
+  free: 'Free',
   basic: 'Solo',
   standard: 'Team',
   premium: 'Firm',

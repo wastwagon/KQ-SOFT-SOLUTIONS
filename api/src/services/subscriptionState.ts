@@ -23,16 +23,16 @@ export function getSubscriptionSnapshot(
   overrides?: SubscriptionOverrides
 ): SubscriptionSnapshot {
   const now = new Date()
-  const trialDays = Math.max(parseInt(process.env.TRIAL_DAYS || '14', 10) || 14, 1)
-  const defaultTrialEnds = new Date(org.createdAt.getTime() + trialDays * 24 * 60 * 60 * 1000)
-  const trialEnds = overrides?.trialEndsAt ?? defaultTrialEnds
+  const trialEnds = overrides?.trialEndsAt ?? null
   const forcedStatus = overrides?.status ?? null
 
   /**
-   * Firm / enterprise uses custom billing (no Paystack). After trial those orgs
+   * Firm / enterprise uses custom billing (no Paystack). Without a payment those orgs
    * would otherwise become `free`/`expired` and hit the paywall even though they
    * cannot self-serve renew. Keep them `active` unless an explicit status override
    * was set by platform admin.
+   * Paid plans have no trial. The Free plan stays active with its own limits.
+   * A trial end date applies only when platform admin sets one.
    */
   const applyFirmCustomBilling = (status: SubscriptionStatus): SubscriptionStatus => {
     if (
@@ -47,11 +47,16 @@ export function getSubscriptionSnapshot(
 
   if (!latestPayment) {
     const status = applyFirmCustomBilling(
-      forcedStatus || (now <= trialEnds ? 'trial' : 'free')
+      forcedStatus ||
+        (org.plan === 'free'
+          ? 'active'
+          : trialEnds && now <= trialEnds
+            ? 'trial'
+            : 'free')
     )
     return {
       status,
-      trialEndsAt: trialEnds.toISOString(),
+      trialEndsAt: trialEnds ? trialEnds.toISOString() : null,
       currentPeriodStart: null,
       currentPeriodEnd: null,
       latestPaymentAt: null,
@@ -70,7 +75,7 @@ export function getSubscriptionSnapshot(
 
   return {
     status,
-    trialEndsAt: trialEnds.toISOString(),
+    trialEndsAt: trialEnds ? trialEnds.toISOString() : null,
     currentPeriodStart: periodStart.toISOString(),
     currentPeriodEnd: periodEnd.toISOString(),
     latestPaymentAt: latestPayment.createdAt.toISOString(),

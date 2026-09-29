@@ -30,7 +30,7 @@ Use this checklist when onboarding a new customer team:
 - [ ] First reconciliation period confirmed
 - [ ] Sample cash book and bank statement files validated
 - [ ] Branding configured (logo/colors/report title) if required
-- [ ] Billing/plan confirmed (trial or paid; see [Subscription Plans](#12-subscription-plans--limits))
+- [ ] Billing/plan confirmed (Free or paid; see [Subscription Plans](#12-subscription-plans--limits))
 - [ ] Bank account seats understood (counted **org-wide**, not per project)
 
 ---
@@ -240,7 +240,6 @@ Logo, primary/secondary colours, letterhead, report title, footer. Full branding
 - Current plan and subscription status (trial / active / expired)
 - Usage: projects and transactions this month
 - **Upgrade / renew** via Paystack: **monthly**, **quarterly** (~5% off), or **yearly** (~17% off)
-- **Intro offer** (when enabled by platform): 50% off your first **2 billing periods**
 - Workspace billing is always **GHS**; project reporting currency is separate
 
 ### Members (Admin)
@@ -281,6 +280,7 @@ Create and revoke keys for programmatic access.
 
 | Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Users |
 |------|-------------|-----------------|--------------------------|-------|
+| Free | 5 | 500 | 1 | 1 |
 | Solo | 12 | 3,000 | 3 | 1 |
 | Team | 40 | 15,000 | 10 | 5 |
 | Firm | 100 | 40,000 | 30 | 10 |
@@ -288,23 +288,23 @@ Create and revoke keys for programmatic access.
 
 | Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
 |------|---------------|-----------------|--------------|
+| Free | 0 | 0 | 0 |
 | Solo | 199 | 567 | 1,990 |
 | Team | 399 | 1,137 | 3,990 |
 | Firm | 990 | 2,822 | 9,900 |
 | Custom | From 1,800 | — | Contract |
 
-- **Trial:** 14 days on signup; renew via Paystack when the paywall is enabled.
+- New workspaces start on **Free**. Paid plans have no trial.
 - **Solo** includes bookkeeping consultancy / advisory messaging.
 - **Bank account seats** are counted across the **whole organisation** (all projects), not per project.
-- **Intro offer:** 50% off the first 2 billing periods when enabled (`INTRO_OFFER_ENABLED` on the server).
 - **Billing periods:** monthly, quarterly (~5% off), yearly (~17% off vs paying monthly).
 
 ### Feature gating (summary)
 
 | Capability | From |
 |------------|------|
-| 1:1 match, BRS export, OCR | Solo+ |
-| Clean tools preview + sample (watermarked) download | Solo+ |
+| 1:1 match, BRS export, OCR | Free+ |
+| Clean tools preview + sample (watermarked) download | Free+ |
 | Full clean Excel/PDF export | Solo+ with monthly quota (Solo 5 / Team 20 / Firm 60 / Custom unlimited) |
 | Suggested matches, bulk / auto-match, AI ranking | All tiers |
 | Match by counting (diagnostic lists / cancel schedule; never auto-clears) | All tiers |
@@ -390,9 +390,6 @@ Admins: **Settings → Billing**. You will see plan, status, usage, and Paystack
 
 ### 9) Are bank account limits per project or for the whole firm?
 **Org-wide.** Creating accounts across projects all count toward the same seat pool (5 / 10 / 30 / unlimited by plan).
-
-### 10) What is the intro offer?
-When enabled by the platform, eligible workspaces get **50% off** for their first **two** paid billing periods (each monthly, quarterly, or yearly checkout that applies the discount counts as one period).
 
 ---
 

@@ -11,6 +11,7 @@ import {
   canReconcile,
   canReopenProject,
   isProjectEditable,
+  isProjectSourceIdentityLocked,
 } from '../lib/permissions'
 import { useAuth } from '../store/auth'
 import { useToast } from '../components/ui/Toast'
@@ -193,12 +194,15 @@ export default function ProjectDetail() {
     )
   }
 
+  const sourceIdentityLocked = isProjectSourceIdentityLocked(project.status, project.documents)
+
   return (
     <div className="space-y-6">
       <ProjectHeader
         project={project}
         clients={clientsList}
-        canEdit={canEditProject(role)}
+        canEdit={canEditProject(role) && isProjectEditable(project.status)}
+        canEditName={canEditProject(role) && !sourceIdentityLocked}
         canDelete={canDeleteProject(role)}
         isUpdating={updateMutation.isPending}
         isDeleting={deleteMutation.isPending}
@@ -213,6 +217,7 @@ export default function ProjectDetail() {
           projectSlug={slug}
           documents={project.documents ?? []}
           role={role}
+          sourceUploadsLocked={sourceIdentityLocked}
           onProceed={() => setStep(1)}
         />
       )}

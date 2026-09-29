@@ -19,11 +19,21 @@ describe('buildPublicPlans', () => {
     invalidatePlanCache()
   })
 
-  it('returns all four canonical tiers when DB is empty (config fallback)', async () => {
+  it('returns every canonical tier when DB is empty (config fallback)', async () => {
     mocks.planFindMany.mockResolvedValue([])
     const plans = await buildPublicPlans()
 
     expect(plans.map((p) => p.id)).toEqual([...PLAN_DISPLAY_ORDER])
+
+    const free = plans.find((p) => p.id === 'free')
+    expect(free).toMatchObject({
+      name: 'Free',
+      monthlyGhs: 0,
+      yearlyGhs: 0,
+      projectsPerMonth: 5,
+      transactionsPerMonth: 500,
+      bankAccounts: 1,
+    })
 
     const basic = plans.find((p) => p.id === 'basic')
     expect(basic).toMatchObject({
@@ -53,7 +63,7 @@ describe('buildPublicPlans', () => {
     ])
     const plans = await buildPublicPlans()
 
-    expect(plans).toHaveLength(4)
+    expect(plans).toHaveLength(5)
     const basic = plans.find((p) => p.id === 'basic')
     // 200 is a deliberate admin override (not a known legacy amount).
     expect(basic?.monthlyGhs).toBe(200)
@@ -81,7 +91,7 @@ describe('buildPublicPlans', () => {
     expect(plans.find((p) => p.id === 'premium')?.quarterlyGhs).toBe(2565)
   })
 
-  it('always orders plans basic → standard → premium → firm regardless of DB ordering', async () => {
+  it('always orders plans free → basic → standard → premium → firm regardless of DB ordering', async () => {
     mocks.planFindMany.mockResolvedValue([
       { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
       { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 10000, monthlyGhs: 900, yearlyGhs: 9000, active: true },
@@ -90,18 +100,18 @@ describe('buildPublicPlans', () => {
     ])
 
     const plans = await buildPublicPlans()
-    expect(plans.map((p) => p.id)).toEqual(['basic', 'standard', 'premium', 'firm'])
+    expect(plans.map((p) => p.id)).toEqual(['free', 'basic', 'standard', 'premium', 'firm'])
   })
 
   it('back-fills missing tiers from the DB by using config defaults', async () => {
-    // Only `basic` and `standard` in DB — `premium` and `firm` should still come back.
+    // Only `basic` and `standard` in DB — the other tiers still come back from config.
     mocks.planFindMany.mockResolvedValue([
       { slug: 'basic', name: 'Basic', projectsPerMonth: 5, transactionsPerMonth: 500, monthlyGhs: 150, yearlyGhs: 1500, active: true },
       { slug: 'standard', name: 'Standard', projectsPerMonth: 20, transactionsPerMonth: 2000, monthlyGhs: 400, yearlyGhs: 4000, active: true },
     ])
 
     const plans = await buildPublicPlans()
-    expect(plans).toHaveLength(4)
+    expect(plans).toHaveLength(5)
     const premium = plans.find((p) => p.id === 'premium')
     expect(premium).toMatchObject({ monthlyGhs: 990, yearlyGhs: 9900, projectsPerMonth: 100, bankAccounts: 30 })
     const firm = plans.find((p) => p.id === 'firm')

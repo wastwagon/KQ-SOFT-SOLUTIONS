@@ -400,7 +400,6 @@ Click **Reset to platform default** to restore platform defaults.
 
 - View **current plan** and usage (projects, transactions)
 - **Upgrade** — Pay monthly, quarterly, or yearly via Paystack (GHS)
-- **Intro offer** — 50% off your first 2 months when enabled by platform
 - **Currency note:** Workspace billing is always in **GHS**. Each **project** still uses its own reporting currency (**GHS**, **USD**, or **EUR**) for the BRS — set when you create the project, not in Billing.
 
 ### Members (Admin only)
@@ -445,6 +444,7 @@ Create rules to auto-suggest matches:
 
 | Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Full clean exports/mo | Users |
 |------|-------------|-----------------|--------------------------|------------------------|-------|
+| Free | 5 | 500 | 1 | Sample only | 1 |
 | Solo | 12 | 3,000 | 3 | 5 | 1 |
 | Team | 40 | 15,000 | 10 | 20 | 5 |
 | Firm | 100 | 40,000 | 30 | 60 | 10 |
@@ -452,15 +452,15 @@ Create rules to auto-suggest matches:
 
 | Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
 |------|---------------|-----------------|--------------|
+| Free | 0 | 0 | 0 |
 | Solo | 199 | 567 | 1,990 |
 | Team | 399 | 1,137 | 3,990 |
 | Firm | 990 | 2,822 | 9,900 |
 | Custom | From 1,800 | — | Contract |
 
-- **Trial:** 14 days on signup; subscribe via Paystack to continue when paywall is enabled.
-- **Solo** is a paid tier (not free after trial) and includes bookkeeping consultancy / advisory.
+- New workspaces start on **Free**. Paid plans have no trial.
+- **Solo** is a paid tier and includes bookkeeping consultancy / advisory.
 - **Excel export** includes mapped bank lines on sheets `BANK CREDITS (MAPPED)` and `BANK DEBITS (MAPPED)`.
-- **Intro offer:** 50% off your first 2 months when enabled by the platform.
 - **Billing periods:** monthly, quarterly (~5% off), or yearly (~17% off vs monthly).
 - **Bank account seats** are counted across the whole organisation (not per project).
 - **Clean tools:** preview is free; sample Excel/PDF is truncated and watermarked (`BRS DEMO — NOT FOR OPERATIONAL USE`); full cleans use the monthly quota above (see Settings → Billing).

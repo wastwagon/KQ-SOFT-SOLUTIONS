@@ -36,8 +36,20 @@ interface PlanSeed {
   usersLimit: number
 }
 
-/** Sep 2026 catalogue: Solo / Team / Firm. Annual = 10× monthly. */
+/** Sep 2026 catalogue: Free / Solo / Team / Firm. Annual = 10× monthly. */
 const PLANS: PlanSeed[] = [
+  {
+    slug: 'free',
+    name: 'Free',
+    projectsPerMonth: 5,
+    transactionsPerMonth: 500,
+    monthlyGhs: 0,
+    yearlyGhs: 0,
+    quarterlyGhs: 0,
+    bankAccounts: 1,
+    cleanExportsPerMonth: 0,
+    usersLimit: 1,
+  },
   {
     slug: 'basic',
     name: 'Solo',

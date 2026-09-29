@@ -1,6 +1,6 @@
 /**
- * Intro offer: 50% off the first N self-serve billing periods.
- * Count is stored in platform_settings so existing DBs need no migration.
+ * Intro offer is retired. The first-two-months discount is no longer sold.
+ * Count helpers remain so historical payment records still read cleanly.
  */
 import { prisma } from '../lib/prisma.js'
 import { INTRO_OFFER_MONTHS } from '../config/subscription.js'
@@ -12,7 +12,7 @@ function settingsKey(orgId: string) {
 }
 
 export function isIntroOfferEnvEnabled(): boolean {
-  return process.env.INTRO_OFFER_ENABLED === 'true' || process.env.INTRO_OFFER_50_PCT === 'true'
+  return false
 }
 
 export async function getIntroOfferPaymentsApplied(orgId: string): Promise<number> {

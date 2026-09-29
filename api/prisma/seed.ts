@@ -16,6 +16,7 @@ async function main() {
 
   // Plans (subscription tiers) — Jul 2026 catalogue
   const plans = [
+    { slug: 'free', name: 'Free', projectsPerMonth: 5, transactionsPerMonth: 500, monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0, bankAccounts: 1, cleanExportsPerMonth: 0, usersLimit: 1 },
     { slug: 'basic', name: 'Solo', projectsPerMonth: 12, transactionsPerMonth: 3000, monthlyGhs: 199, yearlyGhs: 1990, quarterlyGhs: 567, bankAccounts: 3, cleanExportsPerMonth: 5, usersLimit: 1 },
     { slug: 'standard', name: 'Team', projectsPerMonth: 40, transactionsPerMonth: 15000, monthlyGhs: 399, yearlyGhs: 3990, quarterlyGhs: 1137, bankAccounts: 10, cleanExportsPerMonth: 20, usersLimit: 5 },
     { slug: 'premium', name: 'Firm', projectsPerMonth: 100, transactionsPerMonth: 40000, monthlyGhs: 990, yearlyGhs: 9900, quarterlyGhs: 2822, bankAccounts: 30, cleanExportsPerMonth: 60, usersLimit: 10 },

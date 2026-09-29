@@ -5,13 +5,14 @@
  * Keep this surface minimal — only data that is safe to expose to the
  * public landing page (plan list, etc.). Never include user/org data here.
  *
- * Important: this endpoint must always return *all four* tiers (basic,
+ * Important: this endpoint must always return every catalogue tier (free, basic,
  * standard, premium, firm) so the landing-page comparison table is complete.
  * The `firm` tier is custom-priced — its monthlyGhs/yearlyGhs are 0 and the
  * UI renders that as "Custom".
  */
 import { Router } from 'express'
 import { INTRO_OFFER_MONTHS } from '../config/subscription.js'
+import { isIntroOfferEnvEnabled } from '../services/introOffer.js'
 import { CANONICAL_PLAN_SLUGS, listPlans } from '../services/plan.js'
 import leadsPublicRouter from './leadsPublic.js'
 
@@ -35,7 +36,7 @@ export interface PublicPlanResponse {
 }
 
 /**
- * Build the canonical 4-tier plan list from the CMS cache, falling back to
+ * Build the canonical plan list from the CMS cache, falling back to
  * catalogue config when a tier has no DB row. Inactive packages stay here so
  * the landing comparison table stays complete; checkout filters them out.
  */
@@ -63,11 +64,15 @@ router.get('/plans', async (_req, res) => {
   res.set('Cache-Control', 'public, max-age=60, s-maxage=60')
   res.json({
     plans,
-    introOffer: {
-      discountPercent: 50,
-      months: INTRO_OFFER_MONTHS,
-      description: `50% off your first ${INTRO_OFFER_MONTHS} months`,
-    },
+    ...(isIntroOfferEnvEnabled()
+      ? {
+          introOffer: {
+            discountPercent: 50,
+            months: INTRO_OFFER_MONTHS,
+            description: `50% off your first ${INTRO_OFFER_MONTHS} months`,
+          },
+        }
+      : {}),
   })
 })
 

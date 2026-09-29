@@ -39,6 +39,8 @@ interface ProjectHeaderProps {
   clients: ClientLite[]
   /** Inline rename / client / currency update. */
   canEdit: boolean
+  /** Project name stays fixed once the project leaves the upload step. */
+  canEditName?: boolean
   /** Allowed to permanently delete the project. */
   canDelete: boolean
   isUpdating?: boolean
@@ -56,6 +58,7 @@ export default function ProjectHeader({
   project,
   clients,
   canEdit,
+  canEditName = canEdit,
   canDelete,
   isUpdating,
   isDeleting,
@@ -140,12 +143,21 @@ export default function ProjectHeader({
         <div className="min-w-0 flex-1">
           {editing && canEdit ? (
             <div className="flex w-full max-w-2xl flex-col gap-3">
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                placeholder="Project name"
-                aria-label="Project name"
-              />
+              {!canEditName ? (
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{project.name}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    This project name is locked. It already moved past upload, so the name and source files stay as they are.
+                  </p>
+                </div>
+              ) : (
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Project name"
+                  aria-label="Project name"
+                />
+              )}
               <Input
                 value={editStatementBusinessName}
                 onChange={(e) => setEditStatementBusinessName(e.target.value)}
@@ -225,7 +237,7 @@ export default function ProjectHeader({
                     className="text-primary-600 hover:text-primary-700"
                   >
                     <Pencil className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
-                    Edit details
+                    {canEditName ? 'Edit details' : 'Edit client & currency'}
                   </Button>
                 )}
               </div>

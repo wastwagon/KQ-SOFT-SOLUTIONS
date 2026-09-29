@@ -92,7 +92,7 @@ export async function refreshPlanCache(): Promise<void> {
   cacheTs = Date.now()
 }
 
-export const CANONICAL_PLAN_SLUGS = ['basic', 'standard', 'premium', 'firm'] as const
+export const CANONICAL_PLAN_SLUGS = ['free', 'basic', 'standard', 'premium', 'firm'] as const
 
 async function ensureCache(): Promise<void> {
   if (cacheTs === 0 || planCache.size === 0 || Date.now() - cacheTs > CACHE_TTL_MS) {

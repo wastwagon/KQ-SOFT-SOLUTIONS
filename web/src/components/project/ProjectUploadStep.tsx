@@ -38,6 +38,8 @@ export interface ProjectUploadStepProps {
   projectSlug: string
   documents: ProjectDocument[]
   role: string | null
+  /** True once the project has left upload (mapped or later). Hides new source-file pickers. */
+  sourceUploadsLocked?: boolean
   /** Called when the user clicks "Proceed to Map →" so the parent can advance. */
   onProceed: () => void
 }
@@ -46,12 +48,13 @@ export default function ProjectUploadStep({
   projectSlug,
   documents,
   role,
+  sourceUploadsLocked = false,
   onProceed,
 }: ProjectUploadStepProps) {
   const queryClient = useQueryClient()
   const toast = useToast()
 
-  const canUpload = canUploadDocuments(role)
+  const canUpload = canUploadDocuments(role) && !sourceUploadsLocked
 
   const [cbFiles, setCbFiles] = useState<File[]>([])
   const [cbUseAs, setCbUseAs] = useState<CashBookUseAs>('both')
@@ -236,7 +239,12 @@ export default function ProjectUploadStep({
         subtitle="Upload a cash book and a bank statement (Excel, CSV, OFX, MT940, CAMT, PDF, or image). Ghana bank PDFs often map automatically; other layouts are mapped on the next step."
       />
       <p className="text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
-      {!canUpload && (
+      {!canUpload && sourceUploadsLocked && (
+        <Alert tone="info" title="Source files are locked">
+          This project has already moved past upload. Its cash book and bank statement stay in place. Start a new project to use different files.
+        </Alert>
+      )}
+      {!canUpload && !sourceUploadsLocked && (
         <Alert tone="info" title="View only">
           Contact an administrator to upload documents.
         </Alert>

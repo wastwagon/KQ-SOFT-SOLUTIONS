@@ -71,3 +71,17 @@ export const LOCKED_STATUSES = ['submitted_for_review', 'approved', 'completed']
 export function isProjectEditable(status: string | null | undefined): boolean {
   return !!status && !LOCKED_STATUSES.includes(status as (typeof LOCKED_STATUSES)[number])
 }
+
+/** Name changes and new source files are only allowed while the project is still on upload. */
+export function isProjectInUploadStage(status: string | null | undefined): boolean {
+  return status === 'draft'
+}
+
+/** Locked after upload, including older projects that already have mapped transactions. */
+export function isProjectSourceIdentityLocked(
+  status: string | null | undefined,
+  documents?: { _count?: { transactions?: number } }[] | null
+): boolean {
+  if (!isProjectInUploadStage(status)) return true
+  return (documents ?? []).some((d) => (d._count?.transactions ?? 0) > 0)
+}

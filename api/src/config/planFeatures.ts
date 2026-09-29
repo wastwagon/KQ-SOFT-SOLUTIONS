@@ -55,7 +55,7 @@ export const PLAN_FEATURE_CATALOG: { id: PlanFeature; label: string; hint: strin
   { id: 'multi_client', label: 'Multi-client workspace', hint: 'Clients module' },
 ]
 
-const PLAN_ORDER = ['basic', 'standard', 'premium', 'firm'] as const
+const PLAN_ORDER = ['free', 'basic', 'standard', 'premium', 'firm'] as const
 
 /** Confirm match for 1-to-many / many-to-1 / many-to-many is available on every tier. */
 const UNGATED_FEATURES = new Set<PlanFeature>(['one_to_many', 'many_to_many'])
@@ -88,6 +88,7 @@ const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
 
 /** User limit per plan (-1 = unlimited) */
 export const USER_LIMIT_BY_PLAN: Record<string, number> = {
+  free: 1,
   basic: 1,
   standard: 5,
   premium: 10,

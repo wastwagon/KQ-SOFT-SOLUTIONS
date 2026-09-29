@@ -44,7 +44,6 @@ import { maxYearlyDiscountPercent } from '../lib/planPricing'
  * Premium SaaS landing page — KQ-SOFT Bank Reconciliation
  *
  * Sections:
- *   0. Announcement bar (intro offer, dismissible)
  *   1. Sticky glass-morphism navigation
  *   2. Hero (full-bleed atmosphere + product screenshot)
  *   3. Trust strip (example bank / statement layouts)
@@ -194,7 +193,7 @@ const FAQS = [
   },
   {
     q: 'How does pricing and currency work?',
-    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. Every tier includes a 14-day free trial, and new workspaces get 50% off their first two months. The public site shows approximate USD/EUR/GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use its own reporting currency (GHS, USD, or EUR) for BRS and balances.',
+    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. New workspaces start on the Free plan. Paid plans have no trial. The public site shows approximate USD/EUR/GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use its own reporting currency (GHS, USD, or EUR) for BRS and balances.',
   },
   {
     q: 'What are the plan limits?',
@@ -213,8 +212,7 @@ const FAQS = [
 export default function Landing() {
   const [navOpen, setNavOpen] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
-  const [showAnnouncement, setShowAnnouncement] = useState(true)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [showCompare, setShowCompare] = useState(false)
 
   const { data: plansData } = useQuery({
@@ -247,36 +245,19 @@ export default function Landing() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 antialiased">
+    <div id="top" className="min-h-screen bg-white text-gray-900 antialiased">
       {/* Inline keyframes / one-off styles. Kept local so the page is
           self-contained — no global stylesheet edits required. */}
       <style>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(20px, -25px) scale(1.07); }
-          66% { transform: translate(-18px, 18px) scale(0.95); }
-        }
         @keyframes pulseDot {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.55; transform: scale(0.85); }
-        }
-        @keyframes gradientShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
         }
         @keyframes shimmer {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
-        .animate-blob { animation: blob 18s ease-in-out infinite; }
-        .animate-blob-slow { animation: blob 26s ease-in-out infinite; }
         .animate-pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
-        .gradient-text {
-          background: linear-gradient(120deg, #0473ea 0%, #1a7de8 30%, #38d200 100%);
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-        }
         .nav-shimmer {
           background: linear-gradient(120deg, #0473ea 0%, #2563eb 40%, #0473ea 80%);
           background-size: 220% 100%;
@@ -306,12 +287,6 @@ export default function Landing() {
           opacity: 1;
           transform: translateY(0);
         }
-        .grid-overlay {
-          background-image:
-            linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
-          background-size: 56px 56px;
-        }
         .grid-overlay-dark {
           background-image:
             linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
@@ -320,7 +295,7 @@ export default function Landing() {
         }
       `}</style>
 
-      <AnnouncementBar visible={showAnnouncement} onDismiss={() => setShowAnnouncement(false)} />
+      <UtilityBar />
       <Nav navOpen={navOpen} setNavOpen={setNavOpen} />
       <Hero />
       <BankStrip />
@@ -345,40 +320,62 @@ export default function Landing() {
 }
 
 /* ---------------------------------------------------------------------------
- * Section 0: Announcement bar
+ * Contact strip — phones and social, above the main menu
  * ------------------------------------------------------------------------- */
 
-function AnnouncementBar({
-  visible,
-  onDismiss,
-}: {
-  visible: boolean
-  onDismiss: () => void
-}) {
-  const isAuthed = useAuth((s) => !!s.token)
-  if (!visible) return null
+function UtilityBar() {
   return (
-    <div className="relative z-40 nav-shimmer text-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 sm:px-6 lg:px-8 py-2 text-center text-xs sm:text-sm">
-        <Sparkles className="hidden sm:inline h-4 w-4 shrink-0 text-white/90" aria-hidden />
-        <span className="font-medium">
-          Welcome offer · <span className="font-bold">50% off your first 2 months</span> on any paid plan
-        </span>
-        <Link
-          to={isAuthed ? '/settings/billing' : '/register'}
-          className="hidden sm:inline-flex items-center gap-1 ml-2 px-2.5 py-0.5 rounded-full bg-white/15 hover:bg-white/25 font-semibold transition-colors"
-        >
-          {isAuthed ? 'Billing' : 'Claim it'}
-          <ArrowRight className="w-3 h-3" />
-        </Link>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="ml-3 inline-flex w-6 h-6 rounded-full hover:bg-white/15 items-center justify-center transition-colors flex-shrink-0"
-          aria-label="Dismiss announcement"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+    <div className="relative z-40 border-b border-slate-800 bg-slate-900 text-slate-200 shadow-none">
+      <div className="mx-auto flex h-10 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2 text-[11px] sm:text-xs">
+          <Phone className="h-3.5 w-3.5 shrink-0 text-primary-300" aria-hidden />
+          <a href="tel:+233200158182" className="truncate font-medium hover:text-white">
+            0200 158 182
+          </a>
+          <span className="hidden text-slate-500 sm:inline" aria-hidden>
+            ·
+          </span>
+          <a href="tel:+233208915637" className="hidden font-medium hover:text-white sm:inline">
+            0208 915 637
+          </a>
+          <span className="hidden text-slate-500 md:inline" aria-hidden>
+            ·
+          </span>
+          <a href="tel:+233245396813" className="hidden font-medium hover:text-white md:inline">
+            0245 396 813
+          </a>
+        </div>
+        <nav className="flex shrink-0 items-center gap-1.5" aria-label="Social">
+          <a
+            href="https://www.linkedin.com/company/kqsoftwaresolutions"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="LinkedIn"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden>
+              <path d="M4.98 3.5C4.98 4.88 3.88 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.5 8.5h4V24h-4V8.5zM8.5 8.5h3.8v2.1h.1c.5-1 1.8-2.1 3.8-2.1 4.1 0 4.8 2.7 4.8 6.2V24h-4v-7.7c0-1.8 0-4.1-2.5-4.1s-2.9 2-2.9 4V24h-4V8.5z" />
+            </svg>
+          </a>
+          <a
+            href="mailto:info@kqsoftwaresolutions.com"
+            aria-label="Email"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          >
+            <Mail className="h-3.5 w-3.5" aria-hidden />
+          </a>
+          <a
+            href="https://wa.me/233208915637"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="WhatsApp"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden>
+              <path d="M20.5 3.5A11 11 0 0 0 2.1 17.2L1 23l5.9-1.1A11 11 0 0 0 12 23a11 11 0 0 0 8.5-19.5zM12 21a9 9 0 0 1-4.6-1.3l-.3-.2-3.5.7.7-3.4-.2-.3A9 9 0 1 1 12 21zm5-6.7c-.3-.1-1.6-.8-1.8-.9s-.4-.1-.6.1-.7.9-.8 1-.3.2-.6.1a7.4 7.4 0 0 1-2.2-1.4 8.2 8.2 0 0 1-1.5-1.9c-.2-.3 0-.4.1-.6l.4-.5.2-.3a.5.5 0 0 0 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.8 11.8 0 0 0 4.5 4 15 15 0 0 0 1.5.6 3.6 3.6 0 0 0 1.7.1 2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.6-.3z" />
+            </svg>
+          </a>
+        </nav>
       </div>
     </div>
   )
@@ -394,6 +391,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const links: { label: string; href: string }[] = [
+    { label: 'Home', href: '#top' },
     { label: 'Features', href: '#features' },
     { label: 'How it works', href: '#how-it-works' },
     { label: 'Pricing', href: '#pricing' },
@@ -544,7 +542,7 @@ function Hero() {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
-    <section className="relative isolate overflow-hidden min-h-[min(92vh,920px)]">
+    <section className="relative isolate overflow-hidden">
       <div aria-hidden className="absolute inset-0 -z-10">
         <img
           src={MARKETING.heroBg}
@@ -556,14 +554,14 @@ function Hero() {
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-slate-900/30" />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-16 sm:pt-20 sm:pb-20 lg:pt-24 lg:pb-28">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-center">
           <div className="lg:col-span-5 text-center lg:text-left">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-200">
               KQ-SOFT · Bank reconciliation
             </p>
 
-            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.35rem] font-bold tracking-tight text-white leading-[1.05]">
+            <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-white leading-[1.05]">
               Bank reconciliation,
               <br className="hidden sm:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-200 via-white to-green-300">
@@ -571,19 +569,19 @@ function Hero() {
               </span>
             </h1>
 
-            <p className="mt-6 text-lg sm:text-xl text-slate-200/90 leading-relaxed max-w-xl mx-auto lg:mx-0">
+            <p className="mt-3 text-base sm:text-lg text-slate-200/90 leading-snug max-w-xl mx-auto lg:mx-0">
               Pair the cash book with the bank file in one workspace. Intelligent matching
               handles cheques, wires, and split lines — then ships a signed-off BRS you can
               stand behind.
             </p>
 
-            <div className="mt-9 flex flex-col sm:flex-row items-center lg:items-stretch justify-center lg:justify-start gap-3">
+            <div className="mt-5 flex flex-col sm:flex-row items-center lg:items-stretch justify-center lg:justify-start gap-3">
               <Button
                 size="lg"
-                className="group gap-2 shadow-lg shadow-primary-900/40 bg-white text-primary-800 hover:bg-slate-100"
+                className="group gap-2 shadow-lg shadow-primary-900/40 !bg-white !text-primary-800 hover:!bg-slate-100 hover:!text-primary-800"
                 onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
               >
-                {isAuthed ? 'Go to dashboard' : 'Start free trial'}
+                {isAuthed ? 'Go to dashboard' : 'Start free'}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Button>
               <Button
@@ -598,10 +596,10 @@ function Hero() {
               </Button>
             </div>
 
-            <p className="mt-5 text-sm text-slate-300/90">
+            <p className="mt-3 text-sm text-slate-300/90">
               {isAuthed
                 ? 'Signed in — open your workspace to continue reconciliations.'
-                : '14-day free trial · From GHS 199/mo · No card required to start'}
+                : 'Free plan included · Paid plans from GHS 199/mo · No card required'}
             </p>
           </div>
 
@@ -610,8 +608,8 @@ function Hero() {
               className="absolute -inset-3 sm:-inset-5 rounded-[1.75rem] bg-gradient-to-br from-primary-400/30 via-transparent to-green-400/25 blur-2xl"
               aria-hidden
             />
-            <div className="relative overflow-hidden rounded-xl border border-white/25 bg-white/95 shadow-2xl shadow-black/30 ring-1 ring-white/20">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-slate-50/95">
+            <div className="relative overflow-hidden rounded-xl border border-white/25 bg-white/95 ring-1 ring-white/20">
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100 bg-slate-50/95">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
@@ -627,7 +625,7 @@ function Hero() {
               <img
                 src={MARKETING.productMatch}
                 alt="KQ-SOFT matching workspace with cash book and bank statement side by side"
-                className="w-full h-auto object-cover object-top max-h-[min(480px,58vh)]"
+                className="w-full h-auto object-cover object-top max-h-[200px]"
                 loading="eager"
                 decoding="async"
               />
@@ -646,7 +644,7 @@ function Hero() {
 function BankStrip() {
   const items = [...BANKS_SUPPORTED, ...BANKS_SUPPORTED]
   return (
-    <section className="relative overflow-hidden border-y border-gray-100 py-14 sm:py-16">
+    <section className="relative overflow-hidden border-y border-gray-100 py-12 lg:py-16">
       <img
         src={MARKETING.trustBand}
         alt=""
@@ -668,14 +666,14 @@ function BankStrip() {
             Plus generic Excel, CSV, and PDF — tune or extend layouts as your client base grows.
           </p>
         </div>
-        <div className="mt-10 relative overflow-hidden">
+        <div className="mt-4 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-white to-transparent z-10" />
           <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent z-10" />
           <div className="flex gap-10 marquee-track w-max">
             {items.map((name, i) => (
               <div
                 key={`${name}-${i}`}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200/90 bg-white/90 backdrop-blur-sm text-gray-700 font-semibold tracking-wide whitespace-nowrap shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200/90 bg-white/90 backdrop-blur-sm text-gray-700 font-semibold tracking-wide whitespace-nowrap"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
                 {name}
@@ -699,22 +697,22 @@ function StatBand() {
     { value: '< 5 min', label: 'from sign-up to first reconciled grid' },
   ]
   return (
-    <section className="py-24 sm:py-28 border-y border-gray-100 bg-gray-50/30">
+    <section className="py-12 lg:py-16 border-y border-slate-100 bg-slate-50/70">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
           data-reveal
-          className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/70 to-white px-6 py-10 shadow-sm sm:px-10 sm:py-12"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 sm:px-5"
         >
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-10">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
           {stats.map((s, i) => (
             <div
               key={i}
-              className="text-center sm:text-left border-l-4 border-primary-500 pl-5"
+              className={`text-center sm:text-left ${i > 0 ? 'sm:border-l sm:border-slate-200 sm:pl-6' : ''}`}
             >
-              <p className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900 tabular-nums">
+              <p className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 tabular-nums">
                 {s.value}
               </p>
-              <p className="mt-2 text-sm text-gray-600 leading-relaxed">{s.label}</p>
+              <p className="mt-1 text-xs sm:text-sm text-gray-600 leading-snug">{s.label}</p>
             </div>
           ))}
           </div>
@@ -730,38 +728,37 @@ function StatBand() {
 
 function Features() {
   return (
-    <section id="features" className="py-24 sm:py-32 bg-gray-50/40">
+    <section id="features" className="py-16 lg:py-20 bg-gray-50/40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
           data-reveal
-          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+          className="mx-auto max-w-2xl px-4 py-0 text-center"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Features
           </p>
-          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
             Everything you need to close a defensible bank rec.
           </h2>
-          <p className="mt-2 text-base sm:text-lg text-gray-600 leading-relaxed">
+          <p className="mt-1 text-sm text-gray-600 leading-snug">
             Ingestion, matching, approvals, and client-ready reporting — orchestrated in
             one place so reviewers spend time on exceptions, not formatting.
           </p>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:mt-12">
           {FEATURES.map((f) => {
             const Icon = f.icon
             return (
               <div
                 key={f.title}
                 data-reveal
-                className="group relative rounded-xl border border-gray-200 bg-white p-7 shadow-sm hover:shadow-xl hover:-translate-y-0.5 hover:border-primary-200 transition-all duration-300"
+                className="group relative rounded-2xl border border-slate-200 bg-white p-3"
               >
-                <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-primary-500 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-11 h-11 rounded-xl bg-primary-50 grid place-items-center text-primary-600 ring-1 ring-primary-100">
+                <div className="w-9 h-9 rounded-xl bg-primary-50 grid place-items-center text-primary-600 ring-1 ring-primary-100">
                   <Icon className="w-5 h-5" />
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-gray-900">{f.title}</h3>
+                <h3 className="mt-2 text-base font-bold text-gray-900">{f.title}</h3>
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">
                   {f.description}
                 </p>
@@ -780,7 +777,7 @@ function Features() {
 
 function ProductSpotlight() {
   return (
-    <section className="py-20 sm:py-24 bg-slate-950 text-white overflow-hidden relative">
+    <section className="py-16 lg:py-20 bg-slate-950 text-white overflow-hidden relative">
       <div
         aria-hidden
         className="absolute inset-0 opacity-40"
@@ -790,19 +787,19 @@ function ProductSpotlight() {
         }}
       />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           <div data-reveal>
             <p className="text-xs font-semibold uppercase tracking-wider text-primary-300">
               Audit-ready output
             </p>
-            <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">
+            <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight">
               A BRS your reviewers will recognise.
             </h2>
-            <p className="mt-3 text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl">
+            <p className="mt-2 text-sm text-slate-300 leading-snug max-w-xl">
               Formal statement lines, branded exports, and a clear trail from match to sign-off —
               so the report looks like your firm&apos;s work, not a generic SaaS dump.
             </p>
-            <ul className="mt-6 space-y-2.5 text-sm text-slate-200">
+            <ul className="mt-3 space-y-1.5 text-sm text-slate-200">
               {[
                 'Excel + PDF with your logo and colours',
                 'Uncredited lodgments & unpresented cheques laid out cleanly',
@@ -820,11 +817,11 @@ function ProductSpotlight() {
               className="absolute -inset-4 rounded-3xl bg-primary-500/20 blur-2xl"
               aria-hidden
             />
-            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-white shadow-2xl shadow-black/40">
+            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-white ring-1 ring-white/10">
               <img
                 src={MARKETING.productReport}
                 alt="KQ-SOFT bank reconciliation statement report preview"
-                className="w-full object-cover object-top aspect-[16/11]"
+                className="w-full object-cover object-top aspect-[2/1]"
                 loading="lazy"
                 decoding="async"
               />
@@ -842,30 +839,30 @@ function ProductSpotlight() {
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24 sm:py-32">
+    <section id="how-it-works" className="py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
           data-reveal
-          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+          className="mx-auto max-w-2xl px-4 py-0 text-center"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             How it works
           </p>
-          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
             Three steps from raw files to a signed-off BRS.
           </h2>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6 lg:mt-12">
           {STEPS.map((s, i) => {
             const Icon = s.icon
             return (
               <div
                 key={s.title}
                 data-reveal
-                className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-lg"
+                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none"
               >
-                <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
+                <div className="relative aspect-[2/1] overflow-hidden bg-gray-100">
                   <img
                     src={s.image}
                     alt={s.imageAlt}
@@ -878,7 +875,7 @@ function HowItWorks() {
                     {i + 1}
                   </span>
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                   <div className="flex items-center gap-2">
                     <Icon className="h-5 w-5 text-primary-600" />
                     <h3 className="text-lg font-bold text-gray-900">{s.title}</h3>
@@ -902,22 +899,22 @@ function DashboardShowcase() {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
-    <section className="py-24 sm:py-32 bg-gradient-to-b from-white via-gray-50/60 to-white">
+    <section className="py-16 lg:py-20 bg-gradient-to-b from-white via-gray-50/60 to-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           <div data-reveal>
             <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
               Built for accountants
             </p>
-            <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+            <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
               Familiar controls — without the busywork.
             </h2>
-            <p className="mt-2 text-base sm:text-lg text-gray-600 leading-relaxed">
+            <p className="mt-1 text-sm text-gray-600 leading-snug">
               The product mirrors how firms already think about bank recs: uncredited
               lodgments, unpresented cheques, brought-forward lines, and discrepancy
               narratives — automated where it helps, transparent where it matters.
             </p>
-            <ul className="mt-7 space-y-3">
+            <ul className="mt-4 space-y-2">
               {[
                 'Uncredited lodgments and unpresented cheques calculated automatically.',
                 'Discrepancy report flags amount and date variances in matched pairs.',
@@ -932,7 +929,7 @@ function DashboardShowcase() {
                 </li>
               ))}
             </ul>
-            <div className="mt-8 flex gap-3">
+            <div className="mt-4 flex gap-3">
               <Button
                 className="gap-2 shadow-sm"
                 onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
@@ -956,11 +953,11 @@ function DashboardShowcase() {
               className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary-100 via-white to-green-100 blur-2xl opacity-60"
               aria-hidden
             />
-            <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
+            <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-2 ring-1 ring-black/5">
               <img
                 src={MARKETING.productReport}
                 alt="KQ-SOFT bank reconciliation statement with lodgments and cheques"
-                className="w-full rounded-lg object-cover object-top aspect-[16/11]"
+                className="w-full rounded-lg object-cover object-top aspect-[2/1]"
                 loading="lazy"
                 decoding="async"
               />
@@ -999,29 +996,26 @@ function Pricing({
       : 'pay annually'
 
   return (
-    <section id="pricing" className="relative py-24 sm:py-32 bg-gray-50/40 overflow-hidden">
-      <div aria-hidden className="absolute -top-32 right-0 h-[420px] w-[420px] rounded-full bg-primary-200/25 blur-3xl" />
-      <div aria-hidden className="absolute -bottom-32 left-0 h-[420px] w-[420px] rounded-full bg-green-200/20 blur-3xl" />
-
+    <section id="pricing" className="relative py-16 lg:py-20 bg-gray-50/40 overflow-hidden">
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
           data-reveal
-          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+          className="mx-auto max-w-2xl px-4 py-0 text-center"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Pricing
           </p>
-          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
             Simple pricing — billed in GHS via Paystack.
           </h2>
-          <p className="mt-2 text-base sm:text-lg text-gray-600">
-            14-day free trial on every tier. Pay monthly, quarterly (~5% off), or{' '}
-            {yearlySavingsCopy} annually. First 2 months at 50% off. Checkout is always in{' '}
+          <p className="mt-1 text-sm text-gray-600 leading-snug">
+            Start on Free. Paid plans are monthly, quarterly (~5% off), or{' '}
+            {yearlySavingsCopy} annually. Checkout is always in{' '}
             <abbr title="Ghana cedis">GHS</abbr> via Paystack; use the reference converter below for USD, EUR, or GBP.
           </p>
 
           {/* Billing period toggle */}
-          <div className="mt-8 inline-flex flex-wrap items-center justify-center p-1 rounded-xl border border-gray-200 bg-white shadow-sm gap-0.5">
+          <div className="mt-4 inline-flex flex-wrap items-center justify-center p-1 rounded-xl border border-gray-200 bg-white shadow-none gap-0.5">
             <button
               type="button"
               onClick={() => setBillingPeriod('monthly')}
@@ -1076,18 +1070,18 @@ function Pricing({
           </div>
         </div>
 
-        <div className="mt-10 max-w-4xl mx-auto w-full">
+        <div className="mt-10 max-w-4xl mx-auto w-full lg:mt-12">
           <SubscriptionFxReference plans={plans} billingPeriod={billingPeriod} />
         </div>
 
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((p) => (
             <PlanCard key={p.slug} plan={p} period={billingPeriod} />
           ))}
         </div>
 
         {/* Trust line */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-gray-600">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-600">
           <span className="inline-flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-green-600" />
             Paystack checkout · charged in GHS
@@ -1096,14 +1090,10 @@ function Pricing({
             <Check className="w-4 h-4 text-green-600" />
             Cancel any time
           </span>
-          <span className="inline-flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            50% off your first 2 months
-          </span>
         </div>
 
         {/* Comparison table toggle */}
-        <div className="mt-10 text-center">
+        <div className="mt-5 text-center">
           <Button
             variant="outline"
             className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50"
@@ -1119,7 +1109,7 @@ function Pricing({
 
         {showCompare && <ComparisonTable plans={plans} />}
 
-        <p className="mt-10 text-center text-sm text-gray-500">
+        <p className="mt-5 text-center text-sm text-gray-500">
           Need something custom?{' '}
           <a
             href="mailto:info@kqsoftwaresolutions.com?subject=KQ-SOFT%20enterprise%20enquiry"
@@ -1158,43 +1148,47 @@ function PlanCard({
   return (
     <div
       data-reveal
-      className={`relative rounded-xl p-6 flex flex-col transition-all duration-300 ${
+      className={`relative rounded-lg p-3.5 flex flex-col transition-colors ${
         isHighlight
-          ? 'border-2 border-primary-500 bg-white shadow-2xl shadow-primary-600/15 ring-1 ring-primary-100 scale-[1.02] lg:scale-[1.04]'
-          : 'border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:border-primary-200'
+          ? 'border-2 border-primary-500 bg-white'
+          : 'border border-gray-200 bg-white hover:border-primary-200'
       }`}
     >
       {plan.badge && (
         <span
-          className={`absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider shadow ${
+          className={`absolute -top-2.5 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow ${
             isHighlight
               ? 'bg-primary-600 text-white'
               : 'bg-gray-900 text-white'
           }`}
         >
-          {isHighlight && <Sparkles className="w-3 h-3" />}
+          {isHighlight && <Sparkles className="w-2.5 h-2.5" />}
           {plan.badge}
         </span>
       )}
 
-      <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
-      <p className="mt-1 text-sm text-gray-500 min-h-[2.5rem]">{plan.tagline}</p>
+      <h3 className="text-sm font-semibold text-gray-900">{plan.name}</h3>
+      <p className="mt-0.5 text-xs text-gray-500 leading-snug line-clamp-2">{plan.tagline}</p>
 
-      <div className="mt-5">
+      <div className="mt-2">
         {isCustom ? (
           <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-bold text-gray-900">Custom</span>
+            <span className="text-xl font-bold text-gray-900">Custom</span>
+          </div>
+        ) : amount === 0 ? (
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-bold text-gray-900">Free</span>
           </div>
         ) : (
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-bold text-gray-900 tabular-nums">
+              <span className="text-xl font-bold text-gray-900 tabular-nums">
                 {formatGhs(amount)}
               </span>
-              <span className="text-sm text-gray-500">/ {periodLabel}</span>
+              <span className="text-xs text-gray-500">/ {periodLabel}</span>
             </div>
             {monthlyEq !== null && (
-              <p className="mt-1 text-[11px] text-gray-500">
+              <p className="mt-0.5 text-[11px] text-gray-500">
                 ≈ {formatGhs(Math.round(monthlyEq))} / month, billed {periodLabel === 'year' ? 'annually' : 'quarterly'}
               </p>
             )}
@@ -1203,16 +1197,16 @@ function PlanCard({
       </div>
 
       {plan.inheritsFromLabel && (
-        <p className="mt-5 text-xs font-bold uppercase tracking-wider text-primary-700">
+        <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-primary-700">
           {plan.inheritsFromLabel}
         </p>
       )}
 
-      <ul className={`${plan.inheritsFromLabel ? 'mt-3' : 'mt-6'} space-y-3 flex-1`}>
+      <ul className={`${plan.inheritsFromLabel ? 'mt-1.5' : 'mt-3'} space-y-1 flex-1`}>
         {plan.bullets.map((b) => (
-          <li key={b} className="flex items-start gap-2.5 text-sm text-gray-700">
+          <li key={b} className="flex items-start gap-1.5 text-xs text-gray-700 leading-snug">
             <Check
-              className={`mt-0.5 w-4 h-4 flex-shrink-0 ${
+              className={`mt-0.5 w-3.5 h-3.5 flex-shrink-0 ${
                 isHighlight ? 'text-primary-600' : 'text-green-600'
               }`}
             />
@@ -1222,27 +1216,29 @@ function PlanCard({
       </ul>
 
       {checkoutClosed ? (
-        <Button className="mt-7 w-full font-bold" variant="outline" disabled>
+        <Button className="mt-3 w-full" size="sm" variant="outline" disabled>
           Currently unavailable
         </Button>
       ) : isInternalCta ? (
         <Button
-          className={`mt-7 w-full gap-1.5 font-bold ${
+          size="sm"
+          className={`mt-3 w-full gap-1 ${
             isHighlight
-              ? 'shadow-md shadow-primary-600/20 hover:shadow-lg'
+              ? ''
               : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
           }`}
           variant={isHighlight ? 'primary' : 'outline'}
           onClick={() => navigate(ctaHref)}
         >
           {ctaLabel}
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-3.5 h-3.5" />
         </Button>
       ) : (
         <Button
-          className={`mt-7 w-full gap-1.5 font-bold ${
+          size="sm"
+          className={`mt-3 w-full gap-1 ${
             isHighlight
-              ? 'shadow-md shadow-primary-600/20'
+              ? ''
               : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
           }`}
           variant={isHighlight ? 'primary' : 'outline'}
@@ -1251,7 +1247,7 @@ function PlanCard({
           }}
         >
           {ctaLabel}
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-3.5 h-3.5" />
         </Button>
       )}
     </div>
@@ -1261,7 +1257,7 @@ function PlanCard({
 /** Side-by-side feature comparison across all 4 plans, grouped by capability. */
 function ComparisonTable({ plans }: { plans: MarketingPlan[] }) {
   return (
-    <div data-reveal className="mt-12 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div data-reveal className="mt-6 rounded-xl border border-gray-200 bg-white overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -1368,26 +1364,26 @@ function FeatureCell({ value, highlight }: { value: boolean | string | undefined
 
 function Testimonials() {
   return (
-    <section className="py-24 sm:py-32">
+    <section className="py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
           data-reveal
-          className="mx-auto max-w-2xl rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+          className="mx-auto max-w-2xl px-4 py-0 text-center"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             Teams worldwide rely on it
           </p>
-          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
             What finance leaders say.
           </h2>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6 lg:mt-12">
           {TESTIMONIALS.map((t, i) => (
             <figure
               key={i}
               data-reveal
-              className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm flex flex-col"
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-none flex flex-col"
             >
               <div className="flex gap-0.5 text-amber-400" aria-hidden>
                 {Array.from({ length: 5 }).map((_, idx) => (
@@ -1396,10 +1392,10 @@ function Testimonials() {
                   </svg>
                 ))}
               </div>
-              <blockquote className="mt-4 text-base text-gray-700 leading-relaxed flex-1">
+              <blockquote className="mt-2 text-sm text-gray-700 leading-snug flex-1">
                 “{t.quote}”
               </blockquote>
-              <figcaption className="mt-5 pt-4 border-t border-gray-100">
+              <figcaption className="mt-3 pt-3 border-t border-gray-100">
                 <p className="text-sm font-bold text-gray-900">{t.author}</p>
                 <p className="text-xs text-gray-500">{t.role}</p>
               </figcaption>
@@ -1423,21 +1419,21 @@ function Faq({
   setOpenFaq: (i: number | null) => void
 }) {
   return (
-    <section id="faq" className="py-24 sm:py-32 bg-gray-50/40">
+    <section id="faq" className="py-16 lg:py-20 bg-gray-50/40">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <div
           data-reveal
-          className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-slate-50/80 to-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10"
+          className="px-4 py-0 text-center"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
             FAQ
           </p>
-          <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
             Common questions, answered.
           </h2>
         </div>
 
-        <div className="mt-12 space-y-4">
+        <div className="mt-10 space-y-3 lg:mt-12">
           {FAQS.map((f, i) => {
             const isOpen = openFaq === i
             return (
@@ -1446,13 +1442,13 @@ function Faq({
                 data-reveal
                 className={`rounded-xl border transition-colors ${
                   isOpen
-                    ? 'border-primary-200 bg-white shadow-sm'
+                    ? 'border-primary-200 bg-white'
                     : 'border-gray-200 bg-white'
                 }`}
               >
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left"
                   onClick={() => setOpenFaq(isOpen ? null : i)}
                   aria-expanded={isOpen}
                 >
@@ -1485,9 +1481,9 @@ function FinalCta() {
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   return (
-    <section className="py-24 sm:py-28">
+    <section className="py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-xl p-10 sm:p-14 text-white shadow-2xl">
+        <div className="relative overflow-hidden rounded-2xl p-4 sm:p-5 text-white">
           <img
             src={MARKETING.ctaAtmosphere}
             alt=""
@@ -1497,26 +1493,24 @@ function FinalCta() {
             aria-hidden
           />
           <div className="absolute inset-0 bg-gradient-to-br from-primary-900/92 via-primary-800/88 to-primary-950/90" />
-          <div aria-hidden className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-green-400/20 blur-3xl" />
-          <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary-200/95">
                 Ready when you are
               </p>
-              <h2 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight">
+              <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight">
                 Close the next period before the inbox piles up.
               </h2>
-              <p className="mt-3 text-base sm:text-lg text-white/85 leading-relaxed max-w-xl">
-                Start a 14-day free trial, drop in a real cash book and bank extract, and
-                watch suggestions populate. First two months at 50% off when you upgrade —
-                plans from GHS 199/mo.
+              <p className="mt-2 text-sm text-white/85 leading-snug max-w-xl">
+                Start on the free plan, drop in a real cash book and bank extract, and
+                watch suggestions populate. Paid plans from GHS 199/mo.
               </p>
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">
               {isAuthed ? (
                 <Button
                   size="lg"
-                  className="gap-2 bg-white text-primary-700 hover:bg-gray-100 shadow-lg focus:ring-white"
+                  className="gap-2 !bg-white !text-primary-700 hover:!bg-gray-100 hover:!text-primary-700 shadow-lg focus:ring-white"
                   onClick={() => navigate('/dashboard')}
                 >
                   Go to dashboard
@@ -1526,10 +1520,10 @@ function FinalCta() {
                 <>
                   <Button
                     size="lg"
-                    className="gap-2 bg-white text-primary-700 hover:bg-gray-100 shadow-lg focus:ring-white"
+                    className="gap-2 !bg-white !text-primary-700 hover:!bg-gray-100 hover:!text-primary-700 shadow-lg focus:ring-white"
                     onClick={() => navigate('/register')}
                   >
-                    Start free trial
+                    Start free
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                   <Button
@@ -1641,12 +1635,10 @@ function Footer() {
       className="relative overflow-hidden bg-gray-900 text-gray-300"
     >
       <div aria-hidden className="absolute inset-0 grid-overlay-dark opacity-50" />
-      <div aria-hidden className="absolute -top-24 left-1/4 w-96 h-96 rounded-full bg-primary-700/20 blur-3xl" />
-      <div aria-hidden className="absolute -bottom-32 right-1/4 w-[420px] h-[420px] rounded-full bg-green-700/15 blur-3xl" />
 
       {/* Newsletter strip */}
       <div className="relative border-b border-white/10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center lg:py-16">
           <div>
             <h3 className="text-xl font-bold text-white">
               Stay ahead of each close.
@@ -1661,8 +1653,8 @@ function Footer() {
       </div>
 
       {/* Main grid — five columns on large screens: Brand · Contact · Product · Account · Resources */}
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-14 pb-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 pb-10 lg:pt-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Column 1: Brand + social */}
           <div>
             <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2">
@@ -1702,8 +1694,8 @@ function Footer() {
                   <Phone className="w-4 h-4 text-primary-400" />
                 </span>
                 <span className="flex flex-col gap-0.5 leading-snug">
-                  <a href="tel:+233302512596" className="text-gray-300 hover:text-white transition-colors">
-                    0302 512 596
+                  <a href="tel:+233200158182" className="text-gray-300 hover:text-white transition-colors">
+                    0200 158 182
                   </a>
                   <a href="tel:+233208915637" className="text-gray-300 hover:text-white transition-colors">
                     0208 915 637
@@ -1753,7 +1745,7 @@ function Footer() {
         </div>
 
         {/* Trust row */}
-        <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-400">
+        <div className="mt-6 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-400">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-green-400" />
             <span>Encrypted at rest · HTTPS in transit</span>
