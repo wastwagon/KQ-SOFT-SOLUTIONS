@@ -59,7 +59,7 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
     missing_cheques_report: false,
     one_to_many: true,
     many_to_many: true,
-    roll_forward: false,
+    roll_forward: true,
     threshold_approval: false,
     full_branding: false,
     firm_dashboard: false,
@@ -75,7 +75,7 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
     missing_cheques_report: true,
     one_to_many: true,
     many_to_many: true,
-    roll_forward: false,
+    roll_forward: true,
     threshold_approval: false,
     full_branding: true,
     firm_dashboard: false,
@@ -116,8 +116,8 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
   },
 }
 
-/** Split / many-to-1 matching is on every package; CMS cannot turn it off. */
-const UNGATED_PLAN_FEATURES = new Set(['one_to_many', 'many_to_many'])
+/** Split matching, many-to-many, and roll forward start at Solo. Free stays off. */
+const SOLO_AND_ABOVE_FEATURES = new Set(['one_to_many', 'many_to_many', 'roll_forward'])
 
 function fmtLimit(n: number) {
   return n < 0 ? 'Unlimited' : n.toLocaleString()
@@ -352,7 +352,12 @@ function PlanForm({
       bankAccounts: parseInt(bankAccounts, 10) || 0,
       cleanExportsPerMonth: parseInt(cleanExportsPerMonth, 10) || 0,
       usersLimit: parseInt(usersLimit, 10) || 0,
-      features: { ...features, one_to_many: true, many_to_many: true },
+      features: {
+        ...features,
+        one_to_many: slug.trim().toLowerCase() !== 'free',
+        many_to_many: slug.trim().toLowerCase() !== 'free',
+        roll_forward: slug.trim().toLowerCase() !== 'free',
+      },
       active,
     })
   }
@@ -408,8 +413,9 @@ function PlanForm({
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-1">Features</h4>
         <p className="text-xs text-gray-500 mb-3">
-          These flags gate the product (API keys, bank rules, reports). One-to-many and many-to-many
-          matching stay on for every package. Saving updates every workspace on this package.
+          These flags gate the product (API keys, bank rules, reports). Split matching, many-to-many,
+          and roll forward are included from Solo upward and stay off on Free. Saving updates every
+          workspace on this package.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {rows.map((f) => (
@@ -417,8 +423,12 @@ function PlanForm({
               <input
                 type="checkbox"
                 className="mt-0.5 rounded border-gray-300"
-                checked={UNGATED_PLAN_FEATURES.has(f.id) ? true : !!features[f.id]}
-                disabled={UNGATED_PLAN_FEATURES.has(f.id)}
+                checked={
+                  SOLO_AND_ABOVE_FEATURES.has(f.id)
+                    ? slug.trim().toLowerCase() !== 'free'
+                    : !!features[f.id]
+                }
+                disabled={SOLO_AND_ABOVE_FEATURES.has(f.id)}
                 onChange={(e) => setFeatures((prev) => ({ ...prev, [f.id]: e.target.checked }))}
               />
               <span>

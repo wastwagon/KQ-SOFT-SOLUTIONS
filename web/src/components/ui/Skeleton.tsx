@@ -17,15 +17,16 @@ export default function Skeleton({ className = '', pulse = true, ...props }: Ske
 }
 
 /** Skeleton that matches a MetricCard layout */
-export function MetricCardSkeleton({ className = '' }: { className?: string }) {
+export function MetricCardSkeleton({ className = '', compact = false }: { className?: string; compact?: boolean }) {
   return (
-    <div className={`rounded-xl border border-border bg-white p-6 shadow-card ${className}`}>
+    <div className={`rounded-xl border border-border bg-white shadow-card ${compact ? 'px-4 py-3' : 'p-6'} ${className}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <Skeleton className="h-4 w-24 mb-2" />
-          <Skeleton className="h-8 w-20" />
+          <Skeleton className={`w-24 ${compact ? 'h-3 mb-1.5' : 'h-4 mb-2'}`} />
+          <Skeleton className={compact ? 'h-5 w-10' : 'h-8 w-20'} />
+          {compact && <Skeleton className="mt-1.5 h-3 w-28" />}
         </div>
-        <Skeleton className="h-6 w-6 rounded flex-shrink-0" />
+        <Skeleton className={`rounded flex-shrink-0 ${compact ? 'h-7 w-7' : 'h-6 w-6'}`} />
       </div>
     </div>
   )

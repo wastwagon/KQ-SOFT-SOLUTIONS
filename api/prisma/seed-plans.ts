@@ -1,7 +1,7 @@
 /**
  * Production-safe plan seed.
  *
- * Idempotent: upserts the four canonical subscription tiers (basic,
+ * Idempotent: upserts the five canonical subscription tiers (free, basic,
  * standard, premium, firm) so the public `/api/v1/public/plans` endpoint
  * always returns complete data. Safe to run on every container start.
  *
@@ -19,7 +19,21 @@
  *   - web/src/lib/plans.ts → MARKETING_PLANS
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
-import { isStoredFeaturesEmpty, mergePlanFeatures } from '../src/config/planFeatures.js'
+import {
+  defaultHasPlanFeature,
+  isStoredFeaturesEmpty,
+  mergePlanFeatures,
+  type PlanFeature,
+} from '../src/config/planFeatures.js'
+
+/** Catalogue floor: Solo and every paid plan. Free stays off. Re-applied on each seed. */
+const SOLO_AND_ABOVE: PlanFeature[] = ['one_to_many', 'many_to_many', 'roll_forward']
+
+function featuresForSeed(slug: string, stored: unknown): Prisma.InputJsonValue {
+  const features = mergePlanFeatures(slug, stored)
+  for (const id of SOLO_AND_ABOVE) features[id] = defaultHasPlanFeature(slug, id)
+  return features
+}
 
 const prisma = new PrismaClient()
 
@@ -113,7 +127,7 @@ async function main() {
     const isLegacy =
       !!existing && (legacyMonthly[plan.slug] ?? []).includes(existing.monthlyGhs)
     const shouldReset = force || isLegacy || !existing
-    const features = mergePlanFeatures(plan.slug, existing?.features) as Prisma.InputJsonValue
+    const features = featuresForSeed(plan.slug, existing?.features)
     const shouldBackfillFeatures = !!existing && isStoredFeaturesEmpty(existing.features)
     const firstTimeCms = shouldBackfillFeatures
       ? {
@@ -130,8 +144,8 @@ async function main() {
       update: shouldReset
         ? { ...plan, features }
         : {
-            // Keep admin CMS edits (prices, monthly volume, seats) but always
-            // persist ungated split matching so Basic/Standard Confirm match works.
+            // Keep admin CMS edits (prices, monthly volume, seats) but keep
+            // split matching, many-to-many, and roll forward on Solo and above.
             name: plan.name,
             slug: plan.slug,
             features,

@@ -243,9 +243,9 @@ export default function Projects({ initialStatus }: ProjectsProps) {
             type="button"
             variant="outline"
             disabled
-            title="Filter by client requires Firm plan"
+            title="Filter by client requires the Custom plan"
           >
-            Filter by client (Firm)
+            Filter by client (Custom)
           </Button>
         )}
         </div>

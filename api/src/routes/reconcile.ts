@@ -1498,7 +1498,7 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'bulk_match'))) {
-    return res.status(403).json({ error: 'Bulk match requires the Team plan or higher.' })
+    return res.status(403).json({ error: 'Bulk match requires the Solo plan or higher.' })
   }
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })

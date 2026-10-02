@@ -226,6 +226,9 @@ export default function Landing() {
   const plans = useMemo(() => mergeWithApiPlans(plansData?.plans), [plansData])
 
   // Smooth fade-in on scroll for any element marked with [data-reveal].
+  // Mark revealed via a data attribute, not a class. React rewrites className
+  // on the next render (FAQ open/close, etc.) and would drop an imperative class,
+  // which snaps the block back to opacity 0.
   useEffect(() => {
     if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
     const els = document.querySelectorAll<HTMLElement>('[data-reveal]')
@@ -233,7 +236,7 @@ export default function Landing() {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            entry.target.classList.add('is-revealed')
+            entry.target.setAttribute('data-revealed', '')
             io.unobserve(entry.target)
           }
         }
@@ -283,7 +286,7 @@ export default function Landing() {
           transform: translateY(18px);
           transition: opacity 0.7s ease-out, transform 0.7s ease-out;
         }
-        [data-reveal].is-revealed {
+        [data-reveal][data-revealed] {
           opacity: 1;
           transform: translateY(0);
         }

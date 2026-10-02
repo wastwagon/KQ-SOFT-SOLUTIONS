@@ -336,7 +336,7 @@ router.delete('/match-memory/:id', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'ai_suggestions'))) {
-    return res.status(403).json({ error: 'Organisation match memory requires the Team plan or higher.' })
+    return res.status(403).json({ error: 'Organisation match memory requires the Solo plan or higher.' })
   }
   const { forgetOrganisationMatchMemory } = await import('../services/organizationMatchMemory.js')
   const ok = await forgetOrganisationMatchMemory(orgId, req.params.id)

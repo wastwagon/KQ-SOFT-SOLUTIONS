@@ -56,7 +56,7 @@ router.post('/', async (req: AuthRequest, res) => {
     const multiClient = await orgHasPlanFeature(orgId, 'multi_client')
     if (!multiClient) {
       return res.status(403).json({
-        error: 'Multi-client workspace requires Firm plan.',
+        error: 'Multi-client workspace requires the Custom plan.',
         code: 'PLAN_FEATURE_REQUIRED',
         feature: 'multi_client',
       })

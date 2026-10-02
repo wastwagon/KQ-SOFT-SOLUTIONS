@@ -106,7 +106,7 @@ router.post('/', async (req: AuthRequest, res) => {
     let rollForwardId: string | null = null
     if (body.rollForwardFromProjectId) {
       if (!(await planHasFeature(org.plan, 'roll_forward'))) {
-        return res.status(403).json({ error: 'Roll-forward requires the Firm plan or higher.' })
+        return res.status(403).json({ error: 'Roll-forward requires the Solo plan or higher.' })
       }
       rollForwardId = await resolveProjectId(body.rollForwardFromProjectId, orgId)
       const prev = rollForwardId ? await prisma.project.findFirst({
@@ -217,7 +217,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     const multiClient = org ? await planHasFeature(org.plan, 'multi_client') : false
     if (body.clientId !== undefined && body.clientId != null && !multiClient) {
       return res.status(403).json({
-        error: 'Multi-client workspace requires Firm plan.',
+        error: 'Multi-client workspace requires the Custom plan.',
         code: 'PLAN_FEATURE_REQUIRED',
         feature: 'multi_client',
       })

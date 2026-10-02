@@ -243,7 +243,7 @@ export interface ReportBranding {
   primaryColor?: string
   secondaryColor?: string
   footer?: string
-  /** Org default for Ghana BRS workbook netting (Firm plan and above). */
+  /** Org default for Ghana BRS workbook netting (Solo plan and above). */
   ghanaBrsWorkbookNettingDefault?: boolean
 }
 

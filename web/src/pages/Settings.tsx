@@ -270,7 +270,7 @@ export default function Settings() {
             }
           >
             {!features.api_access && (
-              <Alert tone="warning" title="Firm plan required" className="mb-4">
+              <Alert tone="warning" title="Custom plan required" className="mb-4">
                 Upgrade to create API keys for programmatic access.
               </Alert>
             )}

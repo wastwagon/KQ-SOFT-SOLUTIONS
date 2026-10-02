@@ -23,7 +23,8 @@ import { formatDate } from '../lib/format'
 import MetricCard from '../components/ui/MetricCard'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
-import Skeleton, { MetricCardSkeleton } from '../components/ui/Skeleton'
+import { MetricCardSkeleton, TableRowSkeleton } from '../components/ui/Skeleton'
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
 import Button, { buttonClassName } from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Alert from '../components/ui/Alert'
@@ -53,18 +54,36 @@ function DashLinkCard({
   return (
     <Link
       to={to}
-      className="group flex flex-col gap-2 p-5 rounded-xl border border-border shadow-card hover:shadow-card-hover hover:border-primary-300 hover:bg-primary-50/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      className="group flex items-start gap-3 rounded-xl border border-border bg-white p-4 transition-colors hover:border-primary-200 hover:bg-primary-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
     >
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 group-hover:bg-primary-100">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 group-hover:bg-primary-50 group-hover:text-primary-700">
         {icon}
       </span>
-      <span className="font-semibold tracking-tight text-gray-900">{title}</span>
-      <span className="text-xs text-gray-500 leading-snug">{description}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold tracking-tight text-gray-900">{title}</span>
+        <span className="mt-0.5 block text-xs leading-snug text-gray-500">{description}</span>
+      </span>
     </Link>
   )
 }
 
 const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
+
+function RecentProjectsHead() {
+  return (
+    <TableHead>
+      <tr>
+        <TableTh>Project</TableTh>
+        <TableTh>Status</TableTh>
+        <TableTh>Tie-out</TableTh>
+        <TableTh>Created</TableTh>
+        <TableTh className="w-10">
+          <span className="sr-only">Open</span>
+        </TableTh>
+      </tr>
+    </TableHead>
+  )
+}
 
 export default function Dashboard() {
   const queryClient = useQueryClient()
@@ -220,6 +239,7 @@ export default function Dashboard() {
                     ? 'brand'
                     : 'neutral'
             }
+            aria-label={`Your role: ${roleLabel}`}
           >
             {roleLabel}
           </Badge>
@@ -252,7 +272,7 @@ export default function Dashboard() {
             </Button>
           }
         >
-          <ol className="space-y-2 text-sm">
+          <ol className="space-y-3 text-sm">
             <li className="flex gap-3">
               <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">1.</span>
               <span>
@@ -297,22 +317,23 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <section aria-labelledby="dashboard-metrics-heading">
-        <h2 id="dashboard-metrics-heading" className="sr-only">
-          Key metrics
+      <section aria-labelledby="dashboard-metrics-heading" className="space-y-3">
+        <h2 id="dashboard-metrics-heading" className="text-sm font-medium text-gray-600">
+          At a glance
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5 lg:gap-6">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(15.5rem,1fr))] gap-4">
         {usageLoading ? (
           <>
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
+            <MetricCardSkeleton compact />
+            <MetricCardSkeleton compact />
+            <MetricCardSkeleton compact />
+            <MetricCardSkeleton compact />
+            <MetricCardSkeleton compact />
           </>
         ) : (
           <>
             <MetricCard
+              compact
               label="Total Projects"
               value={usage?.usage?.projectsUsed ?? projectsList.length}
               sublabel={
@@ -324,6 +345,7 @@ export default function Dashboard() {
               accent="none"
             />
             <MetricCard
+              compact
               label="Pending review"
               value={pendingReviewCount}
               sublabel={`${inProgressCount} in progress`}
@@ -331,17 +353,24 @@ export default function Dashboard() {
               accent="none"
             />
             <MetricCard
+              compact
               label="Monthly Transactions"
               value={usage?.usage?.transactionsUsed ?? 0}
               sublabel={
                 transactionsUnlimited
                   ? 'Unlimited on plan'
-                  : `${transactionsUsed} of ${transactionsLimit} this calendar month (resets on the 1st)`
+                  : `${transactionsUsed.toLocaleString('en-GH')} of ${transactionsLimit.toLocaleString('en-GH')} this month`
+              }
+              sublabelTitle={
+                transactionsUnlimited
+                  ? undefined
+                  : `${transactionsUsed.toLocaleString('en-GH')} of ${transactionsLimit.toLocaleString('en-GH')} this calendar month. Resets on the 1st.`
               }
               icon={<LayoutDashboard />}
               accent="none"
             />
             <MetricCard
+              compact
               label="Bank Accounts"
               value={bankAccountsUsed}
               sublabel={
@@ -353,6 +382,7 @@ export default function Dashboard() {
               accent="none"
             />
             <MetricCard
+              compact
               label="Team Members"
               value={memberCount}
               sublabel="Active firm accounts"
@@ -369,7 +399,7 @@ export default function Dashboard() {
           <p className="text-sm text-gray-600 mb-5">
             Multi-entity snapshot for this workspace — clients, open jobs, and reports.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5">
             <DashLinkCard
               to="/clients"
               icon={<Building2 className="w-4 h-4" aria-hidden />}
@@ -392,31 +422,8 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <Card title="What’s new">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                {latestRelease ? (
-                  <>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium text-gray-900">Version {latestRelease.version}</span> — {latestRelease.changes}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Released {latestRelease.date}</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-600">No recent release notes on the dashboard.</p>
-                )}
-              </div>
-              <Link to="/manual" className={buttonClassName('outline', 'sm')}>
-                Open user manual
-              </Link>
-            </div>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card title="Next actions">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
+        <Card title="Next actions">
             {nextActions.length === 0 ? (
               <p className="text-sm text-gray-500">
                 Nothing waiting on you. Start a project or open{' '}
@@ -431,7 +438,7 @@ export default function Dashboard() {
                   <li key={item.key}>
                     <Link
                       to={item.to}
-                      className="flex items-start justify-between gap-3 rounded-xl px-3 py-2.5 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                      className="flex items-start justify-between gap-3 rounded-xl px-3 py-3 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
                       <span className="min-w-0">
                         <span className="block text-sm font-medium text-gray-900 truncate">{item.title}</span>
@@ -452,7 +459,26 @@ export default function Dashboard() {
               </Link>
             )}
           </Card>
-        </div>
+
+        <Card title="What’s new">
+            <div className="flex flex-col items-start gap-4">
+              <div>
+                {latestRelease ? (
+                  <>
+                    <p className="text-sm leading-relaxed text-gray-600">
+                      <span className="font-medium text-gray-900">Version {latestRelease.version}</span> — {latestRelease.changes}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1.5">Released {latestRelease.date}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-600">No recent release notes on the dashboard.</p>
+                )}
+              </div>
+              <Link to="/manual" className={buttonClassName('outline', 'sm')}>
+                Open user manual
+              </Link>
+            </div>
+          </Card>
       </div>
 
       <Card title="Clean & export tools">
@@ -460,7 +486,7 @@ export default function Dashboard() {
           Validate bank or cash-book formats with the same parsers. Preview is free; sample downloads
           are truncated and watermarked; full Excel/PDF uses your plan’s monthly clean-export quota.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5">
           <DashLinkCard
             to="/tools/clean-bank-statement"
             icon={<Landmark className="w-4 h-4" aria-hidden />}
@@ -476,102 +502,63 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {isAdmin && (
-        <Card title="Manage app & settings">
-          <p className="text-sm text-gray-600 mb-5">
-            Control branding, billing, bank rules, API keys, and view activity.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <Card
+        title={isAdmin ? 'Manage app & settings' : 'Settings'}
+      >
+        <p className="text-sm text-gray-600 mb-5">
+          {isAdmin
+            ? 'Control branding, billing, bank rules, API keys, and view activity.'
+            : 'Branding, billing, and team — manage your organisation.'}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
+          <DashLinkCard
+            to="/settings/branding"
+            icon={<Palette className="w-4 h-4" aria-hidden />}
+            title="Branding"
+            description="Logo, colours, report title"
+          />
+          <DashLinkCard
+            to="/settings/billing"
+            icon={<CreditCard className="w-4 h-4" aria-hidden />}
+            title="Billing"
+            description="Plan & payment"
+          />
+          <DashLinkCard
+            to="/settings/members"
+            icon={<Users className="w-4 h-4" aria-hidden />}
+            title="Members"
+            description="Add & manage team"
+          />
+          {isAdmin && features.api_access && (
             <DashLinkCard
-              to="/settings/branding"
-              icon={<Palette className="w-4 h-4" aria-hidden />}
-              title="Branding"
-              description="Logo, colours, report title"
+              to="/settings/api-keys"
+              icon={<Key className="w-4 h-4" aria-hidden />}
+              title="API keys"
+              description="Create & manage API access"
             />
+          )}
+          {features.bank_rules && (
             <DashLinkCard
-              to="/settings/billing"
-              icon={<CreditCard className="w-4 h-4" aria-hidden />}
-              title="Billing"
-              description="Plan & payment"
+              to="/settings/bank-rules"
+              icon={<Landmark className="w-4 h-4" aria-hidden />}
+              title="Bank rules"
+              description="Auto-suggest & flag rules"
             />
+          )}
+          {features.audit_trail && (
             <DashLinkCard
-              to="/settings/members"
-              icon={<Users className="w-4 h-4" aria-hidden />}
-              title="Members"
-              description="Add & manage team"
+              to="/audit"
+              icon={<Shield className="w-4 h-4" aria-hidden />}
+              title="Audit log"
+              description="All actions & exports"
             />
-            {features.api_access && (
-              <DashLinkCard
-                to="/settings/api-keys"
-                icon={<Key className="w-4 h-4" aria-hidden />}
-                title="API keys"
-                description="Create & manage API access"
-              />
-            )}
-            {features.bank_rules && (
-              <DashLinkCard
-                to="/settings/bank-rules"
-                icon={<Landmark className="w-4 h-4" aria-hidden />}
-                title="Bank rules"
-                description="Auto-suggest & flag rules"
-              />
-            )}
-            {features.audit_trail && (
-              <DashLinkCard
-                to="/audit"
-                icon={<Shield className="w-4 h-4" aria-hidden />}
-                title="Audit log"
-                description="All actions & exports"
-              />
-            )}
-          </div>
-        </Card>
-      )}
-
-      {!isAdmin && (
-        <Card title="Settings">
-          <p className="text-sm text-gray-600 mb-5">Branding, billing, and team — manage your organisation.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <DashLinkCard
-              to="/settings/branding"
-              icon={<Palette className="w-4 h-4" aria-hidden />}
-              title="Branding"
-              description="Logo, colours, report title"
-            />
-            <DashLinkCard
-              to="/settings/billing"
-              icon={<CreditCard className="w-4 h-4" aria-hidden />}
-              title="Billing"
-              description="Plan & payment"
-            />
-            <DashLinkCard
-              to="/settings/members"
-              icon={<Users className="w-4 h-4" aria-hidden />}
-              title="Members"
-              description="Add & manage team"
-            />
-            {features.bank_rules && (
-              <DashLinkCard
-                to="/settings/bank-rules"
-                icon={<Landmark className="w-4 h-4" aria-hidden />}
-                title="Bank rules"
-                description="Auto-suggest & flag rules"
-              />
-            )}
-            {features.audit_trail && (
-              <DashLinkCard
-                to="/audit"
-                icon={<Shield className="w-4 h-4" aria-hidden />}
-                title="Audit log"
-                description="Actions & exports"
-              />
-            )}
-          </div>
-        </Card>
-      )}
+          )}
+        </div>
+      </Card>
 
       <Card
         id="recent-projects"
+        noPadding
         title="Recent projects"
         sublabel={projectsList.length > 0 ? `${inProgressCount} in progress · ${completedCount} completed` : undefined}
         actions={
@@ -587,63 +574,74 @@ export default function Dashboard() {
           </div>
         }
       >
-        <div className="divide-y divide-border-muted -mx-6">
-          {isLoading ? (
-            <div className="px-6 py-4 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex justify-between items-center">
-                  <div className="flex-1 min-w-0">
-                    <Skeleton className="h-5 w-32 mb-1" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                  <Skeleton className="h-4 w-12 rounded" />
-                </div>
+        {isLoading ? (
+          <Table>
+            <RecentProjectsHead />
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRowSkeleton key={i} cols={5} />
               ))}
-            </div>
-          ) : projectsPaywallBlocked ? (
-            <div className="px-6 py-6">
-              <SubscriptionRenewalPanel />
-            </div>
-          ) : projectsList.length === 0 ? (
+            </TableBody>
+          </Table>
+        ) : projectsPaywallBlocked ? (
+          <div className="px-6 py-6">
+            <SubscriptionRenewalPanel />
+          </div>
+        ) : projectsList.length === 0 ? (
+          <div className="px-6 py-8">
             <EmptyState
               icon={<FolderKanban className="w-6 h-6" />}
               title="No projects yet"
               description="Create your first project to start reconciling cash book and bank statement. Upload files, match transactions, then export your BRS report."
               action={
-            canCreateProject(role) ? (
-            <Link to="/projects/new" className={buttonClassName('primary', 'md')}>
-              New project
-            </Link>
-            ) : undefined
+                canCreateProject(role) ? (
+                  <Link to="/projects/new" className={buttonClassName('primary', 'md')}>
+                    New project
+                  </Link>
+                ) : undefined
               }
             />
-          ) : (
-            projectsList.map((p: { id: string; name: string; slug: string; status: string; createdAt: string }) => (
-              <Link
-                key={p.id}
-                to={`/projects/${p.slug ?? p.id}`}
-                className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-gray-50/90 transition-colors group focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900 group-hover:text-primary-800 transition-colors truncate">
-                    {p.name}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+          </div>
+        ) : (
+            <Table>
+            <caption className="sr-only">Recent projects</caption>
+            <RecentProjectsHead />
+            <TableBody>
+              {projectsList.map((p: { id: string; name: string; slug: string; status: string; createdAt: string }) => (
+                <TableRow key={p.id} className="group relative">
+                  <TableTd className="max-w-[28rem]">
+                    <Link
+                      to={`/projects/${p.slug ?? p.id}`}
+                      className="block truncate font-medium text-gray-900 group-hover:text-primary-800 after:absolute after:inset-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                      title={p.name}
+                    >
+                      {p.name}
+                    </Link>
+                  </TableTd>
+                  <TableTd className="whitespace-nowrap">
                     <ProjectStatusPill status={p.status} size="sm" />
-                    {BRS_SUMMARY_STATUSES.has(p.status) && (
+                  </TableTd>
+                  <TableTd className="whitespace-nowrap">
+                    {BRS_SUMMARY_STATUSES.has(p.status) ? (
                       <BrsVarianceBadge projectId={p.id} compact />
+                    ) : (
+                      <span className="text-gray-400" aria-label="No tie-out yet">—</span>
                     )}
-                    <span className="text-sm text-gray-500">{formatDate(p.createdAt)}</span>
-                  </div>
-                </div>
-                <ChevronRight
-                  className="w-5 h-5 text-gray-400 shrink-0 group-hover:text-primary-600 transition-colors"
-                  aria-hidden
-                />
-              </Link>
-            ))
-          )}
-        </div>
+                  </TableTd>
+                  <TableTd className="whitespace-nowrap text-gray-500 tabular-nums">
+                    {formatDate(p.createdAt)}
+                  </TableTd>
+                  <TableTd className="text-right">
+                    <ChevronRight
+                      className="inline w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors"
+                      aria-hidden
+                    />
+                  </TableTd>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   )

@@ -102,7 +102,7 @@ export default function Clients() {
             <p className="text-gray-500">
               Entities you reconcile for.
               {!features.multi_client && (
-                <span> Filtering projects by client requires the Firm plan.</span>
+                <span> Filtering projects by client requires the Custom plan.</span>
               )}
             </p>
           </>

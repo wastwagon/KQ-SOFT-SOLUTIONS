@@ -35,7 +35,7 @@ async function requireApiAccessPlan(req: AuthRequest, res: import('express').Res
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'api_access'))) {
-    res.status(403).json({ error: 'API keys require Firm plan. Contact sales to upgrade.' })
+    res.status(403).json({ error: 'API keys require the Custom plan. Contact sales to upgrade.' })
     return false
   }
   return true
