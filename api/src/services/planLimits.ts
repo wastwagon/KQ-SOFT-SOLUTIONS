@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js'
 import { getPlanBySlug } from './plan.js'
 import { getLimits, isUnlimited, TIER_LIMITS } from '../config/subscription.js'
+import { seatedBankAccountIds } from './planChange.js'
 
 export interface PlanQuotaLimits {
   projectsPerMonth: number
@@ -66,4 +67,25 @@ export async function canAddBankAccount(
     }
   }
   return { ok: true }
+}
+
+/** null means every bank account on the plan stays in use. */
+export async function seatedBankIdsForOrg(orgId: string, planSlug: string): Promise<Set<string> | null> {
+  const limits = await getPlanQuotaLimits(planSlug)
+  if (isUnlimited(limits.bankAccounts)) return null
+  const accounts = await prisma.bankAccount.findMany({
+    where: { project: { organizationId: orgId } },
+    select: { id: true, createdAt: true },
+  })
+  return seatedBankAccountIds(accounts, limits.bankAccounts)
+}
+
+export function bankAccountVisible(
+  bankAccountId: string | null | undefined,
+  seated: Set<string> | null,
+  requestedId?: string
+): boolean {
+  if (requestedId && bankAccountId !== requestedId) return false
+  if (seated && bankAccountId && !seated.has(bankAccountId)) return false
+  return true
 }

@@ -213,7 +213,6 @@ export default function Landing() {
   const [navOpen, setNavOpen] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
   const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const [showCompare, setShowCompare] = useState(false)
 
   const { data: plansData } = useQuery({
     queryKey: ['public', 'plans'],
@@ -311,8 +310,6 @@ export default function Landing() {
         plans={plans}
         billingPeriod={billingPeriod}
         setBillingPeriod={setBillingPeriod}
-        showCompare={showCompare}
-        setShowCompare={setShowCompare}
       />
       <Testimonials />
       <Faq openFaq={openFaq} setOpenFaq={setOpenFaq} />
@@ -983,14 +980,10 @@ function Pricing({
   plans,
   billingPeriod,
   setBillingPeriod,
-  showCompare,
-  setShowCompare,
 }: {
   plans: MarketingPlan[]
   billingPeriod: BillingPeriod
   setBillingPeriod: (p: BillingPeriod) => void
-  showCompare: boolean
-  setShowCompare: (b: boolean) => void
 }) {
   const maxYearlyDiscount = maxYearlyDiscountPercent(plans)
   const yearlySavingsCopy =
@@ -1095,22 +1088,7 @@ function Pricing({
           </span>
         </div>
 
-        {/* Comparison table toggle */}
-        <div className="mt-5 text-center">
-          <Button
-            variant="outline"
-            className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50"
-            onClick={() => setShowCompare(!showCompare)}
-            aria-expanded={showCompare}
-          >
-            {showCompare ? 'Hide full comparison' : 'Compare all features'}
-            <ChevronDown
-              className={`w-4 h-4 transition-transform ${showCompare ? 'rotate-180' : ''}`}
-            />
-          </Button>
-        </div>
-
-        {showCompare && <ComparisonTable plans={plans} />}
+        <ComparisonTable plans={plans} period={billingPeriod} />
 
         <p className="mt-5 text-center text-sm text-gray-500">
           Need something custom?{' '}
@@ -1257,48 +1235,69 @@ function PlanCard({
   )
 }
 
-/** Side-by-side feature comparison across all 4 plans, grouped by capability. */
-function ComparisonTable({ plans }: { plans: MarketingPlan[] }) {
+/** Full plan comparison. Always visible under the pricing cards. */
+function ComparisonTable({ plans, period }: { plans: MarketingPlan[]; period: BillingPeriod }) {
   return (
-    <div data-reveal className="mt-6 rounded-xl border border-gray-200 bg-white overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-gradient-to-r from-gray-50 to-white">
-              <th className="text-left px-5 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 w-1/3">
-                Feature
-              </th>
-              {plans.map((p) => (
-                <th
-                  key={p.slug}
-                  className={`px-5 py-4 text-center text-sm font-bold ${
-                    p.highlight ? 'text-primary-700' : 'text-gray-900'
-                  }`}
-                >
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span>{p.name}</span>
-                    {p.badge && (
-                      <span
-                        className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                          p.highlight
-                            ? 'bg-primary-100 text-primary-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {p.badge}
-                      </span>
-                    )}
-                  </div>
+    <div id="plan-comparison" className="mt-14 scroll-mt-24">
+      <div className="mx-auto max-w-2xl text-center">
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
+          Full comparison
+        </p>
+        <h3 className="mt-1 text-2xl font-bold tracking-tight text-gray-900">
+          What each plan includes
+        </h3>
+        <p className="mt-2 text-sm text-gray-600">
+          Every plan keeps the features below it. A label means a capped version;
+          a check means the full feature. Prices follow the billing period selected above.
+        </p>
+      </div>
+      <div data-reveal className="mt-6 rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-[880px] w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-white border-b border-gray-200">
+                <th className="sticky left-0 z-20 bg-white text-left px-5 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 min-w-[220px]">
+                  Feature
                 </th>
+                {plans.map((p) => {
+                  const isCustom = p.slug === 'firm' && p.monthlyGhs <= 0 && p.yearlyGhs <= 0
+                  const amount = planAmountForPeriod(p, period)
+                  return (
+                    <th
+                      key={p.slug}
+                      className={`px-4 py-4 text-center min-w-[120px] ${
+                        p.highlight ? 'bg-primary-50 text-primary-800' : 'bg-white text-gray-900'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-sm font-bold">{p.name}</span>
+                        <span className="text-xs font-semibold tabular-nums text-gray-600">
+                          {isCustom ? 'From GHS 1,800' : amount === 0 ? 'Free' : formatGhs(amount)}
+                        </span>
+                        {p.badge && (
+                          <span
+                            className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              p.highlight
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {p.badge}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {FEATURE_GROUPS.map((group) => (
+                <FragmentGroup key={group.title} group={group} plans={plans} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {FEATURE_GROUPS.map((group) => (
-              <FragmentGroup key={group.title} group={group} plans={plans} />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -1323,7 +1322,7 @@ function FragmentGroup({
       </tr>
       {group.features.map((feature) => (
         <tr key={feature.id} className="border-t border-gray-100">
-          <td className="px-5 py-3 text-gray-700">{feature.label}</td>
+          <td className="sticky left-0 bg-white px-5 py-3 text-gray-700">{feature.label}</td>
           {plans.map((p) => {
             const v = p.features[feature.id]
             return (

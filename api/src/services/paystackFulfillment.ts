@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../middleware/logging.js'
 import { invalidateOrgSubscriptionCache } from './orgSubscriptionAccess.js'
+import { clearScheduledPlan } from './planChange.js'
 import { recordIntroOfferPayment } from './introOffer.js'
 
 export const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
@@ -267,6 +268,7 @@ export async function fulfillSuccessfulCharge(
         where: { id: input.orgId },
         data: { plan },
       })
+      await clearScheduledPlan(input.orgId)
       invalidateOrgSubscriptionCache(input.orgId)
       return 'already_applied'
     }
@@ -276,6 +278,7 @@ export async function fulfillSuccessfulCharge(
   if (input.introOffer && !alreadySuccess) {
     await recordIntroOfferPayment(input.orgId)
   }
+  await clearScheduledPlan(input.orgId)
   invalidateOrgSubscriptionCache(input.orgId)
   logger.info(
     { orgId: input.orgId, plan, period: safePeriod, reference, result: alreadySuccess ? 'already_applied' : 'applied' },

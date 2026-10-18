@@ -17,6 +17,9 @@ export type AuditAction =
   | 'attachment_deleted'
   | 'reconciliation_undone'
   | 'tools_clean_export'
+  | 'plan_downgrade_scheduled'
+  | 'plan_scheduled_applied'
+  | 'plan_downgrade_cancelled'
 
 export async function logAudit(params: {
   organizationId: string

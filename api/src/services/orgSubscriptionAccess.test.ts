@@ -1,14 +1,19 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 
 vi.mock('../lib/prisma.js', () => ({
-  prisma: {
+    prisma: {
     organization: { findUnique: vi.fn() },
     payment: { findFirst: vi.fn() },
+    platformSettings: { findUnique: vi.fn().mockResolvedValue(null) },
   },
 }))
 
 vi.mock('./subscriptionOverrides.js', () => ({
   fetchSubscriptionOverrides: vi.fn(async () => ({})),
+}))
+
+vi.mock('./planChange.js', () => ({
+  applyDueScheduledPlan: vi.fn(async () => null),
 }))
 
 vi.mock('./subscriptionState.js', () => ({

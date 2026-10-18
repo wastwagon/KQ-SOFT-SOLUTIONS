@@ -56,10 +56,13 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
   })
   const approveMutation = useMutation({
     mutationFn: () => projects.approve(projectId),
-    onSuccess: () => {
+    onSuccess: (resp) => {
       queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      if (resp.thresholdWarning) {
+        toast.warning('Above the Team warning amount', resp.thresholdWarning.message)
+      }
     },
   })
 
@@ -155,6 +158,12 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
         title="Review & exceptions"
         subtitle="Confirm unmatched items before you generate the BRS. Submit or approve when your firm’s process allows."
       />
+
+      {data.thresholdWarning?.message && (
+        <Alert tone="warning" title="Above the Team warning amount">
+          {data.thresholdWarning.message}
+        </Alert>
+      )}
 
       <div className="sticky top-0 z-20 -mx-1 border-b border-border-muted bg-white/95 px-1 py-3 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3">

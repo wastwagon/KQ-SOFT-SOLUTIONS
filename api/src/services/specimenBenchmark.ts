@@ -12,6 +12,7 @@ import { parseImportedDate } from './dateParser.js'
 import { buildSmartSuggestedMapping } from './suggestedMapping.js'
 import { suggestMatches, suggestSplitMatches, type Tx } from './matching.js'
 import { resolveMatchSides } from './sideInversion.js'
+import { isTglErpSignedAmountColumn } from './applyDocumentMapping.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_SPECIMEN_ROOT = path.resolve(__dirname, '../../../corrected-bank-specimens-for-user')
@@ -132,6 +133,22 @@ export function summarizeParsedAmounts(
   headers: string[],
   rows: unknown[][]
 ): { sumDebit: number; sumCredit: number } {
+  const normalized = headers.map((h) => String(h).trim().toLowerCase())
+  const tglLayout = normalized.some((h) => /tgl\s*account\s*code/.test(h))
+  const amountIdx = normalized.findIndex(
+    (h) => h === 'amount' || h === 'foreign currency amount' || h === 'fc amount'
+  )
+  if (tglLayout && amountIdx >= 0 && isTglErpSignedAmountColumn(headers, amountIdx)) {
+    let sumDebit = 0
+    let sumCredit = 0
+    for (const row of rows) {
+      const raw = parseImportedAmount(row[amountIdx])
+      if (raw > 0) sumDebit += raw
+      else if (raw < 0) sumCredit += Math.abs(raw)
+    }
+    return { sumDebit, sumCredit }
+  }
+
   const debitCol = amountColumnIndex(headers, 'debit')
   const creditCol = amountColumnIndex(headers, 'credit')
   const sumDebit = rows.reduce(
@@ -183,13 +200,29 @@ export async function parseSpecimenFile(
 }
 
 function headersHaveUsableFcAmounts(headers: string[], rows: unknown[][]): boolean {
-  const fcRecv = headers.findIndex((h) => /^fc\s*amt\s*received$/i.test(String(h).trim()))
-  const fcPaid = headers.findIndex((h) => /^fc\s*amt\s*paid$/i.test(String(h).trim()))
-  if (fcRecv < 0 && fcPaid < 0) return false
+  const normalized = headers.map((h) => String(h).trim().toLowerCase())
+  const fcRecv = normalized.findIndex((h) => /^fc\s*amt\s*received$/.test(h))
+  const fcPaid = normalized.findIndex((h) => /^fc\s*amt\s*paid$/.test(h))
+  const fcUnified = normalized.findIndex((h) =>
+    /^foreign\s*currency\s*amount$/.test(h) || /^fc\s*amount$/.test(h)
+  )
+  const tglDrCr =
+    normalized.some((h) => /tgl\s*account\s*code/.test(h)) &&
+    normalized.includes('dr') &&
+    normalized.includes('cr')
+  if (fcRecv < 0 && fcPaid < 0 && !(fcUnified >= 0 && tglDrCr)) return false
   let hits = 0
   for (const row of rows) {
     if (fcRecv >= 0 && Math.abs(parseImportedAmount(row[fcRecv])) > 0) hits++
     if (fcPaid >= 0 && Math.abs(parseImportedAmount(row[fcPaid])) > 0) hits++
+    if (fcUnified >= 0 && tglDrCr) {
+      const drIdx = normalized.indexOf('dr')
+      const crIdx = normalized.indexOf('cr')
+      const fc = Math.abs(parseImportedAmount(row[fcUnified]))
+      const dr = drIdx >= 0 ? Math.abs(parseImportedAmount(row[drIdx])) : 0
+      const cr = crIdx >= 0 ? Math.abs(parseImportedAmount(row[crIdx])) : 0
+      if (fc > 0 && (dr > 0 || cr > 0)) hits++
+    }
     if (hits >= 3) return true
   }
   return hits > 0
@@ -226,10 +259,35 @@ export function rowsToSideTxs(
 
   if (amountIdx < 0) return []
 
+  const isCashMixedOneColumn =
+    isCash &&
+    mapping.amt_received != null &&
+    mapping.amt_paid != null &&
+    mapping.amt_received === mapping.amt_paid
+  const tglSignedCol = isCash && isTglErpSignedAmountColumn(headers, amountIdx)
+  const isBankMixedOneColumn =
+    !isCash &&
+    mapping.credit != null &&
+    mapping.debit != null &&
+    mapping.credit === mapping.debit
+
   const out: Tx[] = []
   rows.forEach((row, i) => {
-    const amount = Math.abs(parseImportedAmount(row[amountIdx]))
-    if (!(amount > 0)) return
+    const rawAmount = parseImportedAmount(row[amountIdx])
+    if (!(Math.abs(rawAmount) > 0)) return
+    if (isCashMixedOneColumn) {
+      if (tglSignedCol) {
+        if (side === 'receipts' && rawAmount >= 0) return
+        if (side === 'payments' && rawAmount <= 0) return
+      } else {
+        if (side === 'receipts' && rawAmount <= 0) return
+        if (side === 'payments' && rawAmount >= 0) return
+      }
+    } else if (isBankMixedOneColumn) {
+      if (side === 'credits' && rawAmount <= 0) return
+      if (side === 'debits' && rawAmount >= 0) return
+    }
+    const amount = Math.abs(rawAmount)
     out.push({
       id: `${idPrefix}-${i}`,
       date: dateIdx >= 0 ? parseImportedDate(row[dateIdx]) : null,

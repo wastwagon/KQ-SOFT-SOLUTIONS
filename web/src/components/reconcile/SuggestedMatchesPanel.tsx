@@ -20,6 +20,8 @@ interface SuggestedMatchesPanelProps {
   suggestions: SuggestedMatch[]
   currency: string
   features: Record<string, boolean>
+  /** Pairs this plan can confirm in one click. Null means no numeric cap. */
+  bulkMatchLimit?: number | null
   matchParams: MatchParams
   onMatchParamsChange: (next: MatchParams) => void
   selectedCbIds: Set<string>
@@ -41,6 +43,7 @@ export default function SuggestedMatchesPanel({
   suggestions,
   currency,
   features,
+  bulkMatchLimit = null,
   matchParams,
   onMatchParamsChange,
   selectedCbIds,
@@ -58,6 +61,10 @@ export default function SuggestedMatchesPanel({
 }: SuggestedMatchesPanelProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [listCount, setListCount] = useState(150)
+  const [capNotice, setCapNotice] = useState<string | null>(null)
+  const cap = bulkMatchLimit != null && bulkMatchLimit > 0 ? bulkMatchLimit : null
+  const withinCap = <T,>(rows: T[]) => (cap == null ? rows : rows.slice(0, cap))
+  const capLabel = (n: number) => (cap != null && n > cap ? `${cap} of ${n}` : String(n))
   const highConfidence = suggestions.filter((s) => s.confidence >= 0.95)
   const safeSuggestions = suggestions.filter((s) => !s.duplicateWarning && s.confidence >= 0.9)
   const phaseBPatternRe =
@@ -112,7 +119,7 @@ export default function SuggestedMatchesPanel({
               isLoading={isPhasedAutoMatching}
               title="Runs server-side auto-complete: safe 90%+ matches, bank-pattern 85%+, corroborated cheque refs, then residual sweeps/clearing pairs (SCB/Ecobank/GCB/NIB etc.)"
             >
-              Auto-match all
+              {cap != null ? `Auto-match all (up to ${cap})` : 'Auto-match all'}
             </Button>
           )}
           {highConfidence.length > 0 && (
@@ -121,7 +128,7 @@ export default function SuggestedMatchesPanel({
               size="sm"
               onClick={() =>
                 onBulkMatch(
-                  highConfidence.map((s) => ({
+                  withinCap(highConfidence).map((s) => ({
                     cashBookTransactionId: s.cashBookTx.id,
                     bankTransactionId: s.bankTx.id,
                   }))
@@ -131,7 +138,7 @@ export default function SuggestedMatchesPanel({
               className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
               title="Apply only suggestions with 95%+ confidence"
             >
-              Match all high-confidence (95%+) — {highConfidence.length}
+              Match all high-confidence (95%+) — {capLabel(highConfidence.length)}
             </Button>
           )}
           <Button
@@ -139,7 +146,7 @@ export default function SuggestedMatchesPanel({
             size="sm"
             onClick={() =>
               onBulkMatch(
-                safeSuggestions.map((s) => ({
+                withinCap(safeSuggestions).map((s) => ({
                   cashBookTransactionId: s.cashBookTx.id,
                   bankTransactionId: s.bankTx.id,
                 }))
@@ -148,7 +155,7 @@ export default function SuggestedMatchesPanel({
             disabled={isMatching || safeSuggestions.length === 0}
             title="Skips ambiguous duplicates; requires 90%+ confidence"
           >
-            Match safe suggestions (90%+, no duplicates) — {safeSuggestions.length}
+            Match safe suggestions (90%+, no duplicates) — {capLabel(safeSuggestions.length)}
           </Button>
           {phaseBSuggestions.length > 0 && (
             <Button
@@ -157,7 +164,7 @@ export default function SuggestedMatchesPanel({
               variant="outline"
               onClick={() =>
                 onBulkMatch(
-                  phaseBSuggestions.map((s) => ({
+                  withinCap(phaseBSuggestions).map((s) => ({
                     cashBookTransactionId: s.cashBookTx.id,
                     bankTransactionId: s.bankTx.id,
                   }))
@@ -166,7 +173,7 @@ export default function SuggestedMatchesPanel({
               disabled={isMatching || phaseBSuggestions.length === 0}
               title="Phase B: pattern-matched suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) — skips generic amount-only guesses"
             >
-              Match receipts + Ecobank patterns (85%+) — {phaseBSuggestions.length}
+              Match receipts + Ecobank patterns (85%+) — {capLabel(phaseBSuggestions.length)}
             </Button>
           )}
           {bulkSelected.size > 0 && (
@@ -174,7 +181,7 @@ export default function SuggestedMatchesPanel({
               type="button"
               size="sm"
               onClick={() => {
-                const pairs = Array.from(bulkSelected).map((i) => ({
+                const pairs = withinCap(Array.from(bulkSelected)).map((i) => ({
                   cashBookTransactionId: suggestions[i].cashBookTx.id,
                   bankTransactionId: suggestions[i].bankTx.id,
                 }))
@@ -182,11 +189,15 @@ export default function SuggestedMatchesPanel({
               }}
               disabled={isMatching}
             >
-              Match {bulkSelected.size} selected
+              Match {capLabel(bulkSelected.size)} selected
             </Button>
           )}
         </div>
       )}
+      {canBulk && encourageAutoMatch && cap != null && (
+        <p className="mb-3 text-xs text-gray-500">This confirm stops at {cap} pairs.</p>
+      )}
+      {capNotice && <p className="mb-3 text-xs text-amber-700">{capNotice}</p>}
 
       <ul className="space-y-2 max-h-96 overflow-y-auto pr-1">
         {visible.map((s, i) => {
@@ -208,8 +219,16 @@ export default function SuggestedMatchesPanel({
                     onChange={(e) => {
                       e.stopPropagation()
                       const next = new Set(bulkSelected)
-                      if (next.has(i)) next.delete(i)
-                      else next.add(i)
+                      if (next.has(i)) {
+                        next.delete(i)
+                        setCapNotice(null)
+                      } else if (cap != null && next.size >= cap) {
+                        setCapNotice(`This plan confirms up to ${cap} pairs at a time.`)
+                        return
+                      } else {
+                        next.add(i)
+                        setCapNotice(null)
+                      }
                       onBulkSelectedChange(next)
                     }}
                     onClick={(e) => e.stopPropagation()}

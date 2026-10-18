@@ -3,7 +3,7 @@
  * Used by POST /reconcile/:projectId/match/auto-complete and mirrors integration-script orchestration.
  */
 import { prisma } from '../lib/prisma.js'
-import { BULK_MATCH_LIMIT, hasPlanFeature } from '../config/planFeatures.js'
+import { bulkMatchLimit, hasPlanFeature } from '../config/planFeatures.js'
 import { getPlanBySlug } from './plan.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveReconcileMaxLimit } from '../config/importLimits.js'
@@ -83,12 +83,15 @@ export type AutoCompleteResult = {
   created: number
   rounds: number
   phases: { A: number; B: number; C: number; residual: number }
+  /** True when this click stopped at the plan’s per-confirm pair cap. */
+  capped: boolean
+  limit: number
 }
 
 function collectPhasedBulkMatches(
   suggestions: SuggestedMatch[],
   phase: 'A' | 'B' | 'C',
-  limit = BULK_MATCH_LIMIT
+  limit = 50
 ): ResidualMatchPair[] {
   const minConf = phase === 'A' ? 0.9 : phase === 'B' ? 0.85 : 0.88
   const filtered =
@@ -437,8 +440,9 @@ export async function runProjectAutoComplete(
 
   const orgPlan = project.organization?.plan ?? 'basic'
   await getPlanBySlug(orgPlan)
-  if (!hasPlanFeature(orgPlan, 'bulk_match')) {
-    throw new Error('Bulk match requires the Solo plan or higher.')
+  const bulkCap = bulkMatchLimit(orgPlan)
+  if (bulkCap <= 0 || !hasPlanFeature(orgPlan, 'bulk_match')) {
+    throw new Error('Bulk match is not included on this plan.')
   }
 
   const platformDefaults = await getPlatformDefaults()
@@ -467,6 +471,8 @@ export async function runProjectAutoComplete(
   const phases = { A: 0, B: 0, C: 0, residual: 0 }
 
   for (let round = 0; round < maxRounds; round++) {
+    if (totalCreated >= bulkCap) break
+    const remaining = bulkCap - totalCreated
     const [rRecLane, rCredLane, rPayLane, rDebLane, sampleBankText, matchRows] = await Promise.all([
       loadReconcileLane({ documentIds: receiptDocIds, perCategory }),
       loadReconcileLane({ documentIds: creditDocIds, perCategory }),
@@ -540,7 +546,7 @@ export async function runProjectAutoComplete(
     let phaseTag: keyof typeof phases = 'A'
 
     for (const phase of ['A', 'B', 'C'] as const) {
-      const phasePairs = collectPhasedBulkMatches(allSuggestions, phase)
+      const phasePairs = collectPhasedBulkMatches(allSuggestions, phase, remaining)
       if (phasePairs.length) {
         roundPairs.push(...phasePairs)
         phaseTag = phase
@@ -555,7 +561,7 @@ export async function runProjectAutoComplete(
         matchedBankIds
       )
       if (corroborated.length) {
-        roundPairs.push(...corroborated.slice(0, BULK_MATCH_LIMIT))
+        roundPairs.push(...corroborated.slice(0, remaining))
         phaseTag = 'C'
       }
     }
@@ -572,7 +578,7 @@ export async function runProjectAutoComplete(
         amountTolerance,
       })
       if (residual.length) {
-        roundPairs.push(...residual.slice(0, BULK_MATCH_LIMIT))
+        roundPairs.push(...residual.slice(0, remaining))
         phaseTag = 'residual'
       }
     }
@@ -584,7 +590,7 @@ export async function runProjectAutoComplete(
       orgId,
       orgPlan,
       project.currency || 'GHS',
-      roundPairs.slice(0, BULK_MATCH_LIMIT)
+      roundPairs.slice(0, remaining)
     )
     if (!created) break
 
@@ -603,5 +609,5 @@ export async function runProjectAutoComplete(
     })
   }
 
-  return { created: totalCreated, rounds, phases }
+  return { created: totalCreated, rounds, phases, capped: totalCreated >= bulkCap, limit: bulkCap }
 }

@@ -103,6 +103,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   })
   const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
+  const featureDepth = usageData?.featureDepth || {}
   const reportQuery = useQuery<ReportResponse>({
     queryKey: ['report', projectId, bankAccountId || null],
     queryFn: () =>
@@ -323,10 +324,13 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   })
   const approveMutation = useMutation({
     mutationFn: () => projects.approve(projectId),
-    onSuccess: () => {
+    onSuccess: (resp) => {
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      if (resp.thresholdWarning) {
+        toast.warning('Above the Team warning amount', resp.thresholdWarning.message)
+      }
     },
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) =>
@@ -730,6 +734,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 </strong>
               </p>
             </details>
+          )}
+          {data?.thresholdWarning?.message && (
+            <Alert tone="warning" title="Above the Team warning amount">
+              {data.thresholdWarning.message}
+            </Alert>
           )}
           <label className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
             <input
@@ -1357,7 +1366,18 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         <div id="missing-cheques-report" className="mb-6 scroll-mt-4">
           {features.missing_cheques_report ? (
             <>
-              <h3 className="text-base font-semibold mb-3 text-blue-900">Missing Cheques Report (Unpresented cheques with ageing)</h3>
+              <h3 className="text-base font-semibold mb-3 text-blue-900">
+                {featureDepth.missing_cheques_report === 'partial'
+                  ? 'Missing Cheques Report (first 10 unpresented cheques)'
+                  : 'Missing Cheques Report (Unpresented cheques with ageing)'}
+              </h3>
+              {featureDepth.missing_cheques_report === 'partial' && (
+                <p className="mb-3 text-sm text-gray-500">
+                  Showing the first 10 unpresented cheques
+                  {data?.missingChequesTotal ? ` of ${data.missingChequesTotal}` : ''}. Solo and above
+                  include the full list, the ageing summary, and the Excel sheet.
+                </p>
+              )}
               {(data.missingChequesWithAgeing || []).length > 0 ? (
                 <>
                   {data.missingChequesAgeingSummary && (
@@ -1383,8 +1403,12 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                           <th className="px-2 py-1.5 text-left">Cheque No</th>
                           <th className="px-2 py-1.5 text-left">Name</th>
                           <th className="px-2 py-1.5 text-right">{effectiveDisplayCurrency}</th>
-                          <th className="px-2 py-1.5 text-right">Days Outstanding</th>
-                          <th className="px-2 py-1.5 text-center">Ageing Band</th>
+                          {featureDepth.missing_cheques_report !== 'partial' && (
+                            <>
+                              <th className="px-2 py-1.5 text-right">Days Outstanding</th>
+                              <th className="px-2 py-1.5 text-center">Ageing Band</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -1394,23 +1418,27 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                             <td className="px-2 py-1.5 font-mono text-gray-600">{t.chqNo || '—'}</td>
                             <td className="px-2 py-1.5 truncate max-w-[120px]" title={t.name}>{t.name}</td>
                             <td className="px-2 py-1.5 text-right font-medium">{fmtSignedReportAmt(t.amount)}</td>
-                            <td className="px-2 py-1.5 text-right">{t.daysOutstanding}</td>
-                            <td className="px-2 py-1.5 text-center">
-                              <Badge
-                                tone={
-                                  t.ageingBand === '0–30'
-                                    ? 'success'
-                                    : t.ageingBand === '31–60'
-                                      ? 'warning'
-                                      : t.ageingBand === '61–90'
-                                        ? 'brand'
-                                        : 'danger'
-                                }
-                                size="sm"
-                              >
-                                {t.ageingBand} days
-                              </Badge>
-                            </td>
+                            {featureDepth.missing_cheques_report !== 'partial' && (
+                              <>
+                                <td className="px-2 py-1.5 text-right">{t.daysOutstanding}</td>
+                                <td className="px-2 py-1.5 text-center">
+                                  <Badge
+                                    tone={
+                                      t.ageingBand === '0–30'
+                                        ? 'success'
+                                        : t.ageingBand === '31–60'
+                                          ? 'warning'
+                                          : t.ageingBand === '61–90'
+                                            ? 'brand'
+                                            : 'danger'
+                                    }
+                                    size="sm"
+                                  >
+                                    {t.ageingBand} days
+                                  </Badge>
+                                </td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1424,8 +1452,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           ) : (
             <>
               <h3 className="text-base font-semibold mb-3 text-blue-900">Missing Cheques Report</h3>
-              <Alert tone="warning" title="Team plan or higher required">
-                Upgrade to see unpresented cheques with ageing bands.
+              <Alert tone="warning" title="Not included on this plan">
+                Upgrade to see unpresented cheques. Free includes the first 10; Solo and above include the full list.
               </Alert>
             </>
           )}
@@ -1850,7 +1878,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               Reconciliation Discrepancy Report
             </h3>
             {features.discrepancy_report ? (
-              (data?.discrepancies || []).length > 0 ? (
+              <>
+              {featureDepth.discrepancy_report === 'partial' && (
+                <p className="mb-2 text-sm text-gray-500">
+                  Showing the first 5 variances
+                  {data?.discrepancyTotal ? ` of ${data.discrepancyTotal}` : ''}. Solo and above include
+                  the full report and the Excel sheet.
+                </p>
+              )}
+              {(data?.discrepancies || []).length > 0 ? (
                 <>
                   <p className="text-sm text-gray-500 mb-2">Matched pairs with amount or date variance detected during reconciliation.</p>
                   <div className="border border-amber-200 rounded-xl overflow-auto max-h-64 shadow-sm bg-white">
@@ -1882,10 +1918,11 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 </>
               ) : (
                 <p className="text-sm text-gray-500 italic">No amount or date variances in matched pairs.</p>
-              )
+              )}
+              </>
             ) : (
-              <Alert tone="warning" title="Team plan or higher required">
-                Upgrade to see the discrepancy report.
+              <Alert tone="warning" title="Not included on this plan">
+                Upgrade to see amount and date variances. Free includes the first 5 rows.
               </Alert>
             )}
           </details>

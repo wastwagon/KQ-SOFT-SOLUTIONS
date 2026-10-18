@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js'
 import { getSubscriptionSnapshot, type SubscriptionStatus } from './subscriptionState.js'
 import { fetchSubscriptionOverrides } from './subscriptionOverrides.js'
+import { applyDueScheduledPlan } from './planChange.js'
 
 const SUBSCRIPTION_CACHE_TTL_MS = 60_000
 const subscriptionStatusCache = new Map<string, { status: SubscriptionStatus; expiresAt: number }>()
@@ -20,6 +21,7 @@ export function invalidateOrgSubscriptionCache(orgId?: string): void {
 }
 
 export async function getOrgSubscriptionStatus(orgId: string): Promise<SubscriptionStatus> {
+  await applyDueScheduledPlan(orgId)
   const now = Date.now()
   const cached = subscriptionStatusCache.get(orgId)
   if (cached && now < cached.expiresAt) return cached.status

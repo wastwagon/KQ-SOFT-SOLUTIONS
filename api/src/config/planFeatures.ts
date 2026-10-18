@@ -57,14 +57,19 @@ export const PLAN_FEATURE_CATALOG: { id: PlanFeature; label: string; hint: strin
 
 const PLAN_ORDER = ['free', 'basic', 'standard', 'premium', 'firm'] as const
 
-/** Minimum plan required for each feature (code defaults when CMS has no override). */
-const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
+export type FeatureDepth = 'none' | 'partial' | 'full'
+
+/**
+ * Full access. A lower tier may still receive a partial version via FEATURE_PARTIAL_FROM.
+ * Raising a minimum removes access — do not do that for a feature a tier already has.
+ */
+const FEATURE_FULL_FROM: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
   bank_rules: 'standard',
   bulk_match: 'basic',
   ai_suggestions: 'basic',
   audit_trail: 'standard',
-  discrepancy_report: 'standard',
-  missing_cheques_report: 'standard',
+  discrepancy_report: 'basic',
+  missing_cheques_report: 'basic',
   one_to_many: 'basic',
   many_to_many: 'basic',
   roll_forward: 'basic',
@@ -73,6 +78,40 @@ const FEATURE_MIN_PLAN: Record<PlanFeature, (typeof PLAN_ORDER)[number]> = {
   firm_dashboard: 'premium',
   api_access: 'firm',
   multi_client: 'firm',
+}
+
+/** First plan that receives a capped version. Omitted features jump straight to full. */
+const FEATURE_PARTIAL_FROM: Partial<Record<PlanFeature, (typeof PLAN_ORDER)[number]>> = {
+  bulk_match: 'free',
+  bank_rules: 'basic',
+  audit_trail: 'free',
+  discrepancy_report: 'free',
+  missing_cheques_report: 'free',
+  threshold_approval: 'standard',
+}
+
+const PARTIAL_BULK_PAIRS = 10
+const FULL_BULK_PAIRS = 50
+const FIRM_BULK_PAIRS = 100
+/** Safety cap for one confirm on Custom. There is no monthly bulk cap. */
+const CUSTOM_BULK_PAIRS = 500
+const PARTIAL_BANK_RULES = 5
+const FREE_AUDIT_ROWS = 25
+const SOLO_AUDIT_ROWS = 100
+const FULL_AUDIT_ROWS = 200
+const PARTIAL_DISCREPANCY_ROWS = 5
+const PARTIAL_CHEQUE_ROWS = 10
+const FREE_AUDIT_DAYS = 14
+
+export function catalogueFeatureDepth(plan: string, feature: PlanFeature): FeatureDepth {
+  const rank = planRank(plan)
+  if (rank < 0) return 'none'
+  const fullAt = planRank(FEATURE_FULL_FROM[feature])
+  const partialSlug = FEATURE_PARTIAL_FROM[feature]
+  const partialAt = partialSlug ? planRank(partialSlug) : fullAt
+  if (rank >= fullAt) return 'full'
+  if (rank >= partialAt) return 'partial'
+  return 'none'
 }
 
 /** User limit per plan (-1 = unlimited) */
@@ -125,11 +164,74 @@ export function planRank(plan: string): number {
 }
 
 export function defaultHasPlanFeature(plan: string, feature: PlanFeature): boolean {
-  const minPlan = FEATURE_MIN_PLAN[feature]
-  const minRank = planRank(minPlan)
-  const planRankVal = planRank(plan)
-  if (planRankVal < 0) return false
-  return planRankVal >= minRank
+  return catalogueFeatureDepth(plan, feature) !== 'none'
+}
+
+/**
+ * none / partial / full after CMS overrides.
+ * A stored `false` turns the feature off. A stored `true` on a plan that
+ * has no catalogue access grants full access. Otherwise the catalogue depth stands.
+ */
+export function featureDepth(plan: string, feature: PlanFeature): FeatureDepth {
+  const runtime = runtimeBySlug.get(plan)?.features?.[feature]
+  const catalogue = catalogueFeatureDepth(plan, feature)
+  if (typeof runtime === 'boolean') {
+    if (!runtime) return 'none'
+    return catalogue === 'none' ? 'full' : catalogue
+  }
+  return catalogue
+}
+
+/** Pairs allowed in one bulk confirm. 0 = feature off. */
+export function bulkMatchLimit(plan: string): number {
+  const depth = featureDepth(plan, 'bulk_match')
+  if (depth === 'none') return 0
+  if (plan === 'free') return PARTIAL_BULK_PAIRS
+  if (plan === 'premium') return FIRM_BULK_PAIRS
+  if (plan === 'firm') return CUSTOM_BULK_PAIRS
+  return FULL_BULK_PAIRS
+}
+
+/** Bank rules an organisation may store. -1 = no cap. 0 = feature off. */
+export function bankRuleLimit(plan: string): number {
+  const depth = featureDepth(plan, 'bank_rules')
+  if (depth === 'none') return 0
+  if (depth === 'partial') return PARTIAL_BANK_RULES
+  return -1
+}
+
+/** Audit rows returned by one request. */
+export function auditListLimit(plan: string): number {
+  const depth = featureDepth(plan, 'audit_trail')
+  if (depth === 'none') return 0
+  if (plan === 'free') return FREE_AUDIT_ROWS
+  if (plan === 'basic') return SOLO_AUDIT_ROWS
+  return FULL_AUDIT_ROWS
+}
+
+export function auditExportAllowed(plan: string): boolean {
+  return featureDepth(plan, 'audit_trail') === 'full'
+}
+
+/** Free activity log only includes this many recent days. Higher plans are uncapped by date. */
+export function auditHistoryDays(plan: string): number | null {
+  if (featureDepth(plan, 'audit_trail') === 'none') return 0
+  if (plan === 'free') return FREE_AUDIT_DAYS
+  return null
+}
+
+export function discrepancyRowCap(plan: string): number {
+  const depth = featureDepth(plan, 'discrepancy_report')
+  if (depth === 'none') return 0
+  if (depth === 'partial') return PARTIAL_DISCREPANCY_ROWS
+  return -1
+}
+
+export function missingChequeRowCap(plan: string): number {
+  const depth = featureDepth(plan, 'missing_cheques_report')
+  if (depth === 'none') return 0
+  if (depth === 'partial') return PARTIAL_CHEQUE_ROWS
+  return -1
 }
 
 export function defaultFeaturesForPlan(plan: string): Record<PlanFeature, boolean> {
@@ -164,9 +266,7 @@ export function mergePlanFeatures(
 }
 
 export function hasPlanFeature(plan: string, feature: PlanFeature): boolean {
-  const runtime = runtimeBySlug.get(plan)?.features?.[feature]
-  if (typeof runtime === 'boolean') return runtime
-  return defaultHasPlanFeature(plan, feature)
+  return featureDepth(plan, feature) !== 'none'
 }
 
 export function getUserLimit(plan: string): number {

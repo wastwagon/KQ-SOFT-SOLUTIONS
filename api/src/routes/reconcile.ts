@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canReconcile, isProjectEditable, PROJECT_LOCKED_ERROR } from '../lib/permissions.js'
-import { hasPlanFeature, BULK_MATCH_LIMIT } from '../config/planFeatures.js'
+import { hasPlanFeature, bankRuleLimit, bulkMatchLimit } from '../config/planFeatures.js'
 import { getPlanBySlug } from '../services/plan.js'
 import { planHasFeature } from '../lib/planGate.js'
 import {
@@ -101,6 +101,9 @@ import {
 } from '../services/suggestionDuplicateFlags.js'
 import { runProjectAutoComplete } from '../services/autoCompleteMatching.js'
 import { getProjectIngestBlock } from '../services/ingestMeta.js'
+import { rulesWithinCap } from '../services/planChange.js'
+import { bankAccountVisible, seatedBankIdsForOrg } from '../services/planLimits.js'
+import { getPartialThresholdWarning } from '../lib/reconcile-variance.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -194,6 +197,7 @@ router.get('/:projectId/count-match', async (req: AuthRequest, res) => {
     const project = await prisma.project.findFirst({
       where: { id: projectId, organizationId: orgId },
       include: {
+        organization: { select: { plan: true } },
         documents: {
           select: { id: true, type: true, bankAccountId: true },
         },
@@ -202,13 +206,20 @@ router.get('/:projectId/count-match', async (req: AuthRequest, res) => {
     })
     if (!project) return res.status(404).json({ error: 'Project not found' })
 
+    const seatedBanks = await seatedBankIdsForOrg(orgId, project.organization?.plan ?? 'basic')
+    if (bankAccountId && seatedBanks && !seatedBanks.has(bankAccountId)) {
+      return res.status(403).json({
+        error: 'This bank account is above the current plan limit. Upgrade to use it again.',
+      })
+    }
+
     const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
     const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
     const creditsDocs = project.documents.filter(
-      (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+      (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
     )
     const debitsDocs = project.documents.filter(
-      (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+      (d) => d.type === 'bank_debits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
     )
 
     const receiptDocIds = receiptsDocs.map((d) => d.id)
@@ -308,13 +319,20 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
+  const seatedBanks = await seatedBankIdsForOrg(orgId, project.organization?.plan ?? 'basic')
+  if (bankAccountId && seatedBanks && !seatedBanks.has(bankAccountId)) {
+    return res.status(403).json({
+      error: 'This bank account is above the current plan limit. Upgrade to use it again.',
+    })
+  }
+
   const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
   const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
   const creditsDocs = project.documents.filter(
-    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
   )
   const debitsDocs = project.documents.filter(
-    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_debits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
   )
 
   const receiptDocIds = receiptsDocs.map((d) => d.id)
@@ -922,7 +940,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     where: { organizationId: orgId },
     orderBy: { priority: 'asc' },
   }) : []
-  const rules: BankRule[] = bankRules.map((r) => ({
+  const activeBankRules = rulesWithinCap(bankRules, bankRuleLimit(plan))
+  const rules: BankRule[] = activeBankRules.map((r) => ({
     id: r.id,
     name: r.name,
     priority: r.priority,
@@ -1078,9 +1097,15 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     splitSuggestions.payments.sort((a, b) => b.confidence - a.confidence)
   }
 
+  const thresholdWarning = await getPartialThresholdWarning(orgId, projectId, plan)
+
   res.json({
+    thresholdWarning,
     project: { id: project.id, name: project.name, status: project.status, currency: project.currency || 'GHS' },
-    bankAccounts: project.bankAccounts || [],
+    bankAccounts: (project.bankAccounts || []).map((account) => ({
+      ...account,
+      locked: seatedBanks ? !seatedBanks.has(account.id) : false,
+    })),
     bankAccountId: bankAccountId || null,
     features: {
       ai_suggestions: hasAiSuggestions,
@@ -1498,8 +1523,9 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'bulk_match'))) {
-    return res.status(403).json({ error: 'Bulk match requires the Solo plan or higher.' })
+    return res.status(403).json({ error: 'Bulk match is not included on this plan.' })
   }
+  const bulkCap = bulkMatchLimit(org.plan)
   const projectId = await resolveProjectId(req.params.projectId, orgId)
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const project = await prisma.project.findFirst({
@@ -1513,9 +1539,9 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     const blocked = await ingestChecksumResponse(projectId)
     if (blocked) return res.status(blocked.status).json(blocked.body)
     const body = bulkMatchSchema.parse(req.body)
-    if (body.matches.length > BULK_MATCH_LIMIT) {
+    if (bulkCap > 0 && body.matches.length > bulkCap) {
       return res.status(400).json({
-        error: `Maximum ${BULK_MATCH_LIMIT} matches per bulk request. You sent ${body.matches.length}.`,
+        error: `Maximum ${bulkCap} matches per bulk request on your plan. You sent ${body.matches.length}.`,
       })
     }
     // Validate all pairs in a single round-trip rather than 2 queries per pair.

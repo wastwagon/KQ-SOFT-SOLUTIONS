@@ -9,6 +9,7 @@ import {
   fetchSubscriptionOverridesBatch,
 } from '../../services/subscriptionOverrides.js'
 import { invalidateOrgSubscriptionCache } from '../../services/orgSubscriptionAccess.js'
+import { clearScheduledPlan } from '../../services/planChange.js'
 import { normalizeOrgMemberRole } from '../../lib/orgMemberRole.js'
 import type { AuthRequest } from '../../middleware/auth.js'
 import { requireJwtSecret } from '../../middleware/auth.js'
@@ -416,6 +417,10 @@ router.post('/bulk-plan', async (req, res) => {
     where: { id: { in: body.organizationIds } },
     data: { plan: body.plan },
   })
+  await Promise.all(body.organizationIds.map(async (id) => {
+    await clearScheduledPlan(id)
+    invalidateOrgSubscriptionCache(id)
+  }))
   res.json({ updated: result.count })
 })
 
@@ -478,6 +483,10 @@ router.patch('/:id', async (req, res) => {
     data,
     select: { id: true, name: true, slug: true, plan: true },
   })
+  if (data.plan) {
+    await clearScheduledPlan(orgId)
+    invalidateOrgSubscriptionCache(orgId)
+  }
   res.json(org)
 })
 

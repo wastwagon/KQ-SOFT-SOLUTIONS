@@ -387,6 +387,11 @@ export interface ReportResponse {
   bankOnlyDebits?: ReportSimpleTx[]
   bankOnlyCredits?: ReportSimpleTx[]
   discrepancies?: ReportDiscrepancy[]
+  discrepancyTruncated?: boolean
+  discrepancyTotal?: number
+  missingChequesTruncated?: boolean
+  missingChequesTotal?: number
+  thresholdWarning?: { variance: number; threshold: number; message: string } | null
   broughtForwardItems?: ReportBroughtForwardItem[]
   broughtForwardLodgments?: ReportBroughtForwardLodgment[]
   summary?: {
@@ -440,6 +445,8 @@ export interface SubscriptionUsageResponse {
    */
   subscriptionBypass?: boolean
   features: Record<string, boolean>
+  /** none = off, partial = capped, full = the complete feature. */
+  featureDepth?: Record<string, 'none' | 'partial' | 'full'>
   usage: {
     projectsUsed: number
     projectsLimit: number
@@ -467,6 +474,7 @@ export interface SubscriptionUsageResponse {
     bankAccountsPerProject: number
     bankAccounts?: number
     cleanExportsPerMonth?: number
+    bulkMatchLimit?: number
   }
   subscription?: {
     status: 'trial' | 'active' | 'expired' | 'free'
@@ -477,6 +485,8 @@ export interface SubscriptionUsageResponse {
     latestPaymentPeriod: 'monthly' | 'quarterly' | 'yearly' | null
     latestPaymentAmount: number | null
   }
+  scheduledPlan?: { plan: string; effectiveAt: string; requestedAt: string } | null
+  prorationCreditGhs?: number
 }
 
 /** Build a URL the browser can load for a branding logo (uses frontend API base to avoid 404 when API returns another host). */
@@ -729,7 +739,10 @@ export const projects = {
   submit: (id: string) =>
     api(`/projects/${id}/submit`, { method: 'PATCH' }),
   approve: (id: string) =>
-    api(`/projects/${id}/approve`, { method: 'PATCH' }),
+    api(`/projects/${id}/approve`, { method: 'PATCH' }) as Promise<{
+      status: string
+      thresholdWarning?: { variance: number; threshold: number; message: string } | null
+    }>,
   updateReportComments: (id: string, body: { reportNarrative?: string; preparerComment?: string; reviewerComment?: string; bankStatementClosingBalance?: number | null; cashBookClosingBalance?: number | null }) =>
     api(`/projects/${id}/report-comments`, { method: 'PATCH', body: JSON.stringify(body) }),
   updateBrsSettings: (id: string, body: { workbookNettingMode: 'inherit' | 'on' | 'off' | 'working' }) =>
@@ -837,7 +850,23 @@ export const subscription = {
   getUsage: () => api('/subscription/usage') as Promise<SubscriptionUsageResponse>,
   getPlans: () => api('/subscription/plans'),
   initializePayment: (body: { plan: string; period: 'monthly' | 'quarterly' | 'yearly' }) =>
-    api('/subscription/initialize', { method: 'POST', body: JSON.stringify(body) }),
+    api('/subscription/initialize', { method: 'POST', body: JSON.stringify(body) }) as Promise<
+      | {
+          authorizationUrl: string
+          reference: string
+          callbackUrl?: string
+          introOfferApplied?: boolean
+          creditApplied?: number
+        }
+      | { applied: true; plan: string; period: string; reference: string; creditApplied?: number }
+    >,
+  scheduleDowngrade: (body: { plan: string }) =>
+    api('/subscription/schedule-downgrade', { method: 'POST', body: JSON.stringify(body) }) as Promise<
+      | { applied: true; plan: string }
+      | { applied: false; scheduledPlan: { plan: string; effectiveAt: string; requestedAt: string } }
+    >,
+  cancelScheduledDowngrade: () =>
+    api('/subscription/schedule-downgrade', { method: 'DELETE' }) as Promise<{ cleared: boolean }>,
   verifyPayment: (body: { reference: string }) =>
     api('/subscription/verify', { method: 'POST', body: JSON.stringify(body) }) as Promise<{
       status: string
@@ -1172,7 +1201,7 @@ export const reconcile = {
     if (params?.useChequeNo === false) q.set('useChequeNo', 'false')
     return api(`/reconcile/${projectId}/match/auto-complete${q.toString() ? `?${q}` : ''}`, {
       method: 'POST',
-    }) as Promise<{ created: number; rounds: number; phases: Record<string, number> }>
+    }) as Promise<{ created: number; rounds: number; phases: Record<string, number>; capped?: boolean; limit?: number }>
   },
   deleteMatch: (projectId: string, matchId: string) =>
     api(`/reconcile/${projectId}/match/${matchId}`, { method: 'DELETE' }),

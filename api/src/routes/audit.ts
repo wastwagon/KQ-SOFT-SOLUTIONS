@@ -2,7 +2,8 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
-import { planHasFeature } from '../lib/planGate.js'
+import { planFeatureDepth } from '../lib/planGate.js'
+import { auditExportAllowed, auditHistoryDays, auditListLimit } from '../config/planFeatures.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -31,16 +32,23 @@ router.get('/', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !(await planHasFeature(org.plan, 'audit_trail'))) {
-    return res.status(403).json({ error: 'Audit trail requires the Team plan or higher.' })
+  if (!org || (await planFeatureDepth(org.plan, 'audit_trail')) === 'none') {
+    return res.status(403).json({ error: 'The activity log is not included on this plan.' })
   }
   const projectId = req.query.projectId as string | undefined
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+  const cap = auditListLimit(org.plan)
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, cap)
+  const historyDays = auditHistoryDays(org.plan)
+  const since =
+    historyDays != null && historyDays > 0
+      ? new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000)
+      : null
 
   const logs = await prisma.auditLog.findMany({
     where: {
       organizationId: orgId,
       ...(projectId ? { projectId } : {}),
+      ...(since ? { createdAt: { gte: since } } : {}),
     },
     orderBy: { createdAt: 'desc' },
     take: limit,
@@ -65,8 +73,11 @@ router.get('/export', async (req: AuthRequest, res) => {
     where: { id: orgId },
     select: { plan: true },
   })
-  if (!org || !(await planHasFeature(org.plan, 'audit_trail'))) {
-    return res.status(403).json({ error: 'Audit trail requires the Team plan or higher.' })
+  if (!org || (await planFeatureDepth(org.plan, 'audit_trail')) === 'none') {
+    return res.status(403).json({ error: 'The activity log is not included on this plan.' })
+  }
+  if (!auditExportAllowed(org.plan)) {
+    return res.status(403).json({ error: 'Audit export requires the Team plan or higher.' })
   }
   const projectId = req.query.projectId as string | undefined
   const format = (req.query.format as string)?.toLowerCase() || 'csv'

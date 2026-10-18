@@ -18,6 +18,17 @@ describe('detectCashBookBankSideInversion', () => {
     expect(result.crossedOverlap).toBeGreaterThan(result.standardOverlap)
   })
 
+  it('detects inversion on small statements when standard overlap is zero', () => {
+    const receipts = [2529.8, 32.1, 31.82].map((a, i) => tx(`r${i}`, a))
+    const payments = [80, 140].map((a, i) => tx(`p${i}`, a))
+    const debits = [2529.8, 32.1, 31.82].map((a, i) => tx(`d${i}`, a))
+    const credits = [80, 140].map((a, i) => tx(`c${i}`, a))
+    const result = detectCashBookBankSideInversion({ receipts, payments, credits, debits })
+    expect(result.inverted).toBe(true)
+    expect(result.standardOverlap).toBe(0)
+    expect(result.crossedOverlap).toBe(5)
+  })
+
   it('keeps standard pairing when normal overlap wins', () => {
     const receipts = [100, 200, 300, 400, 500].map((a, i) => tx(`r${i}`, a))
     const payments = [10, 20, 30, 40, 50].map((a, i) => tx(`p${i}`, a))

@@ -548,7 +548,7 @@ export default function AdminOrgDetail() {
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            Downgrade to Solo cancels the paid subscription. The org keeps access with Solo limits.
+            The new limits apply immediately. The last payment stays on record. Extra people, bank accounts, and rules stay stored, and the ones above the new plan stop counting until you upgrade.
           </p>
         </Card>
 

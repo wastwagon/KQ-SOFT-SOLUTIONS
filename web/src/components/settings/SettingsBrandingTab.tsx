@@ -13,10 +13,11 @@ import { useBrandingSettings } from './useBrandingSettings'
 interface SettingsBrandingTabProps {
   role: OrgRole | string | null
   features: Record<string, boolean>
+  featureDepth?: Record<string, string>
   branding: ReturnType<typeof useBrandingSettings>
 }
 
-export default function SettingsBrandingTab({ role, features, branding: b }: SettingsBrandingTabProps) {
+export default function SettingsBrandingTab({ role, features, featureDepth, branding: b }: SettingsBrandingTabProps) {
   const queryClient = useQueryClient()
 
   const d = b.data
@@ -197,7 +198,11 @@ export default function SettingsBrandingTab({ role, features, branding: b }: Set
             onChange={(e) => b.setApprovalThresholdAmount(e.target.value)}
             placeholder="Leave blank for no limit"
             className="max-w-[200px]"
-            hint="Projects with discrepancy above this amount require admin approval (reviewers cannot approve)."
+            hint={
+              featureDepth?.threshold_approval === 'full'
+                ? 'Reviewers cannot approve when the discrepancy is above this amount. An admin must approve.'
+                : 'Team stores this as a warning. Firm blocks a reviewer from approving above it.'
+            }
           />
         )}
         <div className="flex flex-wrap items-center gap-3 pt-2">

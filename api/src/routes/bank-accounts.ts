@@ -5,7 +5,7 @@ import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canUploadDocuments } from '../lib/permissions.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
-import { canAddBankAccount } from '../services/planLimits.js'
+import { canAddBankAccount, seatedBankIdsForOrg } from '../services/planLimits.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -24,6 +24,7 @@ router.get('/project/:projectId', async (req: AuthRequest, res) => {
   if (!projectId) return res.status(404).json({ error: 'Project not found' })
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: orgId },
+    include: { organization: { select: { plan: true } } },
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
@@ -34,6 +35,7 @@ router.get('/project/:projectId', async (req: AuthRequest, res) => {
       _count: { select: { documents: true } },
     },
   })
+  const seated = await seatedBankIdsForOrg(orgId, project.organization?.plan ?? 'free')
   res.json(accounts.map((a) => ({
     id: a.id,
     projectId: a.projectId,
@@ -42,6 +44,7 @@ router.get('/project/:projectId', async (req: AuthRequest, res) => {
     accountNo: a.accountNo,
     createdAt: a.createdAt,
     documentCount: a._count.documents,
+    locked: seated ? !seated.has(a.id) : false,
   })))
 })
 

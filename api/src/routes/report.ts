@@ -18,7 +18,9 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canExportReport } from '../lib/permissions.js'
-import { hasPlanFeature } from '../config/planFeatures.js'
+import { discrepancyRowCap, featureDepth, missingChequeRowCap } from '../config/planFeatures.js'
+import { bankAccountVisible, seatedBankIdsForOrg } from '../services/planLimits.js'
+import { getPartialThresholdWarning } from '../lib/reconcile-variance.js'
 import { getPlanBySlug } from '../services/plan.js'
 import { logAudit } from '../services/audit.js'
 import { summarizeSignBuckets } from '../services/signClassifier.js'
@@ -223,6 +225,8 @@ async function loadRollForwardChain(
 ): Promise<RollForwardProjectSnapshot[]> {
   const chain: RollForwardProjectSnapshot[] = []
   const visited = new Set<string>()
+  const rollOrg = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } })
+  const seatedBanks = rollOrg ? await seatedBankIdsForOrg(orgId, rollOrg.plan) : null
   let projectId: string | null = fromProjectId
   while (projectId && !visited.has(projectId)) {
     visited.add(projectId)
@@ -242,10 +246,10 @@ async function loadRollForwardChain(
       .filter((d) => d.type === 'cash_book_payments')
       .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
     const credits = project.documents
-      .filter((d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId))
+      .filter((d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId))
       .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
     const debits = project.documents
-      .filter((d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId))
+      .filter((d) => d.type === 'bank_debits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId))
       .flatMap((d) => (d.transactions || []).map((t) => toTxFn(t as Parameters<typeof toTxFn>[0])))
     chain.unshift(
       buildRollForwardSnapshot({
@@ -461,6 +465,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
+  const seatedBanks = await seatedBankIdsForOrg(orgId, project.organization.plan)
+  if (bankAccountId && seatedBanks && !seatedBanks.has(bankAccountId)) {
+    return res.status(403).json({
+      error: 'This bank account is above the current plan limit. Upgrade to use it again.',
+    })
+  }
+
   const workbookNettingResolution = await resolveWorkbookNettingForScope({
     queryValue: req.query.workbookNetting,
     projectMode: (project as { workbookNettingMode?: string }).workbookNettingMode,
@@ -471,10 +482,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
   const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
   const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
   const creditsDocs = project.documents.filter(
-    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
   )
   const debitsDocs = project.documents.filter(
-    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_debits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
   )
 
   const receipts = dedupeTransactions(receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
@@ -495,7 +506,7 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     if (prevProject) {
       const prevReceiptsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_receipts')
       const prevCreditsDocs = prevProject.documents.filter(
-        (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+        (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
       )
       const prevReceipts = prevReceiptsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
       const prevCredits = prevCreditsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
@@ -660,8 +671,10 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     moreInBsThanCb: paidOutVarianceRows.filter((r) => r.variance < 0),
   }
   await getPlanBySlug(project.organization.plan)
-  const hasDiscrepancyReport = hasPlanFeature(project.organization.plan, 'discrepancy_report')
-  const hasMissingChequesReport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
+  const discrepancyCap = discrepancyRowCap(project.organization.plan)
+  const missingChequeCap = missingChequeRowCap(project.organization.plan)
+  const hasDiscrepancyReport = discrepancyCap !== 0
+  const hasMissingChequesReport = missingChequeCap !== 0
 
   const discrepancySummary = hasDiscrepancyReport ? {
     byAmountBand: [
@@ -677,7 +690,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     ].filter((r) => r.count > 0),
   } : null
 
-  const effectiveDiscList = hasDiscrepancyReport ? discList : []
+  const effectiveDiscList = !hasDiscrepancyReport
+    ? []
+    : discrepancyCap < 0
+      ? discList
+      : discList.slice(0, discrepancyCap)
 
   // Legacy BRS statement block (GHANA_BRS_V1 shape) used by current UI consumers.
   // Note: "uncredited lodgments" here includes unmatched bank credits for backward compatibility.
@@ -924,8 +941,13 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       total: missingChequesWithAgeing.filter((x) => x.ageingBand === '90+').reduce((s, x) => s + x.amount, 0),
     },
   }
-  const effectiveMissingCheques = hasMissingChequesReport ? missingChequesWithAgeing : []
-  const effectiveMissingChequesSummary = hasMissingChequesReport ? missingChequesAgeingSummary : null
+  const effectiveMissingCheques = !hasMissingChequesReport
+    ? []
+    : missingChequeCap < 0
+      ? missingChequesWithAgeing
+      : missingChequesWithAgeing.slice(0, missingChequeCap)
+  const effectiveMissingChequesSummary =
+    hasMissingChequesReport && missingChequeCap < 0 ? missingChequesAgeingSummary : null
   if (declaredCashBookBalance == null && bankStatementClosingBalanceValue != null) {
     balancePerCashBook = deriveCashBookFromWorkbookSchedule({
       bankClosingBalance: bankStatementClosingBalanceValue,
@@ -1211,6 +1233,11 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       bankDocRef: p.bank.docRef || null,
       bankAmount: p.bank.amount,
     })),
+    discrepancyTruncated: hasDiscrepancyReport && discrepancyCap > 0 && discList.length > effectiveDiscList.length,
+    discrepancyTotal: hasDiscrepancyReport ? discList.length : 0,
+    missingChequesTruncated:
+      hasMissingChequesReport && missingChequeCap > 0 && missingChequesWithAgeing.length > effectiveMissingCheques.length,
+    missingChequesTotal: hasMissingChequesReport ? missingChequesWithAgeing.length : 0,
     discrepancies: effectiveDiscList.map(({ cbDate, cbName, cbChqNo, cbDocRef, cbAmount, cbAmountReceived, cbAmountPaid, bankDate, bankDescription, bankChqNo, bankDocRef, bankAmount, amountVariance, dateVarianceDays }) => ({
       cbDate,
       cbName,
@@ -1318,6 +1345,12 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     })
   }
 
+  reportPayload.thresholdWarning = await getPartialThresholdWarning(
+    req.auth!.orgId,
+    projectId,
+    project.organization.plan
+  )
+
   res.json(reportPayload)
 })
 
@@ -1341,13 +1374,24 @@ router.get('/:projectId/suggested-journals', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
+  const journalOrg = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { plan: true },
+  })
+  const seatedBanksJournal = journalOrg ? await seatedBankIdsForOrg(orgId, journalOrg.plan) : null
+  if (bankAccountId && seatedBanksJournal && !seatedBanksJournal.has(bankAccountId)) {
+    return res.status(403).json({
+      error: 'This bank account is above the current plan limit. Upgrade to use it again.',
+    })
+  }
+
   const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
   const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
   const creditsDocs = project.documents.filter(
-    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanksJournal, bankAccountId)
   )
   const debitsDocs = project.documents.filter(
-    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_debits' && bankAccountVisible(d.bankAccountId, seatedBanksJournal, bankAccountId)
   )
   const receipts = dedupeTransactions(receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
   const payments = dedupeTransactions(paymentsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
@@ -1437,6 +1481,13 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   })
   if (!project) return res.status(404).json({ error: 'Project not found' })
 
+  const seatedBanks = await seatedBankIdsForOrg(orgId, project.organization.plan)
+  if (bankAccountId && seatedBanks && !seatedBanks.has(bankAccountId)) {
+    return res.status(403).json({
+      error: 'This bank account is above the current plan limit. Upgrade to use it again.',
+    })
+  }
+
   const workbookNettingResolutionExport = await resolveWorkbookNettingForScope({
     queryValue: req.query.workbookNetting,
     projectMode: (project as { workbookNettingMode?: string }).workbookNettingMode,
@@ -1456,10 +1507,10 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const receiptsDocs = project.documents.filter((d) => d.type === 'cash_book_receipts')
   const paymentsDocs = project.documents.filter((d) => d.type === 'cash_book_payments')
   const creditsDocs = project.documents.filter(
-    (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
   )
   const debitsDocs = project.documents.filter(
-    (d) => d.type === 'bank_debits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+    (d) => d.type === 'bank_debits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
   )
 
   const receipts = dedupeTransactions(receiptsDocs.flatMap((d) => (d.transactions || []).map(toTx)))
@@ -1480,7 +1531,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     if (prevProject) {
       const prevReceiptsDocs = prevProject.documents.filter((d) => d.type === 'cash_book_receipts')
       const prevCreditsDocs = prevProject.documents.filter(
-        (d) => d.type === 'bank_credits' && (!bankAccountId || d.bankAccountId === bankAccountId)
+        (d) => d.type === 'bank_credits' && bankAccountVisible(d.bankAccountId, seatedBanks, bankAccountId)
       )
       const prevReceipts = prevReceiptsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
       const prevCredits = prevCreditsDocs.flatMap((d) => (d.transactions || []).map((t) => toTx(t)))
@@ -1561,8 +1612,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
   const reportTitle = (branding.reportTitle as string) || platformDefaults.defaultReportTitle
   const curr = project.currency || 'GHS'
   await getPlanBySlug(project.organization.plan)
-  const hasDiscrepancyReportExport = hasPlanFeature(project.organization.plan, 'discrepancy_report')
-  const hasMissingChequesReportExport = hasPlanFeature(project.organization.plan, 'missing_cheques_report')
+  const hasDiscrepancyReportExport = featureDepth(project.organization.plan, 'discrepancy_report') === 'full'
+  const hasMissingChequesReportExport = featureDepth(project.organization.plan, 'missing_cheques_report') === 'full'
   const reportLanguageProfile = {
     code: 'GHANA_BRS_V1',
     label: 'Standard BRS terminology profile',
@@ -2626,14 +2677,26 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
     }))
     drawTable('MATCHED AUDIT LOG', matchedTableRows, { allowEmptyText: 'None', refLabel: 'DOC REF / CHQ NO' })
 
-    if (discrepancies.length) {
-      const discRows = discrepancies.map((d: any) => ({
+    const discCap = discrepancyRowCap(project.organization.plan)
+    const pdfDiscrepancies = discCap < 0 ? discrepancies : discrepancies.slice(0, Math.max(0, discCap))
+    if (pdfDiscrepancies.length) {
+      const discRows = pdfDiscrepancies.map((d: any) => ({
         date: d['Cash Book Date'],
         ref: d['Cash Book Chq No'] || d['DOC REF'] || '',
         details: (d['Cash Book Desc'] + ' -> ' + d['Bank Desc']).slice(0, 60),
         amount: Number(d[VARIANCE_COLUMN_HEADER] ?? d[`Amount Variance (${curr})`] ?? 0),
       }))
       drawTable('DISCREPANCY AUDIT LOG', discRows, { allowEmptyText: 'None', refLabel: 'REF' })
+      if (discCap >= 0 && discrepancies.length > pdfDiscrepancies.length) {
+        doc
+          .fontSize(8)
+          .font('Helvetica-Oblique')
+          .fillColor('#64748B')
+          .text(
+            `Showing ${pdfDiscrepancies.length} of ${discrepancies.length} discrepancies. Solo and above include the full list.`
+          )
+          .moveDown(0.5)
+      }
     }
 
     const pickField = (row: Record<string, unknown>, prefix: string): unknown => {

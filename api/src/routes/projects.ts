@@ -6,8 +6,8 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canCreateProject, incrementProjects } from '../services/usage.js'
 import { canCreateProject as canCreateProjectPerm, canDeleteProject, canEditProject, canReopenProject, canSubmitForReview, canApprove, isProjectEditable, canExportReport, PROJECT_LOCKED_ERROR, PROJECT_NAME_LOCKED_ERROR } from '../lib/permissions.js'
 import { logAudit } from '../services/audit.js'
-import { planHasFeature } from '../lib/planGate.js'
-import { getProjectVariance } from '../lib/reconcile-variance.js'
+import { planFeatureDepth, planHasFeature } from '../lib/planGate.js'
+import { getPartialThresholdWarning, getProjectVariance } from '../lib/reconcile-variance.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 import { canAddBankAccount } from '../services/planLimits.js'
 import { isExistingProjectSourceLocked } from '../services/projectSourceLock.js'
@@ -408,7 +408,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res) => {
     return res.status(400).json({ error: 'Project must be submitted for review to approve' })
   }
 
-  // Threshold approval (Firm plan and above): reviewers cannot approve when discrepancy exceeds threshold
+  // Firm and Custom block a reviewer above the threshold. Team warns and still approves.
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { plan: true, branding: true },
@@ -417,7 +417,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res) => {
   const threshold = branding.approvalThresholdAmount
   if (
     org &&
-    (await planHasFeature(org.plan, 'threshold_approval')) &&
+    (await planFeatureDepth(org.plan, 'threshold_approval')) === 'full' &&
     threshold != null &&
     threshold > 0 &&
     role === 'reviewer'
@@ -429,6 +429,9 @@ router.patch('/:id/approve', async (req: AuthRequest, res) => {
       })
     }
   }
+  const thresholdWarning = org
+    ? await getPartialThresholdWarning(orgId, projectId, org.plan)
+    : null
 
   await prisma.project.update({
     where: { id: projectId },
@@ -446,7 +449,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res) => {
     projectId,
     action: 'project_approved',
   })
-  res.json({ status: 'completed' })
+  res.json({ status: 'completed', thresholdWarning })
 })
 
 router.delete('/:id', async (req: AuthRequest, res) => {

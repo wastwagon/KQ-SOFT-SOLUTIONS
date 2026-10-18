@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { getKeyPrefix, verifyApiKey } from '../lib/apiKey.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
+import { planHasFeature } from '../lib/planGate.js'
 import type { AuthRequest } from './auth.js'
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -58,7 +59,7 @@ export async function apiKeyAuthMiddleware(req: AuthRequest, res: Response, next
   }
   const keyRecord = await prisma.apiKey.findFirst({
     where: { keyPrefix: prefix },
-    include: { organization: { select: { id: true, suspendedAt: true } } },
+    include: { organization: { select: { id: true, suspendedAt: true, plan: true } } },
   })
   if (!keyRecord) {
     return res.status(401).json({ error: 'Invalid API key' })
@@ -68,6 +69,12 @@ export async function apiKeyAuthMiddleware(req: AuthRequest, res: Response, next
   }
   if (!verifyApiKey(apiKey, keyRecord.keyHash)) {
     return res.status(401).json({ error: 'Invalid API key' })
+  }
+  if (!(await planHasFeature(keyRecord.organization.plan, 'api_access'))) {
+    return res.status(403).json({
+      error: 'API keys require the Custom plan.',
+      code: 'API_PLAN_REQUIRED',
+    })
   }
   if (keyRecord.organization.suspendedAt != null) {
     return res.status(403).json({

@@ -139,7 +139,7 @@ export interface ReconcileSession {
   setView: (view: ReconcileView) => void
   bankAccountId: string
   setBankAccountId: (id: string) => void
-  bankAccounts: { id: string; name: string }[]
+  bankAccounts: { id: string; name: string; locked?: boolean }[]
   // Pagination
   reconcileLimit: number
   loadMore: () => void
@@ -160,6 +160,7 @@ export interface ReconcileSession {
   setBulkSelected: (next: Set<number>) => void
   // Feature flags pulled from /subscription/usage
   features: Record<string, boolean>
+  bulkMatchLimit: number | null
   // Mutations + status
   matchMutation: ReturnType<typeof useMutation<unknown, Error, { cashBookTransactionId: string; bankTransactionId: string }>>
   multiMatchMutation: ReturnType<
@@ -213,6 +214,10 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     refetchOnWindowFocus: true,
   })
   const features = (usageData?.features || {}) as Record<string, boolean>
+  const bulkMatchLimit =
+    typeof usageData?.limits?.bulkMatchLimit === 'number' && usageData.limits.bulkMatchLimit > 0
+      ? usageData.limits.bulkMatchLimit
+      : null
 
   const reconcileQuery = useQuery<ReconcileApiResponse>({
     queryKey: [
@@ -356,7 +361,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       ),
   })
 
-  const phasedAutoMatchMutation = useMutation<{ totalMatched: number; rounds: number }, Error, void>({
+  const phasedAutoMatchMutation = useMutation<{ totalMatched: number; rounds: number; capped: boolean }, Error, void>({
     mutationFn: async () => {
       setReconcileLimit(RECONCILE_CLIENT_MAX_LIMIT)
       const resp = await reconcile.createMatchAutoComplete(projectId, {
@@ -365,7 +370,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
         useDocRef: matchParams.useDocRef,
         useChequeNo: matchParams.useChequeNo,
       })
-      return { totalMatched: resp.created ?? 0, rounds: resp.rounds ?? 0 }
+      return { totalMatched: resp.created ?? 0, rounds: resp.rounds ?? 0, capped: !!resp.capped }
     },
     onSuccess: (resp) => {
       invalidateAll()
@@ -373,7 +378,9 @@ export function useReconcileSession(projectId: string): ReconcileSession {
       setSelectedCbIds(new Set())
       setSelectedBankIds(new Set())
       toast.success(
-        `Auto-matched ${resp.totalMatched} pair${resp.totalMatched === 1 ? '' : 's'} (${resp.rounds} round${resp.rounds === 1 ? '' : 's'})`
+        resp.capped
+          ? `Auto-matched ${resp.totalMatched} pair${resp.totalMatched === 1 ? '' : 's'}, the limit for this plan`
+          : `Auto-matched ${resp.totalMatched} pair${resp.totalMatched === 1 ? '' : 's'} (${resp.rounds} round${resp.rounds === 1 ? '' : 's'})`
       )
     },
     onError: (err) =>
@@ -483,6 +490,7 @@ export function useReconcileSession(projectId: string): ReconcileSession {
     bulkSelected,
     setBulkSelected,
     features,
+    bulkMatchLimit,
     matchMutation,
     multiMatchMutation,
     bulkMatchMutation,

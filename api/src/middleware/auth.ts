@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma.js'
 import { membershipAccessBlocked } from '../lib/membershipAccess.js'
+import { planUserLimit } from '../lib/planGate.js'
+import { seatedUserIds } from '../services/planChange.js'
 import { isPlatformAdmin } from '../lib/platformAdmin.js'
 import type { OrgRole } from '../lib/permissions.js'
 
@@ -33,6 +35,11 @@ export type JwtAuthClaims = {
   orgId: string
   impersonating?: boolean
   homeOrgId?: string
+}
+
+function isPlanRecoveryRequest(req: Request): boolean {
+  const path = `${req.originalUrl || ''} ${req.path || ''}`
+  return /\/(subscription|settings|auth)(\/|$|\?)/.test(path)
 }
 
 function looksLikeJwt(token: string): boolean {
@@ -85,11 +92,28 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       select: {
         role: true,
         user: { select: { email: true, suspendedAt: true } },
-        organization: { select: { suspendedAt: true } },
+        organization: { select: { suspendedAt: true, plan: true } },
       },
     })
     if (!membership) {
       return res.status(401).json({ error: 'Membership not found' })
+    }
+    const seatLimit = await planUserLimit(membership.organization.plan)
+    if (seatLimit >= 0) {
+      const members = await prisma.organizationMember.findMany({
+        where: { organizationId: payload.orgId },
+        select: { userId: true, role: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (members.length > seatLimit && !seatedUserIds(members, seatLimit).has(payload.userId)) {
+        const adminRecovery = membership.role === 'admin' && isPlanRecoveryRequest(req)
+        if (!adminRecovery) {
+          return res.status(403).json({
+            error: 'This workspace has more people than the current plan allows. An admin can remove members or upgrade from Billing.',
+            code: 'SEAT_LIMIT',
+          })
+        }
+      }
     }
     const access = membershipAccessBlocked({
       role: membership.role,

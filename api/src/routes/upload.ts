@@ -12,7 +12,7 @@ import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { logAudit } from '../services/audit.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
-import { canAddBankAccount } from '../services/planLimits.js'
+import { canAddBankAccount, seatedBankIdsForOrg } from '../services/planLimits.js'
 import { autoMapAfterUpload } from '../lib/deferredAutoMap.js'
 import { resolveMaxUploadSizeBytes } from '../config/importLimits.js'
 import { uploadParseRouteLimiter } from '../middleware/heavyRouteLimiter.js'
@@ -228,6 +228,19 @@ router.post('/bank-statement/:projectId', upload.single('file'), async (req: Aut
         },
       })
       bankAccountId = acct.id
+    }
+  }
+  if (bankAccountId) {
+    const seated = await seatedBankIdsForOrg(orgId, project.organization.plan)
+    if (seated && !seated.has(bankAccountId)) {
+      try {
+        fs.unlinkSync(req.file.path)
+      } catch {
+        /* ignore */
+      }
+      return res.status(403).json({
+        error: 'This bank account is above the current plan limit. Upgrade to use it again.',
+      })
     }
   }
   const safeFilename = sanitizeFilename(req.file.originalname)

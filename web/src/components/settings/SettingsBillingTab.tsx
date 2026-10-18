@@ -7,6 +7,7 @@ import { canManageBilling } from '../../lib/permissions'
 import type { OrgRole } from '../../lib/permissions'
 import { formatYearlyDiscountLabel } from '../../lib/planPricing'
 import { publicPlanName, type BillingPeriod } from '../../lib/plans'
+import { isLowerPlan as isLowerPlanSlug, planRank } from '../../lib/planRank'
 
 /** Minimal shapes from subscription API — kept loose for forward compatibility. */
 interface BillingPlanRow {
@@ -22,6 +23,8 @@ interface BillingProps {
   usageData:
     | {
         organization?: { plan?: string }
+        scheduledPlan?: { plan: string; effectiveAt: string; requestedAt: string } | null
+        prorationCreditGhs?: number
         usage?: {
           projectsDisplay?: string
           transactionsDisplay?: string
@@ -63,8 +66,11 @@ interface BillingProps {
       }
     | undefined
   initializing: string | null
+  schedulingPlan: string | null
   checkoutNotice?: { tone: 'success' | 'warning' | 'info' | 'error'; title: string; body?: string } | null
   onUpgrade: (plan: string, period: BillingPeriod) => void
+  onScheduleDowngrade: (plan: string) => void
+  onCancelScheduledDowngrade: () => void
 }
 
 export default function SettingsBillingTab({
@@ -72,9 +78,18 @@ export default function SettingsBillingTab({
   usageData,
   plansData,
   initializing,
+  schedulingPlan,
   checkoutNotice,
   onUpgrade,
+  onScheduleDowngrade,
+  onCancelScheduledDowngrade,
 }: BillingProps) {
+  const currentPlan = usageData?.organization?.plan
+  const scheduled = usageData?.scheduledPlan
+  const prorationCredit = usageData?.prorationCreditGhs ?? 0
+  const canScheduleFree =
+    canManageBilling(role) && currentPlan && planRank(currentPlan) > planRank('free') && currentPlan !== 'firm'
+
   return (
     <Card title="Billing">
       {checkoutNotice && (
@@ -90,9 +105,33 @@ export default function SettingsBillingTab({
       <p className="text-sm text-gray-600 mb-4 flex flex-wrap items-center gap-2">
         Current plan:{' '}
         <Badge tone="brand" size="sm">
-          {publicPlanName(usageData?.organization?.plan)}
+          {publicPlanName(currentPlan)}
         </Badge>
       </p>
+      {scheduled && (
+        <Alert
+          tone="warning"
+          title="Plan change scheduled"
+          className="mb-4"
+          action={
+            canManageBilling(role) ? (
+              <Button type="button" size="sm" variant="outline" onClick={onCancelScheduledDowngrade}>
+                Cancel change
+              </Button>
+            ) : undefined
+          }
+        >
+          <p>
+            This workspace moves to <strong>{publicPlanName(scheduled.plan)}</strong> on{' '}
+            {new Date(scheduled.effectiveAt).toLocaleString()}. You keep {publicPlanName(currentPlan)} until then.
+          </p>
+        </Alert>
+      )}
+      {prorationCredit > 0 && canManageBilling(role) && (
+        <Alert tone="info" title="Unused time credit" className="mb-4">
+          About GH₵{prorationCredit.toFixed(2)} from your current period can reduce your next upgrade charge.
+        </Alert>
+      )}
       {usageData?.usage && (
         <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <MetricCard
@@ -176,6 +215,19 @@ export default function SettingsBillingTab({
           )}
         </Alert>
       )}
+      {canScheduleFree && !scheduled && (
+        <div className="mb-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onScheduleDowngrade('free')}
+            isLoading={schedulingPlan === 'free'}
+          >
+            Move to Free at period end
+          </Button>
+        </div>
+      )}
       {plansData?.introOffer?.eligible && (
         <Alert tone="success" title="Intro offer" className="mb-4">
           {plansData.introOffer.description}.{' '}
@@ -199,7 +251,9 @@ export default function SettingsBillingTab({
             const firstMonthGhs = introEligible ? Math.round(p.monthlyGhs * 0.5 * 100) / 100 : null
             const firstQuarterGhs = introEligible ? Math.round(q * 0.5 * 100) / 100 : null
             const firstYearGhs = introEligible ? Math.round(p.yearlyGhs * 0.5 * 100) / 100 : null
-            const isCurrentPlan = usageData?.organization?.plan === p.id
+            const isCurrentPlan = currentPlan === p.id
+            const isDowngradeTarget = isLowerPlanSlug(currentPlan, p.id)
+            const checkoutAllowed = !isDowngradeTarget && planRank(p.id) >= planRank(currentPlan ?? 'free')
             return (
               <Card
                 key={p.id}
@@ -211,7 +265,7 @@ export default function SettingsBillingTab({
                 <p className="text-lg font-bold text-gray-900 mt-0.5">
                   GH₵{p.monthlyGhs}
                   <span className="text-xs font-normal text-gray-500">/mo</span>
-                  {firstMonthGhs != null && (
+                  {firstMonthGhs != null && checkoutAllowed && (
                     <span className="ml-1.5 text-xs font-normal text-green-700">
                       Intro: GH₵{firstMonthGhs}
                     </span>
@@ -221,6 +275,20 @@ export default function SettingsBillingTab({
                   GH₵{q}/qtr · GH₵{p.yearlyGhs}/yr ({formatYearlyDiscountLabel(p.monthlyGhs, p.yearlyGhs)})
                 </p>
                 <div className="mt-3 flex flex-col gap-1.5">
+                  {isDowngradeTarget ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => onScheduleDowngrade(p.id)}
+                      isLoading={schedulingPlan === p.id}
+                      disabled={!!scheduled}
+                    >
+                      Switch at period end
+                    </Button>
+                  ) : checkoutAllowed ? (
+                    <>
                   <Button
                     type="button"
                     size="sm"
@@ -262,6 +330,10 @@ export default function SettingsBillingTab({
                         ? `Renew yearly (GH₵${p.yearlyGhs})`
                         : `Pay yearly (GH₵${p.yearlyGhs})`}
                   </Button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500">Custom billing — contact support.</p>
+                  )}
                 </div>
                 </div>
               </Card>

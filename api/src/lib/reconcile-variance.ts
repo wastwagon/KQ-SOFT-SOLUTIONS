@@ -1,4 +1,35 @@
+import { featureDepth } from '../config/planFeatures.js'
+import { getPlanBySlug } from '../services/plan.js'
 import { prisma } from './prisma.js'
+
+export type ThresholdWarning = {
+  variance: number
+  threshold: number
+  message: string
+}
+
+function thresholdWarningMessage(variance: number, threshold: number): string {
+  return `Discrepancy of GH₵${Math.abs(variance).toFixed(2)} is above the warning amount of GH₵${threshold.toFixed(2)}. You can still approve. Firm blocks a reviewer above this amount.`
+}
+
+/** Team stores a threshold and warns. Firm and Custom block a reviewer in the approve route. */
+export async function getPartialThresholdWarning(
+  orgId: string,
+  projectId: string,
+  plan: string
+): Promise<ThresholdWarning | null> {
+  await getPlanBySlug(plan)
+  if (featureDepth(plan, 'threshold_approval') !== 'partial') return null
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { branding: true },
+  })
+  const threshold = (org?.branding as { approvalThresholdAmount?: number | null } | null)?.approvalThresholdAmount
+  if (threshold == null || threshold <= 0) return null
+  const variance = await getProjectVariance(projectId, orgId)
+  if (variance === null || Math.abs(variance) <= threshold) return null
+  return { variance, threshold, message: thresholdWarningMessage(variance, threshold) }
+}
 
 /**
  * Compute the variance (total unmatched cash book - total unmatched bank) for a project.

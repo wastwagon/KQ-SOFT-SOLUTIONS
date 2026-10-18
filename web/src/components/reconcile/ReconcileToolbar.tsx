@@ -9,7 +9,7 @@ import Select from '../ui/Select'
 interface ReconcileToolbarProps {
   view: ReconcileView
   onViewChange: (view: ReconcileView) => void
-  bankAccounts: { id: string; name: string }[]
+  bankAccounts: { id: string; name: string; locked?: boolean }[]
   bankAccountId: string
   onBankAccountChange: (id: string) => void
 }
@@ -40,8 +40,8 @@ export default function ReconcileToolbar({
             >
               <option value="">All bank accounts</option>
               {bankAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
+                <option key={a.id} value={a.id} disabled={a.locked}>
+                  {a.name}{a.locked ? ' (above plan limit)' : ''}
                 </option>
               ))}
             </Select>

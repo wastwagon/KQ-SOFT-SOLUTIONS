@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
 import { FileCheck, Download } from 'lucide-react'
-import { audit, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
+import { audit, projects, subscription, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
@@ -36,6 +36,11 @@ export default function Audit() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const org = useAuth((s) => s.org)
+  const usageQuery = useQuery({
+    queryKey: ['subscription', 'usage'],
+    queryFn: subscription.getUsage,
+  })
+  const canExportAudit = usageQuery.data?.featureDepth?.audit_trail === 'full'
   const [projectFilter, setProjectFilter] = useState('')
   const [page, setPage] = useState(0)
   const [exporting, setExporting] = useState(false)
@@ -139,6 +144,7 @@ export default function Audit() {
             ))}
           </Select>
         </div>
+        {canExportAudit ? (
         <Button
           variant="outline"
           onClick={async () => {
@@ -158,6 +164,13 @@ export default function Audit() {
           <Download className="w-4 h-4 mr-2" />
           Export CSV
         </Button>
+        ) : (
+          <p className="text-sm text-gray-500">
+            {usageQuery.data?.featureDepth?.audit_trail === 'partial'
+              ? 'This plan can view the activity log. Export starts on Team.'
+              : 'The activity log export is not included on this plan.'}
+          </p>
+        )}
         </div>
       </Card>
 

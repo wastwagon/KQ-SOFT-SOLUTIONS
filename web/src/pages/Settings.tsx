@@ -50,9 +50,22 @@ export default function Settings() {
   const subscriptionSidebarFailed = usageQueryFailed || plansQueryFailed
 
   const [initializing, setInitializing] = useState<string | null>(null)
+  const [schedulingPlan, setSchedulingPlan] = useState<string | null>(null)
   const initPaymentMutation = useMutation({
     mutationFn: subscription.initializePayment,
     onSuccess: (data) => {
+      if ('applied' in data && data.applied) {
+        setInitializing(null)
+        const planLabel = publicPlanName(data.plan)
+        setCheckoutNotice({
+          tone: 'success',
+          title: 'Plan updated',
+          body: `Your workspace is now on ${planLabel}. Unused time from your last payment was applied.`,
+        })
+        toast.success('Plan updated', `You are now on ${planLabel}.`)
+        void queryClient.invalidateQueries({ queryKey: ['subscription'] })
+        return
+      }
       if (data?.reference) {
         try {
           sessionStorage.setItem('brs_paystack_ref', String(data.reference))
@@ -60,7 +73,7 @@ export default function Settings() {
           /* private mode */
         }
       }
-      if (data?.authorizationUrl) window.location.href = data.authorizationUrl
+      if ('authorizationUrl' in data && data.authorizationUrl) window.location.href = data.authorizationUrl
     },
     onError: (err) => {
       unlessSubscriptionInactive(err, (e) =>
@@ -71,6 +84,7 @@ export default function Settings() {
   })
 
   const features = (usageData?.features || {}) as Record<string, boolean>
+  const featureDepth = usageData?.featureDepth || {}
   const branding = useBrandingSettings(features)
 
   const { tab } = useParams<{ tab: string }>()
@@ -101,6 +115,51 @@ export default function Settings() {
     setInitializing(`${plan}-${period}`)
     initPaymentMutation.mutate({ plan, period })
   }
+
+  const scheduleDowngradeMutation = useMutation({
+    mutationFn: (plan: string) => subscription.scheduleDowngrade({ plan }),
+    onSuccess: (result) => {
+      setSchedulingPlan(null)
+      if (result.applied) {
+        setCheckoutNotice({
+          tone: 'success',
+          title: 'Plan updated',
+          body: `Your workspace is now on ${publicPlanName(result.plan)}.`,
+        })
+        toast.success('Plan updated', `You are now on ${publicPlanName(result.plan)}.`)
+      } else {
+        setCheckoutNotice({
+          tone: 'info',
+          title: 'Plan change scheduled',
+          body: `You will move to ${publicPlanName(result.scheduledPlan.plan)} on ${new Date(result.scheduledPlan.effectiveAt).toLocaleString()}.`,
+        })
+        toast.success('Plan change scheduled')
+      }
+      void queryClient.invalidateQueries({ queryKey: ['subscription'] })
+    },
+    onError: (err) => {
+      setSchedulingPlan(null)
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not schedule plan change', e instanceof Error ? e.message : undefined)
+      )
+    },
+  })
+
+  const cancelScheduleMutation = useMutation({
+    mutationFn: () => subscription.cancelScheduledDowngrade(),
+    onSuccess: () => {
+      setCheckoutNotice({
+        tone: 'info',
+        title: 'Scheduled change cancelled',
+        body: 'Your current plan stays in place until you choose another change.',
+      })
+      void queryClient.invalidateQueries({ queryKey: ['subscription'] })
+    },
+    onError: (err) =>
+      unlessSubscriptionInactive(err, (e) =>
+        toast.error('Could not cancel scheduled change', e instanceof Error ? e.message : undefined)
+      ),
+  })
 
   useEffect(() => {
     if (!paystackReference) return
@@ -225,7 +284,12 @@ export default function Settings() {
       <SettingsTabNav showApiKeys={!!features.api_access} showBankRules={!!features.bank_rules} />
       <div className="w-full max-w-7xl">
         {activeTab === 'branding' && (
-          <SettingsBrandingTab role={role} features={features} branding={branding} />
+          <SettingsBrandingTab
+            role={role}
+            features={features}
+            featureDepth={featureDepth}
+            branding={branding}
+          />
         )}
 
         {activeTab === 'billing' && (
@@ -234,8 +298,14 @@ export default function Settings() {
             usageData={usageData}
             plansData={plansData}
             initializing={initializing}
+            schedulingPlan={schedulingPlan}
             checkoutNotice={checkoutNotice}
             onUpgrade={handleUpgrade}
+            onScheduleDowngrade={(plan) => {
+              setSchedulingPlan(plan)
+              scheduleDowngradeMutation.mutate(plan)
+            }}
+            onCancelScheduledDowngrade={() => cancelScheduleMutation.mutate()}
           />
         )}
 
@@ -289,8 +359,13 @@ export default function Settings() {
             sublabel='Auto-suggest or flag bank transactions that match your rules (e.g. "Bank charges" when description contains "BANK CHARGES").'
           >
             {!features.bank_rules && (
-              <Alert tone="warning" title="Team plan or higher required" className="mb-4">
-                Upgrade to use auto-suggest and flag rules.
+              <Alert tone="warning" title="Solo plan or higher required" className="mb-4">
+                Upgrade to use auto-suggest and flag rules. Solo includes 5 rules; Team removes the cap.
+              </Alert>
+            )}
+            {features.bank_rules && featureDepth.bank_rules === 'partial' && (
+              <Alert tone="info" title="Solo includes 5 bank rules" className="mb-4">
+                Team and above remove the cap.
               </Alert>
             )}
             {features.bank_rules && <BankRulesSection canEdit={canEditBankRules(role)} />}

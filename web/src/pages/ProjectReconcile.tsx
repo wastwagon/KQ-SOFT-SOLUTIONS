@@ -68,6 +68,7 @@ export default function ProjectReconcile({
     bulkSelected,
     setBulkSelected,
     features,
+    bulkMatchLimit,
     matchMutation,
     multiMatchMutation,
     bulkMatchMutation,
@@ -482,6 +483,7 @@ export default function ProjectReconcile({
           suggestions={suggestions}
           currency={currency}
           features={features}
+          bulkMatchLimit={bulkMatchLimit}
           matchParams={matchParams}
           onMatchParamsChange={setMatchParams}
           selectedCbIds={selectedCbIds}

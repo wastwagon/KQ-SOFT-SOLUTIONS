@@ -20,17 +20,27 @@
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
 import {
+  defaultFeaturesForPlan,
   defaultHasPlanFeature,
   isStoredFeaturesEmpty,
-  mergePlanFeatures,
+  parseStoredFeatures,
+  PLAN_FEATURE_IDS,
   type PlanFeature,
 } from '../src/config/planFeatures.js'
 
 /** Catalogue floor: Solo and every paid plan. Free stays off. Re-applied on each seed. */
 const SOLO_AND_ABOVE: PlanFeature[] = ['one_to_many', 'many_to_many', 'roll_forward']
 
+/**
+ * Catalogue access is the floor. A stored `true` can add a feature.
+ * A stored `false` from an older seed must not hide a feature the catalogue now includes.
+ */
 function featuresForSeed(slug: string, stored: unknown): Prisma.InputJsonValue {
-  const features = mergePlanFeatures(slug, stored)
+  const features = defaultFeaturesForPlan(slug)
+  const parsed = parseStoredFeatures(stored)
+  for (const id of PLAN_FEATURE_IDS) {
+    if (parsed[id] === true) features[id] = true
+  }
   for (const id of SOLO_AND_ABOVE) features[id] = defaultHasPlanFeature(slug, id)
   return features
 }

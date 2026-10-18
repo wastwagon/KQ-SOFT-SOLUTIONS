@@ -1,11 +1,16 @@
 import { prisma } from './prisma.js'
-import { getUserLimit, hasPlanFeature, type PlanFeature } from '../config/planFeatures.js'
+import { featureDepth, getUserLimit, hasPlanFeature, type FeatureDepth, type PlanFeature } from '../config/planFeatures.js'
 import { getPlanBySlug } from '../services/plan.js'
 
 /** Load CMS entitlements for `plan`, then evaluate a feature flag. */
 export async function planHasFeature(plan: string, feature: PlanFeature): Promise<boolean> {
   await getPlanBySlug(plan)
   return hasPlanFeature(plan, feature)
+}
+
+export async function planFeatureDepth(plan: string, feature: PlanFeature): Promise<FeatureDepth> {
+  await getPlanBySlug(plan)
+  return featureDepth(plan, feature)
 }
 
 export async function planUserLimit(plan: string): Promise<number> {

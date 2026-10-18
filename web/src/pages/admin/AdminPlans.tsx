@@ -53,10 +53,10 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
   basic: {
     bulk_match: true,
     ai_suggestions: true,
-    bank_rules: false,
-    audit_trail: false,
-    discrepancy_report: false,
-    missing_cheques_report: false,
+    bank_rules: true,
+    audit_trail: true,
+    discrepancy_report: true,
+    missing_cheques_report: true,
     one_to_many: true,
     many_to_many: true,
     roll_forward: true,
@@ -76,7 +76,7 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
     one_to_many: true,
     many_to_many: true,
     roll_forward: true,
-    threshold_approval: false,
+    threshold_approval: true,
     full_branding: true,
     firm_dashboard: false,
     api_access: false,
@@ -413,9 +413,11 @@ function PlanForm({
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-1">Features</h4>
         <p className="text-xs text-gray-500 mb-3">
-          These flags gate the product (API keys, bank rules, reports). Split matching, many-to-many,
-          and roll forward are included from Solo upward and stay off on Free. Saving updates every
-          workspace on this package.
+          These flags gate the product. A checked box includes the feature. Caps still apply:
+          10 bulk pairs on Free, 5 bank rules on Solo, view-only activity log below Team, and a
+          warning-only threshold on Team. Split matching, many-to-many, and roll forward stay on
+          from Solo upward. Saving updates every workspace on this package. The API restores
+          catalogue access for those features the next time it starts.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {rows.map((f) => (

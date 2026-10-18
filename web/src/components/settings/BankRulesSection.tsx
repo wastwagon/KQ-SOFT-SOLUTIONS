@@ -81,13 +81,16 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
     setAction('suggest_match')
   }
 
+  const ruleCap = (data as { ruleCap?: number | null })?.ruleCap ?? null
   const rules = (data?.rules || []) as {
     id: string
     name: string
     priority: number
     conditions: { field: string; operator: string; value: string | number }[]
     action: string
+    activeInMatch?: boolean
   }[]
+  const pausedCount = rules.filter((r) => r.activeInMatch === false).length
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -136,6 +139,12 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
           Contact an admin or reviewer to add or edit rules.
         </Alert>
       )}
+      {pausedCount > 0 && (
+        <Alert tone="warning" title="Some rules are paused">
+          Solo uses the first {ruleCap ?? 5} rules by priority in matching. Delete extras or upgrade to Team for
+          unlimited rules.
+        </Alert>
+      )}
       {rules.length === 0 && !showForm && (
         <EmptyState
           title="No rules yet"
@@ -147,11 +156,16 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
           {rules.map((r) => (
             <li
               key={r.id}
-              className="group flex items-center justify-between p-4 border border-border rounded-xl shadow-card bg-white hover:border-primary-200 transition-colors"
+              className={`group flex items-center justify-between p-4 border border-border rounded-xl shadow-card bg-white hover:border-primary-200 transition-colors ${
+                r.activeInMatch === false ? 'opacity-70' : ''
+              }`}
             >
               <div>
                 <p className="font-semibold text-gray-900">{r.name}</p>
                 <div className="flex flex-wrap gap-2 mt-1.5">
+                  {r.activeInMatch === false && (
+                    <Badge tone="neutral" size="sm">Paused</Badge>
+                  )}
                   <Badge tone={r.action === 'suggest_match' ? 'success' : 'warning'} size="sm" className="uppercase tracking-wider">
                     {r.action.replace(/_/g, ' ')}
                   </Badge>
@@ -173,6 +187,8 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
                     type="button"
                     variant="ghost"
                     size="xs"
+                    disabled={r.activeInMatch === false}
+                    title={r.activeInMatch === false ? 'Paused rules can only be deleted on Solo' : undefined}
                     onClick={() => {
                       setEditId(r.id)
                       setName(r.name)

@@ -12,13 +12,14 @@ const mocks = vi.hoisted(() => {
 })
 
 vi.mock('../lib/prisma.js', () => ({
-  prisma: {
+    prisma: {
     organization: { update: mocks.organizationUpdate },
     payment: {
       create: mocks.paymentCreate,
       update: mocks.paymentUpdate,
       findUnique: mocks.paymentFindUnique,
     },
+    platformSettings: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     $transaction: mocks.transaction,
   },
 }))

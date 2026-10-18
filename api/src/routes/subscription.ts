@@ -7,10 +7,10 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { getUsageWithLimits } from '../services/usage.js'
 import { getPlanBySlug, listSelfServePlans } from '../services/plan.js'
 import { planAmountForPeriod, INTRO_OFFER_DISCOUNT, INTRO_OFFER_MONTHS } from '../config/subscription.js'
-import { hasPlanFeature, PLAN_FEATURE_IDS } from '../config/planFeatures.js'
+import { bulkMatchLimit, featureDepth, hasPlanFeature, PLAN_FEATURE_IDS } from '../config/planFeatures.js'
 import { getSubscriptionSnapshot } from '../services/subscriptionState.js'
 import { fetchSubscriptionOverrides } from '../services/subscriptionOverrides.js'
-import { isSubscriptionPaywallEnabled } from '../services/orgSubscriptionAccess.js'
+import { invalidateOrgSubscriptionCache, isSubscriptionPaywallEnabled } from '../services/orgSubscriptionAccess.js'
 import { getPlanQuotaLimits } from '../services/planLimits.js'
 import {
   isIntroOfferEnvEnabled,
@@ -18,6 +18,16 @@ import {
   getIntroOfferPaymentsApplied,
 } from '../services/introOffer.js'
 import { logger } from '../middleware/logging.js'
+import { logAudit } from '../services/audit.js'
+import {
+  applyDueScheduledPlan,
+  checkoutAmountAfterCredit,
+  clearScheduledPlan,
+  isSelfServeDowngrade,
+  prorationCreditGhs,
+  readScheduledPlan,
+  writeScheduledPlan,
+} from '../services/planChange.js'
 import { pickOrgBillingEmail } from '../lib/orgBillingEmail.js'
 import { isPlatformAdmin } from '../lib/platformAdmin.js'
 import { canManageBilling } from '../lib/permissions.js'
@@ -43,19 +53,15 @@ export {
   parseWebhookEvent,
 }
 
-/** Rank for upgrade/downgrade checks; `firm` is highest (custom billing, not self-service). */
-const PLAN_SLUG_RANK: Record<string, number> = {
-  basic: 1,
-  standard: 2,
-  premium: 3,
-  firm: 4,
-}
 const initializeSchema = z.object({
   plan: z.enum(PAYABLE_PLANS),
   period: z.enum(['monthly', 'quarterly', 'yearly']),
 })
 const verifySchema = z.object({
   reference: z.string().trim().min(3).max(200),
+})
+const scheduleDowngradeSchema = z.object({
+  plan: z.enum(['free', 'basic', 'standard', 'premium']),
 })
 
 const PLAN_FEATURES = PLAN_FEATURE_IDS
@@ -92,6 +98,7 @@ const initializeLimiter = rateLimit({
 router.get('/usage', async (req: AuthRequest, res) => {
   const orgId = req.auth!.orgId
   const userId = req.auth!.userId
+  await applyDueScheduledPlan(orgId)
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
   })
@@ -100,8 +107,9 @@ router.get('/usage', async (req: AuthRequest, res) => {
   const latestPayment = await prisma.payment.findFirst({
     where: { organizationId: orgId, status: 'success' },
     orderBy: { createdAt: 'desc' },
-    select: { createdAt: true, period: true, amount: true },
+    select: { createdAt: true, period: true, amount: true, plan: true },
   })
+  const scheduledPlan = await readScheduledPlan(orgId)
   const overrides = await fetchSubscriptionOverrides(orgId)
   const subscription = getSubscriptionSnapshot(org, latestPayment, overrides)
   const planData = await getPlanBySlug(org.plan)
@@ -114,6 +122,9 @@ router.get('/usage', async (req: AuthRequest, res) => {
         bankAccountsPerProject: quotaLimits.bankAccounts,
       }
     : quotaLimits
+  const featureDepths = Object.fromEntries(
+    PLAN_FEATURES.map((f) => [f, featureDepth(org.plan, f)])
+  ) as Record<string, 'none' | 'partial' | 'full'>
   const features = Object.fromEntries(
     PLAN_FEATURES.map((f) => [f, hasPlanFeature(org.plan, f)])
   ) as Record<string, boolean>
@@ -130,6 +141,7 @@ router.get('/usage', async (req: AuthRequest, res) => {
     /** Platform admins bypass org subscription gates for core product APIs. */
     subscriptionBypass,
     features,
+    featureDepth: featureDepths,
     usage: {
       ...usage,
       projectsDisplay: usage.projectsUnlimited ? `${usage.projectsUsed} (unlimited)` : `${usage.projectsUsed} / ${usage.projectsLimit}`,
@@ -147,8 +159,20 @@ router.get('/usage', async (req: AuthRequest, res) => {
       bankAccounts: limits.bankAccounts,
       bankAccountsPerProject: limits.bankAccountsPerProject,
       cleanExportsPerMonth: quotaLimits.cleanExportsPerMonth,
+      bulkMatchLimit: bulkMatchLimit(org.plan),
     },
     subscription,
+    scheduledPlan,
+    prorationCreditGhs: latestPayment
+      ? prorationCreditGhs({
+          now: new Date(),
+          paymentAt: latestPayment.createdAt,
+          period: latestPayment.period,
+          amount: Number(latestPayment.amount),
+          paymentPlan: latestPayment.plan,
+          currentPlan: org.plan,
+        })
+      : 0,
   })
 })
 
@@ -246,17 +270,54 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
 
   if (org.plan === 'firm') {
     return res.status(400).json({
-      error: 'Firm and enterprise plans use custom billing. Contact support to change your subscription.',
+      error: 'Custom plans use contract billing. Contact support to change this subscription.',
     })
   }
 
-  // Block downgrades through self-service billing — admins who need to switch
-  // plans should contact support so we can prorate / reconcile entitlements.
-  const currentRank = PLAN_SLUG_RANK[org.plan]
-  const targetRank = PLAN_SLUG_RANK[plan]
-  if (currentRank !== undefined && targetRank < currentRank) {
+  if (isSelfServeDowngrade(org.plan, plan)) {
     return res.status(400).json({
-      error: 'Plan downgrades are not supported via self-service. Contact support to switch to a lower tier.',
+      error: 'A lower plan starts when the current period ends. Schedule it from Billing instead of paying again.',
+    })
+  }
+
+  const introOfferApplied = await isOrgIntroOfferEligible(orgId)
+  if (introOfferApplied) amountGhs = amountGhs * INTRO_OFFER_DISCOUNT
+
+  const latestPaid = await prisma.payment.findFirst({
+    where: { organizationId: orgId, status: 'success' },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true, period: true, amount: true, plan: true },
+  })
+  const credit = latestPaid
+    ? prorationCreditGhs({
+        now: new Date(),
+        paymentAt: latestPaid.createdAt,
+        period: latestPaid.period,
+        amount: Number(latestPaid.amount),
+        paymentPlan: latestPaid.plan,
+        currentPlan: org.plan,
+      })
+    : 0
+  const priced = checkoutAmountAfterCredit(amountGhs, credit)
+  amountGhs = priced.charge
+
+  if (priced.covered) {
+    const coveredRef = `brs_${orgId}_${plan}_${period}_${Date.now()}`
+    await fulfillSuccessfulCharge({
+      orgId,
+      plan,
+      period,
+      reference: coveredRef,
+      amountGhs: 0,
+      currency: 'GHS',
+      paystackData: { prorationCreditGhs: priced.creditApplied, coveredByCredit: true },
+    })
+    return res.json({
+      applied: true,
+      plan,
+      period,
+      reference: coveredRef,
+      creditApplied: priced.creditApplied,
     })
   }
 
@@ -265,18 +326,18 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
     return res.status(400).json({ error: 'No billing email found for organization. Add a member email before upgrading.' })
   }
 
-  const introOfferApplied = await isOrgIntroOfferEligible(orgId)
-  if (introOfferApplied) amountGhs = amountGhs * INTRO_OFFER_DISCOUNT
-
   const amountPesewas = Math.round(amountGhs * 100) // GHS to pesewas
   const ref = `brs_${orgId}_${plan}_${period}_${Date.now()}`
   const callbackUrl = paystackCallbackUrl()
-  const metadata = checkoutMetadataPayload({
-    orgId,
-    plan,
-    period,
-    introOffer: introOfferApplied || undefined,
-  })
+  const metadata = {
+    ...checkoutMetadataPayload({
+      orgId,
+      plan,
+      period,
+      introOffer: introOfferApplied || undefined,
+    }),
+    ...(priced.creditApplied > 0 ? { prorationCreditGhs: priced.creditApplied } : {}),
+  }
 
   try {
     const resp = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -319,11 +380,81 @@ router.post('/initialize', authMiddleware, initializeLimiter, async (req: AuthRe
       reference: ref,
       callbackUrl,
       introOfferApplied: introOfferApplied || undefined,
+      creditApplied: priced.creditApplied || undefined,
     })
   } catch (err) {
     logger.error({ err }, 'paystack: initialize failed')
     res.status(502).json({ error: 'Payment service unavailable' })
   }
+})
+
+router.post('/schedule-downgrade', async (req: AuthRequest, res) => {
+  if (!canManageBilling(req.auth?.role)) {
+    return res.status(403).json({ error: 'Only organisation admins can manage billing.' })
+  }
+  const parsed = scheduleDowngradeSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Choose Free, Solo, Team, or Firm.' })
+  const orgId = req.auth!.orgId
+  const org = await prisma.organization.findUnique({ where: { id: orgId } })
+  if (!org) return res.status(404).json({ error: 'Organization not found' })
+  if (org.plan === 'firm') {
+    return res.status(400).json({
+      error: 'Custom plans change through support. Contact sales to move this workspace.',
+    })
+  }
+  if (!isSelfServeDowngrade(org.plan, parsed.data.plan)) {
+    return res.status(400).json({ error: 'Choose a lower plan. Upgrades go through checkout.' })
+  }
+  if (parsed.data.plan !== 'free') {
+    const target = await getPlanBySlug(parsed.data.plan)
+    if (!target?.active) return res.status(400).json({ error: 'This plan is not available.' })
+  }
+
+  const latestPayment = await prisma.payment.findFirst({
+    where: { organizationId: orgId, status: 'success' },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true, period: true, amount: true },
+  })
+  const overrides = await fetchSubscriptionOverrides(orgId)
+  const snapshot = getSubscriptionSnapshot(org, latestPayment, overrides)
+  const periodEnd = snapshot.currentPeriodEnd ? new Date(snapshot.currentPeriodEnd) : null
+  const now = new Date()
+  const waitsForPeriod = snapshot.status === 'active' && periodEnd != null && periodEnd > now
+  if (!waitsForPeriod) {
+    await prisma.organization.update({ where: { id: orgId }, data: { plan: parsed.data.plan } })
+    await clearScheduledPlan(orgId)
+    invalidateOrgSubscriptionCache(orgId)
+    await logAudit({
+      organizationId: orgId,
+      userId: req.auth!.userId,
+      action: 'plan_scheduled_applied',
+      details: { plan: parsed.data.plan, immediate: true },
+    })
+    return res.json({ applied: true, plan: parsed.data.plan })
+  }
+
+  const scheduledPlan = await writeScheduledPlan(orgId, parsed.data.plan, periodEnd)
+  await logAudit({
+    organizationId: orgId,
+    userId: req.auth!.userId,
+    action: 'plan_downgrade_scheduled',
+    details: { plan: scheduledPlan.plan, effectiveAt: scheduledPlan.effectiveAt },
+  })
+  res.json({ applied: false, scheduledPlan })
+})
+
+router.delete('/schedule-downgrade', async (req: AuthRequest, res) => {
+  if (!canManageBilling(req.auth?.role)) {
+    return res.status(403).json({ error: 'Only organisation admins can manage billing.' })
+  }
+  const orgId = req.auth!.orgId
+  await clearScheduledPlan(orgId)
+  await logAudit({
+    organizationId: orgId,
+    userId: req.auth!.userId,
+    action: 'plan_downgrade_cancelled',
+  })
+  res.json({ cleared: true })
 })
 
 router.post('/verify', async (req: AuthRequest, res) => {

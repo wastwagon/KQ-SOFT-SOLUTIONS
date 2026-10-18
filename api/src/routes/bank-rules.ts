@@ -4,6 +4,8 @@ import { prisma } from '../lib/prisma.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
 import { canEditBankRules } from '../lib/permissions.js'
 import { planHasFeature } from '../lib/planGate.js'
+import { bankRuleLimit } from '../config/planFeatures.js'
+import { rulesWithinCap } from '../services/planChange.js'
 import { requireOrgSubscriptionForApp } from '../middleware/requireOrgSubscriptionForApp.js'
 
 const router = Router()
@@ -16,7 +18,7 @@ async function requireBankRulesPlan(req: AuthRequest, res: import('express').Res
     select: { plan: true },
   })
   if (!org || !(await planHasFeature(org.plan, 'bank_rules'))) {
-    res.status(403).json({ error: 'Bank rules require the Team plan or higher. Upgrade to unlock.' })
+    res.status(403).json({ error: 'Bank rules require the Solo plan or higher. Upgrade to unlock.' })
     return false
   }
   return true
@@ -40,11 +42,23 @@ const updateSchema = createSchema.partial()
 router.get('/', async (req: AuthRequest, res) => {
   if (!(await requireBankRulesPlan(req, res))) return
   const orgId = req.auth!.orgId
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { plan: true },
+  })
   const rules = await prisma.bankRule.findMany({
     where: { organizationId: orgId },
     orderBy: { priority: 'asc' },
   })
-  res.json({ rules })
+  const cap = org ? bankRuleLimit(org.plan) : 0
+  const activeIds = new Set(rulesWithinCap(rules, cap).map((r) => r.id))
+  res.json({
+    ruleCap: cap > 0 ? cap : null,
+    rules: rules.map((r) => ({
+      ...r,
+      activeInMatch: cap < 0 || activeIds.has(r.id),
+    })),
+  })
 })
 
 router.post('/', async (req: AuthRequest, res) => {
@@ -55,6 +69,22 @@ router.post('/', async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Insufficient permission to manage bank rules' })
     }
     const orgId = req.auth!.orgId
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { plan: true },
+    })
+    const ruleCap = org ? bankRuleLimit(org.plan) : 0
+    if (ruleCap === 0) {
+      return res.status(403).json({ error: 'Bank rules require the Solo plan or higher. Upgrade to unlock.' })
+    }
+    if (ruleCap > 0) {
+      const existing = await prisma.bankRule.count({ where: { organizationId: orgId } })
+      if (existing >= ruleCap) {
+        return res.status(403).json({
+          error: `Solo includes ${ruleCap} bank rules. Team and above remove the cap.`,
+        })
+      }
+    }
     const body = createSchema.parse(req.body)
     const rule = await prisma.bankRule.create({
       data: {
@@ -88,6 +118,23 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       where: { id, organizationId: orgId },
     })
     if (!existing) return res.status(404).json({ error: 'Rule not found' })
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { plan: true },
+    })
+    const cap = org ? bankRuleLimit(org.plan) : 0
+    if (cap > 0) {
+      const allRules = await prisma.bankRule.findMany({
+        where: { organizationId: orgId },
+        orderBy: { priority: 'asc' },
+      })
+      const activeIds = new Set(rulesWithinCap(allRules, cap).map((r) => r.id))
+      if (!activeIds.has(id)) {
+        return res.status(403).json({
+          error: 'This rule is above your Solo cap and is paused. Delete it or upgrade to Team to edit it.',
+        })
+      }
+    }
     const rule = await prisma.bankRule.update({
       where: { id },
       data: {

@@ -51,10 +51,14 @@ export function detectCashBookBankSideInversion(input: SideInversionInput): Side
     overlapCount(receiptAmts, debitAmts) + overlapCount(paymentAmts, creditAmts)
 
   // Require a clear gap so we don't flip on sparse/noisy samples.
+  // Small bank extracts (few lines) may never hit the large-sample thresholds
+  // even when standard pairing has zero overlap — treat that as a strong signal.
   const inverted =
-    crossedOverlap >= 5 &&
-    crossedOverlap >= standardOverlap * 2 &&
-    crossedOverlap - standardOverlap >= 5
+    crossedOverlap > standardOverlap &&
+    ((standardOverlap === 0 && crossedOverlap >= 2) ||
+      (crossedOverlap >= 5 &&
+        crossedOverlap >= standardOverlap * 2 &&
+        crossedOverlap - standardOverlap >= 5))
 
   return {
     inverted,
