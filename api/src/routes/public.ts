@@ -14,6 +14,7 @@ import { Router } from 'express'
 import { INTRO_OFFER_MONTHS } from '../config/subscription.js'
 import { isIntroOfferEnvEnabled } from '../services/introOffer.js'
 import { CANONICAL_PLAN_SLUGS, listPlans } from '../services/plan.js'
+import { getMarketingFxRates } from '../services/currencyConversion.js'
 import leadsPublicRouter from './leadsPublic.js'
 
 const router = Router()
@@ -57,6 +58,13 @@ export async function buildPublicPlans(): Promise<PublicPlanResponse[]> {
     active: p.active,
   }))
 }
+
+/** Indicative GHS cross-rates for landing reference pricing (not used at Paystack checkout). */
+router.get('/fx-rates', async (_req, res) => {
+  const fx = await getMarketingFxRates()
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=300')
+  res.json(fx)
+})
 
 router.get('/plans', async (_req, res) => {
   const plans = await buildPublicPlans()

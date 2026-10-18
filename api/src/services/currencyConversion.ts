@@ -22,20 +22,92 @@ function buildRatesFromManual(manual: { GHS_USD?: number | null; GHS_EUR?: numbe
   }
 }
 
-async function fetchApiRates(): Promise<Record<Currency, number> | null> {
+async function fetchLatestFromProvider(): Promise<Record<string, number> | null> {
   try {
     const res = await fetch(EXCHANGE_RATE_API, { signal: AbortSignal.timeout(5000) })
     if (!res.ok) return null
     const data = (await res.json()) as { rates?: Record<string, number> }
     const r = data?.rates
     if (!r || typeof r.USD !== 'number' || typeof r.EUR !== 'number') return null
-    return {
-      GHS: 1,
-      USD: r.USD,
-      EUR: r.EUR,
-    }
+    return r
   } catch {
     return null
+  }
+}
+
+async function fetchApiRates(): Promise<Record<Currency, number> | null> {
+  const r = await fetchLatestFromProvider()
+  if (!r) return null
+  return {
+    GHS: 1,
+    USD: r.USD,
+    EUR: r.EUR,
+  }
+}
+
+export type MarketingFxSource = 'live' | 'manual' | 'fallback'
+
+/** Landing-page reference column — aligned with in-app rate service + admin manual overrides. */
+const MARKETING_PER_GHS_FALLBACK = {
+  USD: 0.064,
+  EUR: 0.059,
+  GBP: 0.051,
+} as const
+
+export const MARKETING_FX_ATTRIBUTION =
+  'Rates by ExchangeRate-API (https://www.exchangerate-api.com)'
+
+export async function getMarketingFxRates(): Promise<{
+  perGhs: { USD: number; EUR: number; GBP: number }
+  source: MarketingFxSource
+  attribution: string
+}> {
+  const platformDefaults = await getPlatformDefaults()
+  const manualRates = platformDefaults.manualRates ?? {}
+  const useManualOnly = platformDefaults.useManualRatesOnly ?? false
+  const manualBuilt = buildRatesFromManual(manualRates)
+  const raw = await fetchLatestFromProvider()
+
+  const gbpFromRaw =
+    raw && typeof raw.GBP === 'number' && raw.GBP > 0 ? raw.GBP : MARKETING_PER_GHS_FALLBACK.GBP
+
+  if (useManualOnly && manualBuilt) {
+    return {
+      perGhs: { USD: manualBuilt.USD, EUR: manualBuilt.EUR, GBP: gbpFromRaw },
+      source: 'manual',
+      attribution: MARKETING_FX_ATTRIBUTION,
+    }
+  }
+
+  if (raw) {
+    return {
+      perGhs: { USD: raw.USD, EUR: raw.EUR, GBP: gbpFromRaw },
+      source: 'live',
+      attribution: MARKETING_FX_ATTRIBUTION,
+    }
+  }
+
+  if (manualBuilt) {
+    return {
+      perGhs: {
+        USD: manualBuilt.USD,
+        EUR: manualBuilt.EUR,
+        GBP: MARKETING_PER_GHS_FALLBACK.GBP,
+      },
+      source: 'manual',
+      attribution: MARKETING_FX_ATTRIBUTION,
+    }
+  }
+
+  const core = await getRates()
+  return {
+    perGhs: {
+      USD: core.USD,
+      EUR: core.EUR,
+      GBP: MARKETING_PER_GHS_FALLBACK.GBP,
+    },
+    source: 'fallback',
+    attribution: MARKETING_FX_ATTRIBUTION,
   }
 }
 

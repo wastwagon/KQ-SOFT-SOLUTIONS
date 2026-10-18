@@ -902,7 +902,24 @@ export interface PublicPlan {
  * the API to override pricing/limits. If the API is unreachable we just
  * return `{ plans: [] }` so the page renders the static defaults.
  */
+export type PublicFxRates = {
+  perGhs: { USD: number; EUR: number; GBP: number }
+  source: 'live' | 'manual' | 'fallback'
+  attribution: string
+}
+
 export const publicApi = {
+  getFxRates: async (): Promise<PublicFxRates | null> => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/public/fx-rates`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) return null
+      return (await res.json()) as PublicFxRates
+    } catch {
+      return null
+    }
+  },
   getPlans: async (): Promise<{ plans: PublicPlan[] }> => {
     try {
       const res = await fetch(`${API_URL}/api/v1/public/plans`, {

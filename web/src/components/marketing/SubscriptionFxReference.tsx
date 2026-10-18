@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Globe2, Loader2 } from 'lucide-react'
 import { formatGhs, planAmountForPeriod, type BillingPeriod, type MarketingPlan } from '../../lib/plans'
+import { publicApi, type PublicFxRates } from '../../lib/api'
 import Select from '../ui/Select'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/Table'
 
 type FxCode = 'USD' | 'EUR' | 'GBP'
 
-/** Used only when the public FX endpoint is unreachable (CORS/offline). */
+/** Used when the public FX endpoint is unreachable. */
 const FALLBACK_PER_GHS: Record<FxCode, number> = {
   USD: 0.064,
   EUR: 0.059,
@@ -25,6 +26,19 @@ function formatForeign(amount: number, code: FxCode): string {
   }
 }
 
+function sourceLabel(fx: PublicFxRates | null): string {
+  if (!fx) {
+    return 'Showing approximate rates — live feed unavailable. Refresh to retry.'
+  }
+  if (fx.source === 'live') {
+    return 'Live mid-market rates (1 GHS cross-rate). Not financial advice; card/bank fees may differ.'
+  }
+  if (fx.source === 'manual') {
+    return 'Rates from your platform administrator. Not financial advice; card/bank fees may differ.'
+  }
+  return 'Approximate rates — provider temporarily unavailable. Refresh to retry.'
+}
+
 /**
  * Indicative subscription prices in USD/EUR/GBP for international visitors.
  * Checkout stays in GHS (Paystack); workspace BRS currency is chosen per project in-app.
@@ -37,45 +51,25 @@ export default function SubscriptionFxReference({
   billingPeriod: BillingPeriod
 }) {
   const [code, setCode] = useState<FxCode>('USD')
-  const [rates, setRates] = useState<Record<string, number> | null>(null)
-  const [live, setLive] = useState(false)
+  const [fx, setFx] = useState<PublicFxRates | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      try {
-        const res = await fetch('https://open.er-api.com/v6/latest/GHS')
-        if (!res.ok) throw new Error('bad status')
-        const data = (await res.json()) as { result?: string; conversion_rates?: Record<string, number> }
-        if (cancelled) return
-        if (data.result === 'success' && data.conversion_rates && typeof data.conversion_rates.USD === 'number') {
-          setRates(data.conversion_rates)
-          setLive(true)
-        } else {
-          setRates(null)
-          setLive(false)
-        }
-      } catch {
-        if (!cancelled) {
-          setRates(null)
-          setLive(false)
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
+  const loadFx = useCallback(async () => {
+    setLoading(true)
+    const data = await publicApi.getFxRates()
+    setFx(data)
+    setLoading(false)
   }, [])
 
+  useEffect(() => {
+    void loadFx()
+  }, [loadFx])
+
   const unitPerGhs = useMemo(() => {
-    const r = rates?.[code]
-    if (typeof r === 'number' && r > 0) return r
+    const fromApi = fx?.perGhs?.[code]
+    if (typeof fromApi === 'number' && fromApi > 0) return fromApi
     return FALLBACK_PER_GHS[code]
-  }, [rates, code])
+  }, [fx, code])
 
   const rows = useMemo(() => {
     return plans
@@ -86,6 +80,8 @@ export default function SubscriptionFxReference({
         return { slug: p.slug, name: p.name, ghs, foreign }
       })
   }, [plans, billingPeriod, unitPerGhs])
+
+  const live = fx?.source === 'live' || fx?.source === 'manual'
 
   return (
     <div className="rounded-xl border border-gray-200/80 bg-white p-4 sm:p-5">
@@ -143,9 +139,8 @@ export default function SubscriptionFxReference({
         </Table>
       </div>
       <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
-        {live
-          ? 'Live mid-market rates (1 GHS cross-rate). Not financial advice; card/bank fees may differ.'
-          : 'Showing approximate rates — live feed unavailable. Refresh to retry.'}
+        {sourceLabel(fx)}
+        {fx?.attribution && live ? ` ${fx.attribution}` : ''}
       </p>
     </div>
   )
