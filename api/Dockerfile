@@ -19,6 +19,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY start-api.sh ./
+# Plan seed on boot runs tsx against prisma/*.ts (imports dist/config/planFeatures.js)
+RUN npm install tsx@4.19.2 --no-save
 RUN chmod +x ./start-api.sh
 EXPOSE 9001
 CMD ["./start-api.sh"]

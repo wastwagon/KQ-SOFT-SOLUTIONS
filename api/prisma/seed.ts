@@ -5,7 +5,9 @@
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { defaultFeaturesForPlan, isStoredFeaturesEmpty } from '../src/config/planFeatures.js'
+import { importPlanFeatures } from './seedModulePath.js'
+
+const { defaultFeaturesForPlan, isStoredFeaturesEmpty } = await importPlanFeatures()
 
 const prisma = new PrismaClient()
 const SALT_ROUNDS = 10

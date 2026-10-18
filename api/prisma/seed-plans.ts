@@ -19,14 +19,17 @@
  *   - web/src/lib/plans.ts → MARKETING_PLANS
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
-import {
+import { importPlanFeatures } from './seedModulePath.js'
+
+const planFeatures = await importPlanFeatures()
+const {
   defaultFeaturesForPlan,
   defaultHasPlanFeature,
   isStoredFeaturesEmpty,
   parseStoredFeatures,
   PLAN_FEATURE_IDS,
-  type PlanFeature,
-} from '../src/config/planFeatures.js'
+} = planFeatures
+type PlanFeature = (typeof PLAN_FEATURE_IDS)[number]
 
 /** Catalogue floor: Solo and every paid plan. Free stays off. Re-applied on each seed. */
 const SOLO_AND_ABOVE: PlanFeature[] = ['one_to_many', 'many_to_many', 'roll_forward']

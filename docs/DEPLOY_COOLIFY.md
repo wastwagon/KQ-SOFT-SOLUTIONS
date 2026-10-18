@@ -192,6 +192,14 @@ Configure the webhook URL in Paystack to:
 
 If `prisma migrate deploy` on API startup did not run (e.g. missing `DATABASE_URL`, wrong service env), fix env and redeploy. The API now **fails fast** when `DATABASE_URL` is unset, so check Coolify logs for `start-api: FATAL — DATABASE_URL`.
 
+If logs show `Cannot find module .../planFeatures.js` during `seed-plans`, redeploy the **latest API image** (production seed imports `dist/config/planFeatures.js` and needs `tsx` on boot). After a good deploy you should see `seed-plans: ensured 5 plans` with no WARN.
+
+## 10. Blank web app or “Failed to fetch” on dashboard
+
+- **White screen:** open browser DevTools → Console. Often a missing JS asset or runtime error after a bad deploy; hard-refresh or redeploy **web**.
+- **API calls fail:** the web build must embed the public API URL. Rebuild **web** with `VITE_API_URL=https://<your-api-host>` (no trailing slash). If the site is `https://kqsoftwaresolutions.com` and API is `https://api.kqsoftwaresolutions.com`, that exact API URL must be set at **build** time — not `localhost:9001`.
+- **Local dev:** web on `9100` proxies `/api` to `9001`; start **both** `api` and `web` dev servers.
+
 **After the API is running**, a **platform admin** (see `PLATFORM_ADMIN_EMAILS`, default `admin@kqsoftwaresolutions.com` and legacy `admin@qsoft.com`) can open **Platform Admin → Database** in the web app and run:
 
 - **Refresh status** — `prisma migrate status` (read-only)

@@ -157,7 +157,12 @@ seed_plans() {
     return 0
   fi
   echo "start-api: seeding canonical subscription plans (idempotent)" >&2
-  if ! npx tsx prisma/seed-plans.ts >&2; then
+  if [ -f dist/config/planFeatures.js ]; then
+    SEED_CMD="node --import tsx prisma/seed-plans.ts"
+  else
+    SEED_CMD="npx tsx prisma/seed-plans.ts"
+  fi
+  if ! sh -c "$SEED_CMD" >&2; then
     # Don't fail the deploy if seeding plans hiccups — landing page falls back
     # to PLAN_PRICES config and frontend has its own static catalogue.
     echo "start-api: WARN — seed-plans failed; continuing with config fallback" >&2
@@ -175,7 +180,12 @@ seed_demo_users() {
     return 0
   fi
   echo "start-api: seeding demo users (SEED_DEMO_USERS=1; password Test123!)" >&2
-  if ! npx tsx prisma/seed.ts >&2; then
+  if [ -f dist/config/planFeatures.js ]; then
+    DEMO_SEED_CMD="node --import tsx prisma/seed.ts"
+  else
+    DEMO_SEED_CMD="npx tsx prisma/seed.ts"
+  fi
+  if ! sh -c "$DEMO_SEED_CMD" >&2; then
     echo "start-api: WARN — demo user seed failed; continuing" >&2
   fi
 }
