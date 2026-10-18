@@ -44,7 +44,7 @@ cd web
 npm install && npm run dev
 ```
 
-Open the URL shown by the web dev server (usually http://localhost:5173). Set `VITE_API_URL` in `web/.env` if it’s not pointing at your API (e.g. http://localhost:9001).
+Open **http://localhost:9100** (Vite dev). `/api` proxies to the API (default `http://localhost:9001`). Set `VITE_API_URL` in `web/.env` only when the browser must call the API on another host (production builds).
 
 ---
 

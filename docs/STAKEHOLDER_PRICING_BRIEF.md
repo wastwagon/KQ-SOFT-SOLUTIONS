@@ -129,10 +129,13 @@ Optional launch promo (if enabled in environment): **50% off first 2 months** on
 
 ## Pre go-live checklist (internal)
 
-1. Open **http://localhost:9100/#pricing** (or production URL) and confirm table matches this brief.  
-2. Sign in → **Settings → Billing**: test upgrade copy, proration notice, schedule/cancel downgrade.  
-3. After deploy, **refresh plan seed / admin plans** so database entitlements match the published plan lineup (stale feature flags must not block Solo+ capabilities).  
-4. Push latest release to production when satisfied.
+1. **API + web running** (e.g. API `9001`, web `9100` with proxy, or production URLs).  
+2. Open **/#pricing** — plan cards, comparison table, and **Reference pricing** match this brief. Confirm `GET /api/v1/public/fx-rates` returns `source: live` or `manual` (not only client fallback).  
+3. Sign in → **Settings → Billing**: upgrade copy, proration credit, schedule/cancel downgrade, usage meters (projects, transactions, banks, clean exports).  
+4. **Dashboard** — plan-usage warnings appear when near caps; **New project** blocks at monthly project limit.  
+5. After deploy, **refresh plan seed / admin plans** so database entitlements match the published plan lineup (stale feature flags must not block Solo+ capabilities).  
+6. From repo root: `npm test -- --run` (API), `npm run build --prefix web`, `npm run test:e2e:smoke` (Playwright). Optional: `./scripts/verify-go-live.sh` with Postgres up; `--with-live-api` for `/healthz` and smoke create.  
+7. Push latest release to production when satisfied.
 
 ---
 
