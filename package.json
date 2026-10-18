@@ -5,6 +5,7 @@
   "scripts": {
     "manual:pdf": "node scripts/generate-pdf.js user",
     "mapping-manual:pdf": "node scripts/generate-pdf.js mapping",
+    "pricing-brief:pdf": "node scripts/generate-pdf.js pricing",
     "export:corrected-specimens": "npx tsx scripts/export-corrected-specimens.mjs",
     "clean:specimens": "npx tsx scripts/clean-specimen-bank-statements.mjs",
     "demo:flow": "bash scripts/run-full-flow.sh",

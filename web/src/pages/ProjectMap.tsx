@@ -566,7 +566,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
           }
         >
           <p>
-            <strong>{mapResult.count}</strong> transaction{mapResult.count === 1 ? '' : 's'} extracted.
+            <strong>{mapResult.count}</strong> transaction{mapResult.count === 1 ? '' : 's'} imported.
             {hasBankDocuments && canExportReport(role) && (
               <span className="block mt-1 text-xs opacity-90">
                 Credits and debits you have mapped, as Excel — also available under Report → Export.
@@ -742,7 +742,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                     </Badge>
                   )}
                   {isDocMapped(d) && (
-                    <Badge tone="success" size="sm" className="ml-2" title="Already extracted — proceed, or tick to remap">
+                    <Badge tone="success" size="sm" className="ml-2" title="Already imported — proceed, or tick to remap">
                       Mapped · {docTransactionCount(d)}
                     </Badge>
                   )}
@@ -774,7 +774,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
             <details className="text-xs text-gray-500 max-w-md">
               <summary className="cursor-pointer font-medium text-gray-600">How bulk apply picks sheets</summary>
               <p className="mt-1.5 leading-relaxed">
-                We detect columns from the extracted table and apply mapping per file. For Excel workbooks
+                We detect columns from the imported table and apply mapping per file. For Excel workbooks
                 with several sheets, we automatically use the <strong>best transaction sheet</strong>{' '}
                 (detail rows with date + amount columns). PDFs and scans do not have sheets — open each file
                 below if the preview needs a check. To pick another Excel tab, open that file below.
@@ -924,7 +924,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                   This PDF has {(preview as { pdfTotalPages?: number }).pdfTotalPages} pages. Only the first{' '}
                   {(preview as { pdfPagesProcessed?: number }).pdfPagesProcessed} pages were processed (default
                   limit {DEFAULT_PDF_OCR_MAX_PAGES}; set PDF_OCR_MAX_PAGES to raise). Some transactions may be
-                  missing. Split the PDF or increase the limit for full extraction.
+                  missing. Split the PDF or increase the limit to import all pages.
                 </Alert>
               )}
               {typeof preview.parseQualityScore === 'number' &&
@@ -1233,7 +1233,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       )}
 
       {documentsWithoutTransactions.length > 0 && (
-        <Alert tone="warning" title="Some files have no extracted transactions yet" className="max-w-2xl">
+        <Alert tone="warning" title="Some files have no imported transactions yet" className="max-w-2xl">
           {documentsWithoutTransactions.length === 1
             ? `${documentsWithoutTransactions[0]!.filename} is not mapped or produced no rows.`
             : `${documentsWithoutTransactions.length} files still need a successful map (or contain no data).`}{' '}

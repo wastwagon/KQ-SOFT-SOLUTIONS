@@ -186,10 +186,16 @@ export default function SettingsBillingTab({
         </div>
       )}
       <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-        Workspace subscriptions are charged in <strong>GHS</strong> via Paystack. Each project&apos;s reporting currency
-        (GHS, USD, or EUR) is chosen under <strong>Projects</strong> when you create or open a job — it affects BRS and
-        workbook amounts only, not what you pay for the plan.
+        Firm subscriptions are charged in <strong>GHS</strong> via Paystack. Limits (projects, transactions, bank
+        accounts, seats) apply to your whole organisation. Each project&apos;s BRS currency (GHS, USD, or EUR) is set
+        when you create the job — it affects report figures only, not your subscription charge.
       </p>
+      {scheduled && canManageBilling(role) && (
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          After the downgrade takes effect, extra team members, bank accounts, or bank rules beyond the new plan may be
+          locked or paused until you upgrade again.
+        </p>
+      )}
       {usageData?.subscription && (
         <Alert
           tone="info"
@@ -241,7 +247,7 @@ export default function SettingsBillingTab({
       {canManageBilling(role) && plansData?.paystackConfigured ? (
         (plansData.plans || []).length === 0 ? (
           <Alert tone="info" title="Checkout unavailable">
-            No self-serve packages are currently active. Contact support to change your plan.
+            No self-serve plans are currently active. Contact support to change your plan.
           </Alert>
         ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

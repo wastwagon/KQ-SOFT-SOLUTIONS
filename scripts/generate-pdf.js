@@ -17,6 +17,10 @@ const MANUALS = {
     input: 'docs/MAPPING_AND_MATCHING_MANUAL.md',
     output: 'MAPPING_AND_MATCHING_MANUAL.pdf',
   },
+  pricing: {
+    input: 'docs/STAKEHOLDER_PRICING_BRIEF.md',
+    output: 'STAKEHOLDER_PRICING_BRIEF.pdf',
+  },
 }
 
 // Use system Chrome if available (set PUPPETEER_EXECUTABLE_PATH on Windows/Linux)

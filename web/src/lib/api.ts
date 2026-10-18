@@ -898,7 +898,7 @@ export interface PublicPlan {
  * and must never include user/org-scoped data.
  *
  * NOTE: `getPlans` is intentionally non-throwing. The landing page has a
- * complete static plan catalogue (`web/src/lib/plans.ts`) and only uses
+ * complete published plan definitions (`web/src/lib/plans.ts`) and only uses
  * the API to override pricing/limits. If the API is unreachable we just
  * return `{ plans: [] }` so the page renders the static defaults.
  */

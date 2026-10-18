@@ -1,5 +1,5 @@
 /**
- * Marketing-side plan catalogue.
+ * Marketing-side plan definitions (published pricing & feature matrix).
  *
  * This is the single source of truth for what appears on the public landing
  * page (`/`) and never depends on a network round-trip — the landing page
@@ -157,7 +157,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
 ]
 
 /* -------------------------------------------------------------------------
- * Sep 2026 catalogue — keep in sync with api/src/config/subscription.ts
+ * Sep 2026 plan lineup — keep in sync with api/src/config/subscription.ts
  * Slugs stay free / basic / standard / premium / firm. Public names are Free / Solo / Team / Firm / Custom.
  * Paid plans have no trial. New workspaces start on Free.
  * ----------------------------------------------------------------------- */
@@ -455,8 +455,8 @@ export const MARKETING_PLANS: MarketingPlan[] = [
  * ----------------------------------------------------------------------- */
 
 /**
- * Merge live data from the API into the static catalogue.
- * If the API is unreachable or returns nothing, the static catalogue is
+ * Merge live data from the API into the published plan definitions.
+ * If the API is unreachable or returns nothing, the static plan copy is
  * returned unchanged so the landing page still renders.
  */
 export function mergeWithApiPlans(

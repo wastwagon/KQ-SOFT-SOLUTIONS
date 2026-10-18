@@ -8,6 +8,12 @@ test.describe('public smoke', () => {
     await expect(page.getByRole('link', { name: 'Terms' })).toBeVisible()
   })
 
+  test('pricing section is visible', async ({ page }) => {
+    await page.goto('/#pricing')
+    await expect(page.getByRole('heading', { name: /Simple pricing — billed in GHS via Paystack/i })).toBeVisible()
+    await expect(page.getByText('Free', { exact: true }).first()).toBeVisible()
+  })
+
   test('privacy policy page', async ({ page }) => {
     await page.goto('/privacy')
     await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible()
@@ -17,7 +23,7 @@ test.describe('public smoke', () => {
   test('terms of service page', async ({ page }) => {
     await page.goto('/terms')
     await expect(page.getByRole('heading', { name: 'Terms of Service' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Privacy Policy' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Privacy Policy' }).first()).toBeVisible()
   })
 
   test('login form is reachable', async ({ page }) => {
@@ -28,6 +34,6 @@ test.describe('public smoke', () => {
   test('register links to terms and privacy', async ({ page }) => {
     await page.goto('/register')
     await expect(page.getByRole('link', { name: 'Terms' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Privacy Policy' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Privacy Policy' }).first()).toBeVisible()
   })
 })

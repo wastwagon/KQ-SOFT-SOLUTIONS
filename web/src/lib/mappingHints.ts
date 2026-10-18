@@ -174,7 +174,7 @@ export function getMappingIssues(
       severity: 'warning',
       field: 'description',
       message: 'No description column mapped.',
-      fix: 'Map Description for better match suggestions (cheque numbers are also extracted from text).',
+      fix: 'Map Description for better match suggestions (cheque numbers are also read from the narrative).',
     })
   }
 

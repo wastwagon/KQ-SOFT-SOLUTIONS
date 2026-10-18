@@ -32,6 +32,8 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
+import PlanUsageAlerts from '../components/PlanUsageAlerts'
+import { usageMetricAccent } from '../lib/planUsageHints'
 
 const BRS_SUMMARY_STATUSES = new Set([
   'reconciling',
@@ -225,7 +227,9 @@ export default function Dashboard() {
         subtitle={
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
-            <p className="text-gray-500">Track projects, usage, and team activity in one place.</p>
+            <p className="text-gray-500">
+              Track client reconciliations, plan usage, and team activity in one place.
+            </p>
           </>
         }
         actions={
@@ -255,10 +259,14 @@ export default function Dashboard() {
         />
       )}
 
+      {!usageLoading && usage?.usage ? (
+        <PlanUsageAlerts usage={usage.usage} role={role} />
+      ) : null}
+
       {!isLoading && projectsList.length === 0 && !getStartedDismissed && !projectsPaywallBlocked && (
         <Card
           title="Get started"
-          sublabel="Set up your firm, then start the first reconciliation."
+          sublabel="Set up your firm, then run your first bank reconciliation (cash book + bank statement)."
           actions={
             <Button
               type="button"
@@ -342,7 +350,7 @@ export default function Dashboard() {
                   : `${projectsUsed} of ${projectsLimit} on plan`
               }
               icon={<FolderKanban />}
-              accent="none"
+              accent={usageMetricAccent(projectsUsed, projectsLimit, projectsUnlimited)}
             />
             <MetricCard
               compact
@@ -367,7 +375,11 @@ export default function Dashboard() {
                   : `${transactionsUsed.toLocaleString('en-GH')} of ${transactionsLimit.toLocaleString('en-GH')} this calendar month. Resets on the 1st.`
               }
               icon={<LayoutDashboard />}
-              accent="none"
+              accent={usageMetricAccent(
+                transactionsUsed,
+                transactionsLimit,
+                transactionsUnlimited,
+              )}
             />
             <MetricCard
               compact
@@ -379,7 +391,11 @@ export default function Dashboard() {
                   : `${bankAccountsUsed} of ${bankAccountsLimit} org seats`
               }
               icon={<Building2 />}
-              accent="none"
+              accent={usageMetricAccent(
+                bankAccountsUsed,
+                bankAccountsLimit,
+                bankAccountsUnlimited,
+              )}
             />
             <MetricCard
               compact

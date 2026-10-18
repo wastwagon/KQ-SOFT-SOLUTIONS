@@ -21,9 +21,12 @@ import Select from '../components/ui/Select'
 import { useAuth } from '../store/auth'
 import { COMMON_PROJECT_CURRENCIES, getCurrencySymbol } from '../lib/currency'
 import { composeProjectDisplayName } from '../lib/projectIdentity'
+import { isAtProjectLimit } from '../lib/planUsageHints'
+import PlanUsageAlerts from '../components/PlanUsageAlerts'
 
 export default function ProjectNew() {
   const org = useAuth((s) => s.org)
+  const role = useAuth((s) => s.role)
   const [name, setName] = useState('')
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const [statementBusinessName, setStatementBusinessName] = useState('')
@@ -68,6 +71,7 @@ export default function ProjectNew() {
   })
   const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
+  const projectLimitReached = isAtProjectLimit(usageData?.usage)
   const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: clients.list,
@@ -111,6 +115,10 @@ export default function ProjectNew() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (projectLimitReached) {
+      setError('Monthly project limit reached. Upgrade in Settings → Billing or wait until usage resets.')
+      return
+    }
     const finalName = name.trim() || composedName
     if (!finalName) {
       setError(
@@ -201,6 +209,7 @@ export default function ProjectNew() {
           New projects use GHS until this succeeds.
         </Alert>
       )}
+      <PlanUsageAlerts usage={usageData?.usage} role={role} />
       <Card className="max-w-2xl">
       <form
         onSubmit={handleSubmit}
@@ -406,7 +415,7 @@ export default function ProjectNew() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3 pt-2">
-          <Button type="submit" isLoading={mutation.isPending}>
+          <Button type="submit" isLoading={mutation.isPending} disabled={projectLimitReached}>
             Create
           </Button>
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>

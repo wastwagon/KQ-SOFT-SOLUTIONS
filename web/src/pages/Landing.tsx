@@ -51,7 +51,7 @@ import { maxYearlyDiscountPercent } from '../lib/planPricing'
  *   5. Features grid (6 cards)
  *   6. How it works (3 photographed steps)
  *   7. Dashboard showcase (product imagery)
- *   8. Pricing (static catalogue, 4 tiers + comparison table)
+ *   8. Pricing (published plan definitions, 5 tiers + comparison table)
  *   9. Testimonials
  *  10. FAQ accordion
  *  11. Final CTA banner (atmosphere photography)
@@ -66,7 +66,7 @@ import { maxYearlyDiscountPercent } from '../lib/planPricing'
  *     block for keyframes; no extra dependencies.
  *
  * Pricing data flow:
- *   - Static catalogue lives in src/lib/plans.ts and ALWAYS renders.
+ *   - Published pricing lives in src/lib/plans.ts and ALWAYS renders.
  *   - Optional API call to /api/v1/public/plans overrides price/limits in-place.
  *   - This guarantees the pricing section never appears empty on production.
  * ------------------------------------------------------------------------- */
@@ -100,13 +100,13 @@ const FEATURES = [
     icon: ShieldCheck,
     title: 'Roles & approvals',
     description:
-      'Preparer → Reviewer → Approver with locked states. Threshold rules surface large variances before anything is marked final.',
+      'Preparer → Reviewer workflow with locked periods. On Firm, approval thresholds can block sign-off until variances are explained.',
   },
   {
     icon: Workflow,
-    title: 'API & bank rules',
+    title: 'Bank rules & API',
     description:
-      'Public REST hooks for firm automation. A configurable rules layer flags, tags, or steers the matcher before humans touch the grid.',
+      'Bank rules flag or route lines before reviewers open the grid (Solo and above). Custom adds a public REST API for firm automation.',
   },
 ] as const
 
@@ -115,7 +115,7 @@ const STEPS = [
     icon: Upload,
     title: 'Upload',
     description:
-      'Bring the cash book and bank file — Excel, CSV, PDF, or scan. Column detection and layout hints get you to a clean grid in minutes.',
+      'Upload the cash book and bank statement — Excel, CSV, PDF, or scan. Column detection and layout hints get you to a clean grid in minutes.',
     image: '/marketing/marketing-step-upload.jpg',
     imageAlt: 'Cash book and bank statements ready to upload into KQ-SOFT',
   },
@@ -123,7 +123,7 @@ const STEPS = [
     icon: Sparkles,
     title: 'Match',
     description:
-      'Suggestions are scored and grouped so your team reviews the highest-impact lines first. Split lines, undo, or approve in bulk.',
+      'Auto-match ranks suggestions by amount, date, and references so you review exceptions first. Split lines, undo, or confirm matches in bulk.',
     image: '/marketing/marketing-step-match.jpg',
     imageAlt: 'Transaction streams linking into confirmed bank reconciliation matches',
   },
@@ -180,32 +180,48 @@ const TESTIMONIALS = [
 
 const FAQS = [
   {
+    q: 'What does KQ-SOFT do — and do you replace Tally or Sage?',
+    a: 'KQ-SOFT is bank reconciliation and BRS delivery: upload a cash book and bank statement, match lines, sign off, and export a Bank Reconciliation Statement. It does not replace your general ledger, VAT, or payroll system — it focuses on getting the bank rec and BRS right for each client period.',
+  },
+  {
+    q: 'Which files should I upload?',
+    a: 'Typically a cash book export (Excel or CSV from your books) and the bank statement (Excel, CSV, or PDF from the bank). Scanned PDFs are supported with OCR. You map columns once if the layout is unusual.',
+  },
+  {
     q: 'Which banks or statement formats are supported?',
-    a: 'We ship parsers tuned for major regional banks (for example Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB) plus generic Excel, CSV, and PDF layouts. Scanned statements are supported with OCR. Non-standard files can be mapped; Team and above includes parser tuning support.',
+    a: 'Pre-built layouts for major Ghana banks (for example Ecobank, GCB, Access, Stanbic, Fidelity, Zenith, CalBank, ADB, Prudential) plus generic Excel, CSV, and PDF. If your bank is not listed, map columns manually — Team and above can request help tuning difficult layouts.',
   },
   {
     q: 'Do I need to install anything?',
-    a: 'No. KQ-SOFT runs in the browser. Create an organisation, upload files, and reconcile. There is no desktop agent to maintain.',
+    a: 'No. Use a modern browser (Chrome, Edge, or Safari). Create an organisation, upload files, and reconcile. There is no desktop agent to install or maintain.',
   },
   {
-    q: 'Can my team collaborate on the same project?',
-    a: 'Yes. Invite colleagues as Preparer, Reviewer, or Approver. Every change is written to the audit trail. Seat limits follow the subscription tier.',
+    q: 'Can my team collaborate on the same reconciliation?',
+    a: 'Yes. Each client period is a project. Invite colleagues as Preparer, Reviewer, Viewer, or Admin. Every change is recorded in the activity log. Seat limits depend on your plan (Team and Firm add multiple users).',
+  },
+  {
+    q: 'What happens at month-end?',
+    a: 'Confirm matches, run the BRS, capture preparer and reviewer sign-off, and lock the period. On Solo and above, roll forward unpresented cheques and uncredited lodgments into the next reconciliation without rebuilding from scratch.',
   },
   {
     q: 'How does pricing and currency work?',
-    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. New workspaces start on the Free plan. Paid plans have no trial. The public site shows approximate USD/EUR/GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use its own reporting currency (GHS, USD, or EUR) for BRS and balances.',
+    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. New workspaces start on the Free plan. Paid plans have no trial. The website shows approximate USD, EUR, or GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use GHS, USD, or EUR on the BRS.',
   },
   {
     q: 'What are the plan limits?',
-    a: 'Solo covers 3 bank accounts and 3,000 transactions per month (with bookkeeping advisory). Team is 10 accounts / 15,000 transactions and 5 people. Firm is 30 accounts / 40,000 transactions and 10 people. Custom is unlimited under contract, from GHS 1,800 a month. Bank account seats are counted across your whole organisation.',
+    a: 'Limits apply across your whole firm, not per project. Solo: 3 bank accounts, 3,000 transactions, and 12 projects per month (one user). Team: 10 accounts, 15,000 transactions, 40 projects, and 5 users. Firm: 30 accounts, 40,000 transactions, 100 projects, and 10 users. Custom: unlimited-style quotas under contract (from about GHS 1,800 a month). Bank account seats are shared by everyone in the organisation.',
+  },
+  {
+    q: 'Can I try with one real client before paying?',
+    a: 'Yes. The Free plan lets you run real reconciliations with caps (for example sample exports, smaller bulk confirm, and partial audit/discrepancy previews). Upgrade to Solo when you need clean client exports and full reports every month.',
   },
   {
     q: 'Is my data secure?',
-    a: 'Files live on encrypted storage inside managed infrastructure. Access is scoped per organisation and role. Sessions use signed JWTs over HTTPS. We do not sell or share customer data with advertisers.',
+    a: 'Files are stored on encrypted cloud infrastructure. Access is limited by organisation and role (Admin, Reviewer, Preparer, Viewer). Sessions use HTTPS. We do not sell or share customer data with advertisers.',
   },
   {
-    q: 'Can I export BRS reports with my own logo and colours?',
-    a: 'Yes. Team and above include full branding — logo, palette, report title, and footer — so deliverables match your firm template.',
+    q: 'Can I export a BRS with our firm logo and colours?',
+    a: 'Yes. Team and above include full branding — logo, colours, report title, and footer — so Excel and PDF BRS packs match your firm template.',
   },
 ] as const
 
@@ -221,7 +237,7 @@ export default function Landing() {
     retry: 0,
   })
 
-  // Static catalogue is the source of truth — API only overrides price/limits.
+  // Published plan copy in plans.ts is the source of truth — API only overrides price/limits.
   const plans = useMemo(() => mergeWithApiPlans(plansData?.plans), [plansData])
 
   // Smooth fade-in on scroll for any element marked with [data-reveal].
@@ -570,9 +586,9 @@ function Hero() {
             </h1>
 
             <p className="mt-3 text-base sm:text-lg text-slate-200/90 leading-snug max-w-xl mx-auto lg:mx-0">
-              Pair the cash book with the bank file in one workspace. Intelligent matching
-              handles cheques, wires, and split lines — then ships a signed-off BRS you can
-              stand behind.
+              Upload your cash book and bank statement in one workspace. Auto-match handles
+              cheques, transfers, and split lines — then export a signed-off BRS your reviewer
+              can stand behind.
             </p>
 
             <div className="mt-5 flex flex-col sm:flex-row items-center lg:items-stretch justify-center lg:justify-start gap-3">
@@ -581,7 +597,7 @@ function Hero() {
                 className="group gap-2 shadow-lg shadow-primary-900/40 !bg-white !text-primary-800 hover:!bg-slate-100 hover:!text-primary-800"
                 onClick={() => navigate(isAuthed ? '/dashboard' : '/register')}
               >
-                {isAuthed ? 'Go to dashboard' : 'Start free'}
+                {isAuthed ? 'Continue reconciling' : 'Start free'}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Button>
               <Button
@@ -598,7 +614,7 @@ function Hero() {
 
             <p className="mt-3 text-sm text-slate-300/90">
               {isAuthed
-                ? 'Signed in — open your workspace to continue reconciliations.'
+                ? 'Signed in — open your dashboard to continue month-end bank reconciliations.'
                 : 'Free plan included · Paid plans from GHS 199/mo · No card required'}
             </p>
           </div>
@@ -663,7 +679,7 @@ function BankStrip() {
             Pre-built statement layouts (examples)
           </p>
           <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-            Plus generic Excel, CSV, and PDF — tune or extend layouts as your client base grows.
+            Plus generic Excel, CSV, and PDF bank statements — map or extend layouts as your client base grows.
           </p>
         </div>
         <div className="mt-4 relative overflow-hidden">
@@ -694,7 +710,7 @@ function StatBand() {
   const stats = [
     { value: '10×', label: 'faster than manual spreadsheet reconciliation' },
     { value: '98%', label: 'typical auto-match rate on tuned statement layouts' },
-    { value: '< 5 min', label: 'from sign-up to first reconciled grid' },
+    { value: '< 5 min', label: 'from sign-up to your first match grid' },
   ]
   return (
     <section className="py-12 lg:py-16 border-y border-slate-100 bg-slate-50/70">
@@ -738,11 +754,11 @@ function Features() {
             Features
           </p>
           <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
-            Everything you need to close a defensible bank rec.
+            Everything you need for a defensible bank reconciliation.
           </h2>
           <p className="mt-1 text-sm text-gray-600 leading-snug">
-            Ingestion, matching, approvals, and client-ready reporting — orchestrated in
-            one place so reviewers spend time on exceptions, not formatting.
+            Upload, auto-match, review, approve, and publish the BRS in one place — so reviewers
+            spend time on exceptions, not spreadsheets.
           </p>
         </div>
 
@@ -972,7 +988,7 @@ function DashboardShowcase() {
 /* ---------------------------------------------------------------------------
  * Section 8: Pricing — 4 tiers + comparison table
  *
- * Renders directly from the static catalogue (always available), with API
+ * Renders from published plan definitions (always available), with API
  * data merged in to override price/limits when reachable.
  * ------------------------------------------------------------------------- */
 
@@ -1433,6 +1449,9 @@ function Faq({
           <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
             Common questions, answered.
           </h2>
+          <p className="mt-2 text-sm text-gray-600 leading-snug">
+            Bank reconciliation, BRS exports, plans, and how we fit alongside your existing books.
+          </p>
         </div>
 
         <div className="mt-10 space-y-3 lg:mt-12">
@@ -1501,11 +1520,11 @@ function FinalCta() {
                 Ready when you are
               </p>
               <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight">
-                Close the next period before the inbox piles up.
+                Close month-end reconciliation before the backlog grows.
               </h2>
               <p className="mt-2 text-sm text-white/85 leading-snug max-w-xl">
-                Start on the free plan, drop in a real cash book and bank extract, and
-                watch suggestions populate. Paid plans from GHS 199/mo.
+                Start on Free: upload a real cash book and bank statement and review
+                matching suggestions. Paid plans from GHS 199/mo.
               </p>
             </div>
             <div className="lg:justify-self-end flex flex-col sm:flex-row gap-3">
@@ -1515,7 +1534,7 @@ function FinalCta() {
                   className="gap-2 !bg-white !text-primary-700 hover:!bg-gray-100 hover:!text-primary-700 shadow-lg focus:ring-white"
                   onClick={() => navigate('/dashboard')}
                 >
-                  Go to dashboard
+                  Continue reconciling
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               ) : (
@@ -1634,7 +1653,7 @@ function Footer() {
   return (
     <footer
       id="contact"
-      className="relative overflow-hidden bg-gray-900 text-gray-300"
+      className="relative overflow-hidden bg-gray-900 text-white"
     >
       <div aria-hidden className="absolute inset-0 grid-overlay-dark opacity-50" />
 
@@ -1645,7 +1664,7 @@ function Footer() {
             <h3 className="text-xl font-bold text-white">
               Stay ahead of each close.
             </h3>
-            <p className="mt-2 text-sm text-gray-400 max-w-md">
+            <p className="mt-2 text-sm text-white/90 max-w-md">
               Product updates, new statement layouts, and reconciliation playbooks —
               concise, optional, one-click unsubscribe.
             </p>
@@ -1662,13 +1681,13 @@ function Footer() {
             <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2">
               <BrandLogo className="h-9 w-auto" />
             </div>
-            <p className="mt-5 text-sm text-gray-400 leading-relaxed max-w-md lg:max-w-none">
+            <p className="mt-5 text-sm text-white/90 leading-relaxed max-w-md lg:max-w-none">
               Cloud bank reconciliation for accounting firms and in-house finance teams.
               Match with confidence, publish polished BRS packs, and preserve the audit trail.
             </p>
             <a
               href="mailto:info@kqsoftwaresolutions.com"
-              className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+              className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-white hover:text-primary-200 transition-colors"
             >
               info@kqsoftwaresolutions.com
             </a>
@@ -1676,7 +1695,7 @@ function Footer() {
 
           {/* Column 2: Contact only */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-white">
               Contact
             </p>
             <ul className="mt-4 space-y-3 text-sm">
@@ -1686,7 +1705,7 @@ function Footer() {
                 </span>
                 <a
                   href="mailto:info@kqsoftwaresolutions.com"
-                  className="text-gray-300 hover:text-white break-all transition-colors"
+                  className="text-white hover:text-primary-200 break-all transition-colors"
                 >
                   info@kqsoftwaresolutions.com
                 </a>
@@ -1696,13 +1715,13 @@ function Footer() {
                   <Phone className="w-4 h-4 text-primary-400" />
                 </span>
                 <span className="flex flex-col gap-0.5 leading-snug">
-                  <a href="tel:+233200158182" className="text-gray-300 hover:text-white transition-colors">
+                  <a href="tel:+233200158182" className="text-white hover:text-primary-200 transition-colors">
                     0200 158 182
                   </a>
-                  <a href="tel:+233208915637" className="text-gray-300 hover:text-white transition-colors">
+                  <a href="tel:+233208915637" className="text-white hover:text-primary-200 transition-colors">
                     0208 915 637
                   </a>
-                  <a href="tel:+233245396813" className="text-gray-300 hover:text-white transition-colors">
+                  <a href="tel:+233245396813" className="text-white hover:text-primary-200 transition-colors">
                     0245 396 813
                   </a>
                 </span>
@@ -1711,7 +1730,7 @@ function Footer() {
                 <span className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
                   <MapPin className="w-4 h-4 text-primary-400" />
                 </span>
-                <span className="leading-snug text-gray-300">
+                <span className="leading-snug text-white">
                   Hse No NS 13, 3rd Gate
                   <br />
                   Madina, Accra
@@ -1747,7 +1766,7 @@ function Footer() {
         </div>
 
         {/* Trust row */}
-        <div className="mt-6 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-400">
+        <div className="mt-6 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-white/90">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-green-400" />
             <span>Encrypted at rest · HTTPS in transit</span>
@@ -1766,14 +1785,14 @@ function Footer() {
       {/* Bottom legal row */}
       <div className="relative border-t border-white/10 bg-black/20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-white/90">
             © {new Date().getFullYear()} KQ-SOFT Solutions. All rights reserved.
           </p>
-          <div className="flex items-center gap-5 text-xs text-gray-500">
-            <Link to="/privacy" className="hover:text-gray-300 transition-colors">
+          <div className="flex items-center gap-5 text-xs text-white/90">
+            <Link to="/privacy" className="text-white hover:text-primary-200 transition-colors">
               Privacy
             </Link>
-            <Link to="/terms" className="hover:text-gray-300 transition-colors">
+            <Link to="/terms" className="text-white hover:text-primary-200 transition-colors">
               Terms
             </Link>
             <span className="inline-flex items-center gap-2">
@@ -1796,18 +1815,18 @@ function FooterColumn({
 }) {
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-500">{title}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-white">{title}</p>
       <ul className="mt-4 space-y-3 text-sm">
         {links.map((l) =>
           l.internal ? (
             <li key={l.label}>
-              <Link to={l.href} className="text-gray-400 hover:text-white transition-colors">
+              <Link to={l.href} className="text-white hover:text-primary-200 transition-colors">
                 {l.label}
               </Link>
             </li>
           ) : (
             <li key={l.label}>
-              <a href={l.href} className="text-gray-400 hover:text-white transition-colors">
+              <a href={l.href} className="text-white hover:text-primary-200 transition-colors">
                 {l.label}
               </a>
             </li>

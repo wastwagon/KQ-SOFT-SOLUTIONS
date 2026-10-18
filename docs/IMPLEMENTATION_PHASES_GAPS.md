@@ -4,19 +4,18 @@ Safe, phased implementation of items from `HONEST_REVIEW_GAPS_AND_CONSISTENCY.md
 
 ---
 
-## Phase 1 — New Project form (high impact)
+## Phase 1 — New Project form (high impact) ✅ Done
 
-- **1a** Add optional **Reconciliation date** (date input) to ProjectNew; send `reconciliationDate` (ISO) when set.
-- **1b** Add optional **Roll forward from** dropdown (list completed projects); send `rollForwardFromProjectId` when selected.
+- **1a** Optional **Reconciliation date** on ProjectNew → `reconciliationDate` (ISO).
+- **1b** Optional **Roll forward from** (completed projects) → `rollForwardFromProjectId`.
 
-**Outcome:** New Project form aligned with API/DB; users can set date and create from a completed project without going via Report.
+**Outcome:** New Project form aligned with API/DB; users can set date and roll forward without going via Report only.
 
 ---
 
-## Phase 2 — Deep links for project steps (medium)
+## Phase 2 — Deep links for project steps (medium) ✅ Done
 
-- Support hash-based step: e.g. `/projects/:id#reconcile`, `#report`, `#map`, `#review`.
-- On load, read `location.hash`, map to step index, set initial step so Reconcile/Report are shareable.
+- Hash steps: `/projects/:id#upload`, `#map`, `#reconcile`, `#review`, `#report` (ProjectDetail + hashchange).
 
 **Outcome:** Shareable links to Reconcile or Report step.
 
@@ -35,9 +34,9 @@ Safe, phased implementation of items from `HONEST_REVIEW_GAPS_AND_CONSISTENCY.md
 ## Phase 4 — UX polish (low) ✅ Done
 
 - **4a** On Projects page, when `?clientId=` is in URL, show a **“Filtering by: Client Name”** chip with clear button.
-- **4b** Apply dark mode consistently inside ProjectReconcile, ProjectReview, ProjectReport (tables, buttons, inputs).
+- **4b** Consistent light-theme surfaces inside ProjectReconcile, ProjectReview, ProjectReport (shared border/surface tokens).
 
-**Outcome:** Clearer filter state; full dark mode parity.
+**Outcome:** Clearer filter state; consistent project-step chrome (single premium light theme).
 
 ---
 

@@ -408,7 +408,7 @@ function PlanForm({
       </div>
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="rounded border-gray-300" />
-        Package is active (self-serve checkout and billing). The landing page still lists all four packages.
+        Plan is active (self-serve checkout and billing). The landing page still lists all five plans.
       </label>
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-1">Features</h4>
@@ -416,8 +416,8 @@ function PlanForm({
           These flags gate the product. A checked box includes the feature. Caps still apply:
           10 bulk pairs on Free, 5 bank rules on Solo, view-only activity log below Team, and a
           warning-only threshold on Team. Split matching, many-to-many, and roll forward stay on
-          from Solo upward. Saving updates every workspace on this package. The API restores
-          catalogue access for those features the next time it starts.
+          from Solo upward. Saving updates every organisation on this plan. The API restores
+          built-in tier defaults for those features the next time it starts.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {rows.map((f) => (

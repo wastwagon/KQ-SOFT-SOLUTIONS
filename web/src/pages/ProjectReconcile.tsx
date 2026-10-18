@@ -124,11 +124,11 @@ export default function ProjectReconcile({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
-      toast.success('Extract confirmed — you can match after checking the lines')
+      toast.success('Statement checked — you can match after reviewing the lines')
     },
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) =>
-        toast.error(e instanceof Error ? e.message : 'Could not confirm the extract')
+        toast.error(e instanceof Error ? e.message : 'Could not confirm the statement check')
       ),
   })
 
@@ -287,7 +287,7 @@ export default function ProjectReconcile({
               isLoading={ackChecksumMutation.isPending}
               onClick={() => ackChecksumMutation.mutate()}
             >
-              I have checked the extract
+              I have checked the statement
             </Button>
           }
         >
@@ -401,8 +401,8 @@ export default function ProjectReconcile({
       )}
 
       {canReconcile && matchingAllowed && (
-        <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 max-w-2xl">
-          <summary className="cursor-pointer font-semibold text-slate-800">Matching tips</summary>
+        <details className="rounded-xl border border-border bg-gray-50/80 px-3 py-2 text-xs text-gray-700 max-w-2xl">
+          <summary className="cursor-pointer font-semibold text-gray-800">Matching tips</summary>
           <p className="mt-2 leading-relaxed">
             For cheques, match only when the amount (and reference if present) matches the bank. Prefer
             bank-pattern suggestions (Clearing, INW CLG, cheque paid, telex, EBOX/FT) before generic
@@ -562,7 +562,7 @@ export default function ProjectReconcile({
         <div className="mt-8 flex flex-wrap items-center justify-between gap-6 border-t border-gray-100 pt-8">
           <div className="max-w-md">
             <h4 className="mb-1 text-base font-bold text-gray-900">Ready to finalise?</h4>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-600">
               Review matches and unmatched items before generating the BRS report.
             </p>
           </div>
@@ -579,18 +579,18 @@ export default function ProjectReconcile({
 function ReconcileNotices({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(true)
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800">
+    <div className="rounded-xl border border-border bg-gray-50/80 text-sm text-gray-800">
       <Button
         type="button"
         variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="w-full !justify-between px-4 py-2.5 h-auto font-semibold text-slate-800 hover:bg-slate-100/80"
+        className="w-full !justify-between px-4 py-2.5 h-auto font-semibold text-gray-800 hover:bg-gray-100/80"
         aria-expanded={open}
       >
         Notices
         <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </Button>
-      {open && <div className="space-y-3 border-t border-slate-200 px-4 py-3">{children}</div>}
+      {open && <div className="space-y-3 border-t border-border px-4 py-3">{children}</div>}
     </div>
   )
 }

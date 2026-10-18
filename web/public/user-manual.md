@@ -41,7 +41,7 @@ KQ BRS helps teams reconcile cash book entries with bank statements and generate
 
 Core capabilities:
 - Upload cash book and bank files (Excel, CSV, OFX/QFX, MT940, CAMT.053, PDF, image formats)
-- Map columns once and extract transactions
+- Map columns once and import transactions into the grid
 - Reconcile receipts vs credits and payments vs debits
 - Review exceptions and complete sign-off
 - Export final reports in PDF and Excel
@@ -148,7 +148,7 @@ From the dashboard or sidebar (no project required to preview):
 - **Clean bank statement** — upload a statement, parse with the same engine, preview rows
 - **Clean cash book** — same for cash book files
 - **Sample Excel/PDF** — truncated and watermarked (`BRS DEMO — NOT FOR OPERATIONAL USE`)
-- **Full Excel/PDF** — complete extract; counts against your plan’s monthly clean-export quota
+- **Full Excel/PDF** — full BRS export without watermarks; counts against your plan’s monthly clean-export quota
 
 Useful for validating a bank format before starting a full reconciliation.
 

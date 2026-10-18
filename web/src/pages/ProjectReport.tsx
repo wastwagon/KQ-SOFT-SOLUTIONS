@@ -104,6 +104,32 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   const { data: usageData } = usageQuery
   const features = (usageData?.features || {}) as Record<string, boolean>
   const featureDepth = usageData?.featureDepth || {}
+  const exportPlanNotice = useMemo(() => {
+    const lines: string[] = []
+    if (featureDepth.discrepancy_report === 'partial') {
+      lines.push('Discrepancy workbook tab is capped on your plan (preview rows in Excel).')
+    }
+    if (featureDepth.missing_cheques_report === 'partial') {
+      lines.push('Missing-cheques tab is capped on your plan (preview rows in Excel).')
+    }
+    if (featureDepth.audit_trail === 'partial') {
+      lines.push('Activity log export on the Audit page shows a limited window on your plan.')
+    }
+    const u = usageData?.usage
+    if (u && !u.cleanExportsUnlimited) {
+      const limit = u.cleanExportsLimit ?? 0
+      if (limit === 0) {
+        lines.push(
+          'BRS Excel/PDF from this page are your client deliverables. Dashboard → Clean statement tools offer watermarked samples on Free; upgrade for full cleaned downloads.',
+        )
+      } else {
+        lines.push(
+          `BRS exports here are separate from Tools clean downloads (${u.cleanExportsDisplay ?? `${u.cleanExportsUsed ?? 0} / ${limit}`} full cleans this month).`,
+        )
+      }
+    }
+    return lines
+  }, [featureDepth, usageData?.usage])
   const reportQuery = useQuery<ReportResponse>({
     queryKey: ['report', projectId, bankAccountId || null],
     queryFn: () =>
@@ -598,6 +624,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         <Alert tone="warning" title="Reopened for editing" className="print:hidden">
           This BRS is a working draft until you submit for review and approve again. Prior sign-off is
           not valid for export as a final report.
+        </Alert>
+      )}
+      {exportPlanNotice.length > 0 && (
+        <Alert tone="info" title="Exports and your plan" className="print:hidden max-w-3xl">
+          <ul className="list-disc pl-4 space-y-1 text-sm">
+            {exportPlanNotice.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </Alert>
       )}
       <div className="flex flex-wrap items-center justify-end gap-4 print:hidden">
@@ -1112,7 +1147,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   {' '}
                   <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
                   Large variances usually mean duplicate cash-book exposure, mismatched reconciliation date, or a missing /
-                  overstated closing balance inputs — review mappings and extracted balances.
+                  overstated closing balance inputs — review column mapping and imported balances.
                 </div>
               )
             ) : null}
