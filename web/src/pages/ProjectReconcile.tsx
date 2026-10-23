@@ -274,7 +274,7 @@ export default function ProjectReconcile({
     !!ghanaTip
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-40 lg:pb-0">
       {ingestBlock?.blocked && (
         <Alert
           tone="error"

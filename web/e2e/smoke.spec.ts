@@ -36,4 +36,21 @@ test.describe('public smoke', () => {
     await expect(page.getByRole('link', { name: 'Terms' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Privacy Policy' }).first()).toBeVisible()
   })
+
+  test('PWA manifest is served', async ({ page }) => {
+    const res = await page.goto('/manifest.webmanifest')
+    expect(res?.ok()).toBeTruthy()
+    const body = await res!.text()
+    expect(body).toContain('KQ-SOFT')
+  })
+
+  test('landing footer credits OceanCyber', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('link', { name: 'OceanCyber' })).toBeVisible()
+  })
+
+  test('unknown route shows 404 page', async ({ page }) => {
+    await page.goto('/this-route-does-not-exist')
+    await expect(page.getByRole('heading', { name: /can't find that page/i })).toBeVisible()
+  })
 })

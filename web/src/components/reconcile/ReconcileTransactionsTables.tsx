@@ -8,6 +8,7 @@ import {
   type DateOrder,
 } from '../../lib/transactionDateOrder'
 import DateOrderToggle from '../DateOrderToggle'
+import ReconcileMobileReview from './ReconcileMobileReview'
 import ReconcileTableExportButtons from './ReconcileTableExportButtons'
 import SuggestedMatchMark from './SuggestedMatchMark'
 import Badge from '../ui/Badge'
@@ -211,8 +212,33 @@ export default function ReconcileTransactionsTables({
         <DateOrderToggle value={dateOrder} onChange={changeDateOrder} />
       </div>
 
-      {/* Cash Book table */}
-      <Card noPadding>
+      <ReconcileMobileReview
+        view={view}
+        canReconcile={canReconcile}
+        currency={currency}
+        cbRows={cbRows}
+        bankRows={bankRows}
+        matchedCbIds={matchedCbIds}
+        matchedBankIds={matchedBankIds}
+        flaggedBankIds={flaggedBankIds}
+        selectedCbIds={selectedCbIds}
+        selectedBankIds={selectedBankIds}
+        onToggleCb={onToggleCb}
+        onToggleBank={onToggleBank}
+        cbUnmatchedNote={(t) => getUnmatchedReason(t, true)}
+        bankUnmatchedNote={(t) => getUnmatchedReason(t, false)}
+        cbHasSuggestion={(t, isReceipt) => {
+          const sugMap = isReceipt ? cbReceiptToBank : cbPaymentToBank
+          return sugMap.has(t.id)
+        }}
+        bankHasSuggestion={(t, isCredit) => {
+          const sugMap = isCredit ? bankCreditToCb : bankDebitToCb
+          return sugMap.has(t.id)
+        }}
+      />
+
+      {/* Cash Book table — desktop / tablet landscape */}
+      <Card noPadding className="hidden lg:block">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-surface border-b border-border">
           <h3 className="text-sm font-bold text-gray-900 tracking-tight">Cash Book</h3>
           <ReconcileTableExportButtons side="cash_book" label="cash book" {...exportBase} />
@@ -381,7 +407,7 @@ export default function ReconcileTransactionsTables({
       </Card>
 
       {/* Bank Statement table */}
-      <Card noPadding>
+      <Card noPadding className="hidden lg:block">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-surface border-b border-border">
           <h3 className="text-sm font-bold text-gray-900 tracking-tight">Bank Statement</h3>
           <ReconcileTableExportButtons side="bank_statement" label="bank statement" {...exportBase} />

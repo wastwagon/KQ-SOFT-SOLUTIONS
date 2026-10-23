@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FolderKanban, ChevronRight } from 'lucide-react'
@@ -7,6 +7,7 @@ import { projects, clients, subscription, isSubscriptionInactiveError } from '..
 import { normalizeClientsList } from '../lib/clientsPayload'
 import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
+import { projectPathForStatus } from '../lib/projectRoutes'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Button, { buttonClassName } from '../components/ui/Button'
@@ -80,6 +81,27 @@ export default function Projects({ initialStatus }: ProjectsProps) {
     !paywallBlocked && (projectsQueryFailed || clientsQueryFailed)
 
   const clientName = (clientFilter && clientsList.find((c) => c.id === clientFilter)?.name) || null
+
+  useEffect(() => {
+    setClientFilter(clientFromUrl)
+  }, [clientFromUrl])
+
+  useEffect(() => {
+    if (isReportsView) return
+    setStatusFilter(statusFromUrl)
+  }, [statusFromUrl, isReportsView])
+
+  const setStatusFilterAndUrl = (value: string) => {
+    setStatusFilter(value)
+    if (isReportsView) return
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev)
+      if (value) p.set('status', value)
+      else p.delete('status')
+      return p
+    })
+  }
+
   const clearClientFilter = () => {
     setClientFilter('')
     setSearchParams((prev) => {
@@ -191,7 +213,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                 size="xs"
                 variant={isActive ? 'primary' : 'outline'}
                 aria-pressed={isActive}
-                onClick={() => setStatusFilter(value)}
+                onClick={() => setStatusFilterAndUrl(value)}
                 className="rounded-full gap-1.5"
               >
                 {label}
@@ -342,8 +364,8 @@ export default function Projects({ initialStatus }: ProjectsProps) {
                     <Link
                       to={
                         isReportsView || p.status === 'completed' || p.status === 'approved'
-                          ? `/projects/${p.slug ?? p.id}#report`
-                          : `/projects/${p.slug ?? p.id}`
+                          ? projectPathForStatus(p.slug ?? p.id, p.status, { reportsView: true })
+                          : projectPathForStatus(p.slug ?? p.id, p.status)
                       }
                       onMouseEnter={preloadProjectDetailPage}
                       onFocus={preloadProjectDetailPage}

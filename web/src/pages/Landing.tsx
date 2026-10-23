@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import BrandLogo from '../components/BrandLogo'
 import Button from '../components/ui/Button'
+import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
 import SubscriptionFxReference from '../components/marketing/SubscriptionFxReference'
 import { publicApi } from '../lib/api'
 import { useFocusTrap } from '../lib/focusTrap'
@@ -426,7 +427,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
   }, [navOpen, setNavOpen])
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200/60 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200/60 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 safe-top">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16 sm:h-18">
         <Link
           to="/"
@@ -480,7 +481,7 @@ function Nav({ navOpen, setNavOpen }: { navOpen: boolean; setNavOpen: (b: boolea
           ref={menuButtonRef}
           type="button"
           onClick={() => setNavOpen(!navOpen)}
-          className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-gray-700 hover:bg-gray-100"
+          className="md:hidden inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl text-gray-700 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           aria-label={navOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={navOpen}
           aria-controls="landing-mobile-nav"
@@ -1783,23 +1784,26 @@ function Footer() {
       </div>
 
       {/* Bottom legal row */}
-      <div className="relative border-t border-white/10 bg-black/20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <p className="text-xs text-white/90">
-            © {new Date().getFullYear()} KQ-SOFT Solutions. All rights reserved.
-          </p>
-          <div className="flex items-center gap-5 text-xs text-white/90">
-            <Link to="/privacy" className="text-white hover:text-primary-200 transition-colors">
-              Privacy
-            </Link>
-            <Link to="/terms" className="text-white hover:text-primary-200 transition-colors">
-              Terms
-            </Link>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-dot" />
-              Service operational
-            </span>
+      <div className="relative border-t border-white/10 bg-black/20 safe-bottom">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            <p className="text-xs text-white/90">
+              © {new Date().getFullYear()} KQ-SOFT Solutions. All rights reserved.
+            </p>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-white/90">
+              <Link to="/privacy" className="text-white hover:text-primary-200 transition-colors">
+                Privacy
+              </Link>
+              <Link to="/terms" className="text-white hover:text-primary-200 transition-colors">
+                Terms
+              </Link>
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-dot" />
+                Service operational
+              </span>
+            </div>
           </div>
+          <DevelopmentCredit tone="dark" className="border-t border-white/10 pt-4" />
         </div>
       </div>
     </footer>

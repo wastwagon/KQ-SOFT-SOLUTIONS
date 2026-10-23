@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clients, projects, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { normalizeClientsList } from '../lib/clientsPayload'
@@ -25,6 +25,13 @@ import ProjectUploadStep from '../components/project/ProjectUploadStep'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Skeleton from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
+import {
+  isProjectStepId,
+  projectStepIndex,
+  projectStepPath,
+} from '../lib/projectRoutes'
+import { rememberRecentNav } from '../lib/commandPaletteRecent'
+import CopyProjectLinkButton from '../components/project/CopyProjectLinkButton'
 
 const ProjectMap = lazy(() => import('./ProjectMap'))
 const ProjectReconcile = lazy(() => import('./ProjectReconcile'))
@@ -39,10 +46,6 @@ const STEPS: readonly ProjectStep[] = [
   { id: 'report', label: 'Report' },
 ]
 
-const HASH_TO_STEP: Record<string, number> = Object.fromEntries(
-  STEPS.map((s, i) => [s.id, i])
-)
-
 interface ProjectResponse extends ProjectHeaderProject {
   documents?: { filename: string; type: string; id?: string; _count?: { transactions?: number } }[]
 }
@@ -55,44 +58,38 @@ interface ProjectResponse extends ProjectHeaderProject {
  * shared chrome and per-stage error boundary.
  */
 export default function ProjectDetail() {
-  const { slug } = useParams<{ slug: string }>()
+  const { slug, step: stepParam } = useParams<{ slug: string; step?: string }>()
   const navigate = useNavigate()
   const location = useLocation()
   const role = useAuth((s) => s.role)
   const queryClient = useQueryClient()
   const toast = useToast()
 
-  const [step, setStepState] = useState(() => {
-    if (typeof window === 'undefined') return 0
-    const h = window.location.hash.slice(1).toLowerCase()
-    return HASH_TO_STEP[h] ?? 0
-  })
-
-  // Sync URL hash → step so deep links like /projects/foo#review still work.
-  const syncHashToStep = useCallback(() => {
-    const h = (typeof window !== 'undefined' ? window.location.hash : location.hash)
-      .slice(1)
-      .toLowerCase()
-    const idx = HASH_TO_STEP[h]
-    if (idx !== undefined) setStepState(idx)
-  }, [location.hash])
-
-  useEffect(() => {
-    window.addEventListener('hashchange', syncHashToStep)
-    return () => window.removeEventListener('hashchange', syncHashToStep)
-  }, [syncHashToStep])
+  const [step, setStepState] = useState(0)
 
   const setStep = useCallback(
     (i: number) => {
       setStepState(i)
-      const newHash = STEPS[i]?.id
-      if (newHash) {
-        const url = `${location.pathname}${location.search}#${newHash}`
-        window.history.replaceState(null, '', url)
-      }
+      const stepId = STEPS[i]?.id
+      if (!slug || !stepId) return
+      navigate(projectStepPath(slug, stepId))
     },
-    [location.pathname, location.search]
+    [navigate, slug]
   )
+
+  // Path-based steps (`/projects/:slug/reconcile`) + legacy `#step` hashes.
+  useEffect(() => {
+    if (!slug) return
+    const hash = location.hash.slice(1).toLowerCase()
+    if (!stepParam && hash && isProjectStepId(hash)) {
+      navigate(projectStepPath(slug, hash), { replace: true })
+      return
+    }
+    const fromPath = projectStepIndex(stepParam?.toLowerCase())
+    const fromHash = projectStepIndex(hash)
+    const idx = fromPath ?? fromHash
+    if (idx !== undefined) setStepState(idx)
+  }, [slug, stepParam, location.hash, navigate])
 
   const projectQuery = useQuery<ProjectResponse>({
     queryKey: ['project', slug],
@@ -101,16 +98,16 @@ export default function ProjectDetail() {
   })
   const { data: project, isLoading, isPending: projectPending, isError: projectQueryFailed } = projectQuery
 
-  // Completed / approved / submitted jobs open on Report unless the URL names another step.
+  // Completed / approved jobs open on Report unless the URL names another step.
   useEffect(() => {
-    if (!project) return
+    if (!project || !slug) return
     if (isProjectEditable(project.status)) return
-    const h = (typeof window !== 'undefined' ? window.location.hash : location.hash)
-      .slice(1)
-      .toLowerCase()
-    if (h && HASH_TO_STEP[h] !== undefined) return
+    const hash = location.hash.slice(1).toLowerCase()
+    if (projectStepIndex(stepParam?.toLowerCase()) !== undefined) return
+    if (projectStepIndex(hash) !== undefined) return
     setStepState(4)
-  }, [project, location.hash])
+    navigate(projectStepPath(slug, 'report'), { replace: true })
+  }, [project, slug, stepParam, location.hash, navigate])
 
   const clientsQuery = useQuery({
     queryKey: ['clients'],
@@ -153,8 +150,24 @@ export default function ProjectDetail() {
       ),
   })
 
+  const workflowStepId = STEPS[step]?.id
+
+  useEffect(() => {
+    if (!slug || !project?.name || !workflowStepId) return
+    rememberRecentNav({
+      id: `project-${slug}`,
+      label: project.name,
+      to: projectStepPath(slug, workflowStepId),
+      hint: STEPS[step]?.label,
+    })
+  }, [slug, project?.name, step, workflowStepId])
+
   if (!slug) {
     return <ProjectDetailSkeleton />
+  }
+
+  if (stepParam && !isProjectStepId(stepParam.toLowerCase())) {
+    return <Navigate to={projectStepPath(slug)} replace />
   }
   if (paywallBlocked) {
     return (
@@ -210,7 +223,12 @@ export default function ProjectDetail() {
         onDelete={() => deleteMutation.mutate()}
       />
 
-      <ProjectStepNav steps={STEPS} current={step} onChange={setStep} />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <ProjectStepNav steps={STEPS} current={step} onChange={setStep} />
+        </div>
+        <CopyProjectLinkButton slug={slug} stepId={workflowStepId} />
+      </div>
 
       {step === 0 && (
         <ProjectUploadStep
@@ -260,9 +278,9 @@ export default function ProjectDetail() {
             <ProjectReport
               projectId={slug}
               onGoToReview={() => setStep(3)}
-              onReopen={() => setStep(2)}
+              onReopen={(mode) => setStep(mode === 'sources' ? 1 : 2)}
               onRollForward={(newProjectId) => {
-                navigate(`/projects/${newProjectId}`)
+                navigate(projectStepPath(newProjectId, 'upload'))
               }}
               canExport={canExportReport(role)}
               canReopen={canReopenProject(role)}

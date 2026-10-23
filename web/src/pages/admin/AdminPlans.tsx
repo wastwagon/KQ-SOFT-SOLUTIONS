@@ -145,8 +145,13 @@ export default function AdminPlans() {
     mutationFn: (body: PlanBody) => api('/admin/plans', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] })
+      void queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
+      void queryClient.invalidateQueries({ queryKey: ['public', 'plans'] })
       toast.success('Plan created', 'Pricing and features are live for checkout and the public site.')
       setShowNew(false)
+    },
+    onError: (err) => {
+      toast.error('Could not create plan', err instanceof Error ? err.message : undefined)
     },
   })
 
@@ -155,8 +160,13 @@ export default function AdminPlans() {
       api(`/admin/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] })
+      queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
+      void queryClient.invalidateQueries({ queryKey: ['public', 'plans'] })
       toast.success('Plan updated', 'Billing, feature gates, and the landing page now use these values.')
       setEditing(null)
+    },
+    onError: (err) => {
+      toast.error('Could not update plan', err instanceof Error ? err.message : undefined)
     },
   })
 

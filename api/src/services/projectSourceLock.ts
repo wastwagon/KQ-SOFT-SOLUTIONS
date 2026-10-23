@@ -1,15 +1,9 @@
-import { prisma } from '../lib/prisma.js'
-import { isProjectInUploadStage, isProjectSourceIdentityLocked } from '../lib/permissions.js'
+import { isProjectSourceIdentityLocked } from '../lib/permissions.js'
 
-/** True for every project that has left upload, including ones created before this rule. */
+/** True when reconcile (or later) — uploads are closed for this project period. */
 export async function isExistingProjectSourceLocked(
-  projectId: string,
+  _projectId: string,
   status: string | null | undefined
 ): Promise<boolean> {
-  if (!isProjectInUploadStage(status)) return isProjectSourceIdentityLocked(status, false)
-  const mapped = await prisma.transaction.findFirst({
-    where: { document: { projectId } },
-    select: { id: true },
-  })
-  return isProjectSourceIdentityLocked(status, mapped != null)
+  return isProjectSourceIdentityLocked(status)
 }

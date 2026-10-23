@@ -11,12 +11,21 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   Users,
 } from 'lucide-react'
-import { projects, subscription } from '../lib/api'
+import { clients, projects, subscription, workspace } from '../lib/api'
+import { rankPaletteItems } from '../lib/commandPaletteSearch'
+import { readRecentNav, rememberRecentNav } from '../lib/commandPaletteRecent'
+import {
+  agentPicksToPaletteItems,
+  shouldUseWorkspaceAgent,
+} from '../lib/workspaceAgentSearch'
+import { normalizeClientsList } from '../lib/clientsPayload'
 import { canCreateProject } from '../lib/permissions'
 import { useAuth } from '../store/auth'
 import { useFocusTrap } from '../lib/focusTrap'
+import { projectPathForStatus } from '../lib/projectRoutes'
 import Button from './ui/Button'
 import Alert from './ui/Alert'
 
@@ -37,16 +46,6 @@ function isMacClient() {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 }
 
-function matchesQuery(item: PaletteItem, q: string) {
-  if (!q) return true
-  const hay = `${item.label} ${item.hint ?? ''} ${item.keywords ?? ''} ${item.group}`.toLowerCase()
-  return q
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => hay.includes(word))
-}
-
 export default function CommandPalette({ variant = 'workspace' }: CommandPaletteProps) {
   const navigate = useNavigate()
   const role = useAuth((s) => s.role)
@@ -54,6 +53,8 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
+  const [recentNav, setRecentNav] = useState<ReturnType<typeof readRecentNav>>([])
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const dialogRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -65,6 +66,16 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
     enabled: open && variant === 'workspace',
     staleTime: 30_000,
   })
+  const clientsQuery = useQuery({
+    queryKey: ['clients'],
+    queryFn: clients.list,
+    enabled: open && variant === 'workspace',
+    staleTime: 60_000,
+  })
+  const clientRows = useMemo(
+    () => normalizeClientsList(clientsQuery.data),
+    [clientsQuery.data]
+  )
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: subscription.getUsage,
@@ -72,8 +83,34 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
     staleTime: 60_000,
   })
 
+  useEffect(() => {
+    if (open && variant === 'workspace') setRecentNav(readRecentNav())
+  }, [open, variant])
+
   const features = (usageQuery.data?.features || {}) as Record<string, boolean>
   const projectRows = projectsQuery.data?.projects ?? []
+
+  useEffect(() => {
+    if (!open) {
+      setDebouncedQuery('')
+      return
+    }
+    const t = window.setTimeout(() => setDebouncedQuery(query), 380)
+    return () => window.clearTimeout(t)
+  }, [query, open])
+
+  const agentEnabled =
+    variant === 'workspace' &&
+    Boolean(features.ai_suggestions) &&
+    shouldUseWorkspaceAgent(debouncedQuery)
+
+  const agentQuery = useQuery({
+    queryKey: ['workspace', 'agent-search', debouncedQuery],
+    queryFn: () => workspace.agentSearch({ query: debouncedQuery }),
+    enabled: open && agentEnabled,
+    staleTime: 45_000,
+    retry: false,
+  })
 
   const items = useMemo(() => {
     const list: PaletteItem[] = []
@@ -97,9 +134,41 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
       return list
     }
 
+    for (const r of recentNav) {
+      list.push({
+        id: `recent-${r.id}`,
+        label: r.label,
+        hint: r.hint ? `Recent · ${r.hint}` : 'Recent',
+        group: 'Recent',
+        to: r.to,
+        keywords: 'recent history',
+      })
+    }
+
     list.push(
+      {
+        id: 'qf-reconciling',
+        label: 'Reconciling projects',
+        group: 'Quick filters',
+        to: '/projects?status=reconciling',
+        keywords: 'reconcile rec matching filter list',
+      },
+      {
+        id: 'qf-review',
+        label: 'Projects awaiting review',
+        group: 'Quick filters',
+        to: '/projects?status=submitted_for_review',
+        keywords: 'review submitted filter',
+      },
+      {
+        id: 'qf-draft',
+        label: 'Draft projects',
+        group: 'Quick filters',
+        to: '/projects?status=draft',
+        keywords: 'upload draft filter',
+      },
       { id: 'dash', label: 'Dashboard', group: 'Go to', to: '/dashboard', keywords: 'home overview' },
-      { id: 'projects', label: 'Projects', group: 'Go to', to: '/projects' },
+      { id: 'projects', label: 'Projects', group: 'Go to', to: '/projects', keywords: 'list jobs engagements' },
       { id: 'clients', label: 'Clients', group: 'Go to', to: '/clients' },
       { id: 'reports', label: 'Reports', group: 'Go to', to: '/reports' },
       { id: 'clean-bank', label: 'Clean bank statement', group: 'Tools', to: '/tools/clean-bank-statement' },
@@ -139,38 +208,69 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
       })
     }
     for (const p of projectRows) {
-      const hash =
-        p.status === 'submitted_for_review'
-          ? 'review'
-          : p.status === 'reconciling'
-            ? 'reconcile'
-            : p.status === 'mapping'
-              ? 'map'
-              : p.status === 'completed' || p.status === 'approved'
-                ? 'report'
-                : 'upload'
       list.push({
         id: `project-${p.id}`,
         label: p.name,
         hint: p.client?.name ? `${p.status.replace(/_/g, ' ')} · ${p.client.name}` : p.status.replace(/_/g, ' '),
         group: 'Projects',
-        to: `/projects/${p.slug || p.id}#${hash}`,
-        keywords: `${p.slug} ${p.client?.name ?? ''}`,
+        to: projectPathForStatus(p.slug || p.id, p.status),
+        keywords: `${p.slug} ${p.client?.name ?? ''} reconcile report map review upload`,
+      })
+    }
+    for (const c of clientRows) {
+      list.push({
+        id: `client-${c.id}`,
+        label: c.name,
+        hint: 'View client projects',
+        group: 'Clients',
+        to: `/projects?clientId=${encodeURIComponent(c.id)}`,
+        keywords: 'client filter',
       })
     }
     return list
-  }, [variant, role, features.api_access, features.bank_rules, features.audit_trail, isPlatformAdmin, projectRows])
+  }, [
+    variant,
+    role,
+    features.api_access,
+    features.bank_rules,
+    features.audit_trail,
+    isPlatformAdmin,
+    projectRows,
+    clientRows,
+    recentNav,
+  ])
 
   const filtered = useMemo(() => {
-    const matched = items.filter((item) => matchesQuery(item, query))
-    if (query.trim()) return matched
-    let projectShown = 0
-    return matched.filter((item) => {
-      if (item.group !== 'Projects') return true
-      projectShown += 1
-      return projectShown <= 8
-    })
-  }, [items, query])
+    const ranked = rankPaletteItems(items, query)
+    let base: PaletteItem[]
+    if (query.trim()) {
+      base = ranked
+    } else {
+      let projectShown = 0
+      let clientShown = 0
+      base = ranked.filter((item) => {
+        if (item.group === 'Recent') return true
+        if (item.group === 'Quick filters') return true
+        if (item.group === 'Projects') {
+          projectShown += 1
+          return projectShown <= 8
+        }
+        if (item.group === 'Clients') {
+          clientShown += 1
+          return clientShown <= 6
+        }
+        return true
+      })
+    }
+
+    const agentPicks = agentQuery.data?.picks ?? []
+    if (agentPicks.length === 0) return base
+
+    const existingPaths = new Set(base.map((i) => i.to))
+    const agentItems = agentPicksToPaletteItems(agentPicks, new Set()) as PaletteItem[]
+    const merged = [...agentItems.filter((a) => !existingPaths.has(a.to)), ...base]
+    return merged
+  }, [items, query, agentQuery.data?.picks])
 
   useEffect(() => {
     setActive(0)
@@ -213,6 +313,14 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
   }
 
   function go(item: PaletteItem) {
+    if (variant === 'workspace') {
+      rememberRecentNav({
+        id: item.id.replace(/^recent-/, ''),
+        label: item.label,
+        to: item.to,
+        hint: item.hint?.replace(/^Recent · /, ''),
+      })
+    }
     close()
     navigate(item.to)
   }
@@ -263,18 +371,18 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
           setQuery('')
           setOpen(true)
         }}
-        className="gap-2 text-gray-500"
-        aria-label="Open command palette"
+        className="gap-2 text-gray-500 min-h-[44px] min-w-[44px] sm:min-w-0 px-2.5 sm:px-3"
+        aria-label="Search workspace (Command K)"
       >
         <Search className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="hidden sm:inline">Search</span>
+        <span className="sr-only sm:not-sr-only sm:inline">Search</span>
         <kbd className="hidden sm:inline rounded border border-border bg-white px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
           {mac ? '⌘K' : 'Ctrl+K'}
         </kbd>
       </Button>
 
       {open && (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 pt-[12vh] sm:pt-[15vh]">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center px-0 pt-0 sm:items-start sm:px-4 sm:pt-[15vh] safe-bottom">
           <div className="absolute inset-0 bg-black/40" onClick={close} aria-hidden />
           <div
             ref={dialogRef}
@@ -283,7 +391,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
             aria-label="Command palette"
             tabIndex={-1}
             onKeyDown={onDialogKey}
-            className="relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-white shadow-xl outline-none"
+            className="relative z-10 flex w-full max-w-lg max-h-[min(88dvh,32rem)] flex-col overflow-hidden rounded-t-2xl border border-border bg-white shadow-xl outline-none sm:max-h-none sm:rounded-xl"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 px-3">
               <Search className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
@@ -291,7 +399,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Go to a page or project…"
+                placeholder="Pages, projects, clients — or ask “where is my reconciling project?”"
                 className="min-h-[48px] w-full border-0 bg-transparent py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
                 aria-controls="command-palette-list"
                 aria-activedescendant={filtered[active] ? `cmd-${filtered[active]!.id}` : undefined}
@@ -304,6 +412,21 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
               role="listbox"
               className="max-h-[min(24rem,50vh)] overflow-y-auto py-2"
             >
+              {variant === 'workspace' && agentEnabled && agentQuery.isFetching && (
+                <div className="flex items-center gap-2 px-4 py-2 text-xs text-gray-500">
+                  <Sparkles className="h-3.5 w-3.5 text-primary-500 animate-pulse" aria-hidden />
+                  Assistant is finding the best place to go…
+                </div>
+              )}
+              {variant === 'workspace' && agentQuery.data?.answer && (
+                <div className="mx-2 mb-2 rounded-lg border border-primary-100 bg-primary-50/80 px-3 py-2 text-sm text-primary-950">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-700">
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                    Assistant
+                  </p>
+                  <p className="mt-1 text-sm leading-snug">{agentQuery.data.answer}</p>
+                </div>
+              )}
               {projectsQuery.isError && variant === 'workspace' && (
                 <div className="px-2 pb-2">
                   <Alert
@@ -316,7 +439,14 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
                 </div>
               )}
               {filtered.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-gray-500">No matches.</p>
+                <div className="px-4 py-6 text-sm text-gray-500 space-y-2">
+                  <p>No matches for &ldquo;{query}&rdquo;.</p>
+                  <p className="text-xs text-gray-400">
+                    Try shorthand: <span className="font-medium text-gray-500">rec</span> (reconcile),{' '}
+                    <span className="font-medium text-gray-500">brs</span> (report), a project name, or a full
+                    question for the assistant.
+                  </p>
+                </div>
               ) : (
                 groups.map(({ group, items: groupItems }) => (
                   <div key={group} className="px-2 pb-1">
@@ -354,6 +484,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
             </div>
             <p className="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-400">
               ↑↓ to move · Enter to open · Esc to close
+              {variant === 'workspace' && features.ai_suggestions ? ' · Ask in plain English for AI suggestions' : ''}
             </p>
           </div>
         </div>
@@ -363,6 +494,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
 }
 
 function iconFor(item: PaletteItem) {
+  if (item.group === 'Assistant') return Sparkles
   if (item.group === 'Projects' || item.id === 'projects' || item.id === 'new-project') return FolderKanban
   if (item.id === 'clients') return Users
   if (item.id === 'reports' || item.id === 'audit') return FileCheck

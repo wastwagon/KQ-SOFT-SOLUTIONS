@@ -241,7 +241,9 @@ export default function ProjectUploadStep({
       <p className="text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
       {!canUpload && sourceUploadsLocked && (
         <Alert tone="info" title="Source files are locked">
-          This project has already moved past upload. Its cash book and bank statement stay in place. Start a new project to use different files.
+          This project is in reconcile or sign-off, so cash book and bank files can&apos;t be changed here. On
+          Report, use <strong>Replace source files</strong> to return to Upload/Map, or start a new project for
+          another period.
         </Alert>
       )}
       {!canUpload && !sourceUploadsLocked && (

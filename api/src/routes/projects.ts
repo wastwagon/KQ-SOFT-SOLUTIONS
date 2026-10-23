@@ -468,6 +468,11 @@ router.delete('/:id', async (req: AuthRequest, res) => {
   res.json({ deleted: true })
 })
 
+const reopenSchema = z.object({
+  /** `reconcile` = matching only; `sources` = back to upload/map so statements can be replaced */
+  mode: z.enum(['reconcile', 'sources']).optional().default('reconcile'),
+})
+
 router.patch('/:id/reopen', async (req: AuthRequest, res) => {
   const role = req.auth!.role
   if (!canReopenProject(role)) {
@@ -484,10 +489,12 @@ router.patch('/:id/reopen', async (req: AuthRequest, res) => {
   if (!reopenable.includes(project.status)) {
     return res.status(400).json({ error: 'Only completed, approved, or submitted-for-review projects can be reopened' })
   }
+  const { mode } = reopenSchema.parse(req.body ?? {})
+  const nextStatus = mode === 'sources' ? 'mapping' : 'reconciling'
   await prisma.project.update({
     where: { id: projectId },
     data: {
-      status: 'reconciling',
+      status: nextStatus,
       preparedById: null,
       preparedAt: null,
       reviewedById: null,
@@ -501,8 +508,9 @@ router.patch('/:id/reopen', async (req: AuthRequest, res) => {
     userId: req.auth!.userId,
     projectId,
     action: 'project_reopened',
+    details: { mode, status: nextStatus },
   })
-  res.json({ status: 'reconciling', signOffCleared: true })
+  res.json({ status: nextStatus, signOffCleared: true, mode })
 })
 
 // Phase 8: Undo reconciliation — clear all matches, reset sign-off, reopen

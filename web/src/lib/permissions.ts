@@ -72,16 +72,19 @@ export function isProjectEditable(status: string | null | undefined): boolean {
   return !!status && !LOCKED_STATUSES.includes(status as (typeof LOCKED_STATUSES)[number])
 }
 
-/** Name changes and new source files are only allowed while the project is still on upload. */
+/** Upload + map — user can still add cash book / bank files. */
 export function isProjectInUploadStage(status: string | null | undefined): boolean {
-  return status === 'draft'
+  return status === 'draft' || status === 'mapping'
 }
 
-/** Locked after upload, including older projects that already have mapped transactions. */
+export function isProjectSourceUploadAllowed(status: string | null | undefined): boolean {
+  return status === 'draft' || status === 'mapping'
+}
+
+/** Source uploads lock when the project reaches reconcile or a locked review status. */
 export function isProjectSourceIdentityLocked(
   status: string | null | undefined,
-  documents?: { _count?: { transactions?: number } }[] | null
+  _documents?: { _count?: { transactions?: number } }[] | null
 ): boolean {
-  if (!isProjectInUploadStage(status)) return true
-  return (documents ?? []).some((d) => (d._count?.transactions ?? 0) > 0)
+  return !isProjectSourceUploadAllowed(status)
 }

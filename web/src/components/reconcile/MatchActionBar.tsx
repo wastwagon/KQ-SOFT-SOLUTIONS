@@ -41,21 +41,21 @@ export default function MatchActionBar({
     <div
       role="toolbar"
       aria-label="Confirm reconcile match"
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="fixed z-40 left-0 right-0 px-3 sm:px-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] lg:left-1/2 lg:right-auto lg:bottom-6 lg:-translate-x-1/2 lg:px-4 animate-in fade-in slide-in-from-bottom-4 duration-300"
     >
-      <div className="flex items-center gap-6 border border-gray-800 bg-gray-900/90 p-2 pl-6 text-white shadow-2xl backdrop-blur-md rounded-xl">
-        <div className="flex items-center gap-4 py-2">
-          <div className="flex flex-col">
+      <div className="mx-auto flex max-w-[min(100%,42rem)] flex-col gap-2 border border-gray-800 bg-gray-900/90 p-2 text-white shadow-2xl backdrop-blur-md rounded-xl sm:flex-row sm:items-center sm:gap-4 sm:pl-4">
+        <div className="flex items-center gap-4 px-2 py-1 sm:py-2 sm:pl-2">
+          <div className="flex flex-col min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
               Selected for match
             </span>
-            <span className="text-sm font-semibold">
+            <span className="text-sm font-semibold truncate">
               {cbCount} Book ↔ {bankCount} Bank
             </span>
           </div>
         </div>
-        <div className="h-8 w-px bg-gray-800" aria-hidden="true" />
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:block h-8 w-px bg-gray-800 shrink-0" aria-hidden="true" />
+        <div className="flex items-center gap-2 px-2 pb-1 sm:pb-0 sm:pr-2 sm:ml-auto">
           <Button
             type="button"
             variant="ghost"

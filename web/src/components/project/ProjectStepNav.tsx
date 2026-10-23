@@ -5,7 +5,7 @@ import Button from '../ui/Button'
  * Stepper for the BRS workflow — aligned with Figma golden-path screens.
  */
 export interface ProjectStep {
-  /** Stable identifier used in the URL hash (e.g. `upload`). */
+  /** Stable identifier used in the URL path (e.g. `upload`, `reconcile`). */
   id: string
   /** Display label (e.g. `Upload`). */
   label: string
@@ -38,12 +38,14 @@ export default function ProjectStepNav({ steps, current, onChange }: ProjectStep
           />
         </div>
 
-        <ol className="relative flex flex-wrap items-stretch gap-1.5 sm:flex-nowrap sm:gap-2">
+        <ol
+          className="relative flex items-stretch gap-1.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch] sm:flex-nowrap sm:gap-2 sm:overflow-visible sm:pb-0"
+        >
           {steps.map((s, i) => {
             const isCurrent = i === safeCurrent
             const isCompleted = i < safeCurrent
             return (
-              <li key={s.id} className="min-w-0 sm:flex-1">
+              <li key={s.id} className="min-w-[5.5rem] shrink-0 sm:min-w-0 sm:flex-1">
                 <Button
                   type="button"
                   variant="ghost"

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
 import type { ReactNode } from 'react'
 
 type LegalDocumentProps = {
@@ -49,14 +50,17 @@ export default function LegalDocument({ title, updated, children }: LegalDocumen
         </div>
       </main>
 
-      <footer className="border-t border-gray-100 bg-white py-6 text-center text-xs text-gray-500">
-        © {new Date().getFullYear()} KQ-SOFT Solutions.{' '}
-        <a
-          href="mailto:info@kqsoftwaresolutions.com"
-          className="font-medium text-primary-600 hover:underline"
-        >
-          info@kqsoftwaresolutions.com
-        </a>
+      <footer className="border-t border-gray-100 bg-white px-4 py-8 sm:px-6 safe-bottom">
+        <p className="text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} KQ-SOFT Solutions.{' '}
+          <a
+            href="mailto:info@kqsoftwaresolutions.com"
+            className="font-medium text-primary-600 hover:underline"
+          >
+            info@kqsoftwaresolutions.com
+          </a>
+        </p>
+        <DevelopmentCredit tone="muted" className="mt-4" />
       </footer>
     </div>
   )

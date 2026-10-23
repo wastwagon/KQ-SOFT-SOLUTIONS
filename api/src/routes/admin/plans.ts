@@ -10,7 +10,9 @@ import {
 
 const router = Router()
 
-const STANDARD_SLUGS = ['basic', 'standard', 'premium', 'firm'] as const
+/** Must match `CANONICAL_PLAN_SLUGS` in services/plan.ts and prisma seed. */
+const CANONICAL_PLAN_SLUGS = ['free', 'basic', 'standard', 'premium', 'firm'] as const
+const PAID_PLAN_SLUGS = ['basic', 'standard', 'premium', 'firm'] as const
 const featuresSchema = z
   .record(z.string(), z.boolean())
   .refine((obj) => Object.keys(obj).every((k) => (PLAN_FEATURE_IDS as string[]).includes(k)), {
@@ -19,7 +21,7 @@ const featuresSchema = z
   .optional()
 
 const createPlanSchema = z.object({
-  slug: z.enum(STANDARD_SLUGS),
+  slug: z.enum(PAID_PLAN_SLUGS),
   name: z.string().min(1),
   projectsPerMonth: z.number().int(),
   transactionsPerMonth: z.number().int(),
@@ -33,7 +35,9 @@ const createPlanSchema = z.object({
   active: z.boolean().optional().default(true),
 })
 
-const updatePlanSchema = createPlanSchema.partial()
+const updatePlanSchema = createPlanSchema
+  .extend({ slug: z.enum(CANONICAL_PLAN_SLUGS) })
+  .partial()
 
 function serializePlan(p: {
   slug: string

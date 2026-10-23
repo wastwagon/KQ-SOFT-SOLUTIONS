@@ -20,6 +20,7 @@ import { projects, subscription, settings as settingsApi, isSubscriptionInactive
 import { useAuth } from '../store/auth'
 import { canCreateProject } from '../lib/permissions'
 import { formatDate } from '../lib/format'
+import { projectPathForStatus } from '../lib/projectRoutes'
 import MetricCard from '../components/ui/MetricCard'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
@@ -176,18 +177,37 @@ export default function Dashboard() {
 
   const nextActions = useMemo(() => {
     type ProjectRow = { id: string; name: string; slug?: string; status: string }
-    const href = (p: ProjectRow, hash?: string) =>
-      `/projects/${p.slug ?? p.id}${hash ? `#${hash}` : ''}`
     const items: { key: string; title: string; hint: string; to: string }[] = []
     for (const p of projectsList as ProjectRow[]) {
+      const id = p.slug ?? p.id
       if (p.status === 'submitted_for_review') {
-        items.push({ key: p.id, title: `Review ${p.name}`, hint: 'Submitted for review', to: href(p, 'review') })
+        items.push({
+          key: p.id,
+          title: `Review ${p.name}`,
+          hint: 'Submitted for review',
+          to: projectPathForStatus(id, p.status),
+        })
       } else if (p.status === 'reconciling') {
-        items.push({ key: p.id, title: `Continue matching ${p.name}`, hint: 'Reconciling', to: href(p, 'reconcile') })
+        items.push({
+          key: p.id,
+          title: `Continue matching ${p.name}`,
+          hint: 'Reconciling',
+          to: projectPathForStatus(id, p.status),
+        })
       } else if (p.status === 'mapping') {
-        items.push({ key: p.id, title: `Finish mapping ${p.name}`, hint: 'Map columns', to: href(p, 'map') })
+        items.push({
+          key: p.id,
+          title: `Finish mapping ${p.name}`,
+          hint: 'Map columns',
+          to: projectPathForStatus(id, p.status),
+        })
       } else if (p.status === 'draft') {
-        items.push({ key: p.id, title: `Upload statements for ${p.name}`, hint: 'Draft', to: href(p, 'upload') })
+        items.push({
+          key: p.id,
+          title: `Upload statements for ${p.name}`,
+          hint: 'Draft',
+          to: projectPathForStatus(id, p.status),
+        })
       }
     }
     return items.slice(0, 5)
@@ -228,7 +248,11 @@ export default function Dashboard() {
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
             <p className="text-gray-500">
-              Track client reconciliations, plan usage, and team activity in one place.
+              Track client reconciliations, plan usage, and team activity in one place.{' '}
+              <span className="text-gray-400">
+                Tip: open <span className="font-medium text-gray-600">Search</span> in the header
+                <span className="hidden md:inline"> or press ⌘K / Ctrl+K</span> to jump to a project, or ask in plain English for AI suggestions.
+              </span>
             </p>
           </>
         }

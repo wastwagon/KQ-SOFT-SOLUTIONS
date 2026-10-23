@@ -732,8 +732,11 @@ export const projects = {
   ) => api(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (id: string) =>
     api(`/projects/${id}`, { method: 'DELETE' }),
-  reopen: (id: string) =>
-    api(`/projects/${id}/reopen`, { method: 'PATCH' }),
+  reopen: (id: string, body?: { mode?: 'reconcile' | 'sources' }) =>
+    api(`/projects/${id}/reopen`, {
+      method: 'PATCH',
+      body: JSON.stringify(body ?? {}),
+    }) as Promise<{ status: string; signOffCleared: boolean; mode?: string }>,
   undoReconciliation: (id: string, reason?: string) =>
     api(`/projects/${id}/undo-reconciliation`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
   submit: (id: string) =>
@@ -876,6 +879,19 @@ export const subscription = {
       alreadyApplied?: boolean
       message?: string
     }>,
+}
+
+export type WorkspaceAgentSearchResponse = {
+  available: boolean
+  answer?: string
+  picks: { path: string; label: string; reason?: string }[]
+  model?: string
+}
+
+/** LLM workspace navigator (⌘K). Requires API `OPENAI_API_KEY` and plan `ai_suggestions`. */
+export const workspace = {
+  agentSearch: (body: { query: string }) =>
+    api('/workspace/agent-search', { method: 'POST', body: JSON.stringify(body) }) as Promise<WorkspaceAgentSearchResponse>,
 }
 
 export interface PublicPlan {

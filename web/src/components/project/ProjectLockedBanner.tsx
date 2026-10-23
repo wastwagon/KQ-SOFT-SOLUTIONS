@@ -9,7 +9,7 @@ interface ProjectLockedBannerProps {
   projectId: string
   status: string
   role: string | null
-  onReopened?: () => void
+  onReopened?: (mode: 'reconcile' | 'sources') => void
 }
 
 export default function ProjectLockedBanner({
@@ -23,14 +23,20 @@ export default function ProjectLockedBanner({
   const canReopen = canReopenProject(role)
 
   const reopenMutation = useMutation({
-    mutationFn: () => projects.reopen(projectId),
-    onSuccess: () => {
+    mutationFn: (mode: 'reconcile' | 'sources') => projects.reopen(projectId, { mode }),
+    onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       void queryClient.invalidateQueries({ queryKey: ['projects'] })
       void queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       void queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })
-      toast.success('Project reopened', 'Sign-off cleared — you can edit uploads, mapping, and matches again.')
-      onReopened?.()
+      const sources = data?.status === 'mapping'
+      toast.success(
+        'Project reopened',
+        sources
+          ? 'Sign-off cleared — you can replace cash book or bank files, then continue matching.'
+          : 'Sign-off cleared — continue matching and review from the reconcile step.'
+      )
+      onReopened?.(sources ? 'sources' : 'reconcile')
     },
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) =>
@@ -53,21 +59,34 @@ export default function ProjectLockedBanner({
       title="Project is locked"
       action={
         canReopen ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => reopenMutation.mutate()}
-            isLoading={reopenMutation.isPending}
-          >
-            Reopen for editing
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => reopenMutation.mutate('reconcile')}
+              isLoading={reopenMutation.isPending}
+              className="min-h-[44px]"
+            >
+              Reopen matching
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => reopenMutation.mutate('sources')}
+              isLoading={reopenMutation.isPending}
+              className="min-h-[44px]"
+            >
+              Replace source files
+            </Button>
+          </div>
         ) : undefined
       }
     >
       This job is {statusLabel}, so uploads, mapping, and reconciliation cannot be changed.
       {canReopen
-        ? ' Reopening returns the project to the reconciliation stage.'
+        ? ' Reopen matching to adjust pairs, or replace source files to upload new statements (returns to Upload/Map).'
         : ' Ask an admin or reviewer to reopen this project if changes are needed.'}
     </Alert>
   )

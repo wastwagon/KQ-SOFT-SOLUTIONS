@@ -34,7 +34,7 @@ export default function Tabs<T extends string = string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`inline-flex flex-wrap rounded-xl border border-border bg-gray-50/50 p-0.5 shadow-card ${className}`}
+      className={`inline-flex max-w-full flex-nowrap overflow-x-auto rounded-xl border border-border bg-gray-50/50 p-0.5 shadow-card [-webkit-overflow-scrolling:touch] ${className}`}
     >
       {items.map((item) => {
         const active = item.id === value
@@ -48,7 +48,7 @@ export default function Tabs<T extends string = string>({
             aria-selected={active}
             disabled={item.disabled}
             onClick={() => onChange(item.id)}
-            className={pad}
+            className={`shrink-0 ${pad ?? ''}`}
           >
             {item.label}
           </Button>

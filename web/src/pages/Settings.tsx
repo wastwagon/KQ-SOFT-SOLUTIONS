@@ -20,6 +20,7 @@ import { useBrandingSettings } from '../components/settings/useBrandingSettings'
 import Card from '../components/ui/Card'
 import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
+import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
 import PageHeader from '../components/layout/PageHeader'
 import { PageBodySkeleton } from '../components/ui/Skeleton'
 
@@ -371,6 +372,24 @@ export default function Settings() {
             {features.bank_rules && <BankRulesSection canEdit={canEditBankRules(role)} />}
           </Card>
         )}
+
+        <Card
+          title="About this platform"
+          sublabel="Product information for your team. Branding on exports uses your organisation settings."
+          className="mt-10"
+        >
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wider text-gray-500">Product</dt>
+              <dd className="mt-1 font-medium text-gray-900">KQ-SOFT Bank Reconciliation</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wider text-gray-500">Workspace</dt>
+              <dd className="mt-1 font-medium text-gray-900">{org?.name ?? '—'}</dd>
+            </div>
+          </dl>
+          <DevelopmentCredit tone="muted" align="start" className="mt-6 pt-6 border-t border-border-muted" />
+        </Card>
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { ArrowLeft, Compass, Home } from 'lucide-react'
 import BrandLogo from '../components/BrandLogo'
 import Button, { buttonClassName } from '../components/ui/Button'
 import { useAuth } from '../store/auth'
+import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
 
 /**
  * Friendly 404.  Replaces the previous catch-all `<Navigate to="/" />` so that
@@ -72,6 +73,10 @@ export default function NotFound() {
           </div>
         </div>
       </main>
+
+      <footer className="px-4 py-8 safe-bottom">
+        <DevelopmentCredit tone="muted" />
+      </footer>
     </div>
   )
 }

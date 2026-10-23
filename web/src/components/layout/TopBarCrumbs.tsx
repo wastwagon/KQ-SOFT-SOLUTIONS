@@ -1,5 +1,9 @@
+import { useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
+import { projects } from '../../lib/api'
+import { isProjectStepId, PROJECT_STEP_LABELS, projectStepPath } from '../../lib/projectRoutes'
 
 type Crumb = { label: string; href?: string }
 
@@ -12,7 +16,7 @@ const SETTINGS_TABS: Record<string, string> = {
   'bank-rules': 'Bank rules',
 }
 
-function crumbsFor(pathname: string): Crumb[] {
+function crumbsFor(pathname: string, projectName?: string): Crumb[] {
   if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
     return [{ label: 'Dashboard' }]
   }
@@ -20,7 +24,20 @@ function crumbsFor(pathname: string): Crumb[] {
     return [{ label: 'Projects', href: '/projects' }, { label: 'New project' }]
   }
   if (pathname.startsWith('/projects/') && pathname !== '/projects') {
-    return [{ label: 'Projects', href: '/projects' }, { label: 'Current project' }]
+    const segments = pathname.split('/').filter(Boolean)
+    const slug = segments[1]
+    const maybeStep = segments[2]?.toLowerCase()
+    const crumbs: Crumb[] = [
+      { label: 'Projects', href: '/projects' },
+      {
+        label: projectName?.trim() || 'Project',
+        href: slug ? projectStepPath(slug, 'upload') : undefined,
+      },
+    ]
+    if (maybeStep && isProjectStepId(maybeStep)) {
+      crumbs.push({ label: PROJECT_STEP_LABELS[maybeStep] })
+    }
+    return crumbs
   }
   if (pathname === '/projects') return [{ label: 'Projects' }]
   if (pathname === '/reports' || pathname.startsWith('/reports/')) return [{ label: 'Reports' }]
@@ -65,9 +82,24 @@ function crumbsFor(pathname: string): Crumb[] {
   return []
 }
 
+function projectSlugFromPath(pathname: string): string | null {
+  if (!pathname.startsWith('/projects/')) return null
+  const segments = pathname.split('/').filter(Boolean)
+  if (segments[0] !== 'projects' || !segments[1] || segments[1] === 'new') return null
+  return segments[1]
+}
+
 export default function TopBarCrumbs() {
   const { pathname } = useLocation()
-  const crumbs = crumbsFor(pathname)
+  const projectSlug = useMemo(() => projectSlugFromPath(pathname), [pathname])
+  const { data: projectName } = useQuery({
+    queryKey: ['project', projectSlug],
+    queryFn: () => projects.get(projectSlug!) as Promise<{ name?: string }>,
+    enabled: !!projectSlug,
+    staleTime: 120_000,
+    select: (p) => p.name,
+  })
+  const crumbs = crumbsFor(pathname, projectName)
   if (crumbs.length === 0) return null
 
   return (

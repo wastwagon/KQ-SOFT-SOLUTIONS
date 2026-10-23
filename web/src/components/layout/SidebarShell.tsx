@@ -14,6 +14,8 @@ type SidebarShellProps = {
   children: ReactNode
   sidebarLabel?: string
   topBarStart?: ReactNode
+  /** Fixed bottom nav (phones); adds scroll padding on main. */
+  bottomNav?: ReactNode
 }
 
 /**
@@ -30,6 +32,7 @@ export default function SidebarShell({
   children,
   sidebarLabel = 'Main navigation',
   topBarStart,
+  bottomNav,
 }: SidebarShellProps) {
   const asideRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -90,7 +93,7 @@ export default function SidebarShell({
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-4 lg:px-6 border-b border-border bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90">
+        <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-4 lg:px-6 border-b border-border bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 safe-top">
           <div className="flex items-center gap-2 min-w-0">
             <Button
               ref={menuButtonRef}
@@ -115,10 +118,13 @@ export default function SidebarShell({
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 overflow-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 outline-none"
+          className={`flex-1 overflow-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-8 outline-none ${
+            bottomNav ? 'pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:pb-8' : ''
+          }`}
         >
           <div className="max-w-[1600px] mx-auto w-full">{children}</div>
         </main>
+        {bottomNav}
       </div>
     </div>
   )

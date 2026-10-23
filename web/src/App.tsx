@@ -10,6 +10,7 @@ import ErrorFallback from './components/ErrorFallback'
 import PageLoader from './components/PageLoader'
 import { ToastProvider } from './components/ui/Toast'
 import SubscriptionPaywallToastBridge from './components/SubscriptionPaywallToastBridge'
+import PwaLifecycle from './components/PwaLifecycle'
 import { ConfirmDialogProvider } from './components/ui/ConfirmDialog'
 import { subscriptionPaywallRetry } from './lib/api'
 
@@ -69,6 +70,7 @@ function App() {
         <SubscriptionPaywallToastBridge />
         <ConfirmDialogProvider>
           <AuthHydrator />
+          <PwaLifecycle />
           <BrowserRouter>
             {/*
               App-wide ErrorBoundary catches render errors anywhere in the
@@ -113,6 +115,7 @@ function App() {
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/projects" element={<Projects />} />
                     <Route path="/projects/new" element={<ProjectNew />} />
+                    <Route path="/projects/:slug/:step" element={<ProjectDetail />} />
                     <Route path="/projects/:slug" element={<ProjectDetail />} />
                     <Route path="/tools/clean-bank-statement" element={<CleanBankStatement />} />
                     <Route path="/tools/clean-cash-book" element={<CleanCashBook />} />

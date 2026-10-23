@@ -40,7 +40,7 @@ export const PLAN_FEATURE_IDS: PlanFeature[] = [
 
 export const PLAN_FEATURE_CATALOG: { id: PlanFeature; label: string; hint: string }[] = [
   { id: 'bulk_match', label: 'Bulk match', hint: 'Confirm many suggestions at once' },
-  { id: 'ai_suggestions', label: 'AI match ranking', hint: 'Rank suggestions from confirmed pairs' },
+  { id: 'ai_suggestions', label: 'AI match ranking', hint: 'Rank suggestions; ⌘K natural-language workspace search' },
   { id: 'bank_rules', label: 'Bank rules', hint: 'Auto-suggest/flag from description rules' },
   { id: 'audit_trail', label: 'Audit trail', hint: 'Workspace activity log' },
   { id: 'discrepancy_report', label: 'Discrepancy report', hint: 'Date/amount variance report' },

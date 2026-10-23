@@ -37,7 +37,7 @@ export default function Modal({ open, title, children, onClose, footer }: ModalP
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center px-4 py-4 sm:py-8 safe-bottom safe-top">
       <div
         className="absolute inset-0 bg-gray-900/50 backdrop-blur-[2px]"
         onClick={onClose}
@@ -49,7 +49,7 @@ export default function Modal({ open, title, children, onClose, footer }: ModalP
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5 outline-none"
+        className="relative w-full max-w-md max-h-[min(90dvh,32rem)] flex flex-col overflow-hidden rounded-t-2xl sm:rounded-xl bg-white shadow-2xl ring-1 ring-black/5 outline-none"
       >
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <h2 id={titleId} className="text-lg font-semibold tracking-tight text-gray-900">
@@ -66,7 +66,7 @@ export default function Modal({ open, title, children, onClose, footer }: ModalP
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 sm:flex-row sm:justify-end">
           {footer ?? (
             <Button type="button" variant="outline" onClick={onClose}>

@@ -31,6 +31,7 @@ import SidebarShell, { SidebarHeader, SidebarNavSection } from './layout/Sidebar
 import { sidebarNavLinkClass } from './layout/sidebarStyles'
 import TopBarCrumbs from './layout/TopBarCrumbs'
 import RouteFallback from './layout/RouteFallback'
+import WorkspaceMobileTabBar from './layout/WorkspaceMobileTabBar'
 
 const preloadProjectsPage = () => import('../pages/Projects')
 const preloadSettingsPage = () => import('../pages/Settings')
@@ -287,6 +288,7 @@ export default function AppLayout() {
         </>
       }
       sidebarLabel="Workspace navigation"
+      bottomNav={<WorkspaceMobileTabBar />}
     >
       <Suspense fallback={<RouteFallback />}>
         <Outlet />

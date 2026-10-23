@@ -34,7 +34,7 @@ import BrsWorkbookSignOff from '../components/report/BrsWorkbookSignOff'
 interface ProjectReportProps {
   projectId: string
   onGoToReview?: () => void
-  onReopen?: () => void
+  onReopen?: (mode: 'reconcile' | 'sources') => void
   onRollForward?: (newProjectId: string) => void
   canExport?: boolean
   canReopen?: boolean
@@ -307,13 +307,19 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
   }
 
   const reopenMutation = useMutation({
-    mutationFn: () => projects.reopen(projectId),
-    onSuccess: () => {
+    mutationFn: (mode: 'reconcile' | 'sources') => projects.reopen(projectId, { mode }),
+    onSuccess: (data, mode) => {
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Project reopened', 'Sign-off cleared — re-submit and approve when the BRS is final.')
-      onReopen?.()
+      const sources = mode === 'sources' || data?.status === 'mapping'
+      toast.success(
+        'Project reopened',
+        sources
+          ? 'Sign-off cleared — replace source files on Upload/Map, then re-submit when the BRS is final.'
+          : 'Sign-off cleared — adjust matching, then re-submit and approve when the BRS is final.'
+      )
+      onReopen?.(sources ? 'sources' : 'reconcile')
     },
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) =>
@@ -328,7 +334,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       queryClient.invalidateQueries({ queryKey: ['report', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
-      onReopen?.()
+      onReopen?.('reconcile')
     },
     onError: (err) =>
       unlessSubscriptionInactive(err, (e) =>
@@ -611,7 +617,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
 
   const projectStatus = data?.project?.status ?? ''
   const reopenableStatuses = ['completed', 'approved', 'submitted_for_review'] as const
-  const isReopenedForEditing = projectStatus === 'reconciling'
+  const isReopenedForEditing = projectStatus === 'reconciling' || projectStatus === 'mapping'
 
   return (
     <div className="space-y-6">
@@ -624,6 +630,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
         <Alert tone="warning" title="Reopened for editing" className="print:hidden">
           This BRS is a working draft until you submit for review and approve again. Prior sign-off is
           not valid for export as a final report.
+          {projectStatus === 'mapping'
+            ? ' Source files can be replaced on Upload/Map before you match again.'
+            : null}
         </Alert>
       )}
       {exportPlanNotice.length > 0 && (
@@ -873,12 +882,24 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => reopenMutation.mutate()}
+                onClick={() => reopenMutation.mutate('reconcile')}
                 disabled={reopenMutation.isPending}
                 isLoading={reopenMutation.isPending}
                 title="Reopen to edit matches and clear sign-off"
+                className="min-h-[44px]"
               >
-                Reopen for editing
+                Reopen matching
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => reopenMutation.mutate('sources')}
+                disabled={reopenMutation.isPending}
+                isLoading={reopenMutation.isPending}
+                title="Return to Upload/Map to replace cash book or bank files"
+                className="min-h-[44px]"
+              >
+                Replace source files
               </Button>
               {(data?.summary?.matchedCount || 0) > 0 && (
                 <Button

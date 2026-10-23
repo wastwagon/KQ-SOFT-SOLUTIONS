@@ -11,7 +11,12 @@
     "demo:flow": "bash scripts/run-full-flow.sh",
     "demo:flow:qtest": "bash scripts/run-qtest-licl-flow.sh",
     "test:e2e": "npm run test:e2e --prefix web",
-    "test:e2e:smoke": "npm run test:e2e:smoke --prefix web"
+    "test:e2e:smoke": "npm run test:e2e:smoke --prefix web",
+    "test:e2e:mobile": "npm run test:e2e:mobile --prefix web",
+    "test:e2e:install-browsers": "npm run test:e2e:install-browsers --prefix web",
+    "test:unit:web": "npm run test:unit --prefix web",
+    "test:unit:api": "npm test --prefix api -- --run",
+    "test:ci": "npm run test:unit:api && npm run test:unit:web && npm run test:e2e:smoke --prefix web"
   },
   "devDependencies": {
     "md-to-pdf": "^5.2.5"

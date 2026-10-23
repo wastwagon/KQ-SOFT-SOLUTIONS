@@ -36,6 +36,7 @@ import auditRoutes from './routes/audit.js';
 import settingsRoutes from './routes/settings.js';
 import apiKeysRoutes from './routes/api-keys.js';
 import toolsRoutes from './routes/tools.js';
+import workspaceRoutes from './routes/workspace.js';
 import { securityMiddleware } from './middleware/security.js';
 import { httpLogger, logger, REQUEST_ID_HEADER } from './middleware/logging.js';
 import { livenessHandler, readinessHandler } from './middleware/readiness.js';
@@ -163,6 +164,7 @@ app.use('/api/v1/tools', toolsRoutes);
 app.use('/api/v1/bank-rules', bankRulesRoutes);
 app.use('/api/v1/bank-accounts', bankAccountsRoutes);
 app.use('/api/v1/currency', currencyRoutes);
+app.use('/api/v1/workspace', workspaceRoutes);
 
 // Serve uploaded branding logos (no auth required - logos are shown on reports)
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');

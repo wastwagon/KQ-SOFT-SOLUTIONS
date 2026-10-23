@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Check, FileText, ShieldCheck, Zap } from 'lucide-react'
 import BrandLogo from './BrandLogo'
+import DevelopmentCredit from './marketing/DevelopmentCredit'
 import Card from './ui/Card'
 
 const BENEFITS = [
@@ -127,6 +128,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
               <span>Your data stays in your org</span>
             </li>
           </ul>
+          <DevelopmentCredit tone="muted" className="mt-8" align="start" />
         </div>
       </main>
     </div>

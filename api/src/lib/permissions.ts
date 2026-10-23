@@ -83,24 +83,29 @@ export const PROJECT_NAME_LOCKED_ERROR =
   'Project name cannot be changed after this project leaves upload.'
 
 export const SOURCE_FILES_LOCKED_ERROR =
-  'Source files cannot be added or replaced after this project leaves upload.'
+  'Source files cannot be added or replaced after this project moves to reconcile. From Report, use Replace source files to reopen Upload/Map, or start a new project for another period.'
 
 export function isProjectEditable(status: string | null | undefined): boolean {
   return !!status && !LOCKED_STATUSES.includes(status)
 }
 
-/** Name changes and new source files are only allowed while the project is still on upload. */
+/** Upload + map columns — source files can still be added or replaced. */
 export function isProjectInUploadStage(status: string | null | undefined): boolean {
-  return status === 'draft'
+  return status === 'draft' || status === 'mapping'
+}
+
+/** Cash book / bank statement uploads through the Upload step (before reconcile). */
+export function isProjectSourceUploadAllowed(status: string | null | undefined): boolean {
+  return status === 'draft' || status === 'mapping'
 }
 
 /**
- * Existing projects are locked once they have left upload, or once source
- * files have already been mapped (even if status was never moved off draft).
+ * Source file pickers lock once the project moves to reconcile or later.
+ * Auto-map after the first upload must not block uploading the second statement while still in draft/mapping.
  */
 export function isProjectSourceIdentityLocked(
   status: string | null | undefined,
-  hasMappedSourceData: boolean
+  _hasMappedSourceData?: boolean
 ): boolean {
-  return !isProjectInUploadStage(status) || hasMappedSourceData
+  return !isProjectSourceUploadAllowed(status)
 }
