@@ -96,7 +96,7 @@ router.post('/agent-search', agentSearchLimiter, async (req: AuthRequest, res) =
 
   try {
     const result = await runWorkspaceAgentSearch(query, {
-      role: req.auth!.role,
+      role: req.auth!.role ?? 'viewer',
       isPlatformAdmin: userIsPlatformAdmin,
       features: {
         api_access: apiAccess,
