@@ -6,6 +6,8 @@ import { useToast } from '../ui/Toast'
 import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
+import { Trash2 } from 'lucide-react'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/Table'
@@ -210,16 +212,24 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
                     {roleLabel(invite.role)} · expires {new Date(invite.expiresAt).toLocaleDateString()}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
+                <ActionMenu
+                  label="Actions"
                   size="xs"
-                  onClick={() => revokeMutation.mutate(invite.id)}
-                  disabled={revokeMutation.isPending}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  Revoke
-                </Button>
+                  variant="ghost"
+                  align="right"
+                  menuAriaLabel={`Actions for invite ${invite.email}`}
+                  isLoading={revokeMutation.isPending}
+                  items={[
+                    {
+                      kind: 'button',
+                      label: 'Revoke invitation',
+                      icon: Trash2,
+                      destructive: true,
+                      onClick: () => revokeMutation.mutate(invite.id),
+                      disabled: revokeMutation.isPending,
+                    },
+                  ]}
+                />
               </li>
             ))}
           </ul>
@@ -232,7 +242,7 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
               <TableTh>Name</TableTh>
               <TableTh>Email</TableTh>
               <TableTh>Role</TableTh>
-              {canManage && <TableTh className="w-20" />}
+              {canManage && <TableTh className="text-right w-24">Actions</TableTh>}
             </tr>
           </TableHead>
           <TableBody>
@@ -270,26 +280,34 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
                     )}
                   </TableTd>
                   {canManage && (
-                    <TableTd>
+                    <TableTd className="text-right">
                       {members.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
+                        <ActionMenu
+                          label="Actions"
                           size="xs"
-                          onClick={async () => {
-                            const ok = await confirm({
-                              title: 'Remove this member?',
-                              description: `${m.email} will lose access to this organisation.`,
-                              confirmLabel: 'Remove',
-                              tone: 'danger',
-                            })
-                            if (ok) removeMutation.mutate(m.userId)
-                          }}
-                          disabled={removeMutation.isPending}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          Remove
-                        </Button>
+                          variant="ghost"
+                          align="right"
+                          menuAriaLabel={`Actions for ${m.email}`}
+                          isLoading={removeMutation.isPending}
+                          items={[
+                            {
+                              kind: 'button',
+                              label: 'Remove member',
+                              icon: Trash2,
+                              destructive: true,
+                              onClick: async () => {
+                                const ok = await confirm({
+                                  title: 'Remove this member?',
+                                  description: `${m.email} will lose access to this organisation.`,
+                                  confirmLabel: 'Remove',
+                                  tone: 'danger',
+                                })
+                                if (ok) removeMutation.mutate(m.userId)
+                              },
+                              disabled: removeMutation.isPending,
+                            },
+                          ]}
+                        />
                       )}
                     </TableTd>
                   )}

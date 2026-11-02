@@ -14,7 +14,7 @@ import { COUNT_MATCH_SELECT_CAP } from '../../lib/countMatchExport'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { formatAmount } from '../../lib/format'
 import Button from '../ui/Button'
-import ActionMenu from '../ui/ActionMenu'
+import ActionMenu, { type ActionMenuItem } from '../ui/ActionMenu'
 import { COUNT_MATCH_GROUP_LABELS } from './countMatchListLabels'
 import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
@@ -382,40 +382,13 @@ export default function CountMatchPanel({
                 All lines
               </Button>
             </div>
-            <div className="hidden lg:flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="gap-1.5"
-                isLoading={exporting === 'xlsx'}
-                disabled={!query.data || !!exporting}
-                onClick={() => void handleExport('xlsx')}
-              >
-                <Download className="w-3.5 h-3.5" />
-                Excel
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="gap-1.5"
-                isLoading={exporting === 'pdf'}
-                disabled={!query.data || !!exporting}
-                onClick={() => void handleExport('pdf')}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                PDF
-              </Button>
-            </div>
             <ActionMenu
               label="Export"
-              size="xs"
+              size="sm"
               variant="secondary"
               align="right"
               menuAriaLabel="Export amount-matching schedules"
               isLoading={!!exporting}
-              triggerClassName="lg:hidden"
               items={[
                 {
                   kind: 'button',
@@ -624,57 +597,76 @@ export default function CountMatchPanel({
                         <TableTd className="tabular-nums">{r.difference}</TableTd>
                         <TableTd className="text-right">
                           {onSelectAmountRows &&
-                            (r.cashBookTxIds.length > 0 || r.bankTxIds.length > 0) && (
-                              <div className="flex flex-wrap justify-end gap-1">
-                                {listKey.startsWith('open_') &&
-                                  Math.min(r.cashBookTxIds.length, r.bankTxIds.length) > 0 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="xs"
-                                      className="text-primary-700"
-                                      title="Select matching lines on both sides. Any remainder stays on one side only after you confirm (Unmatched scope)."
-                                      onClick={() => handleSelectRow(r, 'overlap')}
-                                    >
-                                      Match overlap
-                                    </Button>
-                                  )}
-                                <Button
-                                  type="button"
-                                  variant="ghost"
+                            (r.cashBookTxIds.length > 0 || r.bankTxIds.length > 0) &&
+                            (() => {
+                              const items: ActionMenuItem[] = []
+                              if (
+                                listKey.startsWith('open_') &&
+                                Math.min(r.cashBookTxIds.length, r.bankTxIds.length) > 0
+                              ) {
+                                items.push({
+                                  kind: 'button',
+                                  label: 'Match overlap',
+                                  onClick: () => handleSelectRow(r, 'overlap'),
+                                })
+                              }
+                              items.push({
+                                kind: 'button',
+                                label: listKey.startsWith('open_') ? 'Select all' : 'Select lines',
+                                disabled: pairingAmountKey === r.amountKey,
+                                onClick: () => handleSelectRow(r, 'all'),
+                              })
+                              if (
+                                canPairCancelBatch &&
+                                onPairCancelBatch &&
+                                scope === 'unmatched' &&
+                                (listKey === 'cancel_recv' || listKey === 'cancel_pay') &&
+                                r.cashBookCount > 0 &&
+                                r.cashBookCount === r.bankCount
+                              ) {
+                                items.push({
+                                  kind: 'button',
+                                  label: 'Pair batch',
+                                  disabled: pairingAmountKey != null,
+                                  onClick: () => void handlePairBatch(r),
+                                })
+                              }
+                              if (items.length === 0) return null
+                              if (items.length === 1 && items[0].kind === 'button') {
+                                const only = items[0]
+                                return (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="xs"
+                                    className="text-primary-700"
+                                    title={
+                                      only.label === 'Select all'
+                                        ? 'Select every line at this amount, including the surplus. Confirm match requires equal totals.'
+                                        : only.label === 'Match overlap'
+                                          ? 'Select matching lines on both sides. Any remainder stays on one side only after you confirm (Unmatched scope).'
+                                          : 'Select these lines for manual or suggested matching'
+                                    }
+                                    disabled={only.disabled}
+                                    isLoading={pairingAmountKey === r.amountKey && only.label === 'Pair batch'}
+                                    onClick={only.onClick}
+                                  >
+                                    {only.label}
+                                  </Button>
+                                )
+                              }
+                              return (
+                                <ActionMenu
+                                  label="Actions"
                                   size="xs"
-                                  className="text-primary-700"
-                                  title={
-                                    listKey.startsWith('open_')
-                                      ? 'Select every line at this amount, including the surplus. Confirm match requires equal totals.'
-                                      : 'Select these lines for manual or suggested matching'
-                                  }
-                                  onClick={() => handleSelectRow(r, 'all')}
-                                  disabled={pairingAmountKey === r.amountKey}
-                                >
-                                  {listKey.startsWith('open_') ? 'Select all' : 'Select lines'}
-                                </Button>
-                                {canPairCancelBatch &&
-                                  onPairCancelBatch &&
-                                  scope === 'unmatched' &&
-                                  (listKey === 'cancel_recv' || listKey === 'cancel_pay') &&
-                                  r.cashBookCount > 0 &&
-                                  r.cashBookCount === r.bankCount && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="xs"
-                                      className="text-primary-700"
-                                      title="Pair each cash-book line with a bank line at this amount. Saved in batches of 50. One-to-one via Select lines stays available."
-                                      onClick={() => void handlePairBatch(r)}
-                                      disabled={pairingAmountKey != null}
-                                      isLoading={pairingAmountKey === r.amountKey}
-                                    >
-                                      Pair batch
-                                    </Button>
-                                  )}
-                              </div>
-                            )}
+                                  variant="ghost"
+                                  align="right"
+                                  menuAriaLabel={`Actions for ${formatAmount(r.amount, currency)}`}
+                                  isLoading={pairingAmountKey === r.amountKey}
+                                  items={items}
+                                />
+                              )
+                            })()}
                         </TableTd>
                       </TableRow>
                     ))}

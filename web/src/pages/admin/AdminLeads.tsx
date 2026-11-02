@@ -3,6 +3,8 @@ import { Inbox, Mail } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import PageLoadError from '../../components/ui/PageLoadError'
 import Button from '../../components/ui/Button'
+import ActionMenu from '../../components/ui/ActionMenu'
+import { Check, Undo2 } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import PageHeader from '../../components/layout/PageHeader'
@@ -95,6 +97,7 @@ export default function AdminLeads() {
                 <TableTh>Email</TableTh>
                 <TableTh>Details</TableTh>
                 <TableTh>Status</TableTh>
+                <TableTh className="text-right">Actions</TableTh>
               </tr>
             </TableHead>
             <TableBody>
@@ -127,35 +130,46 @@ export default function AdminLeads() {
                   </TableTd>
                   <TableTd>
                     {lead.contactedAt ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        className="text-green-700"
-                        onClick={() => markMutation.mutate({ id: lead.id, contacted: false })}
-                        isLoading={
-                          markMutation.isPending &&
-                          markMutation.variables?.id === lead.id &&
-                          markMutation.variables?.contacted === false
-                        }
-                      >
-                        Contacted · undo
-                      </Button>
+                      <Badge tone="success" size="sm" shape="soft">
+                        Contacted
+                      </Badge>
                     ) : (
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="secondary"
-                        onClick={() => markMutation.mutate({ id: lead.id, contacted: true })}
-                        isLoading={
-                          markMutation.isPending &&
-                          markMutation.variables?.id === lead.id &&
-                          markMutation.variables?.contacted === true
-                        }
-                      >
-                        Mark contacted
-                      </Button>
+                      <Badge tone="neutral" size="sm" shape="soft">
+                        New
+                      </Badge>
                     )}
+                  </TableTd>
+                  <TableTd className="text-right">
+                    <ActionMenu
+                      label="Actions"
+                      size="xs"
+                      align="right"
+                      menuAriaLabel={`Actions for lead ${lead.email}`}
+                      isLoading={
+                        markMutation.isPending && markMutation.variables?.id === lead.id
+                      }
+                      items={
+                        lead.contactedAt
+                          ? [
+                              {
+                                kind: 'button',
+                                label: 'Mark as not contacted',
+                                icon: Undo2,
+                                onClick: () => markMutation.mutate({ id: lead.id, contacted: false }),
+                                disabled: markMutation.isPending,
+                              },
+                            ]
+                          : [
+                              {
+                                kind: 'button',
+                                label: 'Mark contacted',
+                                icon: Check,
+                                onClick: () => markMutation.mutate({ id: lead.id, contacted: true }),
+                                disabled: markMutation.isPending,
+                              },
+                            ]
+                      }
+                    />
                   </TableTd>
                 </TableRow>
               ))}

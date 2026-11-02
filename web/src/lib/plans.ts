@@ -531,6 +531,12 @@ function applyQuotaProseToMarketingPlan(plan: MarketingPlan): MarketingPlan {
   return { ...plan, tagline, bullets }
 }
 
+/** Pricing cards: tagline + bullets always follow numeric CMS limits (same source as comparison table). */
+export function planPricingCardCopy(plan: MarketingPlan): { tagline: string; bullets: string[] } {
+  const synced = applyQuotaProseToMarketingPlan(plan)
+  return { tagline: synced.tagline, bullets: synced.bullets }
+}
+
 function apiPlanToMarketing(p: ApiPublicPlan, fallback: MarketingPlan): MarketingPlan {
   const m = p.marketing
   if (!m) return applyQuotaProseToMarketingPlan(fallback)

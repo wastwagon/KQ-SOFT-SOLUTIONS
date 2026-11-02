@@ -39,7 +39,7 @@
 
 ## Marketing copy (editable in CMS; static text OK elsewhere)
 
-- **Tagline + lead bullet** on pricing cards follow numeric **Projects / TX / seats / banks** at API serve time (`syncMarketingQuotaProse`) and are rewritten on **Save** in Platform admin → Plans.
+- **Tagline + lead bullet** on pricing cards follow numeric **Projects / TX / seats / banks** at API serve time (`syncMarketingQuotaProse`), on **Save** in Platform admin → Plans, and again when rendering cards (`planPricingCardCopy` on landing).
 - Comparison-table **limit rows** always follow quotas when the site loads (`applyQuotaToMarketingMatrix`).
 - Landing FAQ paragraphs and hero copy still mention Solo/Team/Firm **as examples** — update in Plans marketing or FAQ content when positioning changes.
 - `planFeatures.ts` catalog **hints** (e.g. “Solo and above”) are admin UI labels only.

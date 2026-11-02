@@ -5,6 +5,7 @@ import ProjectStatusPill, { type ProjectStatus } from './ProjectStatusPill'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
 
@@ -228,34 +229,45 @@ export default function ProjectHeader({
                     <span className="font-medium text-gray-700">{project.currency}</span>
                   </span>
                 )}
-                {canEdit && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={startEdit}
-                    className="text-primary-600 hover:text-primary-700"
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
-                    {canEditName ? 'Edit details' : 'Edit client & currency'}
-                  </Button>
-                )}
               </div>
             </div>
           )}
         </div>
 
-        {canDelete && !editing && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleDelete}
+        {!editing && (canEdit || canDelete) && (
+          <ActionMenu
+            label="Actions"
+            size="sm"
+            variant="outline"
+            align="right"
+            menuAriaLabel="Project actions"
             isLoading={isDeleting}
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
-            Delete
-          </Button>
+            items={[
+              ...(canEdit
+                ? [
+                    {
+                      kind: 'button' as const,
+                      label: canEditName ? 'Edit details' : 'Edit client & currency',
+                      icon: Pencil,
+                      onClick: startEdit,
+                    },
+                  ]
+                : []),
+              ...(canEdit && canDelete ? [{ kind: 'separator' as const }] : []),
+              ...(canDelete
+                ? [
+                    {
+                      kind: 'button' as const,
+                      label: 'Delete project',
+                      icon: Trash2,
+                      destructive: true,
+                      onClick: () => void handleDelete(),
+                      disabled: isDeleting,
+                    },
+                  ]
+                : []),
+            ]}
+          />
         )}
       </div>
     </header>

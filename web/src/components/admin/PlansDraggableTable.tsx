@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import Badge from '../ui/Badge'
-import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/Table'
 
 export type SortablePlanRow = {
@@ -147,18 +147,28 @@ export default function PlansDraggableTable({
               <TableTd className="text-right">{p.quarterlyGhs}</TableTd>
               <TableTd className="text-right">{p.yearlyGhs}</TableTd>
               <TableTd className="text-right">
-                <Button type="button" variant="ghost" size="xs" onClick={() => onEdit(p)}>
-                  Edit
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
+                <ActionMenu
+                  label="Actions"
                   size="xs"
-                  onClick={() => onDelete(p)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  Delete
-                </Button>
+                  align="right"
+                  menuAriaLabel={`Actions for ${p.name}`}
+                  items={[
+                    {
+                      kind: 'button',
+                      label: 'Edit plan',
+                      icon: Pencil,
+                      onClick: () => onEdit(p),
+                    },
+                    { kind: 'separator' },
+                    {
+                      kind: 'button',
+                      label: 'Delete plan',
+                      icon: Trash2,
+                      destructive: true,
+                      onClick: () => onDelete(p),
+                    },
+                  ]}
+                />
               </TableTd>
             </TableRow>
           )

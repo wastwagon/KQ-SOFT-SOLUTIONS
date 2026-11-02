@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { Paperclip } from 'lucide-react'
+import { Paperclip, Unlink } from 'lucide-react'
 import { formatAmount } from '../../lib/format'
 import { useConfirm } from '../ui/ConfirmDialog'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
 import Card from '../ui/Card'
 import type { MatchedPair } from './types'
 
@@ -101,38 +102,41 @@ export default function ConfirmedMatchesPanel({
               )}
             </span>
             {canReconcile && (
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => triggerEvidence(m.matchId)}
-                  disabled={isUploading && uploadingMatchId !== m.matchId}
-                  isLoading={isUploading && uploadingMatchId === m.matchId}
-                  className="text-primary-600 hover:bg-primary-50"
-                >
-                  Evidence
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={async () => {
-                    const ok = await confirm({
-                      title: 'Remove this match?',
-                      description:
-                        'The cash book and bank transactions will move back to the unmatched list. Any uploaded evidence stays on the project but will no longer be linked to this match.',
-                      confirmLabel: 'Unmatch',
-                      tone: 'danger',
-                    })
-                    if (ok) onUnmatch(m.matchId)
-                  }}
-                  disabled={isUnmatching}
-                  className="text-red-600 hover:bg-red-50"
-                >
-                  Unmatch
-                </Button>
-              </div>
+              <ActionMenu
+                label="Actions"
+                size="xs"
+                variant="ghost"
+                align="right"
+                menuAriaLabel="Match actions"
+                isLoading={isUploading && uploadingMatchId === m.matchId}
+                items={[
+                  {
+                    kind: 'button',
+                    label: 'Upload evidence',
+                    icon: Paperclip,
+                    disabled: (isUploading && uploadingMatchId !== m.matchId) || isUnmatching,
+                    onClick: () => triggerEvidence(m.matchId),
+                  },
+                  { kind: 'separator' },
+                  {
+                    kind: 'button',
+                    label: 'Unmatch',
+                    icon: Unlink,
+                    destructive: true,
+                    disabled: isUnmatching || isUploading,
+                    onClick: async () => {
+                      const ok = await confirm({
+                        title: 'Remove this match?',
+                        description:
+                          'The cash book and bank transactions will move back to the unmatched list. Any uploaded evidence stays on the project but will no longer be linked to this match.',
+                        confirmLabel: 'Unmatch',
+                        tone: 'danger',
+                      })
+                      if (ok) onUnmatch(m.matchId)
+                    },
+                  },
+                ]}
+              />
             )}
           </li>
         ))}

@@ -6,6 +6,8 @@ import { useToast } from '../ui/Toast'
 import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
+import { Trash2 } from 'lucide-react'
 import Input from '../ui/Input'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/Table'
 import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
@@ -105,7 +107,7 @@ export default function ApiKeysSection() {
               <TableTh>Name</TableTh>
               <TableTh>Prefix</TableTh>
               <TableTh>Last used</TableTh>
-              <TableTh className="w-20" />
+              <TableTh className="text-right w-24">Actions</TableTh>
             </tr>
           </TableHead>
           <TableBody>
@@ -123,25 +125,33 @@ export default function ApiKeysSection() {
                   <TableTd className="text-gray-500">
                     {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : '—'}
                   </TableTd>
-                  <TableTd>
-                    <Button
-                      type="button"
-                      variant="ghost"
+                  <TableTd className="text-right">
+                    <ActionMenu
+                      label="Actions"
                       size="xs"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: 'Revoke this API key?',
-                          description: `Integrations using "${k.name}" will stop working immediately.`,
-                          confirmLabel: 'Revoke',
-                          tone: 'danger',
-                        })
-                        if (ok) deleteMutation.mutate(k.id)
-                      }}
-                      disabled={deleteMutation.isPending}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Revoke
-                    </Button>
+                      variant="ghost"
+                      align="right"
+                      menuAriaLabel={`Actions for API key ${k.name}`}
+                      isLoading={deleteMutation.isPending}
+                      items={[
+                        {
+                          kind: 'button',
+                          label: 'Revoke key',
+                          icon: Trash2,
+                          destructive: true,
+                          onClick: async () => {
+                            const ok = await confirm({
+                              title: 'Revoke this API key?',
+                              description: `Integrations using "${k.name}" will stop working immediately.`,
+                              confirmLabel: 'Revoke',
+                              tone: 'danger',
+                            })
+                            if (ok) deleteMutation.mutate(k.id)
+                          },
+                          disabled: deleteMutation.isPending,
+                        },
+                      ]}
+                    />
                   </TableTd>
                 </TableRow>
               ))

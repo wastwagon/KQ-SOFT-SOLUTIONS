@@ -20,6 +20,8 @@ import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
 import Button, { buttonClassName } from '../components/ui/Button'
+import ActionMenu from '../components/ui/ActionMenu'
+import { Download, Trash2 } from 'lucide-react'
 import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import Badge from '../components/ui/Badge'
@@ -1824,32 +1826,43 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                       <td className="px-3 py-2 capitalize">{a.type.replace('_', ' ')}</td>
                       <td className="px-3 py-2 text-slate-600">{fmt(a.createdAt)}</td>
                       <td className="px-3 py-2 text-right print:hidden">
-                        <Button
-                          type="button"
-                          variant="ghost"
+                        <ActionMenu
+                          label="Actions"
                           size="xs"
-                          onClick={() =>
-                            attachments.download(a.id, a.filename).catch((err) =>
-                              unlessSubscriptionInactive(err, (e) =>
-                                setExportError(e instanceof Error ? e.message : 'Download failed')
-                              )
-                            )
+                          variant="ghost"
+                          align="right"
+                          menuAriaLabel={`Actions for ${a.filename}`}
+                          isLoading={
+                            attachmentDeleteMutation.isPending &&
+                            attachmentDeleteMutation.variables === a.id
                           }
-                        >
-                          Download
-                        </Button>
-                        {canDeleteAttachment(role) && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => attachmentDeleteMutation.mutate(a.id)}
-                            disabled={attachmentDeleteMutation.isPending}
-                            className="ml-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            Delete
-                          </Button>
-                        )}
+                          items={[
+                            {
+                              kind: 'button',
+                              label: 'Download',
+                              icon: Download,
+                              onClick: () =>
+                                attachments.download(a.id, a.filename).catch((err) =>
+                                  unlessSubscriptionInactive(err, (e) =>
+                                    setExportError(e instanceof Error ? e.message : 'Download failed')
+                                  )
+                                ),
+                            },
+                            ...(canDeleteAttachment(role)
+                              ? ([
+                                  { kind: 'separator' as const },
+                                  {
+                                    kind: 'button' as const,
+                                    label: 'Delete',
+                                    icon: Trash2,
+                                    destructive: true,
+                                    disabled: attachmentDeleteMutation.isPending,
+                                    onClick: () => attachmentDeleteMutation.mutate(a.id),
+                                  },
+                                ] as const)
+                              : []),
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FileSpreadsheet, FileText } from 'lucide-react'
 import type { ReconcileExportInput, ReconcileExportSide } from '../../lib/reconcileTableExport'
-import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
 import { useToast } from '../ui/Toast'
 
 type Props = Omit<ReconcileExportInput, 'side'> & {
@@ -30,31 +30,29 @@ export default function ReconcileTableExportButtons({ side, label, ...rest }: Pr
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Export ${label}`}>
-      <Button
-        type="button"
-        variant="outline"
-        size="xs"
-        disabled={busy != null}
-        isLoading={busy === 'excel'}
-        onClick={() => run('excel')}
-        title={`Download ${label} as Excel`}
-      >
-        <FileSpreadsheet className="h-3.5 w-3.5 mr-1" aria-hidden />
-        Excel
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="xs"
-        disabled={busy != null}
-        isLoading={busy === 'pdf'}
-        onClick={() => run('pdf')}
-        title={`Download ${label} as PDF`}
-      >
-        <FileText className="h-3.5 w-3.5 mr-1" aria-hidden />
-        PDF
-      </Button>
-    </div>
+    <ActionMenu
+      label="Export"
+      size="xs"
+      variant="outline"
+      align="right"
+      menuAriaLabel={`Export ${label}`}
+      isLoading={busy != null}
+      items={[
+        {
+          kind: 'button',
+          label: 'Download Excel',
+          icon: FileSpreadsheet,
+          disabled: busy != null,
+          onClick: () => void run('excel'),
+        },
+        {
+          kind: 'button',
+          label: 'Download PDF',
+          icon: FileText,
+          disabled: busy != null,
+          onClick: () => void run('pdf'),
+        },
+      ]}
+    />
   )
 }

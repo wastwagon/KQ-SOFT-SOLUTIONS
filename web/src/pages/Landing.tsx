@@ -46,6 +46,7 @@ import {
   mergeWithApiPlans,
   planAmountForPeriod,
   planMonthlyEquivalent,
+  planPricingCardCopy,
   type BillingPeriod,
   type MarketingPlan,
 } from '../lib/plans'
@@ -1204,6 +1205,7 @@ function PlanCard({
   const ctaLabel =
     isAuthed && plan.ctaHref === '/register' ? 'Billing & plans' : plan.ctaLabel
   const isInternalCta = ctaHref.startsWith('/')
+  const cardCopy = planPricingCardCopy(plan)
 
   return (
     <div
@@ -1228,7 +1230,7 @@ function PlanCard({
       )}
 
       <h3 className="text-sm font-semibold text-gray-900">{plan.name}</h3>
-      <p className="mt-0.5 text-xs text-gray-500 leading-snug line-clamp-2">{plan.tagline}</p>
+      <p className="mt-0.5 text-xs text-gray-500 leading-snug line-clamp-2">{cardCopy.tagline}</p>
 
       <div className="mt-2">
         {isCustom ? (
@@ -1263,7 +1265,7 @@ function PlanCard({
       )}
 
       <ul className={`${plan.inheritsFromLabel ? 'mt-1.5' : 'mt-3'} space-y-1 flex-1`}>
-        {plan.bullets.map((b) => (
+        {cardCopy.bullets.map((b) => (
           <li key={b} className="flex items-start gap-1.5 text-xs text-gray-700 leading-snug">
             <Check
               className={`mt-0.5 w-3.5 h-3.5 flex-shrink-0 ${

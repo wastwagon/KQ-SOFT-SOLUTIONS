@@ -592,17 +592,24 @@ export default function AdminOrgDetail() {
                     </Select>
                   </div>
                   {org.members.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
+                    <ActionMenu
+                      label="Actions"
                       size="xs"
-                      onClick={() => removeMemberMutation.mutate(m.user.id)}
-                      disabled={removeMemberMutation.isPending}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      title="Remove member"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      variant="ghost"
+                      align="right"
+                      menuAriaLabel={`Actions for ${m.user.email}`}
+                      isLoading={removeMemberMutation.isPending}
+                      items={[
+                        {
+                          kind: 'button',
+                          label: 'Remove member',
+                          icon: Trash2,
+                          destructive: true,
+                          onClick: () => removeMemberMutation.mutate(m.user.id),
+                          disabled: removeMemberMutation.isPending,
+                        },
+                      ]}
+                    />
                   )}
                 </div>
               </li>

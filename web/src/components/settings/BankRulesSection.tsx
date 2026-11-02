@@ -6,6 +6,8 @@ import { useToast } from '../ui/Toast'
 import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
+import { Pencil, Trash2 } from 'lucide-react'
 import Card from '../ui/Card'
 import EmptyState from '../ui/EmptyState'
 import Input from '../ui/Input'
@@ -182,48 +184,51 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
                 </p>
               </div>
               {canEdit && (
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    disabled={r.activeInMatch === false}
-                    title={r.activeInMatch === false ? 'Paused rules can only be deleted on Solo' : undefined}
-                    onClick={() => {
-                      setEditId(r.id)
-                      setName(r.name)
-                      setPriority(r.priority)
-                      const conds = r.conditions?.length
-                        ? r.conditions.map((c: { field: string; operator: string; value: unknown }) => ({
-                            field: c.field,
-                            operator: c.operator,
-                            value: String(c.value ?? ''),
-                          }))
-                        : [defaultCondition()]
-                      setConditions(conds)
-                      setAction((r.action as 'suggest_match' | 'flag_for_review') || 'suggest_match')
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: 'Delete this rule?',
-                        description: r.name,
-                        confirmLabel: 'Delete',
-                        tone: 'danger',
-                      })
-                      if (ok) deleteMutation.mutate(r.id)
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    Delete
-                  </Button>
-                </div>
+                <ActionMenu
+                  label="Actions"
+                  size="xs"
+                  variant="ghost"
+                  align="right"
+                  menuAriaLabel={`Actions for rule ${r.name}`}
+                  items={[
+                    {
+                      kind: 'button',
+                      label: 'Edit rule',
+                      icon: Pencil,
+                      disabled: r.activeInMatch === false,
+                      onClick: () => {
+                        setEditId(r.id)
+                        setName(r.name)
+                        setPriority(r.priority)
+                        const conds = r.conditions?.length
+                          ? r.conditions.map((c: { field: string; operator: string; value: unknown }) => ({
+                              field: c.field,
+                              operator: c.operator,
+                              value: String(c.value ?? ''),
+                            }))
+                          : [defaultCondition()]
+                        setConditions(conds)
+                        setAction((r.action as 'suggest_match' | 'flag_for_review') || 'suggest_match')
+                      },
+                    },
+                    { kind: 'separator' },
+                    {
+                      kind: 'button',
+                      label: 'Delete rule',
+                      icon: Trash2,
+                      destructive: true,
+                      onClick: async () => {
+                        const ok = await confirm({
+                          title: 'Delete this rule?',
+                          description: r.name,
+                          confirmLabel: 'Delete',
+                          tone: 'danger',
+                        })
+                        if (ok) deleteMutation.mutate(r.id)
+                      },
+                    },
+                  ]}
+                />
               )}
             </li>
           ))}
