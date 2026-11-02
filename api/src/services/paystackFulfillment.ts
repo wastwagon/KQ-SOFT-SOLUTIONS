@@ -317,7 +317,7 @@ export async function applyVerifiedPaystackCharge(
 ): Promise<{ orgId: string; plan: string; period: string; result: 'applied' | 'already_applied' }> {
   const reference = (tx.reference || '').trim()
   const meta = extractCheckoutMetadata(tx.metadata, reference)
-  if (!meta.orgId || !(await isCheckoutPlanSlug(meta.plan))) {
+  if (!meta.orgId || !meta.plan || !(await isCheckoutPlanSlug(meta.plan))) {
     throw Object.assign(new Error('Payment metadata is missing organisation or plan'), { status: 422 })
   }
   const amountRaw = tx.amount ?? 0

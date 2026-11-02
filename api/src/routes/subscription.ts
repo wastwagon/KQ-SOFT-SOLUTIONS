@@ -586,7 +586,7 @@ export async function handlePaystackWebhook(req: express.Request, res: express.R
 
   const reference = event.data?.reference
   const meta = extractCheckoutMetadata(event.data?.metadata, reference)
-  if (!meta.orgId || !reference || !(await isCheckoutPlanSlug(meta.plan))) {
+  if (!meta.orgId || !reference || !meta.plan || !(await isCheckoutPlanSlug(meta.plan))) {
     logger.warn(
       { reference, orgId: meta.orgId, plan: meta.plan },
       'paystack: charge.success missing org/plan metadata'

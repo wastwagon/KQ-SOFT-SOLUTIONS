@@ -36,7 +36,7 @@ export function getSubscriptionSnapshot(
    * A trial end date applies only when platform admin sets one.
    */
   const applyContractBillingGrace = (status: SubscriptionStatus): SubscriptionStatus => {
-    const contractBilling = isContractBillingPlanSlug(org.plan)
+    const contractBilling = org.plan ? isContractBillingPlanSlug(org.plan) : false
     if (contractBilling && forcedStatus == null && (status === 'free' || status === 'expired')) {
       return 'active'
     }
