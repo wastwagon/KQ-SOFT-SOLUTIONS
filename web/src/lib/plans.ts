@@ -157,18 +157,18 @@ export const MARKETING_PLANS: MarketingPlan[] = [
   {
     slug: 'free',
     name: 'Free',
-    tagline: '1 bank account, 500 transactions, and 5 projects a month.',
+    tagline: '1 person, 1 bank account, 300 transactions, and 3 projects a month.',
     audience: 'Getting started',
     monthlyGhs: 0,
     yearlyGhs: 0,
     quarterlyGhs: 0,
-    projectsPerMonth: 5,
-    transactionsPerMonth: 500,
+    projectsPerMonth: 3,
+    transactionsPerMonth: 300,
     bankAccounts: 1,
     users: 1,
     cleanExportsPerMonth: 0,
     bullets: [
-      '5 projects / month · 1 team member',
+      '3 projects / month · 1 team member',
       'Watermarked sample downloads',
       'Excel, CSV and PDF imports, plus OCR',
       'Auto-match suggestions and BRS export',
@@ -177,8 +177,8 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     ],
     features: {
       bank_accounts: '1',
-      projects: '5 / month',
-      transactions: '500 / month',
+      projects: '3 / month',
+      transactions: '300 / month',
       users: '1',
       imports: true,
       ocr: true,
@@ -474,10 +474,67 @@ export type ApiPublicPlan = {
   sortOrder?: number
 }
 
+function suggestTaglineFromQuotas(quotas: {
+  bankAccounts: number
+  projectsPerMonth: number
+  transactionsPerMonth: number
+  users: number
+}): string {
+  const banks =
+    quotas.bankAccounts < 0
+      ? 'unlimited bank accounts'
+      : `${quotas.bankAccounts} bank account${quotas.bankAccounts === 1 ? '' : 's'}`
+  const tx =
+    quotas.transactionsPerMonth < 0
+      ? 'unlimited transactions'
+      : `${quotas.transactionsPerMonth.toLocaleString('en-GH')} transactions`
+  const projects =
+    quotas.projectsPerMonth < 0
+      ? 'unlimited projects'
+      : `${quotas.projectsPerMonth} project${quotas.projectsPerMonth === 1 ? '' : 's'}`
+  const people =
+    quotas.users < 0
+      ? 'unlimited team members'
+      : quotas.users === 1
+        ? '1 person'
+        : `${quotas.users} people`
+  if (quotas.users === 1) {
+    return `${people}, ${banks}, ${tx}, and ${projects} a month.`
+  }
+  return `${people}, ${banks}, ${tx}, and ${projects} a month.`
+}
+
+const QUOTA_LEAD_BULLET =
+  /projects?\s*\/?\s*month|team member|team members|people|person\b/i
+
+/** Align pricing card tagline + lead bullet with CMS numeric limits (API also syncs at serve time). */
+function applyQuotaProseToMarketingPlan(plan: MarketingPlan): MarketingPlan {
+  const tagline = suggestTaglineFromQuotas({
+    bankAccounts: plan.bankAccounts,
+    projectsPerMonth: plan.projectsPerMonth,
+    transactionsPerMonth: plan.transactionsPerMonth,
+    users: plan.users,
+  })
+  const leadProjects =
+    plan.projectsPerMonth < 0
+      ? 'Unlimited projects / month'
+      : `${plan.projectsPerMonth.toLocaleString('en-GH')} projects / month`
+  const leadMembers =
+    plan.users < 0
+      ? 'unlimited team members'
+      : `${plan.users} team member${plan.users === 1 ? '' : 's'}`
+  const lead = `${leadProjects} · ${leadMembers}`
+  const bullets = plan.bullets.length ? [...plan.bullets] : [lead]
+  if (bullets.length > 0 && QUOTA_LEAD_BULLET.test(bullets[0] ?? '')) {
+    bullets[0] = lead
+  }
+  return { ...plan, tagline, bullets }
+}
+
 function apiPlanToMarketing(p: ApiPublicPlan, fallback: MarketingPlan): MarketingPlan {
   const m = p.marketing
-  if (!m) return fallback
-  return {
+  if (!m) return applyQuotaProseToMarketingPlan(fallback)
+  const merged = {
     ...fallback,
     slug: fallback.slug,
     name: p.name || fallback.name,
@@ -503,12 +560,12 @@ function apiPlanToMarketing(p: ApiPublicPlan, fallback: MarketingPlan): Marketin
     },
     active: p.active !== false,
   }
+  return applyQuotaProseToMarketingPlan(merged)
 }
 
 /**
  * Merge live CMS data from the API into published plan definitions.
- * When marketing is present on the API payload, taglines, bullets, and the
- * comparison matrix come from platform admin — not this file.
+ * Numeric limits drive taglines, lead bullets, and comparison limit rows.
  */
 export function mergeWithApiPlans(apiPlans: ReadonlyArray<ApiPublicPlan> | undefined): MarketingPlan[] {
   if (!apiPlans || apiPlans.length === 0) return MARKETING_PLANS
@@ -588,7 +645,7 @@ export function mergeWithApiPlans(apiPlans: ReadonlyArray<ApiPublicPlan> | undef
     if (live.marketing) {
       return apiPlanToMarketing(live, merged)
     }
-    return merged
+    return applyQuotaProseToMarketingPlan(merged)
   })
 }
 

@@ -18,6 +18,7 @@ import {
   applyFeatureFlagsToMarketingMatrix,
   applyQuotaToMarketingMatrix,
   parseStoredMarketing,
+  syncMarketingQuotaProse,
   type PlanMarketing,
 } from '../lib/planMarketing.js'
 
@@ -58,6 +59,7 @@ function resolveMarketing(
 ): PlanMarketing {
   let marketing = parseStoredMarketing(stored, slug)
   marketing = applyQuotaToMarketingMatrix(marketing, quotas)
+  marketing = syncMarketingQuotaProse(marketing, quotas)
   marketing = applyFeatureFlagsToMarketingMatrix(marketing, features)
   return marketing
 }

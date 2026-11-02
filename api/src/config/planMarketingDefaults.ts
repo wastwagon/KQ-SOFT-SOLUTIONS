@@ -18,8 +18,8 @@ export type PlanMarketing = {
 
 const freeMatrix: Record<string, boolean | string> = {
   bank_accounts: '1',
-  projects: '5 / month',
-  transactions: '500 / month',
+  projects: '3 / month',
+  transactions: '300 / month',
   users: '1',
   imports: true,
   ocr: true,
@@ -50,10 +50,10 @@ const freeMatrix: Record<string, boolean | string> = {
 
 export const DEFAULT_PLAN_MARKETING: Record<string, PlanMarketing> = {
   free: {
-    tagline: '1 bank account, 500 transactions, and 5 projects a month.',
+    tagline: '1 person, 1 bank account, 300 transactions, and 3 projects a month.',
     audience: 'Getting started',
     bullets: [
-      '5 projects / month · 1 team member',
+      '3 projects / month · 1 team member',
       'Watermarked sample downloads',
       'Excel, CSV and PDF imports, plus OCR',
       'Auto-match suggestions and BRS export',

@@ -22,7 +22,7 @@ KQ-SOFT is positioned as **end-to-end bank reconciliation**: upload cash book an
 
 | Package | Typical buyer | Monthly list (GHS) | Headline limits |
 |--------|----------------|---------------------|-----------------|
-| **Free** | Trial / very small use | 0 | 1 user · 1 bank · 500 tx/mo · 5 projects/mo |
+| **Free** | Trial / very small use | 0 | 1 user · 1 bank · 300 tx/mo · 3 projects/mo |
 | **Solo** | Individual accountant | **199** | 1 user · 3 banks · 3,000 tx/mo · 12 projects/mo |
 | **Team** | Small finance team | **399** | 5 users · 10 banks · 15,000 tx/mo · 40 projects/mo |
 | **Firm** | Established practice | **990** | 10 users · 30 banks · 40,000 tx/mo · 100 projects/mo |

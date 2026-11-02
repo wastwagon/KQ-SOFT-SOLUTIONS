@@ -3,6 +3,7 @@ import {
   applyQuotaToMarketingMatrix,
   parseStoredMarketing,
   suggestTaglineFromQuotas,
+  syncMarketingQuotaProse,
 } from './planMarketing.js'
 
 describe('planMarketing', () => {
@@ -33,5 +34,18 @@ describe('planMarketing', () => {
         usersLimit: 1,
       })
     ).toContain('300 transactions')
+  })
+
+  it('syncs tagline and lead bullet when quotas change', () => {
+    const base = parseStoredMarketing(null, 'free')
+    const synced = syncMarketingQuotaProse(base, {
+      bankAccounts: 1,
+      projectsPerMonth: 3,
+      transactionsPerMonth: 300,
+      usersLimit: 1,
+    })
+    expect(synced.tagline).toContain('3 project')
+    expect(synced.tagline).toContain('300 transactions')
+    expect(synced.bullets[0]).toBe('3 projects / month · 1 team member')
   })
 })

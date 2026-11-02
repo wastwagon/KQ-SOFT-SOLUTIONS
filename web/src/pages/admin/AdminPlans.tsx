@@ -163,9 +163,34 @@ function suggestTaglineFromLimits(input: {
         ? '1 person'
         : `${input.usersLimit} people`
   if (input.usersLimit === 1) {
-    return `${people}, ${banks}, and ${tx} a month.`
+    return `${people}, ${banks}, ${tx}, and ${projects} a month.`
   }
   return `${people}, ${banks}, ${tx}, and ${projects} a month.`
+}
+
+function leadBulletFromLimits(input: {
+  projectsPerMonth: number
+  usersLimit: number
+}): string {
+  const projects =
+    input.projectsPerMonth < 0
+      ? 'Unlimited projects / month'
+      : `${input.projectsPerMonth.toLocaleString('en-GH')} projects / month`
+  const members =
+    input.usersLimit < 0
+      ? 'unlimited team members'
+      : `${input.usersLimit} team member${input.usersLimit === 1 ? '' : 's'}`
+  return `${projects} · ${members}`
+}
+
+function syncLeadBullet(bullets: string[], limits: { projectsPerMonth: number; usersLimit: number }): string[] {
+  const lead = leadBulletFromLimits(limits)
+  if (bullets.length === 0) return [lead]
+  const out = [...bullets]
+  if (/projects?\s*\/?\s*month|team member|people|person\b/i.test(out[0] ?? '')) {
+    out[0] = lead
+  }
+  return out
 }
 
 const EMPTY_MARKETING: PlanMarketing = {
@@ -426,11 +451,15 @@ function PlanForm({
       features,
       marketing: {
         ...marketing,
+        tagline: suggestTaglineFromLimits(quotaNums),
         badge: marketing.badge?.trim() ? marketing.badge.trim() : null,
         inheritsFromLabel: marketing.inheritsFromLabel?.trim()
           ? marketing.inheritsFromLabel.trim()
           : null,
-        bullets: marketing.bullets.filter((b) => b.trim().length > 0),
+        bullets: syncLeadBullet(
+          marketing.bullets.filter((b) => b.trim().length > 0),
+          quotaNums
+        ),
         featureMatrix: marketing.featureMatrix,
       },
       active,
@@ -488,8 +517,7 @@ function PlanForm({
         <div>
           <h4 className="text-sm font-semibold text-gray-900">Public pricing page</h4>
           <p className="text-xs text-gray-500 mt-1">
-            Taglines, bullets, and comparison-table copy on the landing page. Plan limit rows in
-            the comparison table always follow the numeric fields above when the site loads.
+            Taglines and lead bullets are regenerated from the numeric limits when you save (and on the public site at load time). Other bullets and comparison copy stay editable below.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

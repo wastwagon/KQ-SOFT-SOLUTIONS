@@ -35,8 +35,8 @@ describe('buildPublicPlans', () => {
       name: 'Free',
       monthlyGhs: 0,
       yearlyGhs: 0,
-      projectsPerMonth: 5,
-      transactionsPerMonth: 500,
+      projectsPerMonth: 3,
+      transactionsPerMonth: 300,
       bankAccounts: 1,
     })
 

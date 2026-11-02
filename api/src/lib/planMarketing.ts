@@ -57,6 +57,48 @@ export function applyQuotaToMarketingMatrix(
   return { ...marketing, featureMatrix }
 }
 
+function leadBulletFromQuotas(quotas: {
+  projectsPerMonth: number
+  usersLimit: number
+}): string {
+  const projects =
+    quotas.projectsPerMonth < 0
+      ? 'Unlimited projects / month'
+      : `${quotas.projectsPerMonth.toLocaleString('en-GH')} projects / month`
+  const members =
+    quotas.usersLimit < 0
+      ? 'unlimited team members'
+      : `${quotas.usersLimit} team member${quotas.usersLimit === 1 ? '' : 's'}`
+  return `${projects} · ${members}`
+}
+
+const QUOTA_LEAD_BULLET =
+  /projects?\s*\/?\s*month|team member|team members|people|person\b/i
+
+/**
+ * Tagline + first bullet on pricing cards follow numeric CMS quotas.
+ * Stored marketing JSON can lag after admins edit Projects / TX limits only.
+ */
+export function syncMarketingQuotaProse(
+  marketing: PlanMarketing,
+  quotas: {
+    bankAccounts: number
+    projectsPerMonth: number
+    transactionsPerMonth: number
+    usersLimit: number
+  }
+): PlanMarketing {
+  const tagline = suggestTaglineFromQuotas(quotas)
+  const bullets = [...marketing.bullets]
+  const lead = leadBulletFromQuotas(quotas)
+  if (bullets.length === 0) {
+    bullets.push(lead)
+  } else if (QUOTA_LEAD_BULLET.test(bullets[0] ?? '')) {
+    bullets[0] = lead
+  }
+  return { ...marketing, tagline, bullets }
+}
+
 const FEATURE_ALIAS: Record<string, string> = {
   discrepancy_report: 'discrepancy',
   missing_cheques_report: 'missing_cheques',
@@ -100,7 +142,7 @@ export function suggestTaglineFromQuotas(quotas: {
         ? '1 person'
         : `${quotas.usersLimit} people`
   if (quotas.usersLimit === 1) {
-    return `${people}, ${banks}, and ${tx} a month.`
+    return `${people}, ${banks}, ${tx}, and ${projects} a month.`
   }
   return `${people}, ${banks}, ${tx}, and ${projects} a month.`
 }

@@ -65,6 +65,7 @@ Expect only code identifiers, API fields, and comments — not user-visible stri
 | Platform admin (support mode, customers, plans) | **Done** — no “enter workspace” / “tenant” in UI |
 | User manual & mapping guide | **Done** — synced to `USER_MANUAL.md` |
 | PWA offline + subscription renewal panel | **Done** |
+| Geo / marketplace | **Ghana primary** — GHS Paystack, Ghana bank parsers, `importLocale` on org; landing FX reference (USD/EUR/GBP) is indicative only. No multi-region plan store in DB yet. |
 
 ---
 

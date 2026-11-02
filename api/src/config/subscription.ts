@@ -20,7 +20,7 @@ export const TIER_LIMITS: Record<
   }
 > = {
   free: {
-    projectsPerMonth: 5,
+    projectsPerMonth: 3,
     transactionsPerMonth: TIER_TRANSACTION_LIMITS.free,
     bankAccounts: 1,
     cleanExportsPerMonth: 0,

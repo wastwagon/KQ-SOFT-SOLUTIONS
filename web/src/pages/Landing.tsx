@@ -93,7 +93,7 @@ const FEATURES = [
     icon: Database,
     title: 'Statement layouts that ship ready',
     description:
-      'Pre-built parsers for major regional banks (plus generic Excel, CSV, and PDF). Scanned PDFs and odd columns are handled with OCR and guided mapping.',
+      'Pre-built parsers for major Ghana banks (plus generic Excel, CSV, and PDF). Scanned PDFs and odd columns are handled with OCR and guided mapping.',
   },
   {
     icon: FileText,
@@ -1847,7 +1847,7 @@ function Footer() {
           </div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>Global product · engineering roots in Accra, Ghana</span>
+            <span>Built for Ghana · engineering in Accra</span>
           </div>
         </div>
       </div>

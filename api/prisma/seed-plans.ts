@@ -69,8 +69,8 @@ const PLANS: PlanSeed[] = [
   {
     slug: 'free',
     name: 'Free',
-    projectsPerMonth: 5,
-    transactionsPerMonth: 500,
+    projectsPerMonth: 3,
+    transactionsPerMonth: 300,
     monthlyGhs: 0,
     yearlyGhs: 0,
     quarterlyGhs: 0,
