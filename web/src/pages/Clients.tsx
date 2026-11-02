@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Building2, ChevronRight } from 'lucide-react'
+import { Building2, ChevronRight, Search } from 'lucide-react'
 import { clients, subscription, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { normalizeClientsPayload } from '../lib/clientsPayload'
 import { useAuth } from '../store/auth'
@@ -9,6 +9,7 @@ import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import Modal from '../components/ui/Modal'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
@@ -16,6 +17,7 @@ import { TableRowSkeleton } from '../components/ui/Skeleton'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import ListToolbar from '../components/layout/ListToolbar'
 
 export default function Clients() {
   const queryClient = useQueryClient()
@@ -24,6 +26,7 @@ export default function Clients() {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [addOpen, setAddOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
   const usageQuery = useQuery({
     queryKey: ['subscription', 'usage'],
@@ -37,6 +40,11 @@ export default function Clients() {
   })
   const { data: clientsRaw, isLoading, isError, error: clientsListError } = clientsQuery
   const { clients: list, unassignedProjectCount, totalProjectCount } = normalizeClientsPayload(clientsRaw)
+  const filteredList = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return list
+    return list.filter((c) => c.name.toLowerCase().includes(q))
+  }, [list, search])
   const paywallBlocked = isSubscriptionInactiveError(clientsQuery.error)
 
   const closeAdd = () => {
@@ -80,13 +88,11 @@ export default function Clients() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Work" title="Clients" />
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load clients"
+          error={clientsListError}
           onRetry={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}
-        >
-          {clientsListError instanceof Error ? clientsListError.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
@@ -114,6 +120,20 @@ export default function Clients() {
         }
       />
 
+      <ListToolbar
+        ariaLabel="Client search"
+        search={
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search clients…"
+            leading={<Search className="w-4 h-4" />}
+            aria-label="Search clients"
+          />
+        }
+      />
+
       {unassignedProjectCount > 0 && (
         <Alert
           tone="warning"
@@ -131,7 +151,7 @@ export default function Clients() {
 
       <Card noPadding>
         {isLoading ? (
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Client</TableTh>
@@ -144,6 +164,18 @@ export default function Clients() {
               ))}
             </TableBody>
           </Table>
+        ) : filteredList.length === 0 && list.length > 0 ? (
+          <div className="py-14 px-6">
+            <EmptyState
+              title="No clients match your search"
+              description="Try a different name or clear the search field."
+              action={
+                <Button type="button" variant="outline" onClick={() => setSearch('')}>
+                  Clear search
+                </Button>
+              }
+            />
+          </div>
         ) : list.length === 0 ? (
           <div className="py-14 px-6">
             <EmptyState
@@ -158,7 +190,7 @@ export default function Clients() {
             />
           </div>
         ) : (
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Client</TableTh>
@@ -166,7 +198,7 @@ export default function Clients() {
               </tr>
             </TableHead>
             <TableBody>
-              {list.map((c) => (
+              {filteredList.map((c) => (
                 <TableRow key={c.id}>
                   <TableTd className="font-medium text-gray-900">{c.name}</TableTd>
                   <TableTd>

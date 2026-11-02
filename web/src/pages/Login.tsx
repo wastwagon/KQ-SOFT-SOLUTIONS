@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
+import PublicPageSeo from '../components/marketing/PublicPageSeo'
 
 function safeInternalPath(from: unknown): string | null {
   if (!from || typeof from !== 'object') return null
@@ -82,6 +83,13 @@ export default function Login() {
   }
 
   return (
+    <>
+      <PublicPageSeo
+        title="Sign in — KQ-SOFT"
+        description="Sign in to your KQ-SOFT organisation to reconcile cash book and bank statements."
+        path="/login"
+        noIndex
+      />
     <AuthLayout
       eyebrow={inviteOrgName ? 'Team invitation' : 'Welcome back'}
       title={inviteOrgName ? `Join ${inviteOrgName}` : 'Sign in'}
@@ -151,5 +159,6 @@ export default function Login() {
         </p>
       </form>
     </AuthLayout>
+    </>
   )
 }

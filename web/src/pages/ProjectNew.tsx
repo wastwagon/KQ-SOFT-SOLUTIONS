@@ -13,6 +13,7 @@ import { normalizeClientsList } from '../lib/clientsPayload'
 import { useToast } from '../components/ui/Toast'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -152,7 +153,7 @@ export default function ProjectNew() {
           title="New reconciliation project"
           subtitle={
             <p className="text-gray-500">
-              Spin up a workspace for one client or period. When your subscription is active you can upload statements and match straight away.
+              Start a reconciliation for one client or period. When your subscription is active you can upload statements and match straight away.
             </p>
           }
         />
@@ -170,16 +171,14 @@ export default function ProjectNew() {
           title="New reconciliation project"
           subtitle={<p className="text-gray-500">Create a project as soon as data loads. Copy settings from an older job or start clean.</p>}
         />
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load data for new project"
+          error={err}
           onRetry={() => {
             void queryClient.invalidateQueries({ queryKey: ['projects'] })
             void queryClient.invalidateQueries({ queryKey: ['clients'] })
           }}
-        >
-          {err instanceof Error ? err.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
@@ -202,7 +201,7 @@ export default function ProjectNew() {
       {platformDefaultsFailed && (
         <Alert
           tone="warning"
-          title="Workspace defaults could not be loaded"
+          title="Organisation defaults could not be loaded"
           onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'platform-defaults'] })}
           className="max-w-2xl"
         >

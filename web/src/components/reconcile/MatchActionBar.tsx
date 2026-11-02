@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link as LinkIcon } from 'lucide-react'
 import Button from '../ui/Button'
+import { workspaceMobileTabBarOffset } from '../../lib/workspaceMobileLayout'
 
 /**
  * Floating bottom-of-viewport action bar shown while there's a valid
@@ -41,7 +42,8 @@ export default function MatchActionBar({
     <div
       role="toolbar"
       aria-label="Confirm reconcile match"
-      className="fixed z-40 left-0 right-0 px-3 sm:px-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] lg:left-1/2 lg:right-auto lg:bottom-6 lg:-translate-x-1/2 lg:px-4 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="fixed z-40 left-0 right-0 px-3 sm:px-4 lg:left-1/2 lg:right-auto lg:!bottom-6 lg:-translate-x-1/2 lg:px-4 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      style={{ bottom: workspaceMobileTabBarOffset('0.5rem') }}
     >
       <div className="mx-auto flex max-w-[min(100%,42rem)] flex-col gap-2 border border-gray-800 bg-gray-900/90 p-2 text-white shadow-2xl backdrop-blur-md rounded-xl sm:flex-row sm:items-center sm:gap-4 sm:pl-4">
         <div className="flex items-center gap-4 px-2 py-1 sm:py-2 sm:pl-2">

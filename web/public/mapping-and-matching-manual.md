@@ -2,7 +2,7 @@
 
 **Product:** KQ Bank Reconciliation System (BRS)  
 **Company:** KQ SOFT SOLUTIONS  
-**Audience:** Preparers, reviewers, and trainers  
+**Audience:** Preparers, checkers, and trainers  
 **Updated:** August 2026
 
 This guide explains how to **map** uploaded files to the correct columns and **match** cash book lines to bank statement lines. It is the detailed companion to the main [User Manual](../web/public/user-manual.md).
@@ -35,7 +35,7 @@ Mapping and matching happen **after Upload** in every project:
 | **Upload** | Add cash book and bank statement files |
 | **Map** | Tell the system which column is Date, Amount, Description, etc. |
 | **Reconcile** | Link cash book rows to bank rows |
-| **Review** | Check exceptions and variance |
+| **Review** | Check exceptions and the difference in unmatched totals |
 | **Report** | Generate the Bank Reconciliation Statement (BRS) |
 
 ### Prepare your files
@@ -249,14 +249,14 @@ The **Match by counting** panel on Reconcile builds amount-frequency schedules (
 
 - Amounts only in the cash book (Received / Payment)
 - Amounts only on the bank (Lodgment / Debits)
-- Both sides where batch counts do **not** cancel — **Open — more** lists (CB surplus or bank surplus)
+- Both sides where batch counts do **not** cancel — **extra lines on one side** (more in cash book or more on bank)
 - Both sides where batch counts **do** cancel — a **separate schedule**, not the main BRS
 
-There is **no separate Open — less list**. More on one side is the same as less on the other, so each amount is listed once. Read **CB count**, **Bank count**, and **Diff** on the row to see both sides.
+There is **no separate “less on the other side” list**. Extra lines on one side is the mirror of fewer on the other, so each amount is listed once. Read **Cash book count**, **Bank count**, and **Diff** on the row to see both sides.
 
-Recommended order on the panel: **Cancel** (equal counts) → **Open** → **Only**. Default scope is **unmatched** lines (toggle **All lines** if needed).
+Recommended order on the panel: **Same count** → **Extra lines** → **One side only**. Default scope is **unmatched** lines (toggle **All lines** if needed).
 
-On **Open** rows, **Select overlap** pre-selects the matching count on both sides (e.g. 3 vs 3 when the cash book has 5 and the bank has 3). Confirm those lines as usual. Leftovers stay unmatched and then appear on **Only** (keep Unmatched) — the panel switches to that Only list and highlights the amount. **Select all** still selects every line at that amount, including the surplus. **Select lines** on Cancel and Only lists pre-selects those transactions (capped at 50 lines per side).
+On **extra lines** rows, **Match overlap** pre-selects the lines that pair up on both sides (e.g. 3 vs 3 when the cash book has 5 and the bank has 3). Confirm those lines as usual. Leftovers stay unmatched and then appear on **one side only** (keep Unmatched) — the panel switches to that list and highlights the amount. **Select all** still selects every line at that amount, including the surplus. **Select lines** on cancel and one-side lists pre-selects those transactions (capped at 50 lines per side).
 
 Export to **Excel or PDF** from the panel. Counting is **diagnostic only**. It never auto-clears. Confirmed clears still use suggested/manual matching with amount plus date / reference / cheque / narration corroboration.
 
@@ -378,7 +378,7 @@ Not every row should be matched in the current period. These are **normal except
 
 ## 6. Bank rules (Team plan and above)
 
-**Settings → Bank rules** lets admins and reviewers define automatic behaviour:
+**Settings → Bank rules** lets administrators and checkers define automatic behaviour:
 
 | Setting | Options |
 |---------|---------|
@@ -484,14 +484,14 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 |------|------------|
 | **Mapping** | Assigning source file columns to system fields (Date, Amount, etc.) |
 | **Matching** | Linking a cash book transaction to a bank transaction |
-| **Canonical fields** | Standard field names the system uses internally |
+| **Canonical fields** | Standard column names the system uses after mapping (Date, Amount, etc.) |
 | **Uncredited lodgment** | Receipt recorded in cash book, not yet on bank statement |
 | **Unpresented cheque** | Payment recorded in cash book, cheque not yet debited by bank |
 | **Signed amount mode** | One column holds both positive and negative amounts |
-| **Confidence** | How likely a suggested match is correct (0–100%) |
+| **Confidence** | How likely a suggested match is correct (shown as 0–100%) |
 | **BRS** | Bank Reconciliation Statement — final report |
 | **Forget layout** | Deletes a saved organisation column map so it is not suggested for similar uploads; does not unmap the current file |
-| **Open — more** | Match-by-counting list where one side has more lines at that amount; equivalent to open — less on the other side (listed once) |
+| **Same amount, extra lines** | Same amount on both sides, but **extra lines on one side** — match the lines that pair up; remainder stays on one side only (see in-app help) |
 
 ---
 

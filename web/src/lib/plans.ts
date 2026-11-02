@@ -1,21 +1,11 @@
 /**
  * Marketing-side plan definitions (published pricing & feature matrix).
  *
- * This is the single source of truth for what appears on the public landing
- * page (`/`) and never depends on a network round-trip — the landing page
- * always renders even when the API is unreachable.
+ * Offline fallback when `/api/v1/public/plans` is unreachable. When the API
+ * responds, CMS data from platform admin Plans is the source of truth for
+ * prices, limits, taglines, bullets, and comparison-table copy.
  *
- * The API may override price/limits via `/api/v1/public/plans` (so admins
- * can tune pricing from the admin dashboard without a redeploy), but the
- * marketing copy (taglines, feature bullets, comparison matrix, audience
- * blurbs) is curated here so it does not get accidentally clobbered by
- * editing the DB directly.
- *
- * Source of truth for tier features:
- *   PLANNING_DATA.json → subscription_tiers
- *   api/src/config/subscription.ts → TIER_LIMITS, PLAN_PRICES
- *
- * Keep this file aligned with those when prices/limits change.
+ * See `docs/PRICING_CMS_AUDIT.md` for what is CMS-driven vs catalogue defaults.
  */
 
 export type PlanSlug = 'free' | 'basic' | 'standard' | 'premium' | 'firm'
@@ -29,7 +19,8 @@ const PUBLIC_PLAN_NAMES: Record<string, string> = {
   firm: 'Custom',
 }
 
-export function publicPlanName(slug: string | null | undefined): string {
+export function publicPlanName(slug: string | null | undefined, cmsName?: string | null): string {
+  if (cmsName?.trim()) return cmsName.trim()
   if (!slug) return 'Solo'
   return PUBLIC_PLAN_NAMES[slug] ?? slug
 }
@@ -92,7 +83,7 @@ export interface FeatureGroup {
 
 export const FEATURE_GROUPS: FeatureGroup[] = [
   {
-    title: 'Workspace limits',
+    title: 'Plan limits',
     features: [
       { id: 'bank_accounts', label: 'Bank accounts' },
       { id: 'transactions', label: 'Transactions per month' },
@@ -128,7 +119,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     features: [
       { id: 'brs_export', label: 'BRS export (Excel + PDF)' },
       { id: 'clean_exports', label: 'Full clean Excel/PDF exports' },
-      { id: 'discrepancy', label: 'Discrepancy report (date/amount variances)' },
+      { id: 'discrepancy', label: 'Discrepancy report (date/amount differences in matched pairs)' },
       { id: 'missing_cheques', label: 'Missing cheques report with ageing' },
       { id: 'audit_trail', label: 'Activity log' },
       { id: 'roll_forward', label: 'Roll forward across periods' },
@@ -141,7 +132,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { id: 'basic_branding', label: 'Default report branding' },
       { id: 'full_branding', label: 'Full branding (logo, colours, custom footer)' },
       { id: 'firm_dashboard', label: 'Practice overview dashboard' },
-      { id: 'multi_client', label: 'Multi-client workspace' },
+      { id: 'multi_client', label: 'Multi-client organisation' },
     ],
   },
   {
@@ -159,7 +150,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
 /* -------------------------------------------------------------------------
  * Sep 2026 plan lineup — keep in sync with api/src/config/subscription.ts
  * Slugs stay free / basic / standard / premium / firm. Public names are Free / Solo / Team / Firm / Custom.
- * Paid plans have no trial. New workspaces start on Free.
+ * Paid plans have no trial. New organisations start on Free.
  * ----------------------------------------------------------------------- */
 
 export const MARKETING_PLANS: MarketingPlan[] = [
@@ -354,7 +345,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
     bullets: [
       '100 projects / month',
       '60 full clean exports / month',
-      'Threshold blocks reviewer approval',
+      'Threshold blocks checker approval',
       'Priority support',
       'Bulk confirm up to 100 pairs',
     ],
@@ -378,7 +369,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       missing_cheques: true,
       audit_trail: 'View and export',
       roll_forward: true,
-      threshold_approval: 'Blocks reviewer approval',
+      threshold_approval: 'Blocks checker approval',
       basic_branding: true,
       full_branding: true,
       firm_dashboard: true,
@@ -395,7 +386,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
   {
     slug: 'firm',
     name: 'Custom',
-    tagline: 'Unlimited accounts and seats, with a multi-client workspace. From GHS 1,800 / month.',
+    tagline: 'Unlimited accounts and seats, with a multi-client organisation. From GHS 1,800 / month.',
     audience: 'Accounting firm / enterprise',
     badge: 'Best for firms',
     monthlyGhs: 0,
@@ -434,7 +425,7 @@ export const MARKETING_PLANS: MarketingPlan[] = [
       missing_cheques: true,
       audit_trail: 'View and export',
       roll_forward: true,
-      threshold_approval: 'Blocks reviewer approval',
+      threshold_approval: 'Blocks checker approval',
       basic_branding: true,
       full_branding: true,
       firm_dashboard: true,
@@ -454,38 +445,106 @@ export const MARKETING_PLANS: MarketingPlan[] = [
  * Helpers
  * ----------------------------------------------------------------------- */
 
+export type ApiPlanMarketing = {
+  tagline: string
+  audience: string
+  badge?: string | null
+  highlight?: boolean
+  bullets: string[]
+  inheritsFromLabel?: string | null
+  ctaLabel: string
+  ctaHref: string
+  featureMatrix: Record<string, boolean | string>
+}
+
+export type ApiPublicPlan = {
+  id: string
+  name: string
+  monthlyGhs: number
+  yearlyGhs: number
+  quarterlyGhs?: number
+  projectsPerMonth: number
+  transactionsPerMonth: number
+  bankAccounts?: number
+  usersLimit?: number
+  cleanExportsPerMonth?: number
+  features?: Record<string, boolean>
+  marketing?: ApiPlanMarketing
+  active?: boolean
+  sortOrder?: number
+}
+
+function apiPlanToMarketing(p: ApiPublicPlan, fallback: MarketingPlan): MarketingPlan {
+  const m = p.marketing
+  if (!m) return fallback
+  return {
+    ...fallback,
+    slug: fallback.slug,
+    name: p.name || fallback.name,
+    tagline: m.tagline || fallback.tagline,
+    audience: m.audience || fallback.audience,
+    badge: m.badge ?? fallback.badge,
+    highlight: m.highlight ?? fallback.highlight,
+    bullets: m.bullets?.length ? m.bullets : fallback.bullets,
+    inheritsFromLabel: m.inheritsFromLabel ?? fallback.inheritsFromLabel,
+    ctaLabel: m.ctaLabel || fallback.ctaLabel,
+    ctaHref: m.ctaHref || fallback.ctaHref,
+    monthlyGhs: p.monthlyGhs,
+    yearlyGhs: p.yearlyGhs,
+    quarterlyGhs: p.quarterlyGhs ?? fallback.quarterlyGhs,
+    projectsPerMonth: p.projectsPerMonth,
+    transactionsPerMonth: p.transactionsPerMonth,
+    bankAccounts: p.bankAccounts ?? fallback.bankAccounts,
+    users: p.usersLimit ?? fallback.users,
+    cleanExportsPerMonth: p.cleanExportsPerMonth ?? fallback.cleanExportsPerMonth,
+    features: {
+      ...fallback.features,
+      ...(m.featureMatrix ?? {}),
+    },
+    active: p.active !== false,
+  }
+}
+
 /**
- * Merge live data from the API into the published plan definitions.
- * If the API is unreachable or returns nothing, the static plan copy is
- * returned unchanged so the landing page still renders.
+ * Merge live CMS data from the API into published plan definitions.
+ * When marketing is present on the API payload, taglines, bullets, and the
+ * comparison matrix come from platform admin — not this file.
  */
-export function mergeWithApiPlans(
-  apiPlans: ReadonlyArray<{
-    id: string
-    monthlyGhs: number
-    yearlyGhs: number
-    quarterlyGhs?: number
-    projectsPerMonth: number
-    transactionsPerMonth: number
-    bankAccounts?: number
-    usersLimit?: number
-    cleanExportsPerMonth?: number
-    features?: Record<string, boolean>
-    active?: boolean
-  }> | undefined
-): MarketingPlan[] {
+export function mergeWithApiPlans(apiPlans: ReadonlyArray<ApiPublicPlan> | undefined): MarketingPlan[] {
   if (!apiPlans || apiPlans.length === 0) return MARKETING_PLANS
   const pickNum = (v: unknown, fallback: number) => {
     if (v === null || v === undefined) return fallback
     const n = Number(v)
     return Number.isFinite(n) ? n : fallback
   }
-  const byId = new Map(apiPlans.map((p) => [p.id, p]))
-  return MARKETING_PLANS.map((p) => {
-    const live = byId.get(p.slug)
-    if (!live) return p
+  const staticBySlug = new Map(MARKETING_PLANS.map((p) => [p.slug, p]))
+  const sorted = [...apiPlans].sort(
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id.localeCompare(b.id)
+  )
+
+  return sorted.map((live) => {
+    const slug = live.id as PlanSlug
+    const p = staticBySlug.get(slug) ?? {
+      slug,
+      name: live.name || live.id,
+      tagline: '',
+      audience: '',
+      monthlyGhs: 0,
+      yearlyGhs: 0,
+      quarterlyGhs: 0,
+      projectsPerMonth: 0,
+      transactionsPerMonth: 0,
+      bankAccounts: 0,
+      users: 1,
+      bullets: [],
+      features: {},
+      ctaLabel: 'Subscribe',
+      ctaHref: '/register',
+    }
     const merged: MarketingPlan = {
       ...p,
+      slug,
+      name: live.name || p.name,
       monthlyGhs: pickNum(live.monthlyGhs, p.monthlyGhs),
       yearlyGhs: pickNum(live.yearlyGhs, p.yearlyGhs),
       quarterlyGhs: pickNum(live.quarterlyGhs, p.quarterlyGhs),
@@ -518,13 +577,17 @@ export function mergeWithApiPlans(
       for (const [key, value] of Object.entries(live.features)) {
         if (typeof value !== 'boolean') continue
         const target = featureAlias[key] ?? key
-        if (!(target in merged.features)) continue
-        const current = merged.features[target]
-        if (value === false) merged.features[target] = false
-        else if (current === false) merged.features[target] = true
+        if (!(target in merged.features)) merged.features[target] = value
+        else {
+          const current = merged.features[target]
+          if (value === false) merged.features[target] = false
+          else if (current === false) merged.features[target] = true
+        }
       }
     }
-    merged.bullets = p.bullets
+    if (live.marketing) {
+      return apiPlanToMarketing(live, merged)
+    }
     return merged
   })
 }
@@ -548,6 +611,30 @@ export function planAmountForPeriod(plan: MarketingPlan, period: BillingPeriod):
   if (period === 'yearly') return plan.yearlyGhs
   if (period === 'quarterly') return plan.quarterlyGhs
   return plan.monthlyGhs
+}
+
+/** Paid checkout is closed; price is sales-led (not the Free tier). */
+export function isContactSalesPlan(plan: Pick<MarketingPlan, 'slug' | 'monthlyGhs' | 'yearlyGhs' | 'quarterlyGhs'>): boolean {
+  if (plan.slug === 'free') return false
+  return plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0 && plan.quarterlyGhs <= 0
+}
+
+/** Short label for comparison tables when checkout amounts are zero (CMS tagline first). */
+export function contactSalesPriceLabel(tagline: string | undefined): string {
+  const raw = tagline?.trim()
+  if (!raw) return 'Custom pricing'
+  const first = raw.split(/[.!?\n]/)[0]?.trim()
+  if (!first) return 'Custom pricing'
+  return first.length > 56 ? `${first.slice(0, 53)}…` : first
+}
+
+export function comparisonTablePriceLabel(
+  plan: Pick<MarketingPlan, 'slug' | 'tagline' | 'monthlyGhs' | 'yearlyGhs' | 'quarterlyGhs'>,
+  amount: number
+): string {
+  if (isContactSalesPlan(plan)) return contactSalesPriceLabel(plan.tagline)
+  if (amount === 0) return 'Free'
+  return formatGhs(amount)
 }
 
 export function planMonthlyEquivalent(plan: MarketingPlan, period: BillingPeriod): number {

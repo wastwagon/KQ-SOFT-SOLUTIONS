@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
-import { FileCheck, Download } from 'lucide-react'
+import { FileCheck, Download, Search } from 'lucide-react'
 import { audit, projects, subscription, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../lib/api'
 import { formatDate } from '../lib/format'
 import Card from '../components/ui/Card'
@@ -13,7 +13,9 @@ import { useToast } from '../components/ui/Toast'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
-import Alert from '../components/ui/Alert'
+import ListToolbar from '../components/layout/ListToolbar'
+import Input from '../components/ui/Input'
+import PageLoadError from '../components/ui/PageLoadError'
 import Badge from '../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../components/ui/Table'
 
@@ -42,6 +44,7 @@ export default function Audit() {
   })
   const canExportAudit = usageQuery.data?.featureDepth?.audit_trail === 'full'
   const [projectFilter, setProjectFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [exporting, setExporting] = useState(false)
 
@@ -73,8 +76,17 @@ export default function Audit() {
   const filtered = useMemo(() => {
     let list = (data?.logs || []) as AuditLog[]
     if (projectFilter) list = list.filter((l) => l.projectId === projectFilter)
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(
+        (l) =>
+          l.actionLabel.toLowerCase().includes(q) ||
+          l.action.toLowerCase().includes(q) ||
+          (l.projectId && (projectMap[l.projectId] || '').toLowerCase().includes(q)),
+      )
+    }
     return list
-  }, [data?.logs, projectFilter])
+  }, [data?.logs, projectFilter, search, projectMap])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages - 1)
@@ -97,16 +109,14 @@ export default function Audit() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Administration" title="Audit log" />
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load audit log"
+          error={err}
           onRetry={() => {
             void queryClient.invalidateQueries({ queryKey: ['audit'] })
             void queryClient.invalidateQueries({ queryKey: ['projects'] })
           }}
-        >
-          {err instanceof Error ? err.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
@@ -126,57 +136,78 @@ export default function Audit() {
         }
       />
 
-      <Card>
-        <div className="flex flex-wrap items-center gap-4">
-        <div className="w-full sm:w-64">
-          <Select
-            label="Project"
-            value={projectFilter}
+      <ListToolbar
+        ariaLabel="Audit log search and filters"
+        drawerTitle="Audit filters"
+        activeFilterCount={(projectFilter ? 1 : 0) + (search.trim() ? 1 : 0)}
+        search={
+          <Input
+            type="search"
+            placeholder="Search actions or projects…"
+            value={search}
             onChange={(e) => {
-              setProjectFilter(e.target.value)
+              setSearch(e.target.value)
               setPage(0)
             }}
-            aria-label="Filter by project"
-          >
-            <option value="">All projects</option>
-            {projectsList.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </Select>
-        </div>
-        {canExportAudit ? (
-        <Button
-          variant="outline"
-          onClick={async () => {
-            setExporting(true)
-            try {
-              await audit.exportCsv({ projectId: projectFilter || undefined, limit: 500 })
-            } catch (err) {
-              unlessSubscriptionInactive(err, (e) =>
-                toast.error('Export failed', e instanceof Error ? e.message : undefined)
-              )
-            } finally {
-              setExporting(false)
-            }
-          }}
-          isLoading={exporting}
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
-        ) : (
-          <p className="text-sm text-gray-500">
-            {usageQuery.data?.featureDepth?.audit_trail === 'partial'
-              ? 'This plan can view the activity log. Export starts on Team.'
-              : 'The activity log export is not included on this plan.'}
-          </p>
-        )}
-        </div>
-      </Card>
+            leading={<Search className="w-4 h-4" />}
+            aria-label="Search audit log"
+          />
+        }
+        filters={
+          <div className="w-full md:w-64">
+            <Select
+              label="Project"
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value)
+                setPage(0)
+              }}
+              aria-label="Filter by project"
+            >
+              <option value="">All projects</option>
+              {projectsList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        }
+        actions={
+          canExportAudit ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setExporting(true)
+                try {
+                  await audit.exportCsv({ projectId: projectFilter || undefined, limit: 500 })
+                } catch (err) {
+                  unlessSubscriptionInactive(err, (e) =>
+                    toast.error('Export failed', e instanceof Error ? e.message : undefined),
+                  )
+                } finally {
+                  setExporting(false)
+                }
+              }}
+              isLoading={exporting}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          ) : (
+            <p className="text-sm text-gray-500 max-w-xs">
+              {usageQuery.data?.featureDepth?.audit_trail === 'partial'
+                ? 'Export starts on Team.'
+                : 'Export not on this plan.'}
+            </p>
+          )
+        }
+      />
 
       <Card noPadding>
         {isLoading ? (
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Time</TableTh>
@@ -200,7 +231,7 @@ export default function Audit() {
           />
         ) : (
           <>
-            <Table>
+            <Table compact>
               <TableHead>
                 <tr>
                   <TableTh>Time</TableTh>
@@ -228,7 +259,7 @@ export default function Audit() {
                       {l.details && Object.keys(l.details).length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
                           {Object.entries(l.details).map(([k, v]) => (
-                            <Badge key={k} tone="neutral" size="sm">
+                            <Badge key={k} tone="neutral" size="sm" shape="soft">
                               <span className="opacity-60">{k}:</span>
                               <span className="truncate max-w-[120px]">{String(v)}</span>
                             </Badge>

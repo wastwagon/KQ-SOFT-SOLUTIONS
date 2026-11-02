@@ -6,7 +6,7 @@ import { audit, projects, subscription, isSubscriptionInactiveError } from '../l
 import { useAuth } from '../store/auth'
 import { formatDate } from '../lib/format'
 import Button from './ui/Button'
-import Alert from './ui/Alert'
+import PageLoadError from './ui/PageLoadError'
 
 const LAST_SEEN_KEY = 'brs_notifications_last_seen'
 
@@ -217,8 +217,7 @@ export default function NotificationsBell() {
 
             {loadFailed ? (
               <div className="px-3 py-3">
-                <Alert
-                  tone="error"
+                <PageLoadError
                   title="Could not load notifications"
                   className="!p-3"
                   onRetry={() => {

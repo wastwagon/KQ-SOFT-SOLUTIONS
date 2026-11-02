@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { FolderKanban, ChevronRight } from 'lucide-react'
+import { FolderKanban, ChevronRight, Search } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { projects, clients, subscription, isSubscriptionInactiveError } from '../lib/api'
 import { normalizeClientsList } from '../lib/clientsPayload'
@@ -18,7 +18,10 @@ import { TableRowSkeleton } from '../components/ui/Skeleton'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
+import ListToolbar from '../components/layout/ListToolbar'
+import Tabs from '../components/ui/Tabs'
 import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 
 const preloadProjectDetailPage = () => import('./ProjectDetail')
@@ -150,16 +153,14 @@ export default function Projects({ initialStatus }: ProjectsProps) {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Work" title={isReportsView ? 'Reports' : 'Projects'} />
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load projects"
+          error={err}
           onRetry={() => {
             void queryClient.invalidateQueries({ queryKey: ['projects'] })
             void queryClient.invalidateQueries({ queryKey: ['clients'] })
           }}
-        >
-          {err instanceof Error ? err.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
@@ -188,6 +189,75 @@ export default function Projects({ initialStatus }: ProjectsProps) {
         }
       />
 
+      {!isReportsView && (
+        <Tabs
+          aria-label="Filter by status"
+          value={statusFilter || 'all'}
+          onChange={(id) => setStatusFilterAndUrl(id === 'all' ? '' : id)}
+          size="sm"
+          className="w-full max-w-full"
+          items={STATUS_OPTIONS.map(({ value, label }) => {
+            const count = value ? (counts as Record<string, number>)[value] ?? 0 : counts.all
+            return {
+              id: value || 'all',
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  {label}
+                  <span className="tabular-nums text-xs opacity-80">{count}</span>
+                </span>
+              ),
+            }
+          })}
+        />
+      )}
+
+      <ListToolbar
+        ariaLabel="Project search and filters"
+        drawerTitle="Project filters"
+        activeFilterCount={effectiveClientFilter ? 1 : 0}
+        search={
+          <Input
+            type="search"
+            placeholder="Search by project name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            leading={<Search className="w-4 h-4" />}
+            aria-label="Search projects"
+          />
+        }
+        filters={
+          features.multi_client ? (
+            <div className="w-full md:w-56">
+              <Select
+                value={clientFilter}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setClientFilter(id)
+                  setSearchParams((prev) => {
+                    const p = new URLSearchParams(prev)
+                    if (id) p.set('clientId', id)
+                    else p.delete('clientId')
+                    return p
+                  })
+                }}
+                aria-label="Filter by client"
+              >
+                <option value="">All clients</option>
+                {clientsList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : (
+            <Button type="button" variant="outline" size="sm" disabled title="Filter by client requires the Custom plan">
+              Client filter (Custom plan)
+            </Button>
+          )
+        }
+      />
+
       {features.multi_client && clientFilter && (
         <Alert
           tone="info"
@@ -201,82 +271,10 @@ export default function Projects({ initialStatus }: ProjectsProps) {
         />
       )}
 
-      {!isReportsView && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
-          {STATUS_OPTIONS.map(({ value, label }) => {
-            const count = value ? (counts as Record<string, number>)[value] ?? 0 : counts.all
-            const isActive = statusFilter === value
-            return (
-              <Button
-                key={value || 'all'}
-                type="button"
-                size="xs"
-                variant={isActive ? 'primary' : 'outline'}
-                aria-pressed={isActive}
-                onClick={() => setStatusFilterAndUrl(value)}
-                className="rounded-full gap-1.5"
-              >
-                {label}
-                <span className={`tabular-nums text-xs ${isActive ? 'text-primary-100' : 'text-gray-500'}`}>
-                  {count}
-                </span>
-              </Button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Search & filter bar */}
-      <Card>
-        <div className="flex flex-wrap gap-4">
-        <div className="flex-1 min-w-0 sm:min-w-[200px]">
-          <Input
-            type="search"
-            placeholder="Search by project name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search projects"
-          />
-        </div>
-        {features.multi_client ? (
-          <div className="w-full sm:w-56">
-            <Select
-              value={clientFilter}
-              onChange={(e) => {
-                const id = e.target.value
-                setClientFilter(id)
-                setSearchParams((prev) => {
-                  const p = new URLSearchParams(prev)
-                  if (id) p.set('clientId', id)
-                  else p.delete('clientId')
-                  return p
-                })
-              }}
-              aria-label="Filter by client"
-            >
-              <option value="">All clients</option>
-              {clientsList.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </Select>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            disabled
-            title="Filter by client requires the Custom plan"
-          >
-            Filter by client (Custom)
-          </Button>
-        )}
-        </div>
-      </Card>
-
       {/* Projects table */}
       <Card noPadding>
         {isLoading ? (
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Project</TableTh>
@@ -333,7 +331,7 @@ export default function Projects({ initialStatus }: ProjectsProps) {
             </div>
           )
         ) : (
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Project</TableTh>

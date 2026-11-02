@@ -25,7 +25,7 @@ Full admin controls: user management, subscription tier management, revenue anal
 **Scope:** Plans in DB, CRUD API, admin UI.
 
 - Add `Plan` model: id, name, slug, projectsPerMonth, transactionsPerMonth, monthlyGhs, yearlyGhs, active, createdAt, updatedAt.
-- Migration: create plans table; seed basic, standard, premium, firm from current config.
+- Migration: create plans table; seed default tiers from config (editable via Plans CMS).
 - Update Organization: foreign key `planId` or keep `plan` string and resolve from Plan table.
 - API: `GET/POST /admin/plans`, `GET/PUT/DELETE /admin/plans/:id`.
 - Update `subscription.ts` and `usage.ts` to read limits/prices from Plan table.

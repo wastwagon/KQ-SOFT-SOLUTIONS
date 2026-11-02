@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAuth } from '../store/auth'
 import PageHeader from '../components/layout/PageHeader'
-import Alert from '../components/ui/Alert'
+import PageLoadError from '../components/ui/PageLoadError'
 import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import { PageBodySkeleton } from '../components/ui/Skeleton'
@@ -156,9 +156,9 @@ export default function UserManual() {
       />
 
       {error && (
-        <Alert tone="error" title="Could not load user manual" onRetry={loadManual}>
+        <PageLoadError title="Could not load user manual" onRetry={loadManual}>
           {error}
-        </Alert>
+        </PageLoadError>
       )}
 
       {!error && !content && (

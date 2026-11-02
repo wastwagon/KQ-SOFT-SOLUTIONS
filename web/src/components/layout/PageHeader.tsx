@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 export interface PageHeaderProps {
-  /** Small uppercase label above the title (default: Workspace) */
+  /** Small uppercase label above the title (default: Organisation) */
   eyebrow?: string
   title: string
   subtitle?: ReactNode
@@ -14,7 +14,7 @@ export interface PageHeaderProps {
  * Matches Figma golden-path headers: flat surface, clear hierarchy, no inset hero card.
  */
 export default function PageHeader({
-  eyebrow = 'Workspace',
+  eyebrow = 'Organisation',
   title,
   subtitle,
   actions,

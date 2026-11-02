@@ -11,6 +11,7 @@ import {
   mergePlanFeatures,
   missingChequeRowCap,
   planRank,
+  replacePlanSlugRanks,
   setPlanRuntimeEntitlements,
   clearPlanRuntimeEntitlements,
 } from './planFeatures.js'
@@ -26,6 +27,21 @@ describe('planFeatures', () => {
     expect(planRank('premium')).toBe(3)
     expect(planRank('firm')).toBe(4)
     expect(planRank('unknown')).toBe(-1)
+  })
+
+  it('uses CMS slug ranks for custom plans between tiers', () => {
+    replacePlanSlugRanks({
+      free: 0,
+      basic: 1,
+      growth: 2,
+      standard: 3,
+      premium: 4,
+      firm: 5,
+    })
+    expect(planRank('growth')).toBe(2)
+    expect(catalogueFeatureDepth('growth', 'bulk_match')).toBe('full')
+    expect(catalogueFeatureDepth('growth', 'bank_rules')).toBe('partial')
+    expect(catalogueFeatureDepth('growth', 'threshold_approval')).toBe('none')
   })
 
   it('enables ai_suggestions and bulk_match on every tier', () => {

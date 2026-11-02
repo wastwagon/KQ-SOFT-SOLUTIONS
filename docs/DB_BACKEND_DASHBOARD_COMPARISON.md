@@ -10,11 +10,11 @@
 |-------|-------------|--------------|
 | User | Users with email, password, name, suspendedAt | Auth, Admin users |
 | PasswordResetToken | Password reset flow | Auth /forgot-password, /reset-password |
-| Plan | Plans (basic, standard, premium, firm) | Subscription, Admin plans |
+| Plan | Subscription tiers (CMS slugs) | Subscription, Admin plans, public `/plans` |
 | Organization | Orgs with plan, branding, suspendedAt | Auth/me, Admin organizations, Settings |
 | OrganizationMember | Org membership with role | Settings members, Admin org members |
-| ApiKey | Org API keys ( Firm plan ) | Settings > API keys |
-| BankRule | Org bank rules ( Standard+ ) | Settings > Bank rules |
+| ApiKey | Org API keys (plan feature `api_access`) | Settings > API keys |
+| BankRule | Org bank rules (plan feature `bank_rules`) | Settings > Bank rules |
 | Client | Clients per org | Clients API |
 | Project | Projects with status, roll-forward | Projects API |
 | Document | Cash book / bank statement uploads | Documents API |

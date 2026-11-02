@@ -158,15 +158,15 @@ export default function ReconcileMobileReview({
                             {formatDateCompact(t.date)}
                           </span>
                           {view === 'all' && (
-                            <Badge tone={isReceipt ? 'success' : 'brand'} size="sm">
+                            <Badge tone={isReceipt ? 'success' : 'brand'} size="sm" shape="soft">
                               {isReceipt ? 'Receipt' : 'Payment'}
                             </Badge>
                           )}
                           {matched && (
-                            <Badge tone="neutral" size="sm">Matched</Badge>
+                            <Badge tone="neutral" size="sm" shape="soft">Matched</Badge>
                           )}
                           {suggested && !matched && (
-                            <Badge tone="success" size="sm">Suggested</Badge>
+                            <Badge tone="success" size="sm" shape="soft">Suggested</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-sm font-medium text-gray-900 truncate">
@@ -237,16 +237,16 @@ export default function ReconcileMobileReview({
                             {formatDateCompact(t.date)}
                           </span>
                           {view === 'all' && (
-                            <Badge tone={isCredit ? 'success' : 'brand'} size="sm">
+                            <Badge tone={isCredit ? 'success' : 'brand'} size="sm" shape="soft">
                               {isCredit ? 'Credit' : 'Debit'}
                             </Badge>
                           )}
                           {flaggedBankIds.has(t.id) && (
-                            <Badge tone="warning" size="sm">Flagged</Badge>
+                            <Badge tone="warning" size="sm" shape="soft">Flagged</Badge>
                           )}
-                          {matched && <Badge tone="neutral" size="sm">Matched</Badge>}
+                          {matched && <Badge tone="neutral" size="sm" shape="soft">Matched</Badge>}
                           {suggested && !matched && (
-                            <Badge tone="success" size="sm">Suggested</Badge>
+                            <Badge tone="success" size="sm" shape="soft">Suggested</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-sm font-medium text-gray-900 truncate">

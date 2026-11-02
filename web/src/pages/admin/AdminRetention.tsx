@@ -1,12 +1,15 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Alert from '../../components/ui/Alert'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
+import AdminListToolbar from '../../components/layout/AdminListToolbar'
 import { platformAdminOps, type RetentionPruneResult } from '../../lib/api'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import { useToast } from '../../components/ui/Toast'
@@ -29,7 +32,7 @@ function ResultSummary({ result }: { result: RetentionPruneResult }) {
       </p>
       {result.projects.length > 0 && (
         <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-100">
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Project</TableTh>
@@ -115,6 +118,9 @@ export default function AdminRetention() {
             retention years when blank.
           </p>
         }
+      />
+
+      <AdminListToolbar
         actions={
           <Button
             type="button"
@@ -128,6 +134,15 @@ export default function AdminRetention() {
           </Button>
         }
       />
+
+      <Alert tone="info" title="Change the platform default retention period">
+        To save a new default (e.g. 10 years), open{' '}
+        <Link to="/platform-admin/generation-settings" className="font-medium text-primary-700 underline">
+          Generation settings
+        </Link>
+        , edit <strong>Data retention (years)</strong>, and click <strong>Save settings</strong>. The
+        field below is only a one-time override for preview or prune on this page.
+      </Alert>
 
       <Card
         title="Filters"
@@ -177,15 +192,11 @@ export default function AdminRetention() {
       {previewQuery.isLoading && <PageBodySkeleton label="Loading retention preview" />}
 
       {previewQuery.isError && (
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load retention preview"
+          error={previewQuery.error}
           onRetry={() => void previewQuery.refetch()}
-        >
-          {previewQuery.error instanceof Error
-            ? previewQuery.error.message
-            : 'Something went wrong.'}
-        </Alert>
+        />
       )}
 
       {previewQuery.data && (

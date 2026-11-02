@@ -1,18 +1,34 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import Card from '../../components/ui/Card'
-import Button from '../../components/ui/Button'
+import Button, { buttonClassName } from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import Select from '../../components/ui/Select'
 import Alert from '../../components/ui/Alert'
-import Badge from '../../components/ui/Badge'
-import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
+import PageLoadError from '../../components/ui/PageLoadError'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import PageHeader from '../../components/layout/PageHeader'
 import { useToast } from '../../components/ui/Toast'
+import Textarea from '../../components/ui/Textarea'
+import PlanComparisonMatrixEditor from '../../components/admin/PlanComparisonMatrixEditor'
+import PlansDraggableTable from '../../components/admin/PlansDraggableTable'
+import type { FeatureGroup } from '../../lib/plans'
+import { FEATURE_GROUPS } from '../../lib/plans'
+
+type PlanMarketing = {
+  tagline: string
+  audience: string
+  badge?: string | null
+  highlight?: boolean
+  bullets: string[]
+  inheritsFromLabel?: string | null
+  ctaLabel: string
+  ctaHref: string
+  featureMatrix: Record<string, boolean | string>
+}
 
 type PlanFeatureId = string
 
@@ -29,6 +45,9 @@ type AdminPlan = {
   cleanExportsPerMonth: number
   usersLimit: number
   features: Record<PlanFeatureId, boolean>
+  marketing?: PlanMarketing
+  sortOrder?: number
+  showOnPublic?: boolean
   active: boolean
 }
 
@@ -45,7 +64,10 @@ type PlanBody = {
   bankAccounts: number
   cleanExportsPerMonth: number
   usersLimit: number
+  sortOrder: number
+  showOnPublic: boolean
   features: Record<string, boolean>
+  marketing?: PlanMarketing
   active: boolean
 }
 
@@ -116,11 +138,43 @@ const DEFAULT_FEATURES: Record<string, Record<string, boolean>> = {
   },
 }
 
-/** Split matching, many-to-many, and roll forward start at Solo. Free stays off. */
-const SOLO_AND_ABOVE_FEATURES = new Set(['one_to_many', 'many_to_many', 'roll_forward'])
+function suggestTaglineFromLimits(input: {
+  bankAccounts: number
+  projectsPerMonth: number
+  transactionsPerMonth: number
+  usersLimit: number
+}): string {
+  const banks =
+    input.bankAccounts < 0
+      ? 'unlimited bank accounts'
+      : `${input.bankAccounts} bank account${input.bankAccounts === 1 ? '' : 's'}`
+  const tx =
+    input.transactionsPerMonth < 0
+      ? 'unlimited transactions'
+      : `${input.transactionsPerMonth.toLocaleString('en-GH')} transactions`
+  const projects =
+    input.projectsPerMonth < 0
+      ? 'unlimited projects'
+      : `${input.projectsPerMonth} project${input.projectsPerMonth === 1 ? '' : 's'}`
+  const people =
+    input.usersLimit < 0
+      ? 'unlimited team members'
+      : input.usersLimit === 1
+        ? '1 person'
+        : `${input.usersLimit} people`
+  if (input.usersLimit === 1) {
+    return `${people}, ${banks}, and ${tx} a month.`
+  }
+  return `${people}, ${banks}, ${tx}, and ${projects} a month.`
+}
 
-function fmtLimit(n: number) {
-  return n < 0 ? 'Unlimited' : n.toLocaleString()
+const EMPTY_MARKETING: PlanMarketing = {
+  tagline: '',
+  audience: '',
+  bullets: [],
+  ctaLabel: 'Subscribe',
+  ctaHref: '/register',
+  featureMatrix: {},
 }
 
 export default function AdminPlans() {
@@ -135,9 +189,13 @@ export default function AdminPlans() {
     queryFn: async () => {
       const raw = await api('/admin/plans')
       if (Array.isArray(raw)) {
-        return { plans: raw as AdminPlan[], featureCatalog: [] as FeatureCatalogItem[] }
+        return { plans: raw as AdminPlan[], featureCatalog: [] as FeatureCatalogItem[], comparisonGroups: [] }
       }
-      return raw as { plans: AdminPlan[]; featureCatalog: FeatureCatalogItem[] }
+      return raw as {
+        plans: AdminPlan[]
+        featureCatalog: FeatureCatalogItem[]
+        comparisonGroups: FeatureGroup[]
+      }
     },
   })
 
@@ -145,6 +203,7 @@ export default function AdminPlans() {
     mutationFn: (body: PlanBody) => api('/admin/plans', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'plan-names'] })
       void queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
       void queryClient.invalidateQueries({ queryKey: ['public', 'plans'] })
       toast.success('Plan created', 'Pricing and features are live for checkout and the public site.')
@@ -160,6 +219,7 @@ export default function AdminPlans() {
       api(`/admin/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'plan-names'] })
       queryClient.invalidateQueries({ queryKey: ['subscription', 'plans'] })
       void queryClient.invalidateQueries({ queryKey: ['public', 'plans'] })
       toast.success('Plan updated', 'Billing, feature gates, and the landing page now use these values.')
@@ -170,9 +230,27 @@ export default function AdminPlans() {
     },
   })
 
+  const reorderMutation = useMutation({
+    mutationFn: (orderedIds: string[]) =>
+      api('/admin/plans/reorder', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'plan-names'] })
+      void queryClient.invalidateQueries({ queryKey: ['public', 'plans'] })
+      toast.success('Plan order saved', 'The public pricing page uses this order.')
+    },
+    onError: (err) => {
+      toast.error('Could not save order', err instanceof Error ? err.message : undefined)
+      void refetch()
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api(`/admin/plans/${id}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'plans'] }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'plan-names'] })
+    },
   })
 
   if (isError) {
@@ -183,9 +261,7 @@ export default function AdminPlans() {
           title="Plans"
           subtitle={<p className="text-gray-500">CMS for subscription packages: prices, limits, and features.</p>}
         />
-        <Alert tone="error" title="Could not load plans" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load plans" error={error} onRetry={() => void refetch()} />
       </div>
     )
   }
@@ -203,7 +279,8 @@ export default function AdminPlans() {
     )
   }
 
-  const { plans, featureCatalog } = data
+  const { plans, featureCatalog, comparisonGroups: comparisonGroupsRaw } = data
+  const comparisonGroups = comparisonGroupsRaw?.length ? comparisonGroupsRaw : FEATURE_GROUPS
 
   return (
     <div className="space-y-8">
@@ -212,15 +289,23 @@ export default function AdminPlans() {
         title="Plans"
         subtitle={
           <p className="text-gray-500">
-            Changes here drive Paystack checkout amounts, monthly transaction volume (resets on the
-            1st; the cap stays), workspace feature gates, and the public pricing page.
+            Changes here drive Paystack checkout, organisation limits, and the full public pricing page.
+            Drag rows by the handle to set order on the landing page (or use Sort order in Edit).
           </p>
         }
         actions={
-          <Button onClick={() => setShowNew(true)}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New plan
-          </Button>
+          <>
+            <Link
+              to="/platform-admin/pricing-page"
+              className={buttonClassName('outline', 'sm')}
+            >
+              Pricing layout
+            </Link>
+            <Button onClick={() => setShowNew(true)}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              New plan
+            </Button>
+          </>
         }
       />
 
@@ -228,6 +313,7 @@ export default function AdminPlans() {
         <Card title="New plan" className="mb-6">
           <PlanForm
             catalog={featureCatalog}
+            comparisonGroups={comparisonGroups}
             onSubmit={(b) => createMutation.mutate(b)}
             onCancel={() => setShowNew(false)}
             loading={createMutation.isPending}
@@ -241,6 +327,7 @@ export default function AdminPlans() {
           <PlanForm
             initial={editing}
             catalog={featureCatalog}
+            comparisonGroups={comparisonGroups}
             onSubmit={(b) => updateMutation.mutate({ id: editing.id, ...b })}
             onCancel={() => setEditing(null)}
             loading={updateMutation.isPending}
@@ -249,67 +336,26 @@ export default function AdminPlans() {
         </Card>
       )}
 
-      <Card noPadding>
-        <Table>
-          <TableHead>
-            <tr>
-              <TableTh>Package</TableTh>
-              <TableTh className="text-right">Seats</TableTh>
-              <TableTh className="text-right">Projects</TableTh>
-              <TableTh className="text-right">Tx / calendar mo</TableTh>
-              <TableTh className="text-right">Banks</TableTh>
-              <TableTh className="text-right">Monthly</TableTh>
-              <TableTh className="text-right">Quarterly</TableTh>
-              <TableTh className="text-right">Yearly</TableTh>
-              <TableTh className="text-right">Actions</TableTh>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {plans.map((p) => (
-              <TableRow key={p.id}>
-                <TableTd>
-                  <div className="font-medium text-gray-900">{p.name}</div>
-                  <div className="font-mono text-xs text-gray-500">{p.slug}</div>
-                  {p.active === false ? (
-                    <Badge tone="neutral" size="sm" className="mt-1">
-                      Inactive
-                    </Badge>
-                  ) : null}
-                </TableTd>
-                <TableTd className="text-right">{fmtLimit(p.usersLimit)}</TableTd>
-                <TableTd className="text-right">{fmtLimit(p.projectsPerMonth)}</TableTd>
-                <TableTd className="text-right">{fmtLimit(p.transactionsPerMonth)}</TableTd>
-                <TableTd className="text-right">{fmtLimit(p.bankAccounts)}</TableTd>
-                <TableTd className="text-right">{p.monthlyGhs}</TableTd>
-                <TableTd className="text-right">{p.quarterlyGhs}</TableTd>
-                <TableTd className="text-right">{p.yearlyGhs}</TableTd>
-                <TableTd className="text-right">
-                  <Button type="button" variant="ghost" size="xs" onClick={() => { setShowNew(false); setEditing(p) }}>
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: `Delete the "${p.name}" plan?`,
-                        description:
-                          'Existing subscribers on this plan will not be removed, but no new sign-ups will be able to choose it.',
-                        confirmLabel: 'Delete plan',
-                        tone: 'danger',
-                      })
-                      if (ok) deleteMutation.mutate(p.id)
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    Delete
-                  </Button>
-                </TableTd>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <Card noPadding sublabel="Drag the grip icon to reorder packages on the public pricing page.">
+        <PlansDraggableTable
+          plans={plans}
+          reordering={reorderMutation.isPending}
+          onReorder={(orderedIds) => reorderMutation.mutate(orderedIds)}
+          onEdit={(p) => {
+            setShowNew(false)
+            setEditing(plans.find((x) => x.id === p.id) ?? (p as AdminPlan))
+          }}
+          onDelete={async (p) => {
+            const ok = await confirm({
+              title: `Delete the "${p.name}" plan?`,
+              description:
+                'Existing subscribers on this plan will not be removed, but no new sign-ups will be able to choose it.',
+              confirmLabel: 'Delete plan',
+              tone: 'danger',
+            })
+            if (ok) deleteMutation.mutate(p.id)
+          }}
+        />
       </Card>
     </div>
   )
@@ -318,6 +364,7 @@ export default function AdminPlans() {
 function PlanForm({
   initial,
   catalog,
+  comparisonGroups,
   onSubmit,
   onCancel,
   loading,
@@ -325,6 +372,7 @@ function PlanForm({
 }: {
   initial?: AdminPlan
   catalog: FeatureCatalogItem[]
+  comparisonGroups: FeatureGroup[]
   onSubmit: (b: PlanBody) => void
   onCancel: () => void
   loading: boolean
@@ -342,12 +390,23 @@ function PlanForm({
   const [bankAccounts, setBankAccounts] = useState(String(initial?.bankAccounts ?? 5))
   const [cleanExportsPerMonth, setCleanExportsPerMonth] = useState(String(initial?.cleanExportsPerMonth ?? 5))
   const [usersLimit, setUsersLimit] = useState(String(initial?.usersLimit ?? 1))
+  const [sortOrder, setSortOrder] = useState(String(initial?.sortOrder ?? 0))
+  const [showOnPublic, setShowOnPublic] = useState(initial?.showOnPublic !== false)
   const [active, setActive] = useState(initial?.active !== false)
   const [features, setFeatures] = useState<Record<string, boolean>>(
     () => initial?.features ?? { ...(DEFAULT_FEATURES[initial?.slug || 'basic'] || DEFAULT_FEATURES.basic) }
   )
+  const [marketing, setMarketing] = useState<PlanMarketing>(
+    () => initial?.marketing ?? { ...EMPTY_MARKETING }
+  )
 
   const rows = catalog.length > 0 ? catalog : Object.keys(DEFAULT_FEATURES.basic).map((id) => ({ id, label: id, hint: '' }))
+  const featureRows = [
+    ...rows,
+    ...Object.keys(features)
+      .filter((id) => !rows.some((r) => r.id === id))
+      .map((id) => ({ id, label: id, hint: 'Custom flag' })),
+  ]
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -362,14 +421,27 @@ function PlanForm({
       bankAccounts: parseInt(bankAccounts, 10) || 0,
       cleanExportsPerMonth: parseInt(cleanExportsPerMonth, 10) || 0,
       usersLimit: parseInt(usersLimit, 10) || 0,
-      features: {
-        ...features,
-        one_to_many: slug.trim().toLowerCase() !== 'free',
-        many_to_many: slug.trim().toLowerCase() !== 'free',
-        roll_forward: slug.trim().toLowerCase() !== 'free',
+      sortOrder: parseInt(sortOrder, 10) || 0,
+      showOnPublic,
+      features,
+      marketing: {
+        ...marketing,
+        badge: marketing.badge?.trim() ? marketing.badge.trim() : null,
+        inheritsFromLabel: marketing.inheritsFromLabel?.trim()
+          ? marketing.inheritsFromLabel.trim()
+          : null,
+        bullets: marketing.bullets.filter((b) => b.trim().length > 0),
+        featureMatrix: marketing.featureMatrix,
       },
       active,
     })
+  }
+
+  const quotaNums = {
+    bankAccounts: parseInt(bankAccounts, 10) || 0,
+    projectsPerMonth: parseInt(projectsPerMonth, 10) || 0,
+    transactionsPerMonth: parseInt(transactionsPerMonth, 10) || 0,
+    usersLimit: parseInt(usersLimit, 10) || 0,
   }
 
   return (
@@ -380,27 +452,22 @@ function PlanForm({
         </Alert>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {initial ? (
-          <Input label="Slug" value={slug} readOnly className="font-mono" hint="Locked so existing subscribers keep their package." />
-        ) : (
-          <Select
-            label="Slug"
-            value={slug}
-            onChange={(e) => {
-              const next = e.target.value
-              setSlug(next)
-              if (!initial && DEFAULT_FEATURES[next]) setFeatures({ ...DEFAULT_FEATURES[next] })
-            }}
-            required
-          >
-            <option value="">Select package</option>
-            <option value="basic">basic</option>
-            <option value="standard">standard</option>
-            <option value="premium">premium</option>
-            <option value="firm">firm</option>
-          </Select>
-        )}
+        <Input
+          label="Slug"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          required
+          className="font-mono"
+          hint="Lowercase id (a-z, 0-9, _, -). Renaming updates all orgs on this plan."
+        />
         <Input label="Display name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Solo" />
+        <Input
+          type="number"
+          label="Sort order"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          hint="Lower numbers appear first on the pricing page"
+        />
         <Input type="number" step="0.01" label="Monthly (GHS)" value={monthlyGhs} onChange={(e) => setMonthlyGhs(e.target.value)} />
         <Input type="number" step="0.01" label="Quarterly (GHS)" value={quarterlyGhs} onChange={(e) => setQuarterlyGhs(e.target.value)} />
         <Input type="number" step="0.01" label="Yearly (GHS)" value={yearlyGhs} onChange={(e) => setYearlyGhs(e.target.value)} />
@@ -416,31 +483,121 @@ function PlanForm({
         <Input type="number" label="Bank accounts" value={bankAccounts} onChange={(e) => setBankAccounts(e.target.value)} />
         <Input type="number" label="Full clean exports / month" value={cleanExportsPerMonth} onChange={(e) => setCleanExportsPerMonth(e.target.value)} />
       </div>
+
+      <div className="border-t border-border pt-6 space-y-4">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900">Public pricing page</h4>
+          <p className="text-xs text-gray-500 mt-1">
+            Taglines, bullets, and comparison-table copy on the landing page. Plan limit rows in
+            the comparison table always follow the numeric fields above when the site loads.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="Tagline"
+            value={marketing.tagline}
+            onChange={(e) => setMarketing((m) => ({ ...m, tagline: e.target.value }))}
+            placeholder="Short summary under the plan name"
+          />
+          <Input
+            label="Audience label"
+            value={marketing.audience}
+            onChange={(e) => setMarketing((m) => ({ ...m, audience: e.target.value }))}
+            placeholder="e.g. Solo accountant"
+          />
+          <Input
+            label="Ribbon badge (optional)"
+            value={marketing.badge ?? ''}
+            onChange={(e) => setMarketing((m) => ({ ...m, badge: e.target.value }))}
+            placeholder="Most popular"
+          />
+          <Input
+            label="Inherits-from label"
+            value={marketing.inheritsFromLabel ?? ''}
+            onChange={(e) => setMarketing((m) => ({ ...m, inheritsFromLabel: e.target.value }))}
+            placeholder="Everything in Solo, plus:"
+          />
+          <Input
+            label="CTA label"
+            value={marketing.ctaLabel}
+            onChange={(e) => setMarketing((m) => ({ ...m, ctaLabel: e.target.value }))}
+          />
+          <Input
+            label="CTA link"
+            value={marketing.ctaHref}
+            onChange={(e) => setMarketing((m) => ({ ...m, ctaHref: e.target.value }))}
+            placeholder="/register or mailto:…"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              setMarketing((m) => ({ ...m, tagline: suggestTaglineFromLimits(quotaNums) }))
+            }
+          >
+            Regenerate tagline from limits
+          </Button>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={!!marketing.highlight}
+              onChange={(e) => setMarketing((m) => ({ ...m, highlight: e.target.checked }))}
+              className="rounded border-gray-300"
+            />
+            Highlight on pricing page
+          </label>
+        </div>
+        <Textarea
+          label="Card bullets (one per line)"
+          rows={6}
+          value={marketing.bullets.join('\n')}
+          onChange={(e) =>
+            setMarketing((m) => ({
+              ...m,
+              bullets: e.target.value.split('\n'),
+            }))
+          }
+          hint="Shown on the plan card on the home page."
+        />
+        <div>
+          <h5 className="text-sm font-medium text-gray-900 mb-1">Landing comparison table</h5>
+          <p className="text-xs text-gray-500 mb-3">
+            Plan limit rows preview from the numeric fields above and sync automatically on the
+            public site.
+          </p>
+          <PlanComparisonMatrixEditor
+            featureGroups={comparisonGroups}
+            featureMatrix={marketing.featureMatrix}
+            quotaNums={quotaNums}
+            onChange={(featureMatrix) => setMarketing((m) => ({ ...m, featureMatrix }))}
+          />
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" checked={showOnPublic} onChange={(e) => setShowOnPublic(e.target.checked)} className="rounded border-gray-300" />
+        Show on public pricing page
+      </label>
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="rounded border-gray-300" />
-        Plan is active (self-serve checkout and billing). The landing page still lists all five plans.
+        Plan is active (self-serve checkout when prices are set)
       </label>
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-1">Features</h4>
         <p className="text-xs text-gray-500 mb-3">
-          These flags gate the product. A checked box includes the feature. Caps still apply:
-          10 bulk pairs on Free, 5 bank rules on Solo, view-only activity log below Team, and a
-          warning-only threshold on Team. Split matching, many-to-many, and roll forward stay on
-          from Solo upward. Saving updates every organisation on this plan. The API restores
-          built-in tier defaults for those features the next time it starts.
+          Toggle product gates for this plan. Add custom flags below or in Pricing layout → Extra
+          feature flags.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {rows.map((f) => (
+          {featureRows.map((f) => (
             <label key={f.id} className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50/60 px-3 py-2 text-sm">
               <input
                 type="checkbox"
                 className="mt-0.5 rounded border-gray-300"
-                checked={
-                  SOLO_AND_ABOVE_FEATURES.has(f.id)
-                    ? slug.trim().toLowerCase() !== 'free'
-                    : !!features[f.id]
-                }
-                disabled={SOLO_AND_ABOVE_FEATURES.has(f.id)}
+                checked={!!features[f.id]}
                 onChange={(e) => setFeatures((prev) => ({ ...prev, [f.id]: e.target.checked }))}
               />
               <span>
@@ -450,6 +607,19 @@ function PlanForm({
             </label>
           ))}
         </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="mt-3"
+          onClick={() => {
+            const id = window.prompt('Feature flag id (e.g. custom_reports):')?.trim()
+            if (!id) return
+            setFeatures((prev) => ({ ...prev, [id]: true }))
+          }}
+        >
+          Add feature flag
+        </Button>
       </div>
       <div className="flex gap-2">
         <Button type="submit" isLoading={loading}>

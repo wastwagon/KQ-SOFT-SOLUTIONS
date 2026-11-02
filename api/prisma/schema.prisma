@@ -46,7 +46,7 @@ model PasswordResetToken {
 
 model Plan {
   id                   String   @id @default(cuid())
-  slug                 String   @unique // basic | standard | premium | firm
+  slug                 String   @unique // plan slug from CMS (e.g. free, basic, custom tiers)
   name                 String
   projectsPerMonth     Int      @map("projects_per_month") // -1 = unlimited
   transactionsPerMonth Int      @map("transactions_per_month") // -1 = unlimited
@@ -57,6 +57,9 @@ model Plan {
   cleanExportsPerMonth Int      @map("clean_exports_per_month") @default(5) // -1 = unlimited
   usersLimit           Int      @map("users_limit") @default(1) // -1 = unlimited
   features             Json?    // Record<PlanFeature, boolean> — CMS overrides
+  marketing            Json?    // Public pricing copy: tagline, bullets, comparison matrix, CTA
+  sortOrder            Int      @default(0) @map("sort_order")
+  showOnPublic         Boolean  @default(true) @map("show_on_public")
   active               Boolean  @default(true)
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")

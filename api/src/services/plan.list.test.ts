@@ -21,6 +21,16 @@ function stub(over: Partial<PlanData>): PlanData {
     cleanExportsPerMonth: 5,
     usersLimit: 1,
     features: {} as PlanData['features'],
+    marketing: {
+      tagline: '',
+      audience: '',
+      bullets: [],
+      ctaLabel: 'Subscribe',
+      ctaHref: '/register',
+      featureMatrix: {},
+    },
+    sortOrder: 0,
+    showOnPublic: true,
     active: true,
     ...over,
   }

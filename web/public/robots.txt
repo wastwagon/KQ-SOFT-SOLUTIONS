@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /settings
+Disallow: /platform-admin
+Disallow: /admin
+Disallow: /audit
+Disallow: /clients
+Disallow: /manual
+Disallow: /tools
+Disallow: /reports
+
+Sitemap: https://kqsoftwaresolutions.com/sitemap.xml

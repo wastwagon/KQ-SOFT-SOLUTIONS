@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js'
-import { planRank } from '../config/planFeatures.js'
+import { getPlanBySlug, isContractBillingPlan } from './plan.js'
 import { invalidateOrgSubscriptionCache } from './orgSubscriptionAccess.js'
 import { logAudit } from './audit.js'
 
@@ -81,12 +81,16 @@ export function rulesWithinCap<T>(rules: T[], cap: number): T[] {
   return rules.slice(0, Math.max(0, cap))
 }
 
-export function isSelfServeDowngrade(currentPlan: string, targetPlan: string): boolean {
-  const current = planRank(currentPlan)
-  const target = planRank(targetPlan)
-  if (current < 0 || target < 0) return false
-  if (currentPlan === 'firm') return false
-  return target < current
+/** True when the target plan is lower in CMS sort order (self-serve downgrade). */
+export async function isSelfServeDowngrade(currentPlan: string, targetPlan: string): Promise<boolean> {
+  if (currentPlan === targetPlan) return false
+  const [current, target] = await Promise.all([
+    getPlanBySlug(currentPlan),
+    getPlanBySlug(targetPlan),
+  ])
+  if (!current || !target) return false
+  if (isContractBillingPlan(current)) return false
+  return target.sortOrder < current.sortOrder
 }
 
 function parseScheduled(value: unknown): ScheduledPlan | null {
@@ -133,7 +137,8 @@ export async function applyDueScheduledPlan(orgId: string, now = new Date()): Pr
   const scheduled = await readScheduledPlan(orgId)
   if (!scheduled) return null
   if (new Date(scheduled.effectiveAt).getTime() > now.getTime()) return null
-  if (planRank(scheduled.plan) < 0) {
+  const targetPlan = await getPlanBySlug(scheduled.plan)
+  if (!targetPlan?.active) {
     await clearScheduledPlan(orgId)
     return null
   }

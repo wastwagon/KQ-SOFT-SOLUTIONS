@@ -88,7 +88,7 @@ export default function AuthLayout({ children, eyebrow, title, subtitle }: AuthL
           <BrandLogo className="h-9 w-auto" />
         </Link>
         <p className="mt-2 text-xs font-medium uppercase tracking-wider text-gray-500">
-          Bank reconciliation · cloud workspace
+          Bank reconciliation · online for your team
         </p>
       </div>
 

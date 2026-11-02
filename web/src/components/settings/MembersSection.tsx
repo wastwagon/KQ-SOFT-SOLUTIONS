@@ -3,11 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { settings, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/Table'
+import { ROLE_LABELS, roleLabel } from '../../lib/userFacingTerms'
 import { PageBodySkeleton } from '../ui/Skeleton'
 
 export default function MembersSection({ canManage = false }: { canManage?: boolean }) {
@@ -102,13 +104,11 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
 
   if (membersQueryError) {
     return (
-      <Alert
-        tone="error"
+      <PageLoadError
         title="Could not load members"
+        error={membersQueryError}
         onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'members'] })}
-      >
-        {membersQueryError instanceof Error ? membersQueryError.message : 'Something went wrong.'}
-      </Alert>
+      />
     )
   }
 
@@ -161,9 +161,9 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
             </div>
             <div className="w-40 shrink-0">
               <Select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Role">
-                <option value="viewer">Viewer</option>
-                <option value="preparer">Preparer</option>
-                <option value="reviewer">Reviewer</option>
+                <option value="viewer">{ROLE_LABELS.viewer}</option>
+                <option value="preparer">{ROLE_LABELS.preparer}</option>
+                <option value="reviewer">{ROLE_LABELS.reviewer}</option>
               </Select>
             </div>
             <Button
@@ -180,6 +180,10 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
               your organisation.
             </p>
           )}
+          <p className="text-xs text-gray-500">
+            <strong>Preparer</strong> — captures and matches (Prepared By on the BRS).{' '}
+            <strong>Checker</strong> — reviews and approves (Checked By on the BRS).
+          </p>
         </div>
       )}
       {atLimit && canManage && (
@@ -202,8 +206,8 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
               <li key={invite.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 truncate">{invite.email}</p>
-                  <p className="text-xs text-gray-500 capitalize">
-                    {invite.role} · expires {new Date(invite.expiresAt).toLocaleDateString()}
+                  <p className="text-xs text-gray-500">
+                    {roleLabel(invite.role)} · expires {new Date(invite.expiresAt).toLocaleDateString()}
                   </p>
                 </div>
                 <Button
@@ -222,7 +226,7 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
         </div>
       )}
       <div className="overflow-hidden rounded-xl border border-border">
-        <Table>
+        <Table compact>
           <TableHead>
             <tr>
               <TableTh>Name</TableTh>
@@ -255,16 +259,14 @@ export default function MembersSection({ canManage = false }: { canManage?: bool
                           aria-label={`Role for ${m.email}`}
                           className="!min-h-[36px] py-1.5 pl-3 text-sm"
                         >
-                          <option value="viewer">Viewer</option>
-                          <option value="preparer">Preparer</option>
-                          <option value="reviewer">Reviewer</option>
-                          <option value="admin">Admin</option>
+                          <option value="viewer">{ROLE_LABELS.viewer}</option>
+                          <option value="preparer">{ROLE_LABELS.preparer}</option>
+                          <option value="reviewer">{ROLE_LABELS.reviewer}</option>
+                          <option value="admin">{ROLE_LABELS.admin}</option>
                         </Select>
                       </div>
                     ) : (
-                      <span className="capitalize">
-                        {m.role === 'member' ? 'preparer' : m.role}
-                      </span>
+                      <span>{roleLabel(m.role === 'member' ? 'preparer' : m.role)}</span>
                     )}
                   </TableTd>
                   {canManage && (

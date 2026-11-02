@@ -8,14 +8,16 @@ import {
   ArrowRight,
   Server,
   Activity,
+  HeartPulse,
   Archive,
   Settings,
   Inbox,
-  Landmark,
+  Wrench,
   FileSpreadsheet,
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Alert from '../../components/ui/Alert'
+import PageLoadError from '../../components/ui/PageLoadError'
 import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
 import { MetricCardSkeleton } from '../../components/ui/Skeleton'
@@ -73,24 +75,14 @@ export default function AdminOverview() {
   const parseFailed = derived?.autoMapOutcomes?.failed ?? 0
 
   const jumpLinks = [
+    { to: '/platform-admin/ops', label: 'Ops hub', hint: 'Health, retention, database', icon: HeartPulse },
     { to: '/platform-admin/ops-metrics', label: 'Ops metrics', hint: 'Parse / OCR / match counters', icon: Activity },
     { to: '/platform-admin/leads', label: 'Leads', hint: 'Newsletter & bank-feed waitlist', icon: Inbox },
     { to: '/platform-admin/revenue', label: 'Revenue', hint: 'Payments analytics', icon: DollarSign },
     { to: '/platform-admin/retention', label: 'Data retention', hint: 'Preview or prune old projects', icon: Archive },
     { to: '/platform-admin/database', label: 'Database', hint: 'Migrations & seed', icon: Server },
     { to: '/platform-admin/generation-settings', label: 'Generation settings', hint: 'Platform report defaults', icon: Settings },
-    {
-      to: '/platform-admin/tools/clean-bank-statement',
-      label: 'Clean bank statement',
-      hint: 'Preview / sample / full cleaned export',
-      icon: Landmark,
-    },
-    {
-      to: '/platform-admin/tools/clean-cash-book',
-      label: 'Clean cash book',
-      hint: 'Preview / sample / full cleaned export',
-      icon: FileSpreadsheet,
-    },
+    { to: '/platform-admin/tools', label: 'Tools', hint: 'Clean bank statement & cash book', icon: Wrench },
   ]
 
   return (
@@ -100,16 +92,14 @@ export default function AdminOverview() {
         title="Overview"
         subtitle={
           <p className="text-gray-500">
-            Live tenants and process health. Your account does not need a tenant subscription to use
+            Live customer organisations and process health. Your account does not need a customer subscription to use
             these tools.
           </p>
         }
       />
 
       {isError && (
-        <Alert tone="error" title="Could not load platform overview" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load platform overview" error={error} onRetry={() => void refetch()} />
       )}
 
       {metricsQuery.isError && (
@@ -118,7 +108,7 @@ export default function AdminOverview() {
           title="Ops metrics could not be loaded"
           onRetry={() => void metricsQuery.refetch()}
         >
-          Tenant counts still show below. Open Ops metrics for the full counter table.
+          Organisation counts still show below. Open Ops metrics for the full counter table.
         </Alert>
       )}
 

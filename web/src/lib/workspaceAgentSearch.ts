@@ -45,7 +45,7 @@ export function agentPicksToPaletteItems(
       id: `agent-${p.path}`,
       label: p.label,
       hint: p.reason ? `Assistant · ${p.reason}` : 'Assistant suggestion',
-      group: 'Assistant',
+      group: 'Navigator',
       to: p.path,
       keywords: 'ai agent assistant',
     }))

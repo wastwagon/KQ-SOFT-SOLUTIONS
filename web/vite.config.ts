@@ -8,6 +8,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const apiTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:9001'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('xlsx')) return 'xlsx'
+          if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf'
+          if (id.includes('@tanstack/react-query')) return 'query'
+          if (id.includes('react-router')) return 'router'
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -17,7 +30,7 @@ export default defineConfig({
         name: 'KQ-SOFT — Bank reconciliation',
         short_name: 'KQ-SOFT',
         description:
-          'Cloud bank reconciliation with intelligent matching, approvals, and branded BRS exports.',
+          'Bank reconciliation and BRS exports for Ghana accounting teams. Match cash book to bank statement; pay in GHS via Paystack.',
         start_url: '/dashboard',
         scope: '/',
         display: 'standalone',
@@ -53,7 +66,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest,webp}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [

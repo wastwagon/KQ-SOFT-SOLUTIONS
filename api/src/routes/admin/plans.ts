@@ -2,27 +2,40 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { invalidatePlanCache, refreshPlanCache } from '../../services/plan.js'
+import { PLAN_FEATURE_CATALOG, mergePlanFeatures } from '../../config/planFeatures.js'
+import { parseStoredMarketing, type PlanMarketing } from '../../lib/planMarketing.js'
 import {
-  PLAN_FEATURE_CATALOG,
-  PLAN_FEATURE_IDS,
-  mergePlanFeatures,
-} from '../../config/planFeatures.js'
+  getMergedFeatureCatalog,
+  getPricingPageConfig,
+} from '../../services/pricingPageSettings.js'
 
 const router = Router()
 
-/** Must match `CANONICAL_PLAN_SLUGS` in services/plan.ts and prisma seed. */
-const CANONICAL_PLAN_SLUGS = ['free', 'basic', 'standard', 'premium', 'firm'] as const
-const PAID_PLAN_SLUGS = ['basic', 'standard', 'premium', 'firm'] as const
-const featuresSchema = z
-  .record(z.string(), z.boolean())
-  .refine((obj) => Object.keys(obj).every((k) => (PLAN_FEATURE_IDS as string[]).includes(k)), {
-    message: 'Unknown plan feature flag',
+const planSlugSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9_-]*$/, 'Slug must start with a letter and use lowercase letters, numbers, _ or -')
+
+const featuresSchema = z.record(z.string().max(64), z.boolean()).optional()
+
+const marketingSchema = z
+  .object({
+    tagline: z.string().max(500).optional(),
+    audience: z.string().max(200).optional(),
+    badge: z.string().max(80).nullable().optional(),
+    highlight: z.boolean().optional(),
+    bullets: z.array(z.string().max(500)).max(32).optional(),
+    inheritsFromLabel: z.string().max(200).nullable().optional(),
+    ctaLabel: z.string().max(80).optional(),
+    ctaHref: z.string().max(500).optional(),
+    featureMatrix: z.record(z.union([z.boolean(), z.string()])).optional(),
   })
   .optional()
 
-const createPlanSchema = z.object({
-  slug: z.enum(PAID_PLAN_SLUGS),
-  name: z.string().min(1),
+const planFieldsSchema = z.object({
+  slug: planSlugSchema,
+  name: z.string().min(1).max(120),
   projectsPerMonth: z.number().int(),
   transactionsPerMonth: z.number().int(),
   monthlyGhs: z.number().min(0),
@@ -31,32 +44,42 @@ const createPlanSchema = z.object({
   bankAccounts: z.number().int().optional(),
   cleanExportsPerMonth: z.number().int().optional(),
   usersLimit: z.number().int().optional(),
+  sortOrder: z.number().int().min(-1000).max(10000).optional(),
+  showOnPublic: z.boolean().optional(),
   features: featuresSchema,
+  marketing: marketingSchema,
   active: z.boolean().optional().default(true),
 })
 
-const updatePlanSchema = createPlanSchema
-  .extend({ slug: z.enum(CANONICAL_PLAN_SLUGS) })
-  .partial()
+const createPlanSchema = planFieldsSchema
+const updatePlanSchema = planFieldsSchema.partial()
 
 function serializePlan(p: {
   slug: string
   features: unknown
+  marketing?: unknown
   [key: string]: unknown
 }) {
+  const marketing = parseStoredMarketing(p.marketing, p.slug) as PlanMarketing
   return {
     ...p,
     features: mergePlanFeatures(p.slug, p.features),
+    marketing,
   }
 }
 
 router.get('/', async (_req, res) => {
-  const plans = await prisma.plan.findMany({
-    orderBy: { slug: 'asc' },
-  })
+  const [plans, featureCatalog, pricingPage] = await Promise.all([
+    prisma.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { slug: 'asc' }] }),
+    getMergedFeatureCatalog(),
+    getPricingPageConfig(),
+  ])
   res.json({
     plans: plans.map(serializePlan),
-    featureCatalog: PLAN_FEATURE_CATALOG,
+    featureCatalog,
+    comparisonGroups: pricingPage.featureGroups,
+    extraFeatureCatalog: pricingPage.extraFeatureCatalog,
+    builtInFeatureCatalog: PLAN_FEATURE_CATALOG,
   })
 })
 
@@ -73,11 +96,36 @@ router.post('/', async (req, res) => {
       ...body,
       quarterlyGhs,
       features: body.features ?? mergePlanFeatures(body.slug, null),
+      marketing: body.marketing ?? undefined,
+      sortOrder: body.sortOrder ?? 0,
+      showOnPublic: body.showOnPublic !== false,
     },
   })
   invalidatePlanCache()
   await refreshPlanCache()
   res.status(201).json(serializePlan(plan))
+})
+
+const reorderSchema = z.object({
+  orderedIds: z.array(z.string().min(1)).min(1),
+})
+
+/** Persist landing-page plan order (sortOrder = index × 10). */
+router.put('/reorder', async (req, res) => {
+  const { orderedIds } = reorderSchema.parse(req.body)
+  const existing = await prisma.plan.findMany({ select: { id: true } })
+  const valid = new Set(existing.map((p) => p.id))
+  for (const id of orderedIds) {
+    if (!valid.has(id)) return res.status(400).json({ error: `Unknown plan id: ${id}` })
+  }
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.plan.update({ where: { id }, data: { sortOrder: index * 10 } })
+    )
+  )
+  invalidatePlanCache()
+  await refreshPlanCache()
+  res.json({ ok: true, count: orderedIds.length })
 })
 
 router.get('/:id', async (req, res) => {
@@ -88,19 +136,33 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const body = updatePlanSchema.parse(req.body)
-  if (body.slug) {
-    const existing = await prisma.plan.findFirst({
+  const current = await prisma.plan.findUnique({ where: { id: req.params.id } })
+  if (!current) return res.status(404).json({ error: 'Not found' })
+
+  if (body.slug && body.slug !== current.slug) {
+    const clash = await prisma.plan.findFirst({
       where: { slug: body.slug, NOT: { id: req.params.id } },
     })
-    if (existing) return res.status(400).json({ error: 'Plan slug already exists' })
+    if (clash) return res.status(400).json({ error: 'Plan slug already exists' })
   }
-  const plan = await prisma.plan.update({
-    where: { id: req.params.id },
-    data: {
-      ...body,
-      ...(body.features ? { features: body.features } : {}),
-    },
+
+  const plan = await prisma.$transaction(async (tx) => {
+    if (body.slug && body.slug !== current.slug) {
+      await tx.organization.updateMany({
+        where: { plan: current.slug },
+        data: { plan: body.slug },
+      })
+    }
+    return tx.plan.update({
+      where: { id: req.params.id },
+      data: {
+        ...body,
+        ...(body.features ? { features: body.features } : {}),
+        ...(body.marketing ? { marketing: body.marketing } : {}),
+      },
+    })
   })
+
   invalidatePlanCache()
   await refreshPlanCache()
   res.json(serializePlan(plan))

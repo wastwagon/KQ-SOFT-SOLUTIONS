@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, ChevronDown } from 'lucide-react'
+import { ArrowRight, ChevronDown, ClipboardCheck } from 'lucide-react'
 import BrsHelp from '../components/BrsHelp'
 import ConfirmedMatchesPanel from '../components/reconcile/ConfirmedMatchesPanel'
 import MatchActionBar from '../components/reconcile/MatchActionBar'
@@ -15,6 +15,7 @@ import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Button from '../components/ui/Button'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import type { MatchedPair, SuggestedMatch, SuggestedSplitMatch, Tx } from '../components/reconcile/types'
 import { ghanaBankProfileTip } from '../lib/ghanaBankProfileTips'
@@ -22,6 +23,8 @@ import { reconcileSelectionKind } from '../lib/reconcileSelectionKind'
 import { documents, reconcile, unlessSubscriptionInactive } from '../lib/api'
 import { chunkCountCancelPairs, type CountCancelPair } from '../lib/countMatchSelect'
 import { useToast } from '../components/ui/Toast'
+import Badge from '../components/ui/Badge'
+import { useCountMatchUxSignoff } from '../lib/useCountMatchUxSignoff'
 
 /**
  * Orchestrator for the reconcile step of the BRS workflow.
@@ -82,6 +85,10 @@ export default function ProjectReconcile({
   } = session
 
   const toast = useToast()
+  const countMatchUx = useCountMatchUxSignoff(
+    projectId,
+    (data?.project as { name?: string } | undefined)?.name,
+  )
   const pairCancelBatchMutation = useMutation({
     mutationFn: async (pairs: CountCancelPair[]) => {
       const chunks = chunkCountCancelPairs(pairs)
@@ -165,8 +172,7 @@ export default function ProjectReconcile({
         ? err.message
         : 'Check your connection and try again.'
     return (
-      <Alert
-        tone="error"
+      <PageLoadError
         title="Could not load reconciliation data"
         onRetry={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
       >
@@ -175,7 +181,7 @@ export default function ProjectReconcile({
           If you just finished mapping, wait a few seconds for imports to settle, then retry. Large PDF/Excel
           files can take longer on first open of Reconcile.
         </p>
-      </Alert>
+      </PageLoadError>
     )
   }
 
@@ -307,28 +313,63 @@ export default function ProjectReconcile({
       <BrsHelp variant="reconcile" />
 
       <div className="sticky top-0 z-20 -mx-1 border-b border-border-muted bg-surface/95 px-1 py-3 backdrop-blur-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium text-gray-700">
-            <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> cash-book
-            lines matched
-            {view === 'all'
-              ? '. Tick matching rows, then Confirm match at the bottom.'
-              : canReconcile
-                ? '. Select a cash book row and a bank row, then confirm.'
-                : '. View-only.'}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-sm font-medium text-gray-700 min-w-0">
+            <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> matched
+            <span className="hidden md:inline">
+              {' '}
+              cash-book lines
+              {view === 'all'
+                ? '. Tick matching rows, then Confirm match at the bottom.'
+                : canReconcile
+                  ? '. Select a cash book row and a bank row, then confirm.'
+                  : '. View-only.'}
+            </span>
           </p>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto">
+            {matchingAllowed && showCountMatch && (
+              <>
+                {countMatchUx.signoff?.result === 'pass' && (
+                  <Badge tone="success" size="sm" shape="soft" className="self-start sm:self-auto">
+                    Preparer signed off
+                  </Badge>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 self-start sm:self-auto"
+                  onClick={countMatchUx.openChecklist}
+                >
+                  <ClipboardCheck className="w-4 h-4" aria-hidden />
+                  Preparer check
+                </Button>
+              </>
+            )}
             {matchingAllowed && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-primary-700"
+                className="text-primary-700 self-start sm:self-auto"
                 onClick={() =>
-                  document.getElementById('split-suggestions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  document.getElementById('reconcile-tables')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }
               >
-                Split suggestions
+                Transaction tables
+              </Button>
+            )}
+            {matchingAllowed && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-primary-700 self-start sm:self-auto"
+                onClick={() =>
+                  document.getElementById('matching-helpers')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              >
+                Matching helpers
               </Button>
             )}
             <ReconcileToolbar
@@ -439,6 +480,42 @@ export default function ProjectReconcile({
         </Alert>
       )}
 
+      <p className="text-sm text-gray-600" id="reconcile-tables">
+        {view === 'all'
+          ? 'Tick matching rows in the tables below — Confirm match appears when receipts pair with credits or payments with debits.'
+          : canReconcile
+            ? 'Select a cash book row and a bank row in the tables below, then confirm.'
+            : 'View-only — row selection is disabled.'}
+      </p>
+
+      <ReconcileTransactionsTables
+        projectSlug={projectId}
+        view={view}
+        canReconcile={canReconcile}
+        currency={currency}
+        receipts={receipts}
+        payments={payments}
+        credits={credits}
+        debits={debits}
+        matchedCbIds={matchedCbIds}
+        matchedBankIds={matchedBankIds}
+        flaggedBankIds={flaggedBankIds}
+        receiptSugs={receiptSugs}
+        paymentSugs={paymentSugs}
+        splitSuggestions={splitSuggestions}
+        selectedCbIds={selectedCbIds}
+        selectedBankIds={selectedBankIds}
+        onToggleCb={toggleCb}
+        onToggleBank={toggleBank}
+      />
+
+      <details id="matching-helpers" className="rounded-xl border border-border bg-surface/80 open:pb-2" open>
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 list-none marker:content-none flex items-center justify-between gap-2">
+          <span>Matching helpers</span>
+          <span className="text-xs font-normal text-gray-500">Split · count · suggestions · confirmed</span>
+        </summary>
+        <div className="space-y-6 px-1 pb-2 border-t border-border pt-4">
+
       {matchingAllowed && (
         <SplitSuggestionsPanel
           suggestions={splitSuggestions}
@@ -467,6 +544,8 @@ export default function ProjectReconcile({
           }
           currency={currency}
           bankAccountId={bankAccountId || undefined}
+          uxSignoff={countMatchUx.signoff}
+          onOpenUxChecklist={countMatchUx.openChecklist}
           onSelectAmountRows={(cbIds, bankIds) => {
             setSelectedCbIds(new Set(cbIds))
             setSelectedBankIds(new Set(bankIds))
@@ -519,6 +598,9 @@ export default function ProjectReconcile({
         />
       )}
 
+        </div>
+      </details>
+
       {canMatch && matchingAllowed && (
         <MatchActionBar
           cbCount={cbArr.length}
@@ -528,35 +610,6 @@ export default function ProjectReconcile({
           onConfirm={handleConfirmMatch}
         />
       )}
-
-      <p className="text-sm font-medium text-gray-600">
-        {view === 'all'
-          ? 'Cash book (all) shows receipts and payments together. Tick rows that belong together — Confirm match appears at the bottom when receipts pair with credits or payments with debits. A 2→1 split badge means several cash-book lines add up to one bank line.'
-          : canReconcile
-            ? 'Click rows to select. Confirm match appears at the bottom. A 2→1 split badge means many-to-1; a 1:1 badge is a suggested pair.'
-            : 'View-only. Row selection is disabled.'}
-      </p>
-
-      <ReconcileTransactionsTables
-        projectSlug={projectId}
-        view={view}
-        canReconcile={canReconcile}
-        currency={currency}
-        receipts={receipts}
-        payments={payments}
-        credits={credits}
-        debits={debits}
-        matchedCbIds={matchedCbIds}
-        matchedBankIds={matchedBankIds}
-        flaggedBankIds={flaggedBankIds}
-        receiptSugs={receiptSugs}
-        paymentSugs={paymentSugs}
-        splitSuggestions={splitSuggestions}
-        selectedCbIds={selectedCbIds}
-        selectedBankIds={selectedBankIds}
-        onToggleCb={toggleCb}
-        onToggleBank={toggleBank}
-      />
 
       {onProceedToReview && (
         <div className="mt-8 flex flex-wrap items-center justify-between gap-6 border-t border-gray-100 pt-8">
@@ -572,12 +625,13 @@ export default function ProjectReconcile({
           </Button>
         </div>
       )}
+      {countMatchUx.checklistModal}
     </div>
   )
 }
 
 function ReconcileNotices({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   return (
     <div className="rounded-xl border border-border bg-gray-50/80 text-sm text-gray-800">
       <Button

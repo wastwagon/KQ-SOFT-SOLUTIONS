@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Alert from '../components/ui/Alert'
 import { useToast } from '../components/ui/Toast'
+import PublicPageSeo from '../components/marketing/PublicPageSeo'
 
 export default function Register() {
   const [searchParams] = useSearchParams()
@@ -71,7 +72,7 @@ export default function Register() {
       })
       setAuth(user, org, token, role, isPlatformAdmin)
       toast.success(
-        joiningOrg ? 'Welcome to the team' : 'Workspace created',
+        joiningOrg ? 'Welcome to the team' : 'Organisation created',
         joiningOrg
           ? `You joined ${org.name}.`
           : `Welcome to KQ-SOFT, ${name || email.split('@')[0]}.`
@@ -80,16 +81,22 @@ export default function Register() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Registration failed'
       setError(msg)
-      toast.error(joiningOrg ? 'Could not join organisation' : 'Could not create workspace', msg)
+      toast.error(joiningOrg ? 'Could not join organisation' : 'Could not create organisation', msg)
     } finally {
       setLoading(false)
     }
   }
 
   return (
+    <>
+      <PublicPageSeo
+        title="Create organisation — KQ-SOFT bank reconciliation"
+        description="Start free bank reconciliation for your Ghana accounting team. Match cash book to bank statement and export BRS."
+        path="/register"
+      />
     <AuthLayout
       eyebrow={joiningOrg ? 'Team invitation' : 'Get started'}
-      title={joiningOrg ? `Join ${inviteOrgName}` : 'Create your workspace'}
+      title={joiningOrg ? `Join ${inviteOrgName}` : 'Create your organisation'}
       subtitle={
         joiningOrg
           ? 'Create your account to accept the invitation. Use the email address the invite was sent to.'
@@ -98,7 +105,7 @@ export default function Register() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <Alert tone="error" title={joiningOrg ? 'Could not join organisation' : 'Could not create workspace'}>
+          <Alert tone="error" title={joiningOrg ? 'Could not join organisation' : 'Could not create organisation'}>
             {error}
           </Alert>
         )}
@@ -164,7 +171,7 @@ export default function Register() {
           isLoading={loading || inviteLoading}
           disabled={joiningOrg && !inviteOrgName}
         >
-          {joiningOrg ? 'Join organisation' : 'Create workspace'}
+          {joiningOrg ? 'Join organisation' : 'Create organisation'}
         </Button>
 
         <p className="text-center text-xs leading-relaxed text-gray-500">
@@ -197,5 +204,6 @@ export default function Register() {
         </p>
       </form>
     </AuthLayout>
+    </>
   )
 }

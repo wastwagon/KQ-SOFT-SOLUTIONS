@@ -5,11 +5,13 @@ import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Alert from '../../components/ui/Alert'
 import Badge from '../../components/ui/Badge'
 import MetricCard from '../../components/ui/MetricCard'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import PageHeader from '../../components/layout/PageHeader'
+import ActionMenu from '../../components/ui/ActionMenu'
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>()
@@ -87,13 +89,13 @@ export default function AdminUserDetail() {
           <ArrowLeft className="w-4 h-4" />
           Back to Users
         </Link>
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load user"
+          error={error}
           onRetry={() => queryClient.invalidateQueries({ queryKey: ['admin', 'user', id] })}
         >
           {error instanceof Error ? error.message : 'User not found.'}
-        </Alert>
+        </PageLoadError>
       </div>
     )
   }
@@ -113,37 +115,52 @@ export default function AdminUserDetail() {
       <PageHeader
         eyebrow="Platform admin"
         title={user.name || user.email}
-        subtitle={<p className="text-gray-500 font-mono text-sm">{user.email}</p>}
+        subtitle={
+          <>
+            <p className="text-gray-500 font-mono text-sm">{user.email}</p>
+            <div className="mt-2">
+              {suspended ? (
+                <Badge tone="danger" size="sm" shape="soft">
+                  Suspended
+                </Badge>
+              ) : (
+                <Badge tone="success" size="sm" shape="soft">
+                  Active
+                </Badge>
+              )}
+            </div>
+          </>
+        }
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-          {suspended ? (
-            <Badge tone="danger">Suspended</Badge>
-          ) : (
-            <Badge tone="success">Active</Badge>
-          )}
-          {suspended ? (
+          suspended ? (
             <Button
-              variant="outline"
+              variant="primary"
               size="sm"
               onClick={() => updateMutation.mutate(null)}
               isLoading={updateMutation.isPending}
             >
               <UserCheck className="w-4 h-4 mr-1" />
-              Restore
+              Restore user
             </Button>
           ) : (
-            <Button
+            <ActionMenu
+              label="Actions"
               variant="outline"
               size="sm"
-              onClick={() => updateMutation.mutate(new Date().toISOString())}
+              menuAriaLabel="User account actions"
               isLoading={updateMutation.isPending}
-              className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
-            >
-              <UserX className="w-4 h-4 mr-1" />
-              Suspend
-            </Button>
-          )}
-          </div>
+              items={[
+                {
+                  kind: 'button',
+                  label: 'Suspend user',
+                  icon: UserX,
+                  destructive: true,
+                  onClick: () => updateMutation.mutate(new Date().toISOString()),
+                  disabled: updateMutation.isPending,
+                },
+              ]}
+            />
+          )
         }
       />
 
@@ -170,7 +187,7 @@ export default function AdminUserDetail() {
                 >
                   {m.organization.name}
                 </Link>
-                <Badge tone="neutral" size="sm" className="capitalize">
+                <Badge tone="neutral" size="sm" shape="soft" className="capitalize">
                   {m.role}
                 </Badge>
               </li>

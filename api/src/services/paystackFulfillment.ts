@@ -5,9 +5,8 @@ import { logger } from '../middleware/logging.js'
 import { invalidateOrgSubscriptionCache } from './orgSubscriptionAccess.js'
 import { clearScheduledPlan } from './planChange.js'
 import { recordIntroOfferPayment } from './introOffer.js'
+import { getPlanBySlug, isSelfServePlan } from './plan.js'
 
-export const PAYABLE_PLANS = ['basic', 'standard', 'premium'] as const
-export type PayablePlan = (typeof PAYABLE_PLANS)[number]
 export const BILLING_PERIODS = ['monthly', 'quarterly', 'yearly'] as const
 export type BillingPeriod = (typeof BILLING_PERIODS)[number]
 
@@ -38,10 +37,13 @@ export type PaystackVerifyData = {
 }
 
 const CHECKOUT_REF_RE =
-  /^brs_([a-z0-9]+)_((?:basic|standard|premium))_((?:monthly|quarterly|yearly))_(\d+)$/i
+  /^brs_([a-z0-9]+)_([a-z][a-z0-9_-]*)_((?:monthly|quarterly|yearly))_(\d+)$/i
 
-export function isPayablePlan(plan: string | undefined): plan is PayablePlan {
-  return !!plan && (PAYABLE_PLANS as readonly string[]).includes(plan)
+/** Self-serve checkout: active plan with a positive price (CMS-defined). */
+export async function isCheckoutPlanSlug(plan: string | undefined): Promise<boolean> {
+  if (!plan) return false
+  const data = await getPlanBySlug(plan)
+  return !!(data && isSelfServePlan(data))
 }
 
 export function isBillingPeriod(period: string | undefined): period is BillingPeriod {
@@ -219,7 +221,7 @@ export async function fulfillSuccessfulCharge(
 ): Promise<'applied' | 'already_applied'> {
   const plan = input.plan.toLowerCase()
   const period = (input.period || 'monthly').toLowerCase()
-  if (!isPayablePlan(plan)) {
+  if (!(await isCheckoutPlanSlug(plan))) {
     throw new Error(`Cannot fulfill unpaid / unknown plan "${input.plan}"`)
   }
   const safePeriod: BillingPeriod = isBillingPeriod(period) ? period : 'monthly'
@@ -315,7 +317,7 @@ export async function applyVerifiedPaystackCharge(
 ): Promise<{ orgId: string; plan: string; period: string; result: 'applied' | 'already_applied' }> {
   const reference = (tx.reference || '').trim()
   const meta = extractCheckoutMetadata(tx.metadata, reference)
-  if (!meta.orgId || !isPayablePlan(meta.plan)) {
+  if (!meta.orgId || !(await isCheckoutPlanSlug(meta.plan))) {
     throw Object.assign(new Error('Payment metadata is missing organisation or plan'), { status: 422 })
   }
   const amountRaw = tx.amount ?? 0

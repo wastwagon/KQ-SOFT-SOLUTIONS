@@ -9,8 +9,7 @@ import {
   Settings,
   ShieldCheck,
   FileText,
-  Landmark,
-  FileSpreadsheet,
+  Wrench,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { settings, getLogoDisplayUrl, subscription } from '../lib/api'
@@ -19,6 +18,7 @@ import {
   isSubscriptionBannerDismissed,
   layoutPaywallStripShouldShow,
 } from '../lib/subscriptionBanner'
+import { pickWorkspaceLayoutBanner } from '../lib/workspaceLayoutBanner'
 import BrandLogo from './BrandLogo'
 import OrgSwitcher from './OrgSwitcher'
 import NotificationsBell from './NotificationsBell'
@@ -105,7 +105,7 @@ export default function AppLayout() {
         >
           <BrandLogo variant="icon" className="h-9 w-9 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900 truncate">Workspace</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">KQ BRS</p>
             {showOrgLogo ? (
               <img
                 src={getLogoDisplayUrl(logoUrl!)}
@@ -120,7 +120,7 @@ export default function AppLayout() {
         </NavLink>
       </SidebarHeader>
 
-      <nav className="flex-1 overflow-y-auto py-2 px-3" aria-label="Workspace">
+      <nav className="flex-1 overflow-y-auto py-2 px-3" aria-label="Main menu">
         <SidebarNavSection label="General" active={path === '/dashboard' || path.startsWith('/dashboard/')}>
           <NavLink to="/dashboard" end onClick={closeSidebar} className={sidebarNavLinkClass}>
             <LayoutDashboard className="w-5 h-5 flex-shrink-0 opacity-80" />
@@ -150,13 +150,9 @@ export default function AppLayout() {
         </SidebarNavSection>
 
         <SidebarNavSection label="Tools" active={toolsActive}>
-          <NavLink to="/tools/clean-bank-statement" onClick={closeSidebar} className={sidebarNavLinkClass}>
-            <Landmark className="w-5 h-5 flex-shrink-0 opacity-80" />
-            Clean bank statement
-          </NavLink>
-          <NavLink to="/tools/clean-cash-book" onClick={closeSidebar} className={sidebarNavLinkClass}>
-            <FileSpreadsheet className="w-5 h-5 flex-shrink-0 opacity-80" />
-            Clean cash book
+          <NavLink to="/tools" end onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <Wrench className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Tools
           </NavLink>
         </SidebarNavSection>
 
@@ -211,7 +207,7 @@ export default function AppLayout() {
 
   const stripClass = 'rounded-none border-x-0 border-t-0'
 
-  const statusBanner = showSubscriptionStrip ? (
+  const subscriptionStrip = (
     <Alert
       tone="warning"
       title="Subscription inactive"
@@ -234,15 +230,16 @@ export default function AppLayout() {
       </Link>
       .
     </Alert>
-  ) : !impersonating &&
-    subscriptionBypass &&
-    workspacePlanInactive &&
-    !path.startsWith('/settings') ? (
+  )
+
+  const adminBypassStrip = (
     <Alert tone="info" title="Platform admin bypass" className={stripClass}>
-      This workspace’s subscription is {sub}; core APIs remain available for your account. Tenant users
-      still need an active plan.
+      This organisation’s subscription is {sub}; you still have full access as platform admin. Other
+      team members need an active plan.
     </Alert>
-  ) : layoutUsageQueryFailed && !hideLayoutUsageFailureBanner ? (
+  )
+
+  const usageFailureStrip = (
     <Alert
       tone="warning"
       title="Plan limits could not be loaded"
@@ -251,26 +248,41 @@ export default function AppLayout() {
     >
       Project filters and usage metrics may be incomplete until this succeeds.
     </Alert>
-  ) : layoutBrandingQueryFailed && !hideLayoutBrandingFailureBanner ? (
+  )
+
+  const brandingFailureStrip = (
     <Alert
       tone="warning"
       title="Organisation branding could not be loaded"
       className={stripClass}
       onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })}
     />
-  ) : null
-
-  const banners = impersonating ? (
-    <ImpersonationBanner
-      subscriptionNote={
-        workspacePlanInactive
-          ? `This workspace’s subscription is ${sub}; tenant users still need an active plan.`
-          : undefined
-      }
-    />
-  ) : (
-    statusBanner
   )
+
+  const banners = pickWorkspaceLayoutBanner({
+    impersonating,
+    impersonationBanner: (
+      <ImpersonationBanner
+        subscriptionNote={
+          workspacePlanInactive
+            ? `This organisation’s subscription is ${sub}; other team members need an active plan.`
+            : undefined
+        }
+      />
+    ),
+    showSubscriptionStrip,
+    subscriptionStrip,
+    showAdminBypassStrip:
+      !impersonating &&
+      !!subscriptionBypass &&
+      workspacePlanInactive &&
+      !path.startsWith('/settings'),
+    adminBypassStrip,
+    showUsageFailureStrip: layoutUsageQueryFailed && !hideLayoutUsageFailureBanner,
+    usageFailureStrip,
+    showBrandingFailureStrip: layoutBrandingQueryFailed && !hideLayoutBrandingFailureBanner,
+    brandingFailureStrip,
+  })
 
   return (
     <SidebarShell
@@ -287,8 +299,13 @@ export default function AppLayout() {
           <AccountMenu />
         </>
       }
-      sidebarLabel="Workspace navigation"
-      bottomNav={<WorkspaceMobileTabBar />}
+      sidebarLabel="Main navigation"
+      bottomNav={
+        <WorkspaceMobileTabBar
+          showAudit={!!(usageForBanner?.features as Record<string, boolean> | undefined)?.audit_trail}
+          isPlatformAdmin={isPlatformAdmin}
+        />
+      }
     >
       <Suspense fallback={<RouteFallback />}>
         <Outlet />

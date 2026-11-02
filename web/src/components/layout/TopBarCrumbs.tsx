@@ -11,7 +11,7 @@ const SETTINGS_TABS: Record<string, string> = {
   branding: 'Branding',
   billing: 'Billing',
   members: 'Team members',
-  connections: 'Connections',
+  connections: 'Bank import',
   'api-keys': 'API keys',
   'bank-rules': 'Bank rules',
 }
@@ -51,16 +51,22 @@ function crumbsFor(pathname: string, projectName?: string): Crumb[] {
   if (pathname === '/audit' || pathname.startsWith('/audit/')) return [{ label: 'Audit log' }]
   if (pathname === '/manual' || pathname.startsWith('/manual/')) return [{ label: 'Help' }]
   if (pathname.startsWith('/tools/clean-bank-statement')) {
-    return [{ label: 'Tools' }, { label: 'Clean bank statement' }]
+    return [{ label: 'Tools', href: '/tools' }, { label: 'Clean bank statement' }]
   }
   if (pathname.startsWith('/tools/clean-cash-book')) {
-    return [{ label: 'Tools' }, { label: 'Clean cash book' }]
+    return [{ label: 'Tools', href: '/tools' }, { label: 'Clean cash book' }]
+  }
+  if (pathname === '/tools') {
+    return [{ label: 'Tools' }]
   }
   if (pathname.startsWith('/platform-admin/tools/clean-bank-statement')) {
-    return [{ label: 'Platform' }, { label: 'Clean bank statement' }]
+    return [{ label: 'Platform admin', href: '/platform-admin' }, { label: 'Tools', href: '/platform-admin/tools' }, { label: 'Clean bank statement' }]
   }
   if (pathname.startsWith('/platform-admin/tools/clean-cash-book')) {
-    return [{ label: 'Platform' }, { label: 'Clean cash book' }]
+    return [{ label: 'Platform admin', href: '/platform-admin' }, { label: 'Tools', href: '/platform-admin/tools' }, { label: 'Clean cash book' }]
+  }
+  if (pathname === '/platform-admin/tools') {
+    return [{ label: 'Platform admin', href: '/platform-admin' }, { label: 'Tools' }]
   }
   if (pathname === '/platform-admin') return [{ label: 'Platform admin' }]
   if (pathname.startsWith('/platform-admin/')) {
@@ -72,10 +78,13 @@ function crumbsFor(pathname: string, projectName?: string): Crumb[] {
       payments: 'Payments',
       revenue: 'Revenue',
       'ops-metrics': 'Ops metrics',
+      ops: 'Ops hub',
       leads: 'Leads',
       retention: 'Data retention',
       'generation-settings': 'Generation settings',
       database: 'Database',
+      'pricing-page': 'Pricing layout',
+      tools: 'Tools',
     }
     return [{ label: 'Platform admin', href: '/platform-admin' }, { label: labels[rest] || rest }]
   }

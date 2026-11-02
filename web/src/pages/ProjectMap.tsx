@@ -18,10 +18,12 @@ import {
 } from '@brs/suggested-mapping'
 import { useAuth } from '../store/auth'
 import { canExportReport, isProjectEditable } from '../lib/permissions'
+import { roleListLabel } from '../lib/userFacingTerms'
 import ProjectLockedBanner from '../components/project/ProjectLockedBanner'
 import { useToast } from '../components/ui/Toast'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
@@ -484,13 +486,11 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
   }
   if (projectQueryFailed) {
     return (
-      <Alert
-        tone="error"
+      <PageLoadError
         title="Could not load project"
+        error={projectError}
         onRetry={() => queryClient.invalidateQueries({ queryKey: ['project', id] })}
-      >
-        {projectError instanceof Error ? projectError.message : 'Something went wrong.'}
-      </Alert>
+      />
     )
   }
   if (projectPending || !project) return <WorkflowStepSkeleton bodyRows={3} />
@@ -518,7 +518,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       )}
       {!canMap && (
         <Alert tone="info" title="View only">
-          Contact an admin, reviewer, or preparer to map documents.
+          Contact an {roleListLabel('admin', 'reviewer', 'preparer')} to map documents.
         </Alert>
       )}
       {parseJobsInflight > 0 && (
@@ -830,17 +830,15 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
           {previewLoading ? (
             <PageBodySkeleton label="Loading preview" />
           ) : previewQueryFailed && previewError && !isSubscriptionInactiveError(previewError) ? (
-            <Alert
-              tone="error"
+            <PageLoadError
               title="Could not load document preview"
+              error={previewError}
               onRetry={() =>
                 queryClient.invalidateQueries({
                   queryKey: ['document-preview', selectedDocId, previewSheetIndex],
                 })
               }
-            >
-              {previewError instanceof Error ? previewError.message : 'Something went wrong.'}
-            </Alert>
+            />
           ) : preview ? (
             <Card title={preview.filename}>
               <div className="space-y-4">
@@ -1067,7 +1065,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 </Alert>
               )}
               <div className="rounded-xl border border-border overflow-hidden">
-                <Table>
+                <Table compact>
                   <TableHead>
                     <TableRow>
                       {preview.headers.map((h: string, i: number) => (

@@ -14,7 +14,7 @@ export default function SettingsTabNav({
     { id: 'branding', label: 'Branding' },
     { id: 'billing', label: 'Billing' },
     { id: 'members', label: 'Members' },
-    { id: 'connections', label: 'Connections' },
+    { id: 'connections', label: 'Bank import' },
     ...(showApiKeys ? [{ id: 'api-keys', label: 'API keys' }] : []),
     ...(showBankRules ? [{ id: 'bank-rules', label: 'Bank rules' }] : []),
   ]

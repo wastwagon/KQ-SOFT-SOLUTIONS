@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { api } from '../../lib/api'
-import { publicPlanName } from '../../lib/plans'
+import { usePlanDisplayNames } from '../../lib/usePlanDisplayNames'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import PageHeader from '../../components/layout/PageHeader'
-import Alert from '../../components/ui/Alert'
+import AdminListToolbar from '../../components/layout/AdminListToolbar'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Badge from '../../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
@@ -32,6 +33,7 @@ export default function AdminPayments() {
   const [page, setPage] = useState(1)
   const [orgId, setOrgId] = useState('')
   const [verifyReference, setVerifyReference] = useState('')
+  const { planLabel } = usePlanDisplayNames()
   const toast = useToast()
   const queryClient = useQueryClient()
 
@@ -64,7 +66,7 @@ export default function AdminPayments() {
       if (result.status === 'success') {
         toast.success(
           result.alreadyApplied ? 'Already applied' : 'Payment applied',
-          result.plan ? `Organisation plan is now ${publicPlanName(result.plan)}.` : 'Subscription updated from Paystack.'
+          result.plan ? `Organisation plan is now ${planLabel(result.plan)}.` : 'Subscription updated from Paystack.'
         )
         setVerifyReference('')
         void queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] })
@@ -89,9 +91,7 @@ export default function AdminPayments() {
           title="Payments"
           subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
         />
-        <Alert tone="error" title="Could not load payments" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load payments" error={error} onRetry={() => void refetch()} />
       </div>
     )
   }
@@ -120,24 +120,27 @@ export default function AdminPayments() {
         subtitle={<p className="text-gray-500">All subscription payments across the platform.</p>}
       />
 
-      <Card>
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="w-64">
-            <Input
-              type="text"
-              placeholder="Filter by org ID"
-              value={orgId}
-              onChange={(e) => setOrgId(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
-              aria-label="Filter by org ID"
-            />
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setPage(1)}>
-            Apply
-          </Button>
-        </div>
+      <AdminListToolbar
+        activeFilterCount={orgId.trim() ? 1 : 0}
+        drawerTitle="Payment filters"
+        search={
+          <Input
+            type="search"
+            value={orgId}
+            onChange={(e) => {
+              setOrgId(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Filter by organization ID…"
+            leading={<Search className="w-4 h-4" />}
+            aria-label="Filter by organization ID"
+          />
+        }
+      />
+
+      <Card title="Confirm Paystack payment">
         <form
-          className="flex flex-wrap items-end gap-3 mb-4"
+          className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault()
             const reference = verifyReference.trim()
@@ -145,7 +148,7 @@ export default function AdminPayments() {
             verifyMutation.mutate(reference)
           }}
         >
-          <div className="w-80 max-w-full">
+          <div className="w-full sm:max-w-md flex-1 min-w-0">
             <Input
               type="text"
               placeholder="Paystack reference (e.g. brs_…)"
@@ -158,12 +161,14 @@ export default function AdminPayments() {
             Confirm from Paystack
           </Button>
         </form>
-        <p className="text-xs text-gray-500 mb-4">
-          If a customer paid on Paystack but the workspace plan did not update, paste the transaction reference here
+        <p className="text-xs text-gray-500 mt-3">
+          If a customer paid on Paystack but the organisation plan did not update, paste the transaction reference here
           to verify the charge and apply the plan.
         </p>
+      </Card>
 
-        <Table>
+      <Card noPadding>
+        <Table compact>
           <TableHead>
             <tr>
               <TableTh>Date</TableTh>
@@ -196,7 +201,7 @@ export default function AdminPayments() {
                       {pay.organization.name}
                     </Link>
                   </TableTd>
-                  <TableTd>{publicPlanName(pay.plan)}</TableTd>
+                  <TableTd>{planLabel(pay.plan)}</TableTd>
                   <TableTd className="capitalize">{pay.period}</TableTd>
                   <TableTd className="text-right font-medium text-gray-900">
                     {fmt(Number(pay.amount), pay.currency)}
@@ -211,6 +216,7 @@ export default function AdminPayments() {
                             : 'neutral'
                       }
                       size="sm"
+                      shape="soft"
                       className="capitalize"
                     >
                       {pay.status}

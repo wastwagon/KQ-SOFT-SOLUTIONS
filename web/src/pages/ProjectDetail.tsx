@@ -15,7 +15,7 @@ import {
 } from '../lib/permissions'
 import { useAuth } from '../store/auth'
 import { useToast } from '../components/ui/Toast'
-import Alert from '../components/ui/Alert'
+import PageLoadError from '../components/ui/PageLoadError'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import ProjectHeader, { type ProjectHeaderProject } from '../components/project/ProjectHeader'
@@ -180,16 +180,14 @@ export default function ProjectDetail() {
     const err = projectQuery.error ?? clientsQuery.error
     return (
       <div className="space-y-6">
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load project"
+          error={err}
           onRetry={() => {
             void queryClient.invalidateQueries({ queryKey: ['project', slug] })
             void queryClient.invalidateQueries({ queryKey: ['clients'] })
           }}
-        >
-          {err instanceof Error ? err.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }

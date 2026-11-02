@@ -5,13 +5,7 @@ import { useAuth } from '../store/auth'
 import Badge from './ui/Badge'
 import Button from './ui/Button'
 
-function roleLabel(role: string | null | undefined) {
-  if (role === 'admin') return 'Admin'
-  if (role === 'reviewer') return 'Reviewer'
-  if (role === 'preparer') return 'Preparer'
-  if (role === 'viewer') return 'Viewer'
-  return null
-}
+import { roleLabel as formatRoleLabel } from '../lib/userFacingTerms'
 
 function roleTone(role: string | null | undefined): 'brand' | 'success' | 'neutral' {
   if (role === 'admin' || role === 'preparer') return 'brand'
@@ -20,7 +14,7 @@ function roleTone(role: string | null | undefined): 'brand' | 'success' | 'neutr
 }
 
 type AccountMenuProps = {
-  /** Extra items at the top of the menu (e.g. back to workspace). */
+  /** Extra items at the top of the menu (e.g. back to organisation home). */
   extraItems?: { to: string; label: string; icon?: LucideIcon }[]
 }
 
@@ -29,19 +23,37 @@ export default function AccountMenu({ extraItems = [] }: AccountMenuProps) {
   const { user, role, logout, isPlatformAdmin } = useAuth()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const label = roleLabel(role)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const label = role ? formatRoleLabel(role) : null
   const initial = user?.name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'
 
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+        return
+      }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      if (!menuRef.current) return
+      e.preventDefault()
+      const list = [...menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])')]
+      if (list.length === 0) return
+      const idx = list.indexOf(document.activeElement as HTMLElement)
+      const next =
+        e.key === 'ArrowDown'
+          ? list[(idx + 1 + list.length) % list.length]
+          : list[(idx - 1 + list.length) % list.length]
+      next?.focus()
     }
     const onPointer = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     window.addEventListener('mousedown', onPointer)
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('mousedown', onPointer)
@@ -60,6 +72,7 @@ export default function AccountMenu({ extraItems = [] }: AccountMenuProps) {
   return (
     <div className="relative" ref={rootRef}>
       <Button
+        ref={triggerRef}
         type="button"
         variant="ghost"
         size="xs"
@@ -77,6 +90,7 @@ export default function AccountMenu({ extraItems = [] }: AccountMenuProps) {
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Account"
           className="absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-lg"
@@ -99,6 +113,7 @@ export default function AccountMenu({ extraItems = [] }: AccountMenuProps) {
                 key={item.to}
                 to={item.to}
                 role="menuitem"
+                tabIndex={-1}
                 onClick={() => setOpen(false)}
                 className={itemClass}
               >
@@ -107,16 +122,16 @@ export default function AccountMenu({ extraItems = [] }: AccountMenuProps) {
               </Link>
             )
           })}
-          <Link to="/settings/branding" role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
+          <Link to="/settings/branding" role="menuitem" tabIndex={-1} onClick={() => setOpen(false)} className={itemClass}>
             <Settings className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
             Settings
           </Link>
-          <Link to="/manual" role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
+          <Link to="/manual" role="menuitem" tabIndex={-1} onClick={() => setOpen(false)} className={itemClass}>
             <BookOpen className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
             Help
           </Link>
           {isPlatformAdmin && (
-            <Link to="/platform-admin" role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
+            <Link to="/platform-admin" role="menuitem" tabIndex={-1} onClick={() => setOpen(false)} className={itemClass}>
               <ShieldCheck className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
               Platform admin
             </Link>
@@ -126,6 +141,7 @@ export default function AccountMenu({ extraItems = [] }: AccountMenuProps) {
               type="button"
               variant="ghost"
               role="menuitem"
+              tabIndex={-1}
               onClick={handleLogout}
               className={`${itemClass} h-auto min-h-0 rounded-none !justify-start`}
             >

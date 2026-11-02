@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useSearchParams, Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
@@ -19,6 +19,7 @@ import SettingsTabNav from '../components/settings/SettingsTabNav'
 import { useBrandingSettings } from '../components/settings/useBrandingSettings'
 import Card from '../components/ui/Card'
 import Alert from '../components/ui/Alert'
+import PageLoadError from '../components/ui/PageLoadError'
 import { useToast } from '../components/ui/Toast'
 import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
 import PageHeader from '../components/layout/PageHeader'
@@ -48,6 +49,25 @@ export default function Settings() {
   })
   const { data: plansData, isError: plansQueryFailed } = plansQuery
 
+  type PlansPayload = {
+    plans?: { id: string; name: string }[]
+    planOrder?: { slug: string; name: string }[]
+  }
+  const resolvePlanLabel = useCallback(
+    (slug: string | null | undefined) => {
+      if (!slug) return publicPlanName(slug)
+      const payload = plansData as PlansPayload | undefined
+      const cmsName =
+        payload?.planOrder?.find((p) => p.slug === slug)?.name ??
+        payload?.plans?.find((p) => p.id === slug)?.name
+      if (slug === usageData?.organization?.plan && usageData.organization.planDisplayName) {
+        return publicPlanName(slug, usageData.organization.planDisplayName)
+      }
+      return publicPlanName(slug, cmsName)
+    },
+    [plansData, usageData?.organization?.plan, usageData?.organization?.planDisplayName]
+  )
+
   const subscriptionSidebarFailed = usageQueryFailed || plansQueryFailed
 
   const [initializing, setInitializing] = useState<string | null>(null)
@@ -57,13 +77,13 @@ export default function Settings() {
     onSuccess: (data) => {
       if ('applied' in data && data.applied) {
         setInitializing(null)
-        const planLabel = publicPlanName(data.plan)
+        const label = resolvePlanLabel(data.plan)
         setCheckoutNotice({
           tone: 'success',
           title: 'Plan updated',
-          body: `Your workspace is now on ${planLabel}. Unused time from your last payment was applied.`,
+          body: `Your organisation is now on ${label}. Unused time from your last payment was applied.`,
         })
-        toast.success('Plan updated', `You are now on ${planLabel}.`)
+        toast.success('Plan updated', `You are now on ${label}.`)
         void queryClient.invalidateQueries({ queryKey: ['subscription'] })
         return
       }
@@ -125,14 +145,14 @@ export default function Settings() {
         setCheckoutNotice({
           tone: 'success',
           title: 'Plan updated',
-          body: `Your workspace is now on ${publicPlanName(result.plan)}.`,
+          body: `Your organisation is now on ${resolvePlanLabel(result.plan)}.`,
         })
-        toast.success('Plan updated', `You are now on ${publicPlanName(result.plan)}.`)
+        toast.success('Plan updated', `You are now on ${resolvePlanLabel(result.plan)}.`)
       } else {
         setCheckoutNotice({
           tone: 'info',
           title: 'Plan change scheduled',
-          body: `You will move to ${publicPlanName(result.scheduledPlan.plan)} on ${new Date(result.scheduledPlan.effectiveAt).toLocaleString()}.`,
+          body: `You will move to ${resolvePlanLabel(result.scheduledPlan.plan)} on ${new Date(result.scheduledPlan.effectiveAt).toLocaleString()}.`,
         })
         toast.success('Plan change scheduled')
       }
@@ -168,22 +188,22 @@ export default function Settings() {
     setCheckoutNotice({
       tone: 'info',
       title: 'Confirming payment',
-      body: 'Checking Paystack and updating your workspace plan…',
+      body: 'Checking Paystack and updating your plan…',
     })
     void subscription
       .verifyPayment({ reference: paystackReference })
       .then((result) => {
         if (cancelled) return
         if (result.status === 'success') {
-          const planLabel = result.plan ? ` ${publicPlanName(result.plan)}` : ''
+          const label = result.plan ? ` ${resolvePlanLabel(result.plan)}` : ''
           setCheckoutNotice({
             tone: 'success',
             title: result.alreadyApplied ? 'Subscription already active' : 'Payment confirmed',
-            body: `Your workspace is now on the${planLabel} plan.`,
+            body: `Your organisation is now on the${label} plan.`,
           })
           toast.success(
             result.alreadyApplied ? 'Subscription already active' : 'Payment confirmed',
-            `Your workspace is now on the${planLabel} plan.`
+            `Your organisation is now on the${label} plan.`
           )
           void queryClient.invalidateQueries({ queryKey: ['subscription'] })
           try {
@@ -241,15 +261,14 @@ export default function Settings() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Administration" title="Settings" />
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load branding"
           onRetry={() => queryClient.invalidateQueries({ queryKey: ['settings', 'branding'] })}
         >
           {branding.brandingLoadError != null && branding.brandingLoadError instanceof Error
             ? branding.brandingLoadError.message
             : 'Something went wrong.'}
-        </Alert>
+        </PageLoadError>
       </div>
     )
   }
@@ -263,7 +282,7 @@ export default function Settings() {
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
             <p className="text-gray-500">
-              Branding, billing, team, connections, API keys, and bank rules — everything that applies
+              Branding, billing, team, bank import, API keys, and bank rules — everything that applies
               across projects.
             </p>
           </>
@@ -341,8 +360,8 @@ export default function Settings() {
             }
           >
             {!features.api_access && (
-              <Alert tone="warning" title="Custom plan required" className="mb-4">
-                Upgrade to create API keys for programmatic access.
+              <Alert tone="warning" title="Upgrade required" className="mb-4">
+                Your plan does not include REST API keys. Choose a plan with API access under Billing &amp; plans.
               </Alert>
             )}
             {!canManageBilling(role) && features.api_access && (
@@ -360,13 +379,13 @@ export default function Settings() {
             sublabel='Auto-suggest or flag bank transactions that match your rules (e.g. "Bank charges" when description contains "BANK CHARGES").'
           >
             {!features.bank_rules && (
-              <Alert tone="warning" title="Solo plan or higher required" className="mb-4">
-                Upgrade to use auto-suggest and flag rules. Solo includes 5 rules; Team removes the cap.
+              <Alert tone="warning" title="Upgrade required" className="mb-4">
+                Bank rules are not on your current plan. Upgrade from Billing to enable auto-suggest and flag rules.
               </Alert>
             )}
             {features.bank_rules && featureDepth.bank_rules === 'partial' && (
-              <Alert tone="info" title="Solo includes 5 bank rules" className="mb-4">
-                Team and above remove the cap.
+              <Alert tone="info" title="Limited bank rules" className="mb-4">
+                Your plan includes a capped number of rules. Higher plans remove the cap — see Billing for options.
               </Alert>
             )}
             {features.bank_rules && <BankRulesSection canEdit={canEditBankRules(role)} />}
@@ -384,7 +403,7 @@ export default function Settings() {
               <dd className="mt-1 font-medium text-gray-900">KQ-SOFT Bank Reconciliation</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wider text-gray-500">Workspace</dt>
+              <dt className="text-xs font-semibold uppercase tracking-wider text-gray-500">Organisation</dt>
               <dd className="mt-1 font-medium text-gray-900">{org?.name ?? '—'}</dd>
             </div>
           </dl>

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Pencil, Trash2, Building2, Ban, BadgeCheck, LogIn } from 'lucide-react'
 import { api } from '../../lib/api'
-import { publicPlanName } from '../../lib/plans'
+import { planLabelFromCatalog, complimentaryPlanSlug } from '../../lib/usePlanDisplayNames'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -13,12 +13,14 @@ import { useConfirm } from '../../components/ui/ConfirmDialog'
 import PageHeader from '../../components/layout/PageHeader'
 import { useAuth } from '../../store/auth'
 import { useToast } from '../../components/ui/Toast'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Alert from '../../components/ui/Alert'
 import Badge from '../../components/ui/Badge'
+import ActionMenu from '../../components/ui/ActionMenu'
 import MetricCard from '../../components/ui/MetricCard'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
-import { useNavigate } from 'react-router-dom'
+import { SUPPORT_OPEN_ORG } from '../../lib/userFacingTerms'
 
 const ROLES = ['admin', 'reviewer', 'preparer', 'viewer'] as const
 const COMPLIMENTARY_ACCESS_REASON = 'Complimentary platform admin access'
@@ -109,11 +111,13 @@ export default function AdminOrgDetail() {
     queryFn: async () => {
       const raw = await api('/admin/plans')
       if (Array.isArray(raw)) return { plans: raw as { slug: string; name: string }[] }
-      return raw as { plans: { slug: string; name: string }[] }
+      return raw as { plans: { slug: string; name: string; sortOrder?: number }[] }
     },
     enabled: !!org,
   })
   const plans = plansData?.plans ?? []
+  const planLabel = (slug: string | null | undefined) => planLabelFromCatalog(slug, plans)
+  const complimentarySlug = complimentaryPlanSlug(plans)
 
   const updateMutation = useMutation({
     mutationFn: (plan: string) =>
@@ -218,11 +222,11 @@ export default function AdminOrgDetail() {
   })
 
   const grantComplimentaryMutation = useMutation({
-    mutationFn: async (current: { plan: string }) => {
-      if (current.plan !== 'premium') {
+    mutationFn: async (current: { plan: string; complimentarySlug: string }) => {
+      if (current.plan !== current.complimentarySlug) {
         await api(`/admin/organizations/${slug}`, {
           method: 'PATCH',
-          body: JSON.stringify({ plan: 'premium' }),
+          body: JSON.stringify({ plan: current.complimentarySlug }),
         })
       }
       await api(`/admin/organizations/${slug}/subscription/status`, {
@@ -253,11 +257,11 @@ export default function AdminOrgDetail() {
     onSuccess: (data) => {
       setAuth(data.user, data.org, data.token, data.role, data.isPlatformAdmin, true)
       queryClient.clear()
-      toast.success('Entered workspace', `Now viewing ${data.org.name}`)
+      toast.success('Support mode opened', `Now viewing ${data.org.name}`)
       navigate('/dashboard')
     },
     onError: (e) => {
-      toast.error('Could not enter workspace', e instanceof Error ? e.message : 'Request failed')
+      toast.error('Could not open support mode', e instanceof Error ? e.message : 'Request failed')
     },
   })
 
@@ -303,9 +307,9 @@ export default function AdminOrgDetail() {
           Back to Organizations
         </Link>
         <PageHeader eyebrow="Platform admin" title="Organization" />
-        <Alert
-          tone="error"
+        <PageLoadError
           title={isError ? 'Could not load organization' : 'Organization not found'}
+          error={isError ? error : undefined}
           onRetry={isError ? () => void refetch() : undefined}
         >
           {isError
@@ -313,7 +317,7 @@ export default function AdminOrgDetail() {
               ? error.message
               : 'Something went wrong.'
             : 'Check the URL or return to the organizations list.'}
-        </Alert>
+        </PageLoadError>
       </div>
     )
   }
@@ -321,53 +325,55 @@ export default function AdminOrgDetail() {
   const fmt = (n: number) => new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(n)
   const suspended = org.suspendedAt != null
   const hasComplimentaryAccess =
-    org.plan === 'premium' && org.subscription?.status === 'active'
+    org.plan === complimentarySlug && org.subscription?.status === 'active'
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      {suspended && <Badge tone="danger">Suspended</Badge>}
-      <Badge tone="brand">
-        {publicPlanName(org.plan)}
-      </Badge>
       <Button
         variant="primary"
         size="sm"
         isLoading={impersonateMutation.isPending}
         onClick={async () => {
           const ok = await confirm({
-            title: `Enter workspace “${org.name}”?`,
+            title: `${SUPPORT_OPEN_ORG} — “${org.name}”?`,
             description:
-              'You will open this subscriber’s projects and Reconcile as a platform admin (support mode). An audit log entry is recorded. Sessions expire after 2 hours.',
-            confirmLabel: 'Enter workspace',
+              'You will open this customer’s projects and Reconcile as a platform admin (support mode). An audit log entry is recorded. Sessions expire after 2 hours.',
+            confirmLabel: SUPPORT_OPEN_ORG,
           })
           if (ok) impersonateMutation.mutate()
         }}
       >
         <LogIn className="w-4 h-4 mr-1" />
-        Enter workspace
+        {SUPPORT_OPEN_ORG}
       </Button>
-      {suspended ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => suspendOrgMutation.mutate(null)}
-          isLoading={suspendOrgMutation.isPending}
-        >
-          <Building2 className="w-4 h-4 mr-1" />
-          Restore org
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => suspendOrgMutation.mutate(new Date().toISOString())}
-          isLoading={suspendOrgMutation.isPending}
-          className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
-        >
-          <Ban className="w-4 h-4 mr-1" />
-          Suspend org
-        </Button>
-      )}
+      <ActionMenu
+        label="More"
+        variant="outline"
+        size="sm"
+        menuAriaLabel="Organization actions"
+        items={
+          suspended
+            ? [
+                {
+                  kind: 'button',
+                  label: 'Restore organization',
+                  icon: Building2,
+                  onClick: () => suspendOrgMutation.mutate(null),
+                  disabled: suspendOrgMutation.isPending,
+                },
+              ]
+            : [
+                {
+                  kind: 'button',
+                  label: 'Suspend organization',
+                  icon: Ban,
+                  destructive: true,
+                  onClick: () => suspendOrgMutation.mutate(new Date().toISOString()),
+                  disabled: suspendOrgMutation.isPending,
+                },
+              ]
+        }
+      />
     </div>
   )
 
@@ -397,8 +403,8 @@ export default function AdminOrgDetail() {
               <Input
                 value={editSlug}
                 onChange={(e) => setEditSlug(e.target.value)}
-                placeholder="url-slug"
-                aria-label="URL slug"
+                placeholder="link-name"
+                aria-label="Organisation link name"
                 className="max-w-md font-mono"
               />
               <div className="flex flex-wrap gap-2">
@@ -417,7 +423,17 @@ export default function AdminOrgDetail() {
             </div>
           ) : (
             <>
-              <p className="font-mono text-sm text-gray-700">{org.slug}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-mono text-sm text-gray-700">{org.slug}</p>
+                {suspended && (
+                  <Badge tone="danger" size="sm" shape="soft">
+                    Suspended
+                  </Badge>
+                )}
+                <Badge tone="brand" size="sm" shape="soft">
+                  {planLabel(org.plan)}
+                </Badge>
+              </div>
               <Button
                 type="button"
                 variant="ghost"
@@ -430,7 +446,7 @@ export default function AdminOrgDetail() {
                 className="mt-2 text-primary-600 hover:text-primary-700"
               >
                 <Pencil className="w-4 h-4 mr-1.5" aria-hidden />
-                Edit name & slug
+                Edit name & link name
               </Button>
             </>
           )
@@ -474,7 +490,7 @@ export default function AdminOrgDetail() {
           sublabel={
             <>
               {org.subscriptionMeta?.statusOverride && (
-                <Badge tone="warning" size="sm">
+                <Badge tone="warning" size="sm" shape="soft">
                   Status override
                   {org.subscriptionMeta.computedStatus !== org.subscription?.status
                     ? ` (computed: ${org.subscriptionMeta.computedStatus})`
@@ -482,7 +498,7 @@ export default function AdminOrgDetail() {
                 </Badge>
               )}
               {org.subscriptionMeta?.trialOverrideEndsAt && (
-                <Badge tone="warning" size="sm">
+                <Badge tone="warning" size="sm" shape="soft">
                   Trial end override:{' '}
                   {formatDate(org.subscriptionMeta.trialOverrideEndsAt, {
                     day: '2-digit',
@@ -603,7 +619,11 @@ export default function AdminOrgDetail() {
             <Button
               className="shrink-0"
               onClick={async () => {
-                const planChange = org.plan !== 'premium' ? ` Plan will change from ${publicPlanName(org.plan)} to Firm.` : ''
+                const complimentaryName = planLabel(complimentarySlug)
+                const planChange =
+                  org.plan !== complimentarySlug
+                    ? ` Plan will change from ${planLabel(org.plan)} to ${complimentaryName}.`
+                    : ''
                 const ok = await confirm({
                   title: 'Grant complimentary access?',
                   description: `Subscription will be set to active without payment.${planChange} Reason: "${COMPLIMENTARY_ACCESS_REASON}".`,
@@ -611,7 +631,7 @@ export default function AdminOrgDetail() {
                   tone: 'warning',
                 })
                 if (!ok) return
-                grantComplimentaryMutation.mutate({ plan: org.plan })
+                grantComplimentaryMutation.mutate({ plan: org.plan, complimentarySlug })
               }}
               disabled={suspended}
               isLoading={grantComplimentaryMutation.isPending}
@@ -622,10 +642,13 @@ export default function AdminOrgDetail() {
           )
         }
       >
-        One-click setup for internal or partner orgs: sets plan to <strong>Firm</strong> and subscription
-        status to <strong>Active</strong> without payment. Removes inactive banners in the app immediately.
+        One-click setup for internal or partner orgs: sets plan to{' '}
+        <strong>{planLabel(complimentarySlug)}</strong> and subscription status to{' '}
+        <strong>Active</strong> without payment. Removes inactive banners in the app immediately.
         {hasComplimentaryAccess ? (
-          <p className="mt-1">This org already has the Firm plan and an active subscription.</p>
+          <p className="mt-1">
+            This org already has {planLabel(complimentarySlug)} and an active subscription.
+          </p>
         ) : null}
       </Alert>
 
@@ -633,6 +656,11 @@ export default function AdminOrgDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-2">
             <p className="text-sm font-medium text-gray-800">Set trial end</p>
+            <p className="text-xs text-gray-500">
+              While status is <strong>trial</strong> (no successful payment), monthly project and
+              transaction caps follow the <strong>{planLabel('free')}</strong> plan in Plans CMS — not the
+              assigned paid-tier limits. Feature access still follows the assigned plan.
+            </p>
             <Input
               type="datetime-local"
               value={trialEndsAt}
@@ -770,7 +798,7 @@ export default function AdminOrgDetail() {
         {org.payments.length === 0 ? (
           <p className="text-sm text-gray-500">No payments yet</p>
         ) : (
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>Date</TableTh>
@@ -786,7 +814,7 @@ export default function AdminOrgDetail() {
                   <TableTd>
                     {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </TableTd>
-                  <TableTd>{publicPlanName(p.plan)}</TableTd>
+                  <TableTd>{planLabel(p.plan)}</TableTd>
                   <TableTd>{p.period}</TableTd>
                   <TableTd className="text-right font-medium text-gray-900">
                     {fmt(Number(p.amount))}

@@ -20,7 +20,9 @@ Verified and improved consistency between super admin dashboard settings and use
 | `/platform-admin/organizations` | AdminSubscribers | Orgs list, bulk plan change |
 | `/platform-admin/organizations/:slug` | AdminOrgDetail | Org detail, plan override, suspend |
 | `/platform-admin/users` | AdminUsers | Platform users |
-| `/platform-admin/plans` | AdminPlans | Plans CRUD (basic, standard, premium, firm) |
+| `/platform-admin/plans` | AdminPlans | Plans CMS (any slug, marketing, drag reorder) |
+| `/platform-admin/pricing-page` | AdminPricingPage | Landing comparison sections (drag reorder) |
+| `/platform-admin/pricing-page` | AdminPricingPage | Landing comparison sections & extra flags |
 | `/platform-admin/payments` | AdminPayments | Payment history |
 | `/platform-admin/revenue` | AdminRevenue | Revenue analytics |
 | `/platform-admin/generation-settings` | AdminGenerationSettings | Platform defaults |
@@ -47,8 +49,8 @@ Verified and improved consistency between super admin dashboard settings and use
 | Branding | Logo, colours, report title, footer, letterhead, approval threshold |
 | Billing | Current plan, upgrade (Paystack) |
 | Members | Team members, roles |
-| API keys | (Firm plan) |
-| Bank rules | (Team plan and above) |
+| API keys | Gated by plan feature `api_access` (CMS) |
+| Bank rules | Gated by plan feature `bank_rules` (CMS) |
 
 ### Branding ↔ Platform Defaults
 
@@ -60,17 +62,18 @@ Verified and improved consistency between super admin dashboard settings and use
 
 ## 3. Plans & Subscriptions
 
-### Plan Slugs (Standardised)
+### Plan slugs (CMS)
 
-- **Allowed:** `basic`, `standard`, `premium`, `firm` only
-- **AdminPlans:** Slug restricted to dropdown; API validates `z.enum(['basic','standard','premium','firm'])`
-- **Reason:** `planFeatures.ts` and `USER_LIMIT_BY_PLAN` only support these slugs
+- **Platform admin → Plans:** Create/edit any slug (`^[a-z][a-z0-9_-]*$`), display name, quotas, prices, marketing JSON, `sortOrder`, `showOnPublic`.
+- **Public site:** `GET /api/v1/public/plans` and landing pricing use DB plans (offline fallback in `web/src/lib/plans.ts` if API is down).
+- **Legacy slugs** `free`, `basic`, `standard`, `premium`, `firm` remain the default seed; runtime entitlements merge CMS feature flags with `planFeatures.ts` catalogue.
 
-### Subscription Flow
+### Subscription flow
 
-1. **User upgrade:** Settings → Billing → choose plan → Paystack → webhook updates org.plan
-2. **Admin override:** AdminOrgDetail or AdminSubscribers → change plan directly (no payment)
-3. **Renewals:** Paystack recurring; webhook handles `charge.success`
+1. **User upgrade:** Settings → Billing → self-serve plans from CMS (`isSelfServePlan`) → Paystack → webhook updates `org.plan`.
+2. **Downgrade:** Schedule at period end using CMS `sortOrder` (not a fixed tier enum).
+3. **Contract billing:** `firm` or zero-price non-free plans — no self-serve checkout; subscription stays active without Paystack.
+4. **Admin override:** AdminOrgDetail / Organizations list — set plan directly (no payment).
 
 ---
 
@@ -93,7 +96,8 @@ Verified and improved consistency between super admin dashboard settings and use
 | Platform defaults cache invalidation on admin save | `platformDefaults.ts`, `admin/settings.ts` |
 | Extended platform-defaults API (branding fields) | `settings.ts` |
 | User Settings "Reset to platform default" button | `Settings.tsx` |
-| AdminPlans slug restricted to basic/standard/premium/firm | `admin/plans.ts`, `AdminPlans.tsx` |
+| Admin plans CMS + pricing layout | `admin/plans.ts`, `admin/pricing-page.ts`, `AdminPlans.tsx`, `AdminPricingPage.tsx` |
+| Org list plan filter from CMS | `admin/organizations.ts` (`paid` = self-serve slugs from DB) |
 
 ---
 
@@ -110,8 +114,11 @@ Verified and improved consistency between super admin dashboard settings and use
 |------|--------|
 | Admin generation settings save & invalidate cache | ✅ |
 | User branding can reset to platform default | ✅ |
-| Plan slugs match planFeatures | ✅ |
+| Plan slugs match planFeatures | ✅ CMS slugs + runtime ranks; catalogue thresholds use canonical seed slugs |
+| Paystack uses CMS checkout plans | ✅ `isCheckoutPlanSlug` |
+| Usage returns CMS display name | ✅ `planDisplayName`, `contractBilling` |
 | Admin plan override works | ✅ |
 | User upgrade flow (Paystack) works | ✅ |
+| Pricing CMS audit reference | ✅ `docs/PRICING_CMS_AUDIT.md` |
 | Settings tabs link correctly | ✅ |
 | Platform admin nav links work | ✅ |

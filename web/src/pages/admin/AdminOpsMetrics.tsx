@@ -2,9 +2,11 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Activity, RefreshCw, BellRing } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Alert from '../../components/ui/Alert'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Button from '../../components/ui/Button'
 import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
+import AdminListToolbar from '../../components/layout/AdminListToolbar'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { api, platformAdminOps } from '../../lib/api'
@@ -17,6 +19,24 @@ function formatUptime(sec: number) {
   if (h > 0) return `${h}h ${m}m`
   if (m > 0) return `${m}m ${s}s`
   return `${s}s`
+}
+
+function formatMetricValue(value: unknown): string {
+  if (value == null) return '—'
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'string') return value
+  if (typeof value === 'object' && value !== null) {
+    const o = value as Record<string, unknown>
+    if (
+      typeof o.mapped === 'number' &&
+      typeof o.skipped === 'number' &&
+      typeof o.failed === 'number'
+    ) {
+      return `${o.mapped} mapped · ${o.skipped} skipped · ${o.failed} failed`
+    }
+    return JSON.stringify(value)
+  }
+  return String(value)
 }
 
 export default function AdminOpsMetrics() {
@@ -51,8 +71,11 @@ export default function AdminOpsMetrics() {
             redeploy.
           </p>
         }
+      />
+
+      <AdminListToolbar
         actions={
-          <div className="flex flex-wrap gap-2">
+          <>
             <Button
               type="button"
               variant="outline"
@@ -73,7 +96,7 @@ export default function AdminOpsMetrics() {
               <RefreshCw className={`w-4 h-4 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-          </div>
+          </>
         }
       />
 
@@ -88,13 +111,7 @@ export default function AdminOpsMetrics() {
       {isLoading && <PageBodySkeleton label="Loading metrics" />}
 
       {isError && (
-        <Alert
-          tone="error"
-          title="Could not load ops metrics"
-          onRetry={() => void refetch()}
-        >
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load ops metrics" error={error} onRetry={() => void refetch()} />
       )}
 
       {data && (
@@ -121,7 +138,7 @@ export default function AdminOpsMetrics() {
                       {key}
                     </dt>
                     <dd className="text-sm font-semibold text-gray-900 mt-0.5">
-                      {value == null ? '—' : value}
+                      {formatMetricValue(value)}
                     </dd>
                   </div>
                 ))}
@@ -131,7 +148,7 @@ export default function AdminOpsMetrics() {
 
           {gaugeEntries.length > 0 && (
             <Card title="Gauges">
-              <Table>
+              <Table compact>
                 <TableHead>
                   <tr>
                     <TableTh>Metric</TableTh>
@@ -142,7 +159,7 @@ export default function AdminOpsMetrics() {
                   {gaugeEntries.map(([key, value]) => (
                     <TableRow key={key}>
                       <TableTd className="font-mono text-xs">{key}</TableTd>
-                      <TableTd className="font-medium text-gray-900">{value}</TableTd>
+                      <TableTd className="font-medium text-gray-900">{formatMetricValue(value)}</TableTd>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -155,7 +172,7 @@ export default function AdminOpsMetrics() {
               <p className="text-sm text-gray-500">No counters recorded yet in this process.</p>
             ) : (
               <div className="max-h-[480px] overflow-y-auto">
-                <Table>
+                <Table compact>
                   <TableHead>
                     <tr>
                       <TableTh>Metric</TableTh>
@@ -166,7 +183,7 @@ export default function AdminOpsMetrics() {
                     {counterEntries.map(([key, value]) => (
                       <TableRow key={key}>
                         <TableTd className="font-mono text-xs">{key}</TableTd>
-                        <TableTd className="font-medium text-gray-900">{value}</TableTd>
+                        <TableTd className="font-medium text-gray-900">{formatMetricValue(value)}</TableTd>
                       </TableRow>
                     ))}
                   </TableBody>

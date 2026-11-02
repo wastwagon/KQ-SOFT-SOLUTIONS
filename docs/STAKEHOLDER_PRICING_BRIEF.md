@@ -3,8 +3,8 @@
 
 **Product:** Bank reconciliation and BRS delivery for accounting firms and in-house finance teams (not a full general ledger — works alongside Tally, Sage, and similar)  
 **Market:** Ghana (billing in GHS via Paystack)  
-**Document date:** October 2026  
-**Status:** Pre-production review — verify on http://localhost:9100/#pricing before go-live
+**Document date:** November 2026  
+**Status:** Production — **Platform admin → Plans** and **Pricing page layout** are the source of truth for public prices, limits, marketing copy, and comparison tables. This brief describes the default seed lineup; verify live data at `GET /api/v1/public/plans` or **/#pricing**.
 
 ---
 
@@ -29,7 +29,9 @@ KQ-SOFT is positioned as **end-to-end bank reconciliation**: upload cash book an
 | **Custom** | Large firm / enterprise | From **~1,800** (contract) | Unlimited-style quotas · API · onboarding · SLA |
 
 **Billing periods:** Monthly, quarterly (~5% off), or yearly (save up to ~17%).  
-**Self-serve Paystack checkout:** Solo, Team, and Firm. **Custom** is sales-led.
+**Self-serve Paystack checkout:** Any CMS plan with active self-serve prices (typically Solo, Team, Firm list prices). **Custom / contract** tiers are sales-led (zero checkout price or `firm` slug).
+
+**Admin:** `/platform-admin/plans` (packages, drag order), `/platform-admin/pricing-page` (comparison sections), `/platform-admin/organizations` (plan filter from CMS).
 
 ---
 
@@ -112,7 +114,7 @@ Everything in Firm, plus:
 | **Upgrade** | Paystack checkout in GHS; **unused time on current plan can reduce** the upgrade charge (proration credit). |
 | **Downgrade** | **Scheduled for end of billing period** via Billing — not instant cheap checkout to a lower tier. |
 | **After downgrade** | Org may exceed new **seat**, **bank account**, or **bank rule** caps; product **enforces** (locked banks, paused rules, seat limit for non-admins). Admins retain access to billing and settings. |
-| **API keys** | **Custom** tier (firm slug) — API access gated to that plan. |
+| **API keys** | Plans CMS **`api_access`** flag (typically Custom / `firm`) — not hardcoded to one slug. |
 
 Optional launch promo (if enabled in environment): **50% off first 2 months** on self-serve paid tiers — confirm with operations before advertising.
 
@@ -133,7 +135,7 @@ Optional launch promo (if enabled in environment): **50% off first 2 months** on
 2. Open **/#pricing** — plan cards, comparison table, and **Reference pricing** match this brief. Confirm `GET /api/v1/public/fx-rates` returns `source: live` or `manual` (not only client fallback).  
 3. Sign in → **Settings → Billing**: upgrade copy, proration credit, schedule/cancel downgrade, usage meters (projects, transactions, banks, clean exports).  
 4. **Dashboard** — plan-usage warnings appear when near caps; **New project** blocks at monthly project limit.  
-5. After deploy, **refresh plan seed / admin plans** so database entitlements match the published plan lineup (stale feature flags must not block Solo+ capabilities).  
+5. After deploy, confirm **Plans CMS** and **`npx prisma migrate deploy`** — database entitlements and marketing drive checkout, usage caps, and the landing page (no stale hardcoded tier list in admin).  
 6. From repo root: `npm test -- --run` (API), `npm run build --prefix web`, `npm run test:e2e:smoke` (Playwright). Optional: `./scripts/verify-go-live.sh` with Postgres up; `--with-live-api` for `/healthz` and smoke create.  
 7. Push latest release to production when satisfied.
 
@@ -145,4 +147,4 @@ Optional launch promo (if enabled in environment): **50% off first 2 months** on
 Web: https://kqsoftwaresolutions.com  
 Email: info@kqsoftwaresolutions.com  
 
-*This brief reflects the September 2026 plan lineup and enforcement shipped in the application. Admin CMS may override prices and limits; marketing copy in the app is curated to stay consistent with code defaults.*
+*Default seed values below. Runtime pricing, limits, and copy come from the Plans CMS; this brief is a stakeholder snapshot — reconcile with the live public plans API before external commitments.*

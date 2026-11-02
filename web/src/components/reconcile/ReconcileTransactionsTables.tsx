@@ -350,7 +350,7 @@ export default function ReconcileTransactionsTables({
                     )}
                     {view === 'all' && (
                       <td className="px-2 sm:px-3 py-1.5 whitespace-nowrap">
-                        <Badge tone={isReceipt ? 'success' : 'brand'} size="sm">
+                        <Badge tone={isReceipt ? 'success' : 'brand'} size="sm" shape="soft">
                           {isReceipt ? 'Receipt' : 'Payment'}
                         </Badge>
                       </td>
@@ -504,7 +504,7 @@ export default function ReconcileTransactionsTables({
                   >
                     {view === 'all' ? (
                       <td className="px-2 sm:px-3 py-1.5 whitespace-nowrap">
-                        <Badge tone={t._type === 'credit' ? 'success' : 'brand'} size="sm">
+                        <Badge tone={t._type === 'credit' ? 'success' : 'brand'} size="sm" shape="soft">
                           {t._type === 'credit' ? 'Credit' : 'Debit'}
                         </Badge>
                       </td>
@@ -531,7 +531,7 @@ export default function ReconcileTransactionsTables({
                     >
                       <span>{t.name || t.details || '—'}</span>
                       {flaggedBankIds.has(t.id) && (
-                        <Badge size="sm" tone="warning" className="ml-1" title="Flagged by bank rule">
+                        <Badge size="sm" shape="soft" tone="warning" className="ml-1" title="Flagged by bank rule">
                           Flagged
                         </Badge>
                       )}
@@ -635,7 +635,7 @@ function RowMatchHints({
 }) {
   if (split) {
     return (
-      <Badge tone="brand" size="sm" className="ml-1 normal-case tracking-normal" title={split.title}>
+      <Badge tone="brand" size="sm" shape="soft" className="ml-1 normal-case tracking-normal" title={split.title}>
         {split.label} split
       </Badge>
     )
@@ -644,7 +644,7 @@ function RowMatchHints({
     return (
       <span className="inline-flex items-center ml-1 gap-0.5">
         <SuggestedMatchMark title={oneToOneTitle} />
-        <Badge tone="success" size="sm" className="normal-case tracking-normal" title={oneToOneTitle}>
+        <Badge tone="success" size="sm" shape="soft" className="normal-case tracking-normal" title={oneToOneTitle}>
           1:1
         </Badge>
       </span>

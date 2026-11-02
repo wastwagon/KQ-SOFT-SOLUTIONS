@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { RefreshCw, Server } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Alert from '../../components/ui/Alert'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
@@ -17,7 +18,7 @@ function OutputBlock({ title, result }: { title: string; result: PlatformDatabas
     <div>
       <p className="text-sm font-medium text-gray-800 mb-1">
         {title}
-        <Badge tone={result.success ? 'success' : 'danger'} size="sm" className="ml-2">
+        <Badge tone={result.success ? 'success' : 'danger'} size="sm" shape="soft" className="ml-2">
           {result.success ? 'OK' : 'Failed'}
         </Badge>
         <span className="ml-2 text-xs text-gray-500">exit {result.exitCode}</span>
@@ -125,11 +126,6 @@ export default function AdminDatabase() {
             this when Coolify startup migrations fail, or to seed plans/users after deploy.
           </p>
         }
-        actions={
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-600 border border-primary-100 shadow-sm" aria-hidden>
-            <Server className="w-5 h-5" />
-          </span>
-        }
       />
 
       <Alert tone="warning" title="Recommended order after a failed deploy" className="max-w-4xl">
@@ -157,14 +153,12 @@ export default function AdminDatabase() {
             </Button>
           </div>
           {statusQuery.isError && (
-            <Alert
-              tone="error"
+            <PageLoadError
               title="Could not load migration status"
               className="mb-2"
+              error={statusQuery.error}
               onRetry={() => void statusQuery.refetch()}
-            >
-              {(statusQuery.error as Error).message}
-            </Alert>
+            />
           )}
           <OutputBlock title="prisma migrate status" result={statusQuery.data ?? null} />
         </Card>
@@ -218,16 +212,12 @@ export default function AdminDatabase() {
             <div>
               <p className="text-sm font-medium text-gray-800 mb-2">Migrate resolve (P3009)</p>
               {migrationsQuery.isError && (
-                <Alert
-                  tone="error"
+                <PageLoadError
                   title="Could not load migrations"
                   className="mb-2"
+                  error={migrationsQuery.error}
                   onRetry={() => void migrationsQuery.refetch()}
-                >
-                  {migrationsQuery.error instanceof Error
-                    ? migrationsQuery.error.message
-                    : 'Something went wrong.'}
-                </Alert>
+                />
               )}
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[280px] flex-1">
@@ -306,7 +296,7 @@ export default function AdminDatabase() {
         >
           <Alert tone="warning" title="Staging and demo only" className="mb-4">
             Creates test orgs/users (<code className="text-xs">premium@test.com</code> / Test123!). Do not run
-            on production with real tenants.
+            on production with real customer organisations.
           </Alert>
           <Button
             type="button"

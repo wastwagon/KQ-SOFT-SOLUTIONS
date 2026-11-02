@@ -5,11 +5,13 @@ import { reconcile, projects, isSubscriptionInactiveError, unlessSubscriptionIna
 import { formatAmountNumber, formatDateCompact } from '../lib/format'
 import { amountColumnHeader } from '../lib/currency'
 import { canSubmitForReview, canApprove } from '../lib/permissions'
+import { UNMATCHED_TOTALS_DIFFERENCE } from '../lib/userFacingTerms'
 import BrsHelp from '../components/BrsHelp'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import WorkflowStepIntro from '../components/project/WorkflowStepIntro'
 import WorkflowStepSkeleton from '../components/project/WorkflowStepSkeleton'
 import Button from '../components/ui/Button'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import Card from '../components/ui/Card'
 import { useToast } from '../components/ui/Toast'
@@ -78,9 +80,9 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       )
     }
     return (
-      <Alert
-        tone="error"
+      <PageLoadError
         title="Could not load review data"
+        error={error}
         onRetry={() => queryClient.invalidateQueries({ queryKey: ['reconcile', projectId] })}
         action={
           onGoToReconcile ? (
@@ -91,7 +93,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
         }
       >
         {error instanceof Error ? error.message : 'Something went wrong. Try again or go back to Reconcile.'}
-      </Alert>
+      </PageLoadError>
     )
   }
 
@@ -177,7 +179,8 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
               <>
                 {' · '}
                 <span className="font-medium text-red-700">
-                  variance {fmtAmt(Math.abs(variance))} {variance > 0 ? '(CB > Bank)' : '(Bank > CB)'}
+                  {UNMATCHED_TOTALS_DIFFERENCE} {fmtAmt(Math.abs(variance))}{' '}
+                  {variance > 0 ? '(cash book higher)' : '(bank higher)'}
                 </span>
               </>
             ) : null}

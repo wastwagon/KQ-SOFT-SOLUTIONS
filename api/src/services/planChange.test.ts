@@ -1,4 +1,53 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { PlanData } from './plan.js'
+
+function stubPlan(
+  slug: string,
+  sortOrder: number,
+  prices: { monthlyGhs: number; yearlyGhs?: number; quarterlyGhs?: number } = { monthlyGhs: 99 }
+): PlanData {
+  return {
+    slug,
+    name: slug,
+    sortOrder,
+    monthlyGhs: prices.monthlyGhs,
+    yearlyGhs: prices.yearlyGhs ?? prices.monthlyGhs * 10,
+    quarterlyGhs: prices.quarterlyGhs ?? prices.monthlyGhs * 3,
+    projectsPerMonth: 1,
+    transactionsPerMonth: 300,
+    bankAccounts: 1,
+    cleanExportsPerMonth: 1,
+    usersLimit: 1,
+    features: {},
+    marketing: {
+      tagline: '',
+      audience: '',
+      bullets: [],
+      ctaLabel: '',
+      ctaHref: '',
+      featureMatrix: {},
+    },
+    showOnPublic: true,
+    active: true,
+  }
+}
+
+const planStubs: Record<string, PlanData> = {
+  free: stubPlan('free', 0, { monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0 }),
+  basic: stubPlan('basic', 10, { monthlyGhs: 99 }),
+  standard: stubPlan('standard', 20, { monthlyGhs: 199 }),
+  premium: stubPlan('premium', 30, { monthlyGhs: 399 }),
+  firm: stubPlan('firm', 40, { monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0 }),
+}
+
+vi.mock('./plan.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./plan.js')>()
+  return {
+    ...actual,
+    getPlanBySlug: vi.fn(async (slug: string) => planStubs[slug] ?? null),
+  }
+})
+
 import {
   checkoutAmountAfterCredit,
   isSelfServeDowngrade,
@@ -70,10 +119,10 @@ describe('plan change', () => {
     expect(rulesWithinCap(['a', 'b'], -1)).toEqual(['a', 'b'])
   })
 
-  it('treats a lower self-serve plan as a downgrade and leaves Custom with sales', () => {
-    expect(isSelfServeDowngrade('standard', 'basic')).toBe(true)
-    expect(isSelfServeDowngrade('basic', 'standard')).toBe(false)
-    expect(isSelfServeDowngrade('firm', 'basic')).toBe(false)
-    expect(isSelfServeDowngrade('free', 'basic')).toBe(false)
+  it('treats a lower self-serve plan as a downgrade and leaves Custom with sales', async () => {
+    expect(await isSelfServeDowngrade('standard', 'basic')).toBe(true)
+    expect(await isSelfServeDowngrade('basic', 'standard')).toBe(false)
+    expect(await isSelfServeDowngrade('firm', 'basic')).toBe(false)
+    expect(await isSelfServeDowngrade('free', 'basic')).toBe(false)
   })
 })

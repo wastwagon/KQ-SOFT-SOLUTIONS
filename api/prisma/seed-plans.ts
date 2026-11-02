@@ -20,6 +20,7 @@
  */
 import { PrismaClient, type Prisma } from '@prisma/client'
 import { importPlanFeatures } from './seedModulePath.js'
+import { defaultMarketingForSlug } from '../src/config/planMarketingDefaults.js'
 
 const planFeatures = await importPlanFeatures()
 const {
@@ -142,6 +143,8 @@ async function main() {
     const shouldReset = force || isLegacy || !existing
     const features = featuresForSeed(plan.slug, existing?.features)
     const shouldBackfillFeatures = !!existing && isStoredFeaturesEmpty(existing.features)
+    const shouldBackfillMarketing = !!existing && (existing.marketing == null || existing.marketing === undefined)
+    const marketingDefaults = defaultMarketingForSlug(plan.slug) as Prisma.InputJsonValue
     const firstTimeCms = shouldBackfillFeatures
       ? {
           features,
@@ -153,16 +156,17 @@ async function main() {
       : {}
     await prisma.plan.upsert({
       where: { slug: plan.slug },
-      create: { ...plan, features },
+      create: { ...plan, features, marketing: marketingDefaults, sortOrder: plan.slug === 'free' ? 0 : plan.slug === 'basic' ? 10 : plan.slug === 'standard' ? 20 : plan.slug === 'premium' ? 30 : 40 },
       update: shouldReset
-        ? { ...plan, features }
+        ? { ...plan, features, marketing: marketingDefaults }
         : {
-            // Keep admin CMS edits (prices, monthly volume, seats) but keep
+            // Keep admin CMS edits (prices, monthly volume, seats, marketing) but keep
             // split matching, many-to-many, and roll forward on Solo and above.
             name: plan.name,
             slug: plan.slug,
             features,
             ...firstTimeCms,
+            ...(shouldBackfillMarketing ? { marketing: marketingDefaults } : {}),
           },
     })
     if (isLegacy && !force) {

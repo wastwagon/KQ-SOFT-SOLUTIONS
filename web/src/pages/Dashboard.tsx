@@ -19,6 +19,7 @@ import {
 import { projects, subscription, settings as settingsApi, isSubscriptionInactiveError } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { canCreateProject } from '../lib/permissions'
+import { roleLabel as formatRoleLabel } from '../lib/userFacingTerms'
 import { formatDate } from '../lib/format'
 import { projectPathForStatus } from '../lib/projectRoutes'
 import MetricCard from '../components/ui/MetricCard'
@@ -29,12 +30,12 @@ import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../comp
 import Button, { buttonClassName } from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Alert from '../components/ui/Alert'
+import PageLoadError from '../components/ui/PageLoadError'
 import SubscriptionRenewalPanel from '../components/SubscriptionRenewalPanel'
 import PageHeader from '../components/layout/PageHeader'
 import BrsVarianceBadge from '../components/project/BrsVarianceBadge'
 import ProjectStatusPill from '../components/project/ProjectStatusPill'
 import PlanUsageAlerts from '../components/PlanUsageAlerts'
-import { usageMetricAccent } from '../lib/planUsageHints'
 
 const BRS_SUMMARY_STATUSES = new Set([
   'reconciling',
@@ -217,27 +218,17 @@ export default function Dashboard() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Overview" title="Dashboard" />
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load projects"
+          error={projectsError}
           onRetry={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
-        >
-          {projectsError instanceof Error ? projectsError.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
 
-  const roleLabel =
-    role === 'admin'
-      ? 'Admin'
-      : role === 'reviewer'
-        ? 'Reviewer'
-        : role === 'preparer'
-          ? 'Preparer'
-          : role === 'viewer'
-            ? 'Viewer'
-            : role ?? 'Member'
+  const roleDisplay =
+    role != null ? formatRoleLabel(role) : 'Member'
 
   return (
     <div className="space-y-10">
@@ -247,7 +238,25 @@ export default function Dashboard() {
         subtitle={
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
-            <p className="text-gray-500">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <Badge
+                tone={
+                  isAdmin
+                    ? 'brand'
+                    : role === 'reviewer'
+                      ? 'success'
+                      : role === 'preparer'
+                        ? 'brand'
+                        : 'neutral'
+                }
+                shape="soft"
+                size="sm"
+                aria-label={`Your role: ${roleDisplay}`}
+              >
+                {roleDisplay}
+              </Badge>
+            </div>
+            <p className="text-gray-500 mt-1.5">
               Track client reconciliations, plan usage, and team activity in one place.{' '}
               <span className="text-gray-400">
                 Tip: open <span className="font-medium text-gray-600">Search</span> in the header
@@ -255,22 +264,6 @@ export default function Dashboard() {
               </span>
             </p>
           </>
-        }
-        actions={
-          <Badge
-            tone={
-              isAdmin
-                ? 'brand'
-                : role === 'reviewer'
-                  ? 'success'
-                  : role === 'preparer'
-                    ? 'brand'
-                    : 'neutral'
-            }
-            aria-label={`Your role: ${roleLabel}`}
-          >
-            {roleLabel}
-          </Badge>
         }
       />
 
@@ -374,7 +367,7 @@ export default function Dashboard() {
                   : `${projectsUsed} of ${projectsLimit} on plan`
               }
               icon={<FolderKanban />}
-              accent={usageMetricAccent(projectsUsed, projectsLimit, projectsUnlimited)}
+              accent="none"
             />
             <MetricCard
               compact
@@ -399,11 +392,7 @@ export default function Dashboard() {
                   : `${transactionsUsed.toLocaleString('en-GH')} of ${transactionsLimit.toLocaleString('en-GH')} this calendar month. Resets on the 1st.`
               }
               icon={<LayoutDashboard />}
-              accent={usageMetricAccent(
-                transactionsUsed,
-                transactionsLimit,
-                transactionsUnlimited,
-              )}
+              accent="none"
             />
             <MetricCard
               compact
@@ -415,11 +404,7 @@ export default function Dashboard() {
                   : `${bankAccountsUsed} of ${bankAccountsLimit} org seats`
               }
               icon={<Building2 />}
-              accent={usageMetricAccent(
-                bankAccountsUsed,
-                bankAccountsLimit,
-                bankAccountsUnlimited,
-              )}
+              accent="none"
             />
             <MetricCard
               compact
@@ -437,7 +422,7 @@ export default function Dashboard() {
       {features.firm_dashboard && (
         <Card title="Practice overview">
           <p className="text-sm text-gray-600 mb-5">
-            Multi-entity snapshot for this workspace — clients, open jobs, and reports.
+            Snapshot for this organisation — clients, open reconciliations, and reports.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5">
             <DashLinkCard
@@ -456,7 +441,7 @@ export default function Dashboard() {
               to="/reports"
               icon={<FileSpreadsheet className="w-4 h-4" aria-hidden />}
               title="Reports"
-              description={`${pendingReviewCount} waiting for review`}
+              description={`${completedCount} completed · export BRS`}
             />
           </div>
         </Card>
@@ -524,7 +509,10 @@ export default function Dashboard() {
       <Card title="Clean & export tools">
         <p className="text-sm text-gray-600 mb-5">
           Validate bank or cash-book formats with the same parsers. Preview is free; sample downloads
-          are truncated and watermarked; full Excel/PDF uses your plan’s monthly clean-export quota.
+          are truncated and watermarked; full Excel/PDF uses your plan’s monthly clean-export quota.{' '}
+          <Link to="/tools" className="font-medium text-primary-700 hover:underline">
+            All tools
+          </Link>
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5">
           <DashLinkCard
@@ -615,7 +603,7 @@ export default function Dashboard() {
         }
       >
         {isLoading ? (
-          <Table>
+          <Table compact>
             <RecentProjectsHead />
             <TableBody>
               {[1, 2, 3, 4, 5].map((i) => (
@@ -643,7 +631,7 @@ export default function Dashboard() {
             />
           </div>
         ) : (
-            <Table>
+            <Table compact>
             <caption className="sr-only">Recent projects</caption>
             <RecentProjectsHead />
             <TableBody>

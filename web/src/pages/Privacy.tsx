@@ -1,4 +1,5 @@
 import LegalDocument, { LegalSection } from './LegalDocument'
+import PublicPageSeo from '../components/marketing/PublicPageSeo'
 
 /**
  * Public privacy policy for KQ-SOFT BRS (bank reconciliation SaaS).
@@ -6,6 +7,12 @@ import LegalDocument, { LegalSection } from './LegalDocument'
  */
 export default function Privacy() {
   return (
+    <>
+      <PublicPageSeo
+        title="Privacy Policy — KQ-SOFT bank reconciliation"
+        description="How KQ-SOFT Solutions handles personal and reconciliation data for Ghana accounting teams using kqsoftwaresolutions.com."
+        path="/privacy"
+      />
     <LegalDocument title="Privacy Policy" updated="25 July 2026">
       <p>
         This Privacy Policy explains how KQ-SOFT Solutions (“KQ-SOFT”, “we”, “us”) collects, uses,
@@ -68,7 +75,7 @@ export default function Privacy() {
             <strong>Authorities</strong> when required by applicable law or valid legal process
           </li>
           <li>
-            <strong>Your organisation’s admins</strong>, who control member access and workspace
+            <strong>Your organisation’s admins</strong>, who control member access and organisation
             data
           </li>
         </ul>
@@ -96,7 +103,7 @@ export default function Privacy() {
       <LegalSection title="7. Your rights">
         <p>
           Depending on applicable law, you may request access, correction, or deletion of personal
-          data we hold about you, or object to certain processing. Organisation workspace data is
+          data we hold about you, or object to certain processing. Organisation data is
           controlled by your organisation’s administrators. Contact us at the email above; we will
           respond within a reasonable time.
         </p>
@@ -117,5 +124,6 @@ export default function Privacy() {
         </p>
       </LegalSection>
     </LegalDocument>
+    </>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Download, FileText, Hash } from 'lucide-react'
+import { ChevronDown, ChevronRight, ClipboardCheck, Download, FileText, Hash } from 'lucide-react'
 import { reconcile } from '../../lib/api'
 import { exportCountMatchExcel, exportCountMatchPdf } from '../../lib/countMatchExport'
 import {
@@ -14,6 +14,9 @@ import { COUNT_MATCH_SELECT_CAP } from '../../lib/countMatchExport'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { formatAmount } from '../../lib/format'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
+import { COUNT_MATCH_GROUP_LABELS } from './countMatchListLabels'
+import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Badge from '../ui/Badge'
 import Card from '../ui/Card'
@@ -21,61 +24,15 @@ import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../ui/T
 import Skeleton from '../ui/Skeleton'
 import { useToast } from '../ui/Toast'
 import type { CountAmountRow, CountMatchDiagnostic, CountScope } from './countMatchTypes'
+import CountMatchListFilters, {
+  COUNT_MATCH_LIST_META,
+  type CountMatchListKey,
+} from './CountMatchListFilters'
+import type { CountMatchUxSignoff } from '../../lib/countMatchUxSignoff'
 
-type ListKey =
-  | 'only_cb_received'
-  | 'only_cb_payment'
-  | 'only_bank_lodgment'
-  | 'only_bank_debits'
-  | 'open_recv_cb'
-  | 'open_recv_bank'
-  | 'open_pay_cb'
-  | 'open_pay_bank'
-  | 'cancel_recv'
-  | 'cancel_pay'
+type ListKey = CountMatchListKey
 
-const LIST_META: { key: ListKey; label: string; group: 'only' | 'open' | 'cancel'; hint: string }[] = [
-  { key: 'only_cb_received', label: 'Only CB — Received', group: 'only', hint: 'Amounts only in cash book (receipts)' },
-  { key: 'only_cb_payment', label: 'Only CB — Payment', group: 'only', hint: 'Amounts only in cash book (payments)' },
-  { key: 'only_bank_lodgment', label: 'Only bank — Lodgment', group: 'only', hint: 'Amounts only on bank credits' },
-  { key: 'only_bank_debits', label: 'Only bank — Debits', group: 'only', hint: 'Amounts only on bank debits' },
-  {
-    key: 'open_recv_cb',
-    label: 'Open — more receipts in CB',
-    group: 'open',
-    hint: 'Both sides; CB receipt count > bank credit count (same as fewer credits on the bank — listed once, not as Open — less)',
-  },
-  {
-    key: 'open_recv_bank',
-    label: 'Open — more credits in bank',
-    group: 'open',
-    hint: 'Both sides; bank credit count > CB receipt count (same as fewer receipts in the cash book — listed once, not as Open — less)',
-  },
-  {
-    key: 'open_pay_cb',
-    label: 'Open — more payments in CB',
-    group: 'open',
-    hint: 'Both sides; CB payment count > bank debit count (same as fewer debits on the bank — listed once, not as Open — less)',
-  },
-  {
-    key: 'open_pay_bank',
-    label: 'Open — more debits in bank',
-    group: 'open',
-    hint: 'Both sides; bank debit count > CB payment count (same as fewer payments in the cash book — listed once, not as Open — less)',
-  },
-  {
-    key: 'cancel_recv',
-    label: 'Cancel — receipts = credits',
-    group: 'cancel',
-    hint: 'Separate schedule (not main BRS) — batch totals cancel by count',
-  },
-  {
-    key: 'cancel_pay',
-    label: 'Cancel — payments = debits',
-    group: 'cancel',
-    hint: 'Separate schedule (not main BRS) — batch totals cancel by count',
-  },
-]
+const LIST_META = COUNT_MATCH_LIST_META
 
 function rowsFor(data: CountMatchDiagnostic, key: ListKey): CountAmountRow[] {
   const d = data.brsDetails
@@ -147,7 +104,7 @@ function ListGroupButtons({
             aria-pressed={listKey === m.key}
             title={
               m.group === 'open'
-                ? `${m.hint}. Open — more on one side is open — less on the other; each amount is listed once.`
+                ? `${m.hint}. When one side has more lines at the same amount, match the pairs that belong together; each amount is listed once.`
                 : 'Label shows distinct amounts and transaction counts (same amount counted per line)'
             }
             onClick={() => onPick(m.key)}
@@ -171,6 +128,8 @@ interface CountMatchPanelProps {
   /** Cancel-out only. Omitted leaves Select lines as the only action on that list. */
   canPairCancelBatch?: boolean
   onPairCancelBatch?: (pairs: CountCancelPair[]) => Promise<void>
+  uxSignoff?: CountMatchUxSignoff | null
+  onOpenUxChecklist?: () => void
 }
 
 export default function CountMatchPanel({
@@ -182,6 +141,8 @@ export default function CountMatchPanel({
   onSelectAmountRows,
   canPairCancelBatch = false,
   onPairCancelBatch,
+  uxSignoff = null,
+  onOpenUxChecklist,
 }: CountMatchPanelProps) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -222,7 +183,7 @@ export default function CountMatchPanel({
       setPendingLeftover(null)
       toast.info(
         'Leftovers moved to Only',
-        'The unmatched remainder is now on the Only list. Check suggestions or leave as BRS items.'
+        'The remainder is on one side only. Try suggested matches or leave it for the BRS (lodgment or unpresented cheque).'
       )
       return
     }
@@ -315,7 +276,7 @@ export default function CountMatchPanel({
         'Overlap selected',
         `${sel.cashBookTxIds.length} cash book · ${sel.bankTxIds.length} bank (matching count). Confirm match. Leftover ${sel.leftoverCb} CB / ${sel.leftoverBank} bank stay unmatched${
           scope === 'unmatched'
-            ? ' and will show on Only after you confirm.'
+            ? ' and will stay on one side only after you confirm.'
             : ' — switch to Unmatched after confirm so leftovers appear on Only.'
         }`
       )
@@ -363,6 +324,16 @@ export default function CountMatchPanel({
             {open ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
             <Hash className="w-4 h-4 text-slate-500" />
             Match by counting
+            {uxSignoff?.result === 'pass' && (
+              <Badge tone="success" size="sm" shape="soft">
+                Preparer signed off
+              </Badge>
+            )}
+            {uxSignoff?.result === 'fail' && (
+              <Badge tone="warning" size="sm" shape="soft">
+                UX check failed
+              </Badge>
+            )}
           </h3>
           <p className="text-sm text-slate-600 max-w-2xl pl-6">
             Groups by amount; <strong className="font-semibold text-slate-700">CB count</strong> and{' '}
@@ -378,6 +349,17 @@ export default function CountMatchPanel({
         </Button>
         {open && (
           <div className="flex flex-wrap items-center gap-2 pb-1">
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => onOpenUxChecklist?.()}
+              disabled={!onOpenUxChecklist}
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              Preparer check
+            </Button>
             <div className="inline-flex rounded-lg border border-border p-0.5 bg-surface">
               <Button
                 type="button"
@@ -400,36 +382,68 @@ export default function CountMatchPanel({
                 All lines
               </Button>
             </div>
-            <Button
-              type="button"
+            <div className="hidden lg:flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="gap-1.5"
+                isLoading={exporting === 'xlsx'}
+                disabled={!query.data || !!exporting}
+                onClick={() => void handleExport('xlsx')}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Excel
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="gap-1.5"
+                isLoading={exporting === 'pdf'}
+                disabled={!query.data || !!exporting}
+                onClick={() => void handleExport('pdf')}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                PDF
+              </Button>
+            </div>
+            <ActionMenu
+              label="Export"
+              size="xs"
               variant="secondary"
-              size="sm"
-              className="gap-1.5"
-              isLoading={exporting === 'xlsx'}
-              disabled={!query.data || !!exporting}
-              onClick={() => void handleExport('xlsx')}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Excel
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="gap-1.5"
-              isLoading={exporting === 'pdf'}
-              disabled={!query.data || !!exporting}
-              onClick={() => void handleExport('pdf')}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              PDF
-            </Button>
+              align="right"
+              menuAriaLabel="Export amount-matching schedules"
+              isLoading={!!exporting}
+              triggerClassName="lg:hidden"
+              items={[
+                {
+                  kind: 'button',
+                  label: 'Download Excel',
+                  icon: Download,
+                  disabled: !query.data || !!exporting,
+                  onClick: () => void handleExport('xlsx'),
+                },
+                {
+                  kind: 'button',
+                  label: 'Download PDF',
+                  icon: FileText,
+                  disabled: !query.data || !!exporting,
+                  onClick: () => void handleExport('pdf'),
+                },
+              ]}
+            />
           </div>
         )}
       </header>
 
       {open && (
         <div className="p-5 pt-4">
+          {uxSignoff?.result === 'fail' && uxSignoff.notes && (
+            <Alert tone="warning" title="Preparer UX check — issues recorded" className="mb-4">
+              {uxSignoff.notes}
+            </Alert>
+          )}
           {query.isLoading && (
             <div className="space-y-2" aria-busy="true" aria-label="Building count schedules">
               <Skeleton className="h-8 w-64" />
@@ -437,9 +451,8 @@ export default function CountMatchPanel({
             </div>
           )}
           {query.isError && (
-            <Alert
-              tone="error"
-              title="Could not load count-match diagnostic"
+            <PageLoadError
+              title="Could not load matching-by-amount summary"
               onRetry={() => void query.refetch()}
             />
           )}
@@ -450,9 +463,10 @@ export default function CountMatchPanel({
                 <Badge
                   tone="neutral"
                   size="sm"
+                  shape="soft"
                   title={`${summaryBits.onlyCbAmounts} distinct amounts · ${summaryBits.onlyCbTxs} transactions`}
                 >
-                  Only CB: {summaryBits.onlyCbTxs} txs
+                  Only on cash book: {summaryBits.onlyCbTxs} txs
                   {summaryBits.onlyCbAmounts !== summaryBits.onlyCbTxs
                     ? ` (${summaryBits.onlyCbAmounts} amts)`
                     : ''}
@@ -460,9 +474,10 @@ export default function CountMatchPanel({
                 <Badge
                   tone="neutral"
                   size="sm"
+                  shape="soft"
                   title={`${summaryBits.onlyBankAmounts} distinct amounts · ${summaryBits.onlyBankTxs} transactions`}
                 >
-                  Only bank: {summaryBits.onlyBankTxs} txs
+                  Only on bank statement: {summaryBits.onlyBankTxs} txs
                   {summaryBits.onlyBankAmounts !== summaryBits.onlyBankTxs
                     ? ` (${summaryBits.onlyBankAmounts} amts)`
                     : ''}
@@ -470,9 +485,10 @@ export default function CountMatchPanel({
                 <Badge
                   tone="warning"
                   size="sm"
+                  shape="soft"
                   title={`${summaryBits.openAmounts} distinct amounts · ${summaryBits.openTxs} transactions`}
                 >
-                  Open: {summaryBits.openTxs} txs
+                  Same amount (extra lines): {summaryBits.openTxs} txs
                   {summaryBits.openAmounts !== summaryBits.openTxs
                     ? ` (${summaryBits.openAmounts} amts)`
                     : ''}
@@ -480,6 +496,7 @@ export default function CountMatchPanel({
                 <Badge
                   tone="success"
                   size="sm"
+                  shape="soft"
                   title={`${summaryBits.cancelAmounts} distinct amounts · ${summaryBits.cancelTxs} transactions`}
                 >
                   Batch cancel: {summaryBits.cancelTxs} txs
@@ -488,61 +505,72 @@ export default function CountMatchPanel({
                     : ''}
                 </Badge>
                 {query.data.invertedSides && (
-                  <Badge tone="brand" size="sm">
+                  <Badge tone="brand" size="sm" shape="soft">
                     Crossed sides applied
                   </Badge>
                 )}
                 {query.data.meta?.laneTruncated && (
-                  <Badge tone="warning" size="sm">
+                  <Badge tone="warning" size="sm" shape="soft">
                     Large file — counts use loaded lane cap
                   </Badge>
                 )}
               </div>
 
               <div className="mb-2">
-                <p className="text-xs text-slate-600 mb-3 max-w-3xl leading-relaxed">
-                  Recommended order:{' '}
-                  <span className="font-semibold text-slate-800">1. Cancel</span> (equal counts) →{' '}
-                  <span className="font-semibold text-slate-800">2. Open</span> (select overlap, then
-                  confirm) → <span className="font-semibold text-slate-800">3. Only</span>{' '}
-                  (suggestions, or leave as BRS items). Keep{' '}
-                  <span className="font-medium text-slate-700">Unmatched</span> so leftover Open
-                  lines move to Only after the overlap is matched. Counting never auto-clears.
+                <p className="text-xs text-slate-600 mb-3 max-w-3xl leading-relaxed hidden lg:block">
+                  Suggested order:{' '}
+                  <span className="font-semibold text-slate-800">1. Cancel</span> (same amount, same
+                  number of lines on both sides) →{' '}
+                  <span className="font-semibold text-slate-800">2. Extra lines</span> (select the lines
+                  that pair up, then confirm) →{' '}
+                  <span className="font-semibold text-slate-800">3. One side only</span> (use suggestions,
+                  or leave as uncredited lodgments / unpresented cheques on the BRS). Keep{' '}
+                  <span className="font-medium text-slate-700">Unmatched</span> selected so any remainder
+                  stays on one side only after you confirm. Nothing is matched until you confirm.
                 </p>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                  1. Cancel schedule
-                </p>
-                <ListGroupButtons
-                  group="cancel"
+                <CountMatchListFilters
                   listKey={listKey}
                   onPick={setListKey}
                   data={query.data}
-                />
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                  2. Open lists
-                </p>
-                <ListGroupButtons
-                  group="open"
-                  listKey={listKey}
-                  onPick={setListKey}
-                  data={query.data}
-                />
-                <p className="text-xs text-slate-500 mb-3 -mt-1 max-w-3xl">
-                  <span className="font-medium text-slate-600">Open — more</span> on one side is the
-                  same as <span className="font-medium text-slate-600">open — less</span> on the
-                  other, so there is no separate Open — less list. Each amount appears once.{' '}
-                  <span className="font-medium text-slate-600">Select overlap</span> takes the
-                  matching count on both sides; leftovers stay unmatched and show on Only after
-                  confirm (Unmatched scope).
-                </p>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                  3. Only lists
-                </p>
-                <ListGroupButtons
-                  group="only"
-                  listKey={listKey}
-                  onPick={setListKey}
-                  data={query.data}
+                  rowsFor={rowsFor}
+                  listCountLabel={listCountLabel}
+                  renderDesktopGroups={() => (
+                    <>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                        {COUNT_MATCH_GROUP_LABELS.cancel}
+                      </p>
+                      <ListGroupButtons
+                        group="cancel"
+                        listKey={listKey}
+                        onPick={setListKey}
+                        data={query.data}
+                      />
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                        2. Same amount, extra lines
+                      </p>
+                      <ListGroupButtons
+                        group="open"
+                        listKey={listKey}
+                        onPick={setListKey}
+                        data={query.data}
+                      />
+                      <p className="text-xs text-slate-500 mb-3 -mt-1 max-w-3xl">
+                        When one side has more lines at the same amount, pick the lines that clearly
+                        belong together, then confirm. Any leftover lines stay on{' '}
+                        <span className="font-medium text-slate-600">one side only</span> (Unmatched
+                        scope) for the BRS or the next statement.
+                      </p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                        3. One side only
+                      </p>
+                      <ListGroupButtons
+                        group="only"
+                        listKey={listKey}
+                        onPick={setListKey}
+                        data={query.data}
+                      />
+                    </>
+                  )}
                 />
               </div>
 
@@ -559,7 +587,7 @@ export default function CountMatchPanel({
               </p>
 
               <div className="rounded-lg border border-border overflow-hidden">
-                <Table>
+                <Table compact>
                   <TableHead>
                     <tr>
                       <TableTh title="Money value used to group lines — not a count">Amount</TableTh>
@@ -605,10 +633,10 @@ export default function CountMatchPanel({
                                       variant="ghost"
                                       size="xs"
                                       className="text-primary-700"
-                                      title="Select the matching count on both sides. Leftovers stay unmatched and move to Only after you confirm (Unmatched scope)."
+                                      title="Select matching lines on both sides. Any remainder stays on one side only after you confirm (Unmatched scope)."
                                       onClick={() => handleSelectRow(r, 'overlap')}
                                     >
-                                      Select overlap
+                                      Match overlap
                                     </Button>
                                   )}
                                 <Button

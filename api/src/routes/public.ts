@@ -15,6 +15,7 @@ import { INTRO_OFFER_MONTHS } from '../config/subscription.js'
 import { isIntroOfferEnvEnabled } from '../services/introOffer.js'
 import { CANONICAL_PLAN_SLUGS, listPlans } from '../services/plan.js'
 import { getMarketingFxRates } from '../services/currencyConversion.js'
+import { getPricingPageConfig } from '../services/pricingPageSettings.js'
 import leadsPublicRouter from './leadsPublic.js'
 
 const router = Router()
@@ -33,7 +34,9 @@ export interface PublicPlanResponse {
   cleanExportsPerMonth: number
   usersLimit: number
   features: Record<string, boolean>
+  marketing: import('../lib/planMarketing.js').PlanMarketing
   active: boolean
+  sortOrder?: number
 }
 
 /**
@@ -41,22 +44,33 @@ export interface PublicPlanResponse {
  * catalogue config when a tier has no DB row. Inactive packages stay here so
  * the landing comparison table stays complete; checkout filters them out.
  */
-export async function buildPublicPlans(): Promise<PublicPlanResponse[]> {
-  const plans = await listPlans()
-  return plans.map((p) => ({
-    id: p.slug,
-    name: p.name,
-    monthlyGhs: p.monthlyGhs,
-    yearlyGhs: p.yearlyGhs,
-    quarterlyGhs: p.quarterlyGhs,
-    projectsPerMonth: p.projectsPerMonth,
-    transactionsPerMonth: p.transactionsPerMonth,
-    bankAccounts: p.bankAccounts,
-    cleanExportsPerMonth: p.cleanExportsPerMonth,
-    usersLimit: p.usersLimit,
-    features: p.features,
-    active: p.active,
-  }))
+export async function buildPublicPlans(): Promise<{
+  plans: PublicPlanResponse[]
+  comparisonGroups: Awaited<ReturnType<typeof getPricingPageConfig>>['featureGroups']
+}> {
+  const [plans, pricingPage] = await Promise.all([
+    listPlans({ publicSite: true }),
+    getPricingPageConfig(),
+  ])
+  return {
+    plans: plans.map((p) => ({
+      id: p.slug,
+      name: p.name,
+      monthlyGhs: p.monthlyGhs,
+      yearlyGhs: p.yearlyGhs,
+      quarterlyGhs: p.quarterlyGhs,
+      projectsPerMonth: p.projectsPerMonth,
+      transactionsPerMonth: p.transactionsPerMonth,
+      bankAccounts: p.bankAccounts,
+      cleanExportsPerMonth: p.cleanExportsPerMonth,
+      usersLimit: p.usersLimit,
+      features: p.features,
+      marketing: p.marketing,
+      sortOrder: p.sortOrder,
+      active: p.active,
+    })),
+    comparisonGroups: pricingPage.featureGroups,
+  }
 }
 
 /** Indicative GHS cross-rates for landing reference pricing (not used at Paystack checkout). */
@@ -67,11 +81,12 @@ router.get('/fx-rates', async (_req, res) => {
 })
 
 router.get('/plans', async (_req, res) => {
-  const plans = await buildPublicPlans()
+  const { plans, comparisonGroups } = await buildPublicPlans()
   // Light cache — plan data changes rarely; 60s so CMS price/feature edits show quickly.
   res.set('Cache-Control', 'public, max-age=60, s-maxage=60')
   res.json({
     plans,
+    comparisonGroups,
     ...(isIntroOfferEnvEnabled()
       ? {
           introOffer: {

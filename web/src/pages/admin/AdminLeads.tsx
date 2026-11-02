@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Inbox, Mail } from 'lucide-react'
 import Card from '../../components/ui/Card'
-import Alert from '../../components/ui/Alert'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import PageHeader from '../../components/layout/PageHeader'
+import AdminListToolbar from '../../components/layout/AdminListToolbar'
 import EmptyState from '../../components/ui/EmptyState'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { api } from '../../lib/api'
@@ -58,6 +59,9 @@ export default function AdminLeads() {
             Newsletter, bank-feed waitlist, and sales enquiries from the public site.
           </p>
         }
+      />
+
+      <AdminListToolbar
         actions={
           <Button type="button" variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
             Refresh
@@ -68,13 +72,7 @@ export default function AdminLeads() {
       {isLoading && <PageBodySkeleton label="Loading leads" />}
 
       {isError && (
-        <Alert
-          tone="error"
-          title="Could not load leads"
-          onRetry={() => void refetch()}
-        >
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load leads" error={error} onRetry={() => void refetch()} />
       )}
 
       {!isLoading && !isError && leads.length === 0 && (
@@ -89,7 +87,7 @@ export default function AdminLeads() {
 
       {leads.length > 0 && (
         <Card noPadding>
-          <Table>
+          <Table compact>
             <TableHead>
               <tr>
                 <TableTh>When</TableTh>
@@ -106,7 +104,7 @@ export default function AdminLeads() {
                     {formatDate(lead.createdAt)}
                   </TableTd>
                   <TableTd>
-                    <Badge tone="neutral" size="sm">
+                    <Badge tone="neutral" size="sm" shape="soft">
                       {lead.source}
                     </Badge>
                   </TableTd>

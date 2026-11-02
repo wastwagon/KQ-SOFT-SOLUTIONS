@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Settings } from 'lucide-react'
 import { formatAmount } from '../../lib/format'
 import Button from '../ui/Button'
+import ActionMenu from '../ui/ActionMenu'
 import Badge from '../ui/Badge'
 import Card from '../ui/Card'
 import MatchSettingsPanel from './MatchSettingsPanel'
@@ -79,6 +80,8 @@ export default function SuggestedMatchesPanel({
   )
   const visible = suggestions.slice(0, listCount)
   const canBulk = !!features.bulk_match
+  const hasOverflowBulk =
+    highConfidence.length > 0 || safeSuggestions.length > 0 || phaseBSuggestions.length > 0
   return (
     <Card
       title="Suggested matches"
@@ -122,60 +125,6 @@ export default function SuggestedMatchesPanel({
               {cap != null ? `Auto-match all (up to ${cap})` : 'Auto-match all'}
             </Button>
           )}
-          {highConfidence.length > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() =>
-                onBulkMatch(
-                  withinCap(highConfidence).map((s) => ({
-                    cashBookTransactionId: s.cashBookTx.id,
-                    bankTransactionId: s.bankTx.id,
-                  }))
-                )
-              }
-              disabled={isMatching}
-              className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
-              title="Apply only suggestions with 95%+ confidence"
-            >
-              Match all high-confidence (95%+) — {capLabel(highConfidence.length)}
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            onClick={() =>
-              onBulkMatch(
-                withinCap(safeSuggestions).map((s) => ({
-                  cashBookTransactionId: s.cashBookTx.id,
-                  bankTransactionId: s.bankTx.id,
-                }))
-              )
-            }
-            disabled={isMatching || safeSuggestions.length === 0}
-            title="Skips ambiguous duplicates; requires 90%+ confidence"
-          >
-            Match safe suggestions (90%+, no duplicates) — {capLabel(safeSuggestions.length)}
-          </Button>
-          {phaseBSuggestions.length > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                onBulkMatch(
-                  withinCap(phaseBSuggestions).map((s) => ({
-                    cashBookTransactionId: s.cashBookTx.id,
-                    bankTransactionId: s.bankTx.id,
-                  }))
-                )
-              }
-              disabled={isMatching || phaseBSuggestions.length === 0}
-              title="Phase B: pattern-matched suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) — skips generic amount-only guesses"
-            >
-              Match receipts + Ecobank patterns (85%+) — {capLabel(phaseBSuggestions.length)}
-            </Button>
-          )}
           {bulkSelected.size > 0 && (
             <Button
               type="button"
@@ -191,6 +140,118 @@ export default function SuggestedMatchesPanel({
             >
               Match {capLabel(bulkSelected.size)} selected
             </Button>
+          )}
+          <div className="hidden md:flex flex-wrap gap-2">
+            {highConfidence.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() =>
+                  onBulkMatch(
+                    withinCap(highConfidence).map((s) => ({
+                      cashBookTransactionId: s.cashBookTx.id,
+                      bankTransactionId: s.bankTx.id,
+                    }))
+                  )
+                }
+                disabled={isMatching}
+                className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
+                title="Apply only suggestions with 95%+ confidence"
+              >
+                Match all high-confidence (95%+) — {capLabel(highConfidence.length)}
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                onBulkMatch(
+                  withinCap(safeSuggestions).map((s) => ({
+                    cashBookTransactionId: s.cashBookTx.id,
+                    bankTransactionId: s.bankTx.id,
+                  }))
+                )
+              }
+              disabled={isMatching || safeSuggestions.length === 0}
+              title="Skips ambiguous duplicates; requires 90%+ confidence"
+            >
+              Match safe suggestions (90%+, no duplicates) — {capLabel(safeSuggestions.length)}
+            </Button>
+            {phaseBSuggestions.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  onBulkMatch(
+                    withinCap(phaseBSuggestions).map((s) => ({
+                      cashBookTransactionId: s.cashBookTx.id,
+                      bankTransactionId: s.bankTx.id,
+                    }))
+                  )
+                }
+                disabled={isMatching || phaseBSuggestions.length === 0}
+                title="Phase B: pattern-matched suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) — skips generic amount-only guesses"
+              >
+                Match receipts + Ecobank patterns (85%+) — {capLabel(phaseBSuggestions.length)}
+              </Button>
+            )}
+          </div>
+          {hasOverflowBulk && (
+            <ActionMenu
+            label="More bulk"
+            size="xs"
+            variant="outline"
+            align="left"
+            menuAriaLabel="Additional bulk match actions"
+            triggerClassName="md:hidden"
+            items={[
+              ...(highConfidence.length > 0
+                ? [
+                    {
+                      kind: 'button' as const,
+                      label: `High confidence (95%+) — ${capLabel(highConfidence.length)}`,
+                      onClick: () =>
+                        onBulkMatch(
+                          withinCap(highConfidence).map((s) => ({
+                            cashBookTransactionId: s.cashBookTx.id,
+                            bankTransactionId: s.bankTx.id,
+                          }))
+                        ),
+                      disabled: isMatching,
+                    },
+                  ]
+                : []),
+              {
+                kind: 'button' as const,
+                label: `Safe (90%+, no dupes) — ${capLabel(safeSuggestions.length)}`,
+                onClick: () =>
+                  onBulkMatch(
+                    withinCap(safeSuggestions).map((s) => ({
+                      cashBookTransactionId: s.cashBookTx.id,
+                      bankTransactionId: s.bankTx.id,
+                    }))
+                  ),
+                disabled: isMatching || safeSuggestions.length === 0,
+              },
+              ...(phaseBSuggestions.length > 0
+                ? [
+                    {
+                      kind: 'button' as const,
+                      label: `Patterns (85%+) — ${capLabel(phaseBSuggestions.length)}`,
+                      onClick: () =>
+                        onBulkMatch(
+                          withinCap(phaseBSuggestions).map((s) => ({
+                            cashBookTransactionId: s.cashBookTx.id,
+                            bankTransactionId: s.bankTx.id,
+                          }))
+                        ),
+                      disabled: isMatching || phaseBSuggestions.length === 0,
+                    },
+                  ]
+                : []),
+            ]}
+            />
           )}
         </div>
       )}
@@ -252,17 +313,17 @@ export default function SuggestedMatchesPanel({
                     {Math.round(s.confidence * 100)}%
                   </span>
                   {s.reason.toLowerCase().includes('ecobank clearing') && (
-                    <Badge size="sm" tone="brand" className="ml-2" title="Ecobank inward clearing / HSE deposit — payment matched to bank credit">
+                    <Badge size="sm" shape="soft" tone="brand" className="ml-2" title="Ecobank inward clearing / HSE deposit — payment matched to bank credit">
                       Clearing
                     </Badge>
                   )}
                   {s.reason.toLowerCase().includes('ecobank transfer') && (
-                    <Badge size="sm" tone="warning" className="ml-2" title="Ecobank outward transfer — payment matched to bank debit">
+                    <Badge size="sm" shape="soft" tone="warning" className="ml-2" title="Ecobank outward transfer — payment matched to bank debit">
                       Transfer
                     </Badge>
                   )}
                   {s.reason.toLowerCase().includes('ecobank withdrawal') && (
-                    <Badge size="sm" tone="neutral" className="ml-2" title="Ecobank named withdrawal — payment matched to bank debit by payee">
+                    <Badge size="sm" shape="soft" tone="neutral" className="ml-2" title="Ecobank named withdrawal — payment matched to bank debit by payee">
                       Withdrawal
                     </Badge>
                   )}
@@ -270,6 +331,7 @@ export default function SuggestedMatchesPanel({
                     !/ecobank (clearing|transfer|withdrawal)/i.test(s.reason) && (
                       <Badge
                         size="sm"
+                        shape="soft"
                         tone="brand"
                         className="ml-2"
                         title={s.reason}
@@ -282,6 +344,7 @@ export default function SuggestedMatchesPanel({
                     <span className="ml-2 inline-flex items-center gap-1">
                       <Badge
                         size="sm"
+                        shape="soft"
                         tone="success"
                         title={
                           s.orgMemoryConfirmations
@@ -299,6 +362,7 @@ export default function SuggestedMatchesPanel({
                   {s.duplicateWarning && (
                     <Badge
                       size="sm"
+                      shape="soft"
                       tone="warning"
                       className="ml-2"
                       title="Multiple bank transactions match this cash book — verify before matching"

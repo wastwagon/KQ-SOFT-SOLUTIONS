@@ -200,8 +200,8 @@ export default function SettingsBrandingTab({ role, features, featureDepth, bran
             className="max-w-[200px]"
             hint={
               featureDepth?.threshold_approval === 'full'
-                ? 'Reviewers cannot approve when the discrepancy is above this amount. An admin must approve.'
-                : 'Team stores this as a warning. Firm blocks a reviewer from approving above it.'
+                ? 'Checkers cannot approve when the discrepancy is above this amount. An administrator must approve.'
+                : 'Team stores this as a warning. Firm blocks a checker from approving above it.'
             }
           />
         )}

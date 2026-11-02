@@ -2,26 +2,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   planFindMany: vi.fn(),
+  platformSettingsFindUnique: vi.fn(),
 }))
 
 vi.mock('../lib/prisma.js', () => ({
   prisma: {
     plan: { findMany: mocks.planFindMany },
+    platformSettings: { findUnique: mocks.platformSettingsFindUnique },
   },
 }))
 
 import { invalidatePlanCache } from '../services/plan.js'
+import { invalidatePricingPageConfigCache } from '../services/pricingPageSettings.js'
 import { buildPublicPlans, PLAN_DISPLAY_ORDER } from './public.js'
 
 describe('buildPublicPlans', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     invalidatePlanCache()
+    invalidatePricingPageConfigCache()
+    mocks.platformSettingsFindUnique.mockResolvedValue(null)
   })
 
   it('returns every canonical tier when DB is empty (config fallback)', async () => {
     mocks.planFindMany.mockResolvedValue([])
-    const plans = await buildPublicPlans()
+    const { plans } = await buildPublicPlans()
 
     expect(plans.map((p) => p.id)).toEqual([...PLAN_DISPLAY_ORDER])
 
@@ -61,7 +66,7 @@ describe('buildPublicPlans', () => {
       { slug: 'premium', name: 'Premium', projectsPerMonth: 120, transactionsPerMonth: 12000, monthlyGhs: 1000, yearlyGhs: 10000, active: true },
       { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
     ])
-    const plans = await buildPublicPlans()
+    const { plans } = await buildPublicPlans()
 
     expect(plans).toHaveLength(5)
     const basic = plans.find((p) => p.id === 'basic')
@@ -84,7 +89,7 @@ describe('buildPublicPlans', () => {
       { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 20000, monthlyGhs: 900, yearlyGhs: 9000, quarterlyGhs: 2565, active: true },
       { slug: 'firm', name: 'Custom', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, quarterlyGhs: 0, active: true },
     ])
-    const plans = await buildPublicPlans()
+    const { plans } = await buildPublicPlans()
     expect(plans.find((p) => p.id === 'basic')?.monthlyGhs).toBe(150)
     expect(plans.find((p) => p.id === 'standard')?.monthlyGhs).toBe(400)
     expect(plans.find((p) => p.id === 'premium')?.monthlyGhs).toBe(900)
@@ -93,13 +98,13 @@ describe('buildPublicPlans', () => {
 
   it('always orders plans free → basic → standard → premium → firm regardless of DB ordering', async () => {
     mocks.planFindMany.mockResolvedValue([
-      { slug: 'firm', name: 'Firm', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
-      { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 10000, monthlyGhs: 900, yearlyGhs: 9000, active: true },
-      { slug: 'basic', name: 'Basic', projectsPerMonth: 5, transactionsPerMonth: 500, monthlyGhs: 150, yearlyGhs: 1500, active: true },
-      { slug: 'standard', name: 'Standard', projectsPerMonth: 20, transactionsPerMonth: 2000, monthlyGhs: 400, yearlyGhs: 4000, active: true },
+      { slug: 'firm', name: 'Firm', sortOrder: 40, projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
+      { slug: 'premium', name: 'Premium', sortOrder: 30, projectsPerMonth: 100, transactionsPerMonth: 10000, monthlyGhs: 900, yearlyGhs: 9000, active: true },
+      { slug: 'basic', name: 'Basic', sortOrder: 10, projectsPerMonth: 5, transactionsPerMonth: 500, monthlyGhs: 150, yearlyGhs: 1500, active: true },
+      { slug: 'standard', name: 'Standard', sortOrder: 20, projectsPerMonth: 20, transactionsPerMonth: 2000, monthlyGhs: 400, yearlyGhs: 4000, active: true },
     ])
 
-    const plans = await buildPublicPlans()
+    const { plans } = await buildPublicPlans()
     expect(plans.map((p) => p.id)).toEqual(['free', 'basic', 'standard', 'premium', 'firm'])
   })
 
@@ -110,7 +115,7 @@ describe('buildPublicPlans', () => {
       { slug: 'standard', name: 'Standard', projectsPerMonth: 20, transactionsPerMonth: 2000, monthlyGhs: 400, yearlyGhs: 4000, active: true },
     ])
 
-    const plans = await buildPublicPlans()
+    const { plans } = await buildPublicPlans()
     expect(plans).toHaveLength(5)
     const premium = plans.find((p) => p.id === 'premium')
     expect(premium).toMatchObject({ monthlyGhs: 990, yearlyGhs: 9900, projectsPerMonth: 100, bankAccounts: 30 })
@@ -125,7 +130,7 @@ describe('buildPublicPlans', () => {
       { slug: 'premium', name: 'Premium', projectsPerMonth: 100, transactionsPerMonth: 20000, monthlyGhs: 1500, yearlyGhs: 15000, active: true },
       { slug: 'firm', name: 'Custom', projectsPerMonth: -1, transactionsPerMonth: -1, monthlyGhs: 0, yearlyGhs: 0, active: true },
     ])
-    const plans = await buildPublicPlans()
+    const { plans } = await buildPublicPlans()
     expect(plans.find((p) => p.id === 'basic')).toMatchObject({ monthlyGhs: 300, active: false })
     expect(plans.find((p) => p.id === 'standard')?.active).toBe(true)
   })

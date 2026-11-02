@@ -2,8 +2,8 @@
  * Plan-based feature gating.
  *
  * Defaults live in FEATURE_MIN_PLAN / USER_LIMIT_BY_PLAN. Super-admin CMS
- * values (Plan.features JSON + usersLimit) override these at runtime via
- * `setPlanRuntimeEntitlements` after the plan cache loads.
+ * values (Plan.features JSON + usersLimit + sortOrder) override these at runtime via
+ * `replacePlanRuntimeEntitlements` / `replacePlanSlugRanks` after the plan cache loads.
  */
 export type PlanFeature =
   | 'bank_rules'
@@ -150,8 +150,16 @@ export function replacePlanRuntimeEntitlements(
   for (const [slug, ent] of Object.entries(all)) runtimeBySlug.set(slug, ent)
 }
 
+/** CMS plan order (index by sortOrder) for feature-depth comparisons on custom slugs. */
+let slugRank = new Map<string, number>()
+
+export function replacePlanSlugRanks(ranks: Record<string, number>): void {
+  slugRank = new Map(Object.entries(ranks))
+}
+
 export function clearPlanRuntimeEntitlements(): void {
   runtimeBySlug.clear()
+  slugRank.clear()
 }
 
 export function peekPlanRuntimeEntitlements(slug: string): PlanRuntimeEntitlements | undefined {
@@ -159,6 +167,8 @@ export function peekPlanRuntimeEntitlements(slug: string): PlanRuntimeEntitlemen
 }
 
 export function planRank(plan: string): number {
+  const fromCms = slugRank.get(plan)
+  if (fromCms != null) return fromCms
   const idx = PLAN_ORDER.indexOf(plan as (typeof PLAN_ORDER)[number])
   return idx >= 0 ? idx : -1
 }
@@ -186,9 +196,13 @@ export function featureDepth(plan: string, feature: PlanFeature): FeatureDepth {
 export function bulkMatchLimit(plan: string): number {
   const depth = featureDepth(plan, 'bulk_match')
   if (depth === 'none') return 0
-  if (plan === 'free') return PARTIAL_BULK_PAIRS
-  if (plan === 'premium') return FIRM_BULK_PAIRS
-  if (plan === 'firm') return CUSTOM_BULK_PAIRS
+  if (depth === 'partial') return PARTIAL_BULK_PAIRS
+  const r = planRank(plan)
+  if (r < 0) return FULL_BULK_PAIRS
+  const firmR = planRank('firm')
+  const premiumR = planRank('premium')
+  if (firmR >= 0 && r >= firmR) return CUSTOM_BULK_PAIRS
+  if (premiumR >= 0 && r >= premiumR) return FIRM_BULK_PAIRS
   return FULL_BULK_PAIRS
 }
 
@@ -204,8 +218,11 @@ export function bankRuleLimit(plan: string): number {
 export function auditListLimit(plan: string): number {
   const depth = featureDepth(plan, 'audit_trail')
   if (depth === 'none') return 0
-  if (plan === 'free') return FREE_AUDIT_ROWS
-  if (plan === 'basic') return SOLO_AUDIT_ROWS
+  const r = planRank(plan)
+  const freeR = planRank('free')
+  const basicR = planRank('basic')
+  if (freeR >= 0 && r === freeR) return FREE_AUDIT_ROWS
+  if (basicR >= 0 && r === basicR) return SOLO_AUDIT_ROWS
   return FULL_AUDIT_ROWS
 }
 
@@ -216,7 +233,9 @@ export function auditExportAllowed(plan: string): boolean {
 /** Free activity log only includes this many recent days. Higher plans are uncapped by date. */
 export function auditHistoryDays(plan: string): number | null {
   if (featureDepth(plan, 'audit_trail') === 'none') return 0
-  if (plan === 'free') return FREE_AUDIT_DAYS
+  const r = planRank(plan)
+  const freeR = planRank('free')
+  if (freeR >= 0 && r === freeR) return FREE_AUDIT_DAYS
   return null
 }
 
@@ -258,11 +277,13 @@ export function isStoredFeaturesEmpty(raw: unknown): boolean {
 export function mergePlanFeatures(
   plan: string,
   stored: unknown
-): Record<PlanFeature, boolean> {
-  return {
-    ...defaultFeaturesForPlan(plan),
-    ...parseStoredFeatures(stored),
+): Record<string, boolean> {
+  const merged: Record<string, boolean> = { ...defaultFeaturesForPlan(plan) }
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return merged
+  for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+    if (typeof value === 'boolean') merged[key] = value
   }
+  return merged
 }
 
 export function hasPlanFeature(plan: string, feature: PlanFeature): boolean {

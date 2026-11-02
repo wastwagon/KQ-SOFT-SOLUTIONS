@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Alert from '../../components/ui/Alert'
+import PageLoadError from '../../components/ui/PageLoadError'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import { BRAND_PRIMARY_HEX, BRAND_SECONDARY_HEX } from '../../lib/brandColors'
@@ -102,9 +103,7 @@ export default function AdminGenerationSettings() {
             <p className="text-gray-500">Platform-wide defaults for reports, API limits, and new organisations.</p>
           }
         />
-        <Alert tone="error" title="Could not load generation settings" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load generation settings" error={error} onRetry={() => void refetch()} />
       </div>
     )
   }

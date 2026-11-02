@@ -26,12 +26,33 @@ Use this checklist when onboarding a new customer team:
 
 - [ ] Platform URL shared with all users
 - [ ] Admin account created and tested
-- [ ] Team roles assigned (`admin`, `reviewer`, `preparer`, `viewer`)
+- [ ] Team roles assigned (**Administrator**, **Preparer**, **Checker**, **View only** — see [Plain language & roles](#plain-language--roles-ghana-facing))
 - [ ] First reconciliation period confirmed
 - [ ] Sample cash book and bank statement files validated
 - [ ] Branding configured (logo/colors/report title) if required
 - [ ] Billing/plan confirmed (Free or paid; see [Subscription Plans](#12-subscription-plans--limits))
-- [ ] Bank account seats understood (counted **org-wide**, not per project)
+- [ ] Bank account seats understood (counted **across your organisation**, not per project)
+
+---
+
+## Plain language & roles (Ghana-facing)
+
+We use words that match Ghana accounting practice and the BRS sign-off block (**Prepared By / Checked By / Approved By**):
+
+| In the app | Who it is | BRS sign-off |
+|------------|-----------|--------------|
+| **Administrator** | Manages billing, members, branding | Often approves |
+| **Preparer** | Uploads files, maps columns, matches transactions | Prepared By |
+| **Checker** | Reviews exceptions and approves the job | Checked By |
+| **View only** | Can view projects and reports, cannot edit | — |
+
+**Organisation** means your company or firm account (one subscription, shared bank-account seats). We do not use “workspace” in customer-facing screens.
+
+**Bank reconciliation** means comparing your **cash book** (your records) with the **bank statement** and explaining every difference — the same idea taught in Ghana SHS accounting and used by GRA when they ask businesses to keep **good records**.
+
+For matching jargon, see **What do these terms mean?** on Reconcile and Report, and the [Mapping & Matching guide](/mapping-and-matching-manual.md) glossary.
+
+Full style guide for writers: `docs/GHANA_PLAIN_LANGUAGE_GUIDE.md` (repository).
 
 ---
 
@@ -57,7 +78,7 @@ Core capabilities:
 - **Reports**: completed jobs and exports
 - **Clients**: client directory
 - **Audit log**: activity records (Team+)
-- **Settings**: branding, billing, members, connections, API keys, bank rules (plan-based)
+- **Settings**: branding, billing, members, bank import, API keys, bank rules (plan-based)
 - **User manual**: this documentation page
 
 ---
@@ -100,8 +121,8 @@ Each project follows:
 1. Open `Settings -> Members` and invite team
 2. Assign roles for maker-checker flow
 3. Configure branding and billing
-4. Review plan limits (projects, transactions, **org-wide bank accounts**) with your team
-5. Optionally configure **Connections** (import path / bank-feed waitlist)
+4. Review plan limits (projects, transactions, **bank accounts across your organisation**) with your team
+5. Optionally configure **Bank import** (upload path / bank-feed waitlist)
 
 ### Preparer (daily operations)
 1. Create project
@@ -110,9 +131,12 @@ Each project follows:
 4. Reconcile and resolve major exceptions
 5. Submit for review
 
-### Reviewer (approval)
+### Checker (approval)
+
+Role label in Settings: **Checker** (matches “Checked By” on the BRS).
+
 1. Open Review step
-2. Validate unmatched items and variance
+2. Validate unmatched items and the **difference in unmatched totals**
 3. Approve or reopen with comments
 4. Confirm final export package
 
@@ -138,7 +162,7 @@ Go to **Projects → New project**, then set:
 
 ### Bank Statement
 - Upload as `Credits`, `Debits`, or `Both`
-- For multiple accounts, add or select a **bank account** name (counts toward your org-wide seat limit)
+- For multiple accounts, add or select a **bank account** name (counts toward your organisation’s bank-account limit)
 
 Supported formats:
 - `.xlsx`, `.xls`, `.csv`, `.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`
@@ -240,15 +264,15 @@ Logo, primary/secondary colours, letterhead, report title, footer. Full branding
 - Current plan and subscription status (trial / active / expired)
 - Usage: projects and transactions this month
 - **Upgrade / renew** via Paystack: **monthly**, **quarterly** (~5% off), or **yearly** (~17% off)
-- Workspace billing is always **GHS**; project reporting currency is separate
+- Organisation billing is always **GHS**; project reporting currency is separate
 
 ### Members (Admin)
-Invite by email; assign Admin / Reviewer / Preparer / Viewer. Seat limits follow the plan.
+Invite by email; assign **Administrator**, **Checker**, **Preparer**, or **View only**. Seat limits follow the plan.
 
-### Connections
-Configure how statements arrive (manual upload path today; bank-feed waitlist where offered).
+### Bank import
+Upload cash books and statements today; join the **live bank feeds** waitlist if you want automatic imports later.
 
-### Bank Rules (Admin/Reviewer, Team+)
+### Bank Rules (Administrator / Checker, Team+)
 Conditions on description/amount/date → suggest match or flag for review.
 
 ### API Keys (Custom, Admin)
@@ -258,13 +282,15 @@ Create and revoke keys for programmatic access.
 
 ## 11) Roles
 
-- **Admin**: full control (billing, members, branding, delete project)
-- **Reviewer**: review and approval flows; bank rules
-- **Preparer**: upload / map / reconcile / report preparation
-- **Viewer**: read-only access
+Display names in Settings (API values unchanged):
 
-| Action | Admin | Reviewer | Preparer | Viewer |
-|--------|-------|----------|----------|--------|
+- **Administrator**: full control (billing, members, branding, delete project)
+- **Checker**: review and approval flows; bank rules
+- **Preparer**: upload / map / reconcile / report preparation
+- **View only**: read-only access
+
+| Action | Administrator | Checker | Preparer | View only |
+|--------|---------------|---------|----------|-----------|
 | Delete project | ✓ | | | |
 | Reopen project | ✓ | ✓ | | |
 | Edit bank rules | ✓ | ✓ | | |
@@ -278,7 +304,7 @@ Create and revoke keys for programmatic access.
 
 ## 12) Subscription Plans & Limits
 
-| Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Users |
+| Plan | Projects/mo | Transactions/mo | Bank accounts (organisation) | Users |
 |------|-------------|-----------------|--------------------------|-------|
 | Free | 5 | 500 | 1 | 1 |
 | Solo | 12 | 3,000 | 3 | 1 |
@@ -294,7 +320,7 @@ Create and revoke keys for programmatic access.
 | Firm | 990 | 2,822 | 9,900 |
 | Custom | From 1,800 | — | Contract |
 
-- New workspaces start on **Free**. Paid plans have no trial.
+- New organisations start on **Free**. Paid plans have no trial.
 - **Solo** includes bookkeeping consultancy / advisory messaging.
 - **Bank account seats** are counted across the **whole organisation** (all projects), not per project.
 - **Billing periods:** monthly, quarterly (~5% off), yearly (~17% off vs paying monthly).
@@ -311,7 +337,7 @@ Create and revoke keys for programmatic access.
 | Bank rules, audit, discrepancy | Team+ |
 | 1:many / many:many, split suggestions | All tiers |
 | Roll-forward, threshold approval, priority support | Firm+ |
-| Multi-client workspace, public API, custom contract | Custom |
+| Multi-client organisation, public API, custom contract | Custom |
 
 ---
 
@@ -377,13 +403,13 @@ Common reasons: date/amount/reference differences, missing transactions, wrong m
 Yes. You can proceed to report with exceptions noted, then approve based on your internal policy.
 
 ### 5) Who can approve or reopen a project?
-Approval and reopen are role-based (typically reviewer/admin).
+Approval and reopen are role-based (typically checker or administrator).
 
 ### 6) How do we keep users aligned after UI updates?
 Update this manual changelog every release and announce changes to active teams.
 
 ### 7) Why is our subscription billed in GHS if we reconcile in USD or EUR?
-**Workspace billing** is processed in **GHS** through **Paystack**. Each **project's reporting currency** (`GHS`, `USD`, or `EUR`) is set when creating the project and controls BRS amounts only.
+**Organisation billing** is processed in **GHS** through **Paystack**. Each **project's reporting currency** (`GHS`, `USD`, or `EUR`) is set when creating the project and controls BRS amounts only.
 
 ### 8) Where do we upgrade, renew, or see subscription status?
 Admins: **Settings → Billing**. You will see plan, status, usage, and Paystack buttons for monthly / quarterly / yearly when billing is enabled.

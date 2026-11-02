@@ -8,6 +8,7 @@ import organizationsRouter from './organizations.js'
 import paymentsRouter from './payments.js'
 import analyticsRouter from './analytics.js'
 import settingsRouter from './settings.js'
+import pricingPageRouter from './pricing-page.js'
 import databaseRouter from './database.js'
 import opsMetricsRouter from './opsMetrics.js'
 import retentionRouter from './retention.js'
@@ -23,6 +24,7 @@ router.get('/', (_req, res) => {
 })
 
 router.use('/settings', settingsRouter)
+router.use('/pricing-page', pricingPageRouter)
 router.use('/database', databaseRouter)
 router.use('/ops-metrics', opsMetricsRouter)
 router.use('/retention', retentionRouter)

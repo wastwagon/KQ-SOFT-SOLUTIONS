@@ -9,9 +9,9 @@
 | Feature | Status | Gap |
 |---------|--------|-----|
 | **Multi-currency display** | ✅ GHS, USD, EUR | Display only; no conversion |
-| **Admin defaultCurrency** | ✅ In Generation Settings | **Not used** by ProjectNew (hardcodes GHS) |
-| **Manual exchange rates** | ❌ Not implemented | No admin override for rates |
-| **Free FX API** | ❌ Not implemented | No conversion between currencies |
+| **Admin defaultCurrency** | ✅ In Generation Settings | **Used** by ProjectNew via `platform-defaults` |
+| **Free FX API** | ✅ Implemented | `currencyConversion.ts` + `/currency/rates` |
+| **Manual exchange rates** | ✅ Admin generation settings | `manualRates`, `useManualRatesOnly` |
 
 ---
 
@@ -22,10 +22,9 @@
 **Fix:** ProjectNew fetches admin generation settings (or a lightweight endpoint) and uses `defaultCurrency` as initial value when creating a new project.
 
 ### Deliverables
-- [ ] Add GET `/api/v1/settings/default-currency` (or use existing admin settings for org users — need a non-admin endpoint)
-- [ ] **Alternative:** Add GET `/api/v1/platform-defaults` returning `{ defaultCurrency }` — callable by any authenticated user (read-only platform defaults)
-- [ ] ProjectNew: fetch defaultCurrency on mount, set `currency` state from it
-- [ ] Fallback to 'GHS' if fetch fails
+- [x] `GET /api/v1/settings/platform-defaults` (read-only platform defaults)
+- [x] ProjectNew: fetch defaultCurrency on mount
+- [x] Fallback to 'GHS' if fetch fails
 
 ### Files
 - `api/src/routes/settings.ts` or new `platform-defaults.ts`
@@ -47,12 +46,9 @@ Low. Backward compatible.
 - **Attribution:** Required per their terms.
 
 ### Deliverables
-- [ ] Create `api/src/services/currencyConversion.ts`:
-  - `getRates(base: 'GHS'|'USD'|'EUR'): Promise<{ USD, EUR, GHS }>`
-  - Cache in memory (TTL 24h or configurable)
-  - Fallback to manual rates if API fails
-- [ ] Add `convert(amount: number, from: string, to: string, rates?: object): number`
-- [ ] Optional: GET `/api/v1/currency/rates` for frontend (display converted amounts)
+- [x] Create `api/src/services/currencyConversion.ts` (rates + manual fallback)
+- [x] GET `/api/v1/currency/rates` for frontend
+- [ ] Optional report display-currency toggle (Phase 5)
 
 ### Use cases
 - **Report:** "Show BRS totals in USD" when project is GHS (optional toggle)
@@ -92,11 +88,9 @@ Add to `PlatformSettings` (key `generation` or new key `currency`):
 - `useManualRatesOnly: false` → use API; fallback to manual if API fails
 
 ### Deliverables
-- [ ] Extend admin generation schema: `manualRates?: Record<string, number>`, `useManualRatesOnly?: boolean`
-- [ ] AdminGenerationSettings UI: section "Manual exchange rates (override)"
-  - Inputs: GHS→USD, GHS→EUR, USD→GHS, EUR→GHS (or derive inverse)
-  - Checkbox: "Use manual rates only (disable API)"
-- [ ] `currencyConversion.ts` reads manual rates first when `useManualRatesOnly`, else uses API with manual fallback
+- [x] Extend admin generation schema: `manualRates`, `useManualRatesOnly`
+- [x] AdminGenerationSettings UI — manual rates + checkbox
+- [x] `currencyConversion.ts` reads manual rates when configured
 
 ### Files
 - `api/src/routes/admin/settings.ts`
@@ -113,7 +107,7 @@ Low. Optional; defaults to API.
 **Gap:** Ensure admin settings are consistent and used correctly across the app.
 
 ### Audit checklist
-- [ ] **defaultCurrency** — used by ProjectNew (Phase 1)
+- [x] **defaultCurrency** — used by ProjectNew (Phase 1)
 - [ ] **defaultReportTitle, defaultFooter** — used when creating new orgs or projects (verify)
 - [ ] **defaultPrimaryColor, defaultSecondaryColor** — used in report generation (verify)
 - [ ] **apiRateLimitPerMin** — used by API key middleware (verify)
@@ -135,12 +129,12 @@ Low. Documentation and verification.
 **Scope:** On BRS Report, add "Show in [USD/EUR]" when project is GHS. Converts displayed totals using current rates.
 
 ### Deliverables
-- [ ] Report API accepts `?displayCurrency=USD`
-- [ ] Frontend toggle: "Display in project currency | USD | EUR"
-- [ ] Convert balance per cash book, uncredited, unpresented, bank closing for display only (original values in project currency remain)
+- [x] Report UI: display currency select + preview-only badge (`ProjectReport.tsx`)
+- [x] Rates from `GET /currency/rates` + conversion helper in report preview
+- [ ] API export query `displayCurrency` (exports stay in project currency by design)
 
 ### Risk
-Medium. Display vs stored amounts must be clear to avoid confusion.
+Medium. Display vs stored amounts must be clear — **preview only** copy shipped in UI.
 
 ---
 
@@ -148,11 +142,11 @@ Medium. Display vs stored amounts must be clear to avoid confusion.
 
 | Phase | Description | Est. effort |
 |-------|-------------|-------------|
-| **1** | Admin defaultCurrency → ProjectNew | 1–2 hrs |
-| **4** | Cross-check admin settings | 1 hr |
-| **3** | Admin manual exchange rates | 2–3 hrs |
-| **2** | Free API currency conversion service | 2–3 hrs |
-| **5** | Report display currency toggle | 2–3 hrs (optional) |
+| **1** | Admin defaultCurrency → ProjectNew | **Done** |
+| **2** | Free API currency conversion service | **Done** |
+| **3** | Admin manual exchange rates | **Done** |
+| **4** | Cross-check admin settings | Partial — `ADMIN_SETTINGS_VERIFICATION.md` |
+| **5** | Report display currency toggle | **Done** (preview UI; exports in project currency) |
 
 ---
 

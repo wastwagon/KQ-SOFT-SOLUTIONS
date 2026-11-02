@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bankRules as bankRulesApi, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -12,6 +13,7 @@ import Select from '../ui/Select'
 import SubscriptionRenewalPanel from '../SubscriptionRenewalPanel'
 import { PageBodySkeleton } from '../ui/Skeleton'
 import Badge from '../ui/Badge'
+import { roleListLabel } from '../../lib/userFacingTerms'
 
 type ConditionRow = { field: string; operator: string; value: string }
 const defaultCondition = (): ConditionRow => ({ field: 'description', operator: 'contains', value: '' })
@@ -122,13 +124,11 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
 
   if (rulesQueryError && !paywallBlocked) {
     return (
-      <Alert
-        tone="error"
+      <PageLoadError
         title="Could not load bank rules"
+        error={rulesQueryError}
         onRetry={() => queryClient.invalidateQueries({ queryKey: ['bank-rules'] })}
-      >
-        {rulesQueryError instanceof Error ? rulesQueryError.message : 'Something went wrong.'}
-      </Alert>
+      />
     )
   }
 
@@ -136,7 +136,7 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
     <div className="space-y-4">
       {!canEdit && (
         <Alert tone="info" title="View only">
-          Contact an admin or reviewer to add or edit rules.
+          Contact an {roleListLabel('admin', 'reviewer')} to add or edit rules.
         </Alert>
       )}
       {pausedCount > 0 && (
@@ -164,9 +164,9 @@ export default function BankRulesSection({ canEdit = true }: { canEdit?: boolean
                 <p className="font-semibold text-gray-900">{r.name}</p>
                 <div className="flex flex-wrap gap-2 mt-1.5">
                   {r.activeInMatch === false && (
-                    <Badge tone="neutral" size="sm">Paused</Badge>
+                    <Badge tone="neutral" size="sm" shape="soft">Paused</Badge>
                   )}
-                  <Badge tone={r.action === 'suggest_match' ? 'success' : 'warning'} size="sm" className="uppercase tracking-wider">
+                  <Badge tone={r.action === 'suggest_match' ? 'success' : 'warning'} size="sm" shape="soft" className="uppercase tracking-wider">
                     {r.action.replace(/_/g, ' ')}
                   </Badge>
                   <span className="text-[11px] text-gray-500 font-medium">Priority {r.priority}</span>

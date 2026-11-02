@@ -10,12 +10,23 @@ import {
 } from '../../services/subscriptionOverrides.js'
 import { invalidateOrgSubscriptionCache } from '../../services/orgSubscriptionAccess.js'
 import { clearScheduledPlan } from '../../services/planChange.js'
+import { isSelfServePlan, listPlans } from '../../services/plan.js'
 import { normalizeOrgMemberRole } from '../../lib/orgMemberRole.js'
 import type { AuthRequest } from '../../middleware/auth.js'
 import { requireJwtSecret } from '../../middleware/auth.js'
 import jwt from 'jsonwebtoken'
 
 const router = Router()
+
+async function organizationPlanFilter(planFilter: string): Promise<Record<string, unknown> | null> {
+  const trimmed = planFilter.trim()
+  if (!trimmed) return null
+  if (trimmed === 'paid') {
+    const slugs = (await listPlans()).filter(isSelfServePlan).map((p) => p.slug)
+    return slugs.length ? { plan: { in: slugs } } : { plan: { in: ['__no_paid_plans__'] } }
+  }
+  return { plan: trimmed }
+}
 
 const updateOrgSchema = z.object({
   plan: z.string().min(1).optional(),
@@ -66,11 +77,8 @@ router.get('/', async (req, res) => {
       { slug: { contains: search, mode: 'insensitive' as const } },
     ]
   }
-  if (planFilter === 'paid') {
-    where.plan = { in: ['basic', 'standard', 'premium'] }
-  } else if (planFilter && ['basic', 'standard', 'premium', 'firm'].includes(planFilter)) {
-    where.plan = planFilter
-  }
+  const planWhere = await organizationPlanFilter(planFilter)
+  if (planWhere) Object.assign(where, planWhere)
 
   const [orgs, total] = await Promise.all([
     prisma.organization.findMany({
@@ -154,8 +162,8 @@ router.get('/', async (req, res) => {
 router.get('/export/csv', async (req, res) => {
   const planFilter = (req.query.plan as string)?.trim() || ''
   const where: Record<string, unknown> = {}
-  if (planFilter === 'paid') where.plan = { in: ['basic', 'standard', 'premium'] }
-  else if (planFilter && ['basic', 'standard', 'premium', 'firm'].includes(planFilter)) where.plan = planFilter
+  const planWhere = await organizationPlanFilter(planFilter)
+  if (planWhere) Object.assign(where, planWhere)
 
   const orgs = await prisma.organization.findMany({
     where,

@@ -20,6 +20,7 @@ import BrsHelp from '../components/BrsHelp'
 import { useConfirm } from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
 import Button, { buttonClassName } from '../components/ui/Button'
+import PageLoadError from '../components/ui/PageLoadError'
 import Alert from '../components/ui/Alert'
 import Badge from '../components/ui/Badge'
 import Modal from '../components/ui/Modal'
@@ -476,17 +477,15 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     const err = reportQuery.error ?? attachmentsQuery.error ?? ratesQueryError
     return (
       <div className="py-8 space-y-4">
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load report"
+          error={err}
           onRetry={() => {
             void queryClient.invalidateQueries({ queryKey: ['report', projectId] })
             void queryClient.invalidateQueries({ queryKey: ['attachments', projectId] })
             void queryClient.invalidateQueries({ queryKey: ['currency', 'rates'] })
           }}
-        >
-          {err instanceof Error ? err.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
@@ -1247,10 +1246,10 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   rows={2}
                 />
                 <Textarea
-                  label="Reviewer note (optional)"
+                  label="Checker note (optional)"
                   value={editReviewerComment}
                   onChange={(e) => setEditReviewerComment(e.target.value)}
-                  placeholder="Reviewer notes…"
+                  placeholder="Checker notes…"
                   rows={2}
                 />
                 <div className="flex gap-2 print:hidden">
@@ -1293,7 +1292,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   </p>
                 )}
                 {data.preparerComment && <p><span className="font-medium text-slate-600">Preparer:</span> {data.preparerComment}</p>}
-                {data.reviewerComment && <p><span className="font-medium text-slate-600">Reviewer:</span> {data.reviewerComment}</p>}
+                {data.reviewerComment && <p><span className="font-medium text-slate-600">Checker:</span> {data.reviewerComment}</p>}
               </div>
             )}
           </div>
@@ -1944,7 +1943,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
               )}
               {(data?.discrepancies || []).length > 0 ? (
                 <>
-                  <p className="text-sm text-gray-500 mb-2">Matched pairs with amount or date variance detected during reconciliation.</p>
+                  <p className="text-sm text-gray-500 mb-2">Matched pairs where amounts or dates differ between cash book and bank.</p>
                   <div className="border border-amber-200 rounded-xl overflow-auto max-h-64 shadow-sm bg-white">
                     <table className="min-w-full text-sm text-slate-900">
                       <thead className="bg-amber-50">

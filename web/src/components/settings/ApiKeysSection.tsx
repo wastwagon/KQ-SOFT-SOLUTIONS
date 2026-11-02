@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiKeys as apiKeysApi, isSubscriptionInactiveError, unlessSubscriptionInactive } from '../../lib/api'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
@@ -63,13 +64,11 @@ export default function ApiKeysSection() {
 
   if (keysQueryError && !paywallBlocked) {
     return (
-      <Alert
-        tone="error"
+      <PageLoadError
         title="Could not load API keys"
+        error={keysQueryError}
         onRetry={() => queryClient.invalidateQueries({ queryKey: ['api-keys'] })}
-      >
-        {keysQueryError instanceof Error ? keysQueryError.message : 'Something went wrong.'}
-      </Alert>
+      />
     )
   }
 
@@ -100,7 +99,7 @@ export default function ApiKeysSection() {
         </Alert>
       )}
       <div className="overflow-hidden rounded-xl border border-border">
-        <Table>
+        <Table compact>
           <TableHead>
             <tr>
               <TableTh>Name</TableTh>

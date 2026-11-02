@@ -39,7 +39,7 @@ export default function PwaLifecycle() {
       {offline && (
         <Alert tone="warning" title="You are offline" className="rounded-none border-x-0 border-t-0">
           The app shell is available, but live data and saves need a connection. Reconnect to sync with
-          your workspace.
+          your organisation.
         </Alert>
       )}
       {updateReady && (

@@ -215,3 +215,13 @@ These call `POST/GET /api/v1/admin/database/...` and require a logged-in platfor
 3. Create a project and upload a small test file.
 
 If anything fails, check Coolify logs for `api` (migrations, `JWT_SECRET`, `DATABASE_URL`) and `web` (wrong `VITE_API_URL` → API calls go to the wrong host).
+
+## 11. SEO & performance (after go-live)
+
+- Confirm `https://kqsoftwaresolutions.com/robots.txt` and `/sitemap.xml` are served from the web container.
+- Optional: set `VITE_PUBLIC_SITE_URL=https://kqsoftwaresolutions.com` on **web build** if the canonical host differs from the default in code.
+- Submit sitemap in [Google Search Console](https://search.google.com/search-console).
+- Run [PageSpeed Insights](https://pagespeed.web.dev/) on `/` (WebP marketing images are generated during `npm run build` prebuild).
+- Optional stronger crawler HTML: `cd web && npm run build:seo` (Playwright prerender of `/`, `/register`, `/privacy`, `/terms` into `dist/`).
+
+See `docs/SEO_AND_PERFORMANCE.md` for full checklist.

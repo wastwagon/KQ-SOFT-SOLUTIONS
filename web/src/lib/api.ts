@@ -436,7 +436,7 @@ export interface ReportResponse {
 }
 
 export interface SubscriptionUsageResponse {
-  organization: { id: string; name: string; plan: string }
+  organization: { id: string; name: string; plan: string; planDisplayName?: string; contractBilling?: boolean }
   /** True when API has SUBSCRIPTION_PAYWALL=true (core routes blocked for inactive subs). */
   paywallEnabled?: boolean
   /**
@@ -485,7 +485,12 @@ export interface SubscriptionUsageResponse {
     latestPaymentPeriod: 'monthly' | 'quarterly' | 'yearly' | null
     latestPaymentAmount: number | null
   }
-  scheduledPlan?: { plan: string; effectiveAt: string; requestedAt: string } | null
+  scheduledPlan?: {
+    plan: string
+    effectiveAt: string
+    requestedAt: string
+    planDisplayName?: string
+  } | null
   prorationCreditGhs?: number
 }
 
@@ -936,14 +941,23 @@ export const publicApi = {
       return null
     }
   },
-  getPlans: async (): Promise<{ plans: PublicPlan[] }> => {
+  getPlans: async (): Promise<{
+    plans: PublicPlan[]
+    comparisonGroups?: import('./plans').FeatureGroup[]
+  }> => {
     try {
       const res = await fetch(`${API_URL}/api/v1/public/plans`, {
         headers: { Accept: 'application/json' },
       })
       if (!res.ok) return { plans: [] }
-      const data = (await res.json()) as { plans?: PublicPlan[] }
-      return { plans: Array.isArray(data.plans) ? data.plans : [] }
+      const data = (await res.json()) as {
+        plans?: PublicPlan[]
+        comparisonGroups?: import('./plans').FeatureGroup[]
+      }
+      return {
+        plans: Array.isArray(data.plans) ? data.plans : [],
+        comparisonGroups: data.comparisonGroups,
+      }
     } catch {
       return { plans: [] }
     }

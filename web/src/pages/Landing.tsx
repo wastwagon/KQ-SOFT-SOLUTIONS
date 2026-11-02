@@ -1,3 +1,7 @@
+/**
+ * Public marketing site — rounded-full ribbons and decorative dots are intentional here.
+ * Do not copy these patterns into signed-in app chrome; see docs/UI_CHROME_GUIDE.md.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -26,12 +30,18 @@ import {
 import BrandLogo from '../components/BrandLogo'
 import Button from '../components/ui/Button'
 import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
+import PublicPageSeo from '../components/marketing/PublicPageSeo'
+import MarketingPhoto from '../components/marketing/MarketingPhoto'
 import SubscriptionFxReference from '../components/marketing/SubscriptionFxReference'
+import { PUBLIC_SITE_URL, DEFAULT_SEO } from '../lib/publicSeo'
 import { publicApi } from '../lib/api'
 import { useFocusTrap } from '../lib/focusTrap'
 import { useAuth } from '../store/auth'
 import {
   FEATURE_GROUPS,
+  type FeatureGroup,
+  isContactSalesPlan,
+  comparisonTablePriceLabel,
   formatGhs,
   mergeWithApiPlans,
   planAmountForPeriod,
@@ -67,9 +77,9 @@ import { maxYearlyDiscountPercent } from '../lib/planPricing'
  *     block for keyframes; no extra dependencies.
  *
  * Pricing data flow:
- *   - Published pricing lives in src/lib/plans.ts and ALWAYS renders.
- *   - Optional API call to /api/v1/public/plans overrides price/limits in-place.
- *   - This guarantees the pricing section never appears empty on production.
+ *   - Platform admin Plans CMS → /api/v1/public/plans (prices, limits, marketing copy).
+ *   - src/lib/plans.ts is offline fallback when the API is unreachable.
+ *   - Landing cache refreshes every 60s so CMS edits show quickly.
  * ------------------------------------------------------------------------- */
 
 const FEATURES = [
@@ -89,11 +99,11 @@ const FEATURES = [
     icon: FileText,
     title: 'Audit-ready reports',
     description:
-      'Branded BRS in Excel and PDF with preparer/reviewer sign-off, discrepancy lines, and an immutable trail of who changed what and when.',
+      'Branded BRS in Excel and PDF with preparer and checker sign-off, discrepancy lines, and an immutable trail of who changed what and when.',
   },
   {
     icon: Users,
-    title: 'Multi-client workspace',
+    title: 'Multi-client organisation',
     description:
       'Run every engagement from one hub: separate projects, shared templates, and roll-forward so nothing drops between periods.',
   },
@@ -101,13 +111,13 @@ const FEATURES = [
     icon: ShieldCheck,
     title: 'Roles & approvals',
     description:
-      'Preparer → Reviewer workflow with locked periods. On Firm, approval thresholds can block sign-off until variances are explained.',
+      'Preparer → Checker workflow with locked periods. On Firm, approval thresholds can block sign-off until unmatched differences are explained.',
   },
   {
     icon: Workflow,
     title: 'Bank rules & API',
     description:
-      'Bank rules flag or route lines before reviewers open the grid (Solo and above). Custom adds a public REST API for firm automation.',
+      'Bank rules flag or route lines before checkers open the grid (Solo and above). Custom adds a public REST API for firm automation.',
   },
 ] as const
 
@@ -198,15 +208,15 @@ const FAQS = [
   },
   {
     q: 'Can my team collaborate on the same reconciliation?',
-    a: 'Yes. Each client period is a project. Invite colleagues as Preparer, Reviewer, Viewer, or Admin. Every change is recorded in the activity log. Seat limits depend on your plan (Team and Firm add multiple users).',
+    a: 'Yes. Each client period is a project. Invite colleagues as Preparer, Checker, View only, or Administrator. Every change is recorded in the activity log. Seat limits depend on your plan (Team and Firm add multiple users).',
   },
   {
     q: 'What happens at month-end?',
-    a: 'Confirm matches, run the BRS, capture preparer and reviewer sign-off, and lock the period. On Solo and above, roll forward unpresented cheques and uncredited lodgments into the next reconciliation without rebuilding from scratch.',
+    a: 'Confirm matches, run the BRS, capture preparer and checker sign-off, and lock the period. On Solo and above, roll forward unpresented cheques and uncredited lodgments into the next reconciliation without rebuilding from scratch.',
   },
   {
     q: 'How does pricing and currency work?',
-    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. New workspaces start on the Free plan. Paid plans have no trial. The website shows approximate USD, EUR, or GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use GHS, USD, or EUR on the BRS.',
+    a: 'Subscriptions are billed in Ghana cedis (GHS) through Paystack on monthly, quarterly (~5% off), or annual (~17% off) cycles. New organisations start on the Free plan. Paid plans have no trial. The website shows approximate USD, EUR, or GBP equivalents for reference only — checkout always charges GHS. Inside the product, each project can use GHS, USD, or EUR on the BRS.',
   },
   {
     q: 'What are the plan limits?',
@@ -218,7 +228,7 @@ const FAQS = [
   },
   {
     q: 'Is my data secure?',
-    a: 'Files are stored on encrypted cloud infrastructure. Access is limited by organisation and role (Admin, Reviewer, Preparer, Viewer). Sessions use HTTPS. We do not sell or share customer data with advertisers.',
+    a: 'Files are stored on encrypted cloud infrastructure. Access is limited by organisation and role (Administrator, Checker, Preparer, View only). Sessions use HTTPS. We do not sell or share customer data with advertisers.',
   },
   {
     q: 'Can I export a BRS with our firm logo and colours?',
@@ -234,12 +244,16 @@ export default function Landing() {
   const { data: plansData } = useQuery({
     queryKey: ['public', 'plans'],
     queryFn: publicApi.getPlans,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60_000,
     retry: 0,
   })
 
-  // Published plan copy in plans.ts is the source of truth — API only overrides price/limits.
+  // CMS plans from API; static copy in plans.ts is offline fallback only.
   const plans = useMemo(() => mergeWithApiPlans(plansData?.plans), [plansData])
+  const comparisonGroups =
+    plansData?.comparisonGroups && plansData.comparisonGroups.length > 0
+      ? plansData.comparisonGroups
+      : FEATURE_GROUPS
 
   // Smooth fade-in on scroll for any element marked with [data-reveal].
   // Mark revealed via a data attribute, not a class. React rewrites className
@@ -263,8 +277,45 @@ export default function Landing() {
     return () => io.disconnect()
   }, [])
 
+  const landingJsonLd = useMemo(
+    () => ({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Organization',
+          name: 'KQ-SOFT Solutions',
+          url: PUBLIC_SITE_URL,
+          logo: `${PUBLIC_SITE_URL}/kqsoft-icon.svg`,
+          areaServed: 'GH',
+          contactPoint: {
+            '@type': 'ContactPoint',
+            contactType: 'customer support',
+            email: 'info@kqsoftwaresolutions.com',
+            availableLanguage: 'English',
+          },
+        },
+        {
+          '@type': 'SoftwareApplication',
+          name: 'KQ-SOFT Bank Reconciliation',
+          applicationCategory: 'BusinessApplication',
+          operatingSystem: 'Web',
+          url: PUBLIC_SITE_URL,
+          description: DEFAULT_SEO.description,
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'GHS',
+            description: 'Free plan; paid plans via Paystack',
+          },
+        },
+      ],
+    }),
+    []
+  )
+
   return (
     <div id="top" className="min-h-screen bg-white text-gray-900 antialiased">
+      <PublicPageSeo jsonLd={landingJsonLd} path="/" />
       {/* Inline keyframes / one-off styles. Kept local so the page is
           self-contained — no global stylesheet edits required. */}
       <style>{`
@@ -327,6 +378,7 @@ export default function Landing() {
         plans={plans}
         billingPeriod={billingPeriod}
         setBillingPeriod={setBillingPeriod}
+        featureGroups={comparisonGroups}
       />
       <Testimonials />
       <Faq openFaq={openFaq} setOpenFaq={setOpenFaq} />
@@ -561,11 +613,12 @@ function Hero() {
   return (
     <section className="relative isolate overflow-hidden">
       <div aria-hidden className="absolute inset-0 -z-10">
-        <img
+        <MarketingPhoto
           src={MARKETING.heroBg}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover object-center hero-drift"
+          className="absolute inset-0 h-full w-full object-cover object-center hero-drift [&_img]:absolute [&_img]:inset-0 [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_img]:object-center"
           fetchPriority="high"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-900/55 to-slate-900/25" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-slate-900/30" />
@@ -579,7 +632,7 @@ function Hero() {
             </p>
 
             <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-white leading-[1.05]">
-              Bank reconciliation,
+              Bank reconciliation for Ghana teams,
               <br className="hidden sm:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-200 via-white to-green-300">
                 automated end to end.
@@ -587,8 +640,8 @@ function Hero() {
             </h1>
 
             <p className="mt-3 text-base sm:text-lg text-slate-200/90 leading-snug max-w-xl mx-auto lg:mx-0">
-              Upload your cash book and bank statement in one workspace. Auto-match handles
-              cheques, transfers, and split lines — then export a signed-off BRS your reviewer
+              Upload your cash book and bank statement. Auto-match handles cheques, transfers, and
+              split lines — then export a signed-off Bank Reconciliation Statement (BRS) your checker
               can stand behind.
             </p>
 
@@ -639,12 +692,13 @@ function Hero() {
                 </div>
                 <div className="w-12" />
               </div>
-              <img
+              <MarketingPhoto
                 src={MARKETING.productMatch}
-                alt="KQ-SOFT matching workspace with cash book and bank statement side by side"
-                className="w-full h-auto object-cover object-top max-h-[200px]"
+                alt="KQ-SOFT reconciliation screen with cash book and bank statement side by side"
+                className="w-full h-auto object-cover object-top max-h-[200px] [&_img]:w-full [&_img]:h-auto [&_img]:object-cover [&_img]:object-top [&_img]:max-h-[200px]"
                 loading="eager"
                 decoding="async"
+                fetchPriority="high"
               />
             </div>
           </div>
@@ -662,10 +716,12 @@ function BankStrip() {
   const items = [...BANKS_SUPPORTED, ...BANKS_SUPPORTED]
   return (
     <section className="relative overflow-hidden border-y border-gray-100 py-12 lg:py-16">
-      <img
+      <MarketingPhoto
         src={MARKETING.trustBand}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-40"
+        width={1536}
+        height={1024}
+        className="absolute inset-0 h-full w-full object-cover opacity-40 [&_img]:absolute [&_img]:inset-0 [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
         loading="lazy"
         decoding="async"
         aria-hidden
@@ -758,7 +814,7 @@ function Features() {
             Everything you need for a defensible bank reconciliation.
           </h2>
           <p className="mt-1 text-sm text-gray-600 leading-snug">
-            Upload, auto-match, review, approve, and publish the BRS in one place — so reviewers
+            Upload, auto-match, review, approve, and publish the BRS in one place — so checkers
             spend time on exceptions, not spreadsheets.
           </p>
         </div>
@@ -810,7 +866,7 @@ function ProductSpotlight() {
               Audit-ready output
             </p>
             <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight">
-              A BRS your reviewers will recognise.
+              A BRS your checkers will recognise.
             </h2>
             <p className="mt-2 text-sm text-slate-300 leading-snug max-w-xl">
               Formal statement lines, branded exports, and a clear trail from match to sign-off —
@@ -820,7 +876,7 @@ function ProductSpotlight() {
               {[
                 'Excel + PDF with your logo and colours',
                 'Uncredited lodgments & unpresented cheques laid out cleanly',
-                'Preparer / reviewer sign-off states preserved',
+                'Preparer and checker sign-off states preserved',
               ].map((line) => (
                 <li key={line} className="flex items-start gap-2.5">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
@@ -835,10 +891,12 @@ function ProductSpotlight() {
               aria-hidden
             />
             <div className="relative overflow-hidden rounded-xl border border-white/15 bg-white ring-1 ring-white/10">
-              <img
+              <MarketingPhoto
                 src={MARKETING.productReport}
                 alt="KQ-SOFT bank reconciliation statement report preview"
-                className="w-full object-cover object-top aspect-[2/1]"
+                width={1536}
+                height={1024}
+                className="w-full object-cover object-top aspect-[2/1] [&_img]:w-full [&_img]:object-cover [&_img]:object-top [&_img]:aspect-[2/1]"
                 loading="lazy"
                 decoding="async"
               />
@@ -880,10 +938,10 @@ function HowItWorks() {
                 className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none"
               >
                 <div className="relative aspect-[2/1] overflow-hidden bg-gray-100">
-                  <img
+                  <MarketingPhoto
                     src={s.image}
                     alt={s.imageAlt}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
                     loading="lazy"
                     decoding="async"
                   />
@@ -934,7 +992,7 @@ function DashboardShowcase() {
             <ul className="mt-4 space-y-2">
               {[
                 'Uncredited lodgments and unpresented cheques calculated automatically.',
-                'Discrepancy report flags amount and date variances in matched pairs.',
+                'Discrepancy report flags amount and date differences in matched pairs.',
                 'Roll-forward carries unresolved items into the next reconciliation period.',
                 'Branded Excel and PDF BRS exports with your logo and colours.',
               ].map((line) => (
@@ -971,10 +1029,12 @@ function DashboardShowcase() {
               aria-hidden
             />
             <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-2 ring-1 ring-black/5">
-              <img
+              <MarketingPhoto
                 src={MARKETING.productReport}
                 alt="KQ-SOFT bank reconciliation statement with lodgments and cheques"
-                className="w-full rounded-lg object-cover object-top aspect-[2/1]"
+                width={1536}
+                height={1024}
+                className="w-full rounded-lg object-cover object-top aspect-[2/1] [&_img]:w-full [&_img]:rounded-lg [&_img]:object-cover [&_img]:object-top [&_img]:aspect-[2/1]"
                 loading="lazy"
                 decoding="async"
               />
@@ -997,10 +1057,12 @@ function Pricing({
   plans,
   billingPeriod,
   setBillingPeriod,
+  featureGroups,
 }: {
   plans: MarketingPlan[]
   billingPeriod: BillingPeriod
   setBillingPeriod: (p: BillingPeriod) => void
+  featureGroups: FeatureGroup[]
 }) {
   const maxYearlyDiscount = maxYearlyDiscountPercent(plans)
   const yearlySavingsCopy =
@@ -1105,7 +1167,7 @@ function Pricing({
           </span>
         </div>
 
-        <ComparisonTable plans={plans} period={billingPeriod} />
+        <ComparisonTable plans={plans} period={billingPeriod} featureGroups={featureGroups} />
 
         <p className="mt-5 text-center text-sm text-gray-500">
           Need something custom?{' '}
@@ -1132,7 +1194,7 @@ function PlanCard({
   const navigate = useNavigate()
   const isAuthed = useAuth((s) => !!s.token)
   const isHighlight = !!plan.highlight && plan.active !== false
-  const isCustom = plan.slug === 'firm' && plan.monthlyGhs <= 0 && plan.yearlyGhs <= 0
+  const isCustom = isContactSalesPlan(plan)
   const checkoutClosed = plan.active === false && !isCustom
   const amount = planAmountForPeriod(plan, period)
   const monthlyEq = period === 'monthly' ? null : planMonthlyEquivalent(plan, period)
@@ -1253,7 +1315,15 @@ function PlanCard({
 }
 
 /** Full plan comparison. Always visible under the pricing cards. */
-function ComparisonTable({ plans, period }: { plans: MarketingPlan[]; period: BillingPeriod }) {
+function ComparisonTable({
+  plans,
+  period,
+  featureGroups,
+}: {
+  plans: MarketingPlan[]
+  period: BillingPeriod
+  featureGroups: FeatureGroup[]
+}) {
   return (
     <div id="plan-comparison" className="mt-14 scroll-mt-24">
       <div className="mx-auto max-w-2xl text-center">
@@ -1277,7 +1347,6 @@ function ComparisonTable({ plans, period }: { plans: MarketingPlan[]; period: Bi
                   Feature
                 </th>
                 {plans.map((p) => {
-                  const isCustom = p.slug === 'firm' && p.monthlyGhs <= 0 && p.yearlyGhs <= 0
                   const amount = planAmountForPeriod(p, period)
                   return (
                     <th
@@ -1289,7 +1358,7 @@ function ComparisonTable({ plans, period }: { plans: MarketingPlan[]; period: Bi
                       <div className="flex flex-col items-center gap-1">
                         <span className="text-sm font-bold">{p.name}</span>
                         <span className="text-xs font-semibold tabular-nums text-gray-600">
-                          {isCustom ? 'From GHS 1,800' : amount === 0 ? 'Free' : formatGhs(amount)}
+                          {comparisonTablePriceLabel(p, amount)}
                         </span>
                         {p.badge && (
                           <span
@@ -1309,7 +1378,7 @@ function ComparisonTable({ plans, period }: { plans: MarketingPlan[]; period: Bi
               </tr>
             </thead>
             <tbody>
-              {FEATURE_GROUPS.map((group) => (
+              {featureGroups.map((group) => (
                 <FragmentGroup key={group.title} group={group} plans={plans} />
               ))}
             </tbody>
@@ -1324,7 +1393,7 @@ function FragmentGroup({
   group,
   plans,
 }: {
-  group: (typeof FEATURE_GROUPS)[number]
+  group: FeatureGroup
   plans: MarketingPlan[]
 }) {
   return (
@@ -1390,10 +1459,10 @@ function Testimonials() {
           className="mx-auto max-w-2xl px-4 py-0 text-center"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
-            Teams worldwide rely on it
+            Teams across Ghana rely on it
           </p>
           <h2 className="mt-1 text-2xl sm:text-[1.65rem] font-bold tracking-tight text-gray-900">
-            What finance leaders say.
+            What accounting leads say.
           </h2>
         </div>
 
@@ -1506,10 +1575,10 @@ function FinalCta() {
     <section className="py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl p-4 sm:p-5 text-white">
-          <img
+          <MarketingPhoto
             src={MARKETING.ctaAtmosphere}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover [&_img]:absolute [&_img]:inset-0 [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
             loading="lazy"
             decoding="async"
             aria-hidden

@@ -44,7 +44,7 @@ export default function BrsVarianceBadge({
     <Badge
       tone={tone}
       size="sm"
-      title={`BRS variance: ${formatAmount(variance, resolvedCurrency)}`}
+      title={`BRS tie-out: ${formatAmount(Math.abs(variance), resolvedCurrency)} ${label?.toLowerCase() ?? ''}`.trim()}
     >
       {label} {formatAmount(Math.abs(variance), resolvedCurrency)}
     </Badge>

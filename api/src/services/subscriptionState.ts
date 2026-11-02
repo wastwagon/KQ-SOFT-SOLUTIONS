@@ -1,4 +1,5 @@
 import type { Organization, Payment } from '@prisma/client'
+import { isContractBillingPlanSlug } from './plan.js'
 
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'free'
 
@@ -34,19 +35,16 @@ export function getSubscriptionSnapshot(
    * Paid plans have no trial. The Free plan stays active with its own limits.
    * A trial end date applies only when platform admin sets one.
    */
-  const applyFirmCustomBilling = (status: SubscriptionStatus): SubscriptionStatus => {
-    if (
-      org.plan === 'firm' &&
-      forcedStatus == null &&
-      (status === 'free' || status === 'expired')
-    ) {
+  const applyContractBillingGrace = (status: SubscriptionStatus): SubscriptionStatus => {
+    const contractBilling = isContractBillingPlanSlug(org.plan)
+    if (contractBilling && forcedStatus == null && (status === 'free' || status === 'expired')) {
       return 'active'
     }
     return status
   }
 
   if (!latestPayment) {
-    const status = applyFirmCustomBilling(
+    const status = applyContractBillingGrace(
       forcedStatus ||
         (org.plan === 'free'
           ? 'active'
@@ -69,7 +67,7 @@ export function getSubscriptionSnapshot(
     latestPayment.period === 'yearly' ? 365 : latestPayment.period === 'quarterly' ? 90 : 30
   const periodStart = latestPayment.createdAt
   const periodEnd = new Date(periodStart.getTime() + periodDays * 24 * 60 * 60 * 1000)
-  const status = applyFirmCustomBilling(
+  const status = applyContractBillingGrace(
     forcedStatus || (now <= periodEnd ? 'active' : 'expired')
   )
 

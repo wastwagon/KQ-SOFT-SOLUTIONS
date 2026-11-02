@@ -122,14 +122,16 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
         { id: 'admin-plans', label: 'Plans', group: 'Platform', to: '/platform-admin/plans' },
         { id: 'admin-payments', label: 'Payments', group: 'Platform', to: '/platform-admin/payments' },
         { id: 'admin-revenue', label: 'Revenue', group: 'Platform', to: '/platform-admin/revenue' },
+        { id: 'admin-ops-hub', label: 'Ops hub', group: 'Platform', to: '/platform-admin/ops', keywords: 'health retention database metrics' },
         { id: 'admin-ops', label: 'Ops metrics', group: 'Platform', to: '/platform-admin/ops-metrics', keywords: 'parse ocr queue' },
         { id: 'admin-leads', label: 'Leads', group: 'Platform', to: '/platform-admin/leads' },
         { id: 'admin-retention', label: 'Data retention', group: 'Platform', to: '/platform-admin/retention' },
         { id: 'admin-gen', label: 'Generation settings', group: 'Platform', to: '/platform-admin/generation-settings' },
         { id: 'admin-db', label: 'Database', group: 'Platform', to: '/platform-admin/database' },
+        { id: 'admin-tools-hub', label: 'Tools', group: 'Platform', to: '/platform-admin/tools', keywords: 'clean bank cash book worker' },
         { id: 'admin-clean-bank', label: 'Clean bank statement', group: 'Tools', to: '/platform-admin/tools/clean-bank-statement' },
         { id: 'admin-clean-cb', label: 'Clean cash book', group: 'Tools', to: '/platform-admin/tools/clean-cash-book' },
-        { id: 'ws', label: 'Back to workspace', group: 'Workspace', to: '/dashboard' }
+        { id: 'ws', label: 'Back to organisation home', group: 'Organisation', to: '/dashboard' }
       )
       return list
     }
@@ -171,13 +173,14 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
       { id: 'projects', label: 'Projects', group: 'Go to', to: '/projects', keywords: 'list jobs engagements' },
       { id: 'clients', label: 'Clients', group: 'Go to', to: '/clients' },
       { id: 'reports', label: 'Reports', group: 'Go to', to: '/reports' },
+      { id: 'tools-hub', label: 'Tools', group: 'Tools', to: '/tools', keywords: 'clean bank cash book export' },
       { id: 'clean-bank', label: 'Clean bank statement', group: 'Tools', to: '/tools/clean-bank-statement' },
       { id: 'clean-cb', label: 'Clean cash book', group: 'Tools', to: '/tools/clean-cash-book' },
       { id: 'settings', label: 'Settings', group: 'Settings', to: '/settings/branding' },
       { id: 'branding', label: 'Branding', group: 'Settings', to: '/settings/branding', keywords: 'logo colours' },
       { id: 'billing', label: 'Billing', group: 'Settings', to: '/settings/billing', keywords: 'plan subscription paystack' },
       { id: 'members', label: 'Team members', group: 'Settings', to: '/settings/members', keywords: 'invite' },
-      { id: 'connections', label: 'Connections', group: 'Settings', to: '/settings/connections' }
+      { id: 'connections', label: 'Bank import', group: 'Settings', to: '/settings/connections', keywords: 'bank feeds import upload' },
     )
     if (canCreateProject(role)) {
       list.push({
@@ -204,7 +207,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
         label: 'Platform admin',
         group: 'Go to',
         to: '/platform-admin',
-        keywords: 'ops tenants',
+        keywords: 'ops customers organisations',
       })
     }
     for (const p of projectRows) {
@@ -372,7 +375,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
           setOpen(true)
         }}
         className="gap-2 text-gray-500 min-h-[44px] min-w-[44px] sm:min-w-0 px-2.5 sm:px-3"
-        aria-label="Search workspace (Command K)"
+        aria-label="Search organisation (Command K)"
       >
         <Search className="h-4 w-4 shrink-0" aria-hidden />
         <span className="sr-only sm:not-sr-only sm:inline">Search</span>
@@ -415,14 +418,14 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
               {variant === 'workspace' && agentEnabled && agentQuery.isFetching && (
                 <div className="flex items-center gap-2 px-4 py-2 text-xs text-gray-500">
                   <Sparkles className="h-3.5 w-3.5 text-primary-500 animate-pulse" aria-hidden />
-                  Assistant is finding the best place to go…
+                  Navigator is finding the best place to go…
                 </div>
               )}
               {variant === 'workspace' && agentQuery.data?.answer && (
                 <div className="mx-2 mb-2 rounded-lg border border-primary-100 bg-primary-50/80 px-3 py-2 text-sm text-primary-950">
                   <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary-700">
                     <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                    Assistant
+                    Navigator
                   </p>
                   <p className="mt-1 text-sm leading-snug">{agentQuery.data.answer}</p>
                 </div>
@@ -444,7 +447,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
                   <p className="text-xs text-gray-400">
                     Try shorthand: <span className="font-medium text-gray-500">rec</span> (reconcile),{' '}
                     <span className="font-medium text-gray-500">brs</span> (report), a project name, or a full
-                    question for the assistant.
+                    question for the navigator.
                   </p>
                 </div>
               ) : (
@@ -494,7 +497,7 @@ export default function CommandPalette({ variant = 'workspace' }: CommandPalette
 }
 
 function iconFor(item: PaletteItem) {
-  if (item.group === 'Assistant') return Sparkles
+  if (item.group === 'Navigator') return Sparkles
   if (item.group === 'Projects' || item.id === 'projects' || item.id === 'new-project') return FolderKanban
   if (item.id === 'clients') return Users
   if (item.id === 'reports' || item.id === 'audit') return FileCheck

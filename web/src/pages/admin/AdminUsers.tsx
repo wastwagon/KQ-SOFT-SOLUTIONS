@@ -8,7 +8,8 @@ import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import PageHeader from '../../components/layout/PageHeader'
-import Alert from '../../components/ui/Alert'
+import AdminListToolbar from '../../components/layout/AdminListToolbar'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Badge from '../../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
@@ -31,34 +32,33 @@ export default function AdminUsers() {
         eyebrow="Platform admin"
         title="Users"
         subtitle={<p className="text-gray-500">View and manage platform accounts.</p>}
-        actions={
-          <div className="w-full sm:w-72 min-w-0">
-            <Input
-              type="search"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
-              placeholder="Search by email or name..."
-              leading={<Search className="w-4 h-4" />}
-              aria-label="Search by email or name"
-            />
-          </div>
+      />
+
+      <AdminListToolbar
+        search={
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Search by email or name..."
+            leading={<Search className="w-4 h-4" />}
+            aria-label="Search by email or name"
+          />
         }
       />
 
       {isLoading && !data && <PageBodySkeleton label="Loading users" />}
 
       {isError && (
-        <Alert tone="error" title="Could not load users" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load users" error={error} onRetry={() => void refetch()} />
       )}
 
       {data && (
       <Card noPadding>
-        <Table>
+        <Table compact>
           <TableHead>
             <tr>
               <TableTh>Email</TableTh>
@@ -79,11 +79,11 @@ export default function AdminUsers() {
                 <TableTd>{u.name || '—'}</TableTd>
                 <TableTd>
                   {u.suspendedAt ? (
-                    <Badge tone="danger" size="sm">
+                    <Badge tone="danger" size="sm" shape="soft">
                       Suspended
                     </Badge>
                   ) : (
-                    <Badge tone="success" size="sm">
+                    <Badge tone="success" size="sm" shape="soft">
                       Active
                     </Badge>
                   )}

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { projects, unlessSubscriptionInactive } from '../../lib/api'
 import { canReopenProject } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
+import { roleListLabel } from '../../lib/userFacingTerms'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
 
@@ -87,7 +88,7 @@ export default function ProjectLockedBanner({
       This job is {statusLabel}, so uploads, mapping, and reconciliation cannot be changed.
       {canReopen
         ? ' Reopen matching to adjust pairs, or replace source files to upload new statements (returns to Upload/Map).'
-        : ' Ask an admin or reviewer to reopen this project if changes are needed.'}
+        : ` Ask an ${roleListLabel('admin', 'reviewer')} to reopen this project if changes are needed.`}
     </Alert>
   )
 }

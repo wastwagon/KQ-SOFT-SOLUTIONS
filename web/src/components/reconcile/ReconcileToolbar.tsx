@@ -1,4 +1,5 @@
 import type { ReconcileView } from './types'
+import type { ReactNode } from 'react'
 import Tabs from '../ui/Tabs'
 import Select from '../ui/Select'
 
@@ -12,12 +13,37 @@ interface ReconcileToolbarProps {
   bankAccounts: { id: string; name: string; locked?: boolean }[]
   bankAccountId: string
   onBankAccountChange: (id: string) => void
+  className?: string
 }
 
-const VIEWS: { id: ReconcileView; label: string }[] = [
-  { id: 'receipts', label: 'Receipts vs Credits' },
-  { id: 'payments', label: 'Payments vs Debits' },
-  { id: 'all', label: 'Cash book (all)' },
+const VIEWS: { id: ReconcileView; label: ReactNode }[] = [
+  {
+    id: 'receipts',
+    label: (
+      <>
+        <span className="hidden sm:inline">Receipts vs Credits</span>
+        <span className="sm:hidden">Receipts</span>
+      </>
+    ),
+  },
+  {
+    id: 'payments',
+    label: (
+      <>
+        <span className="hidden sm:inline">Payments vs Debits</span>
+        <span className="sm:hidden">Payments</span>
+      </>
+    ),
+  },
+  {
+    id: 'all',
+    label: (
+      <>
+        <span className="hidden sm:inline">Cash book (all)</span>
+        <span className="sm:hidden">All</span>
+      </>
+    ),
+  },
 ]
 
 export default function ReconcileToolbar({
@@ -26,12 +52,13 @@ export default function ReconcileToolbar({
   bankAccounts,
   bankAccountId,
   onBankAccountChange,
+  className = '',
 }: ReconcileToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className={`flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end ${className}`}>
+      <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
         {bankAccounts.length > 0 && (
-          <div className="w-48">
+          <div className="w-full sm:w-48">
             <Select
               value={bankAccountId}
               onChange={(e) => onBankAccountChange(e.target.value)}
@@ -53,6 +80,7 @@ export default function ReconcileToolbar({
           onChange={onViewChange}
           items={VIEWS}
           size="sm"
+          className="w-full sm:w-auto"
         />
       </div>
     </div>

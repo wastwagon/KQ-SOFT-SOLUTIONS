@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { DollarSign, TrendingUp, CreditCard, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '../../lib/api'
-import { publicPlanName } from '../../lib/plans'
+import { usePlanDisplayNames } from '../../lib/usePlanDisplayNames'
 import { formatDate } from '../../lib/format'
 import Card from '../../components/ui/Card'
 import MetricCard from '../../components/ui/MetricCard'
 import PageHeader from '../../components/layout/PageHeader'
-import Alert from '../../components/ui/Alert'
+import PageLoadError from '../../components/ui/PageLoadError'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 
 export default function AdminRevenue() {
+  const { planLabel } = usePlanDisplayNames()
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'analytics', 'revenue'],
     queryFn: () => api('/admin/analytics/revenue') as Promise<{
@@ -31,9 +32,7 @@ export default function AdminRevenue() {
           title="Revenue analytics"
           subtitle={<p className="text-gray-500">Platform revenue, MRR, and payment history.</p>}
         />
-        <Alert tone="error" title="Could not load revenue" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load revenue" error={error} onRetry={() => void refetch()} />
       </div>
     )
   }
@@ -91,7 +90,7 @@ export default function AdminRevenue() {
             ) : (
               data.byPlan.map((p) => (
                 <div key={p.plan} className="flex justify-between items-center py-2 border-b border-border-muted last:border-0">
-                  <span className="font-medium text-gray-900">{publicPlanName(p.plan)}</span>
+                  <span className="font-medium text-gray-900">{planLabel(p.plan)}</span>
                   <span className="text-sm text-gray-600">{fmt(p.total)} ({p.count} payments)</span>
                 </div>
               ))
@@ -107,7 +106,7 @@ export default function AdminRevenue() {
                 <div key={p.id} className="flex justify-between items-center py-2 border-b border-border-muted last:border-0 text-sm">
                   <div>
                     <p className="font-medium text-gray-900">{p.orgName}</p>
-                    <p className="text-gray-500 text-xs">{publicPlanName(p.plan)} • {p.period} • {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-gray-500 text-xs">{planLabel(p.plan)} • {p.period} • {formatDate(p.createdAt, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                   <span className="font-medium text-gray-900">{fmt(p.amount)}</span>
                 </div>

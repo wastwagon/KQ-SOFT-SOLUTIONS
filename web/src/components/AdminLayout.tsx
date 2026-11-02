@@ -11,10 +11,11 @@ import {
   Server,
   ArrowLeft,
   Activity,
+  HeartPulse,
   Archive,
   Inbox,
-  Landmark,
   FileSpreadsheet,
+  Wrench,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import BrandLogo from './BrandLogo'
@@ -47,9 +48,11 @@ export default function AdminLayout() {
     path.startsWith('/platform-admin/organizations') || path.startsWith('/platform-admin/users')
   const commerceActive =
     path.startsWith('/platform-admin/plans') ||
+    path.startsWith('/platform-admin/pricing-page') ||
     path.startsWith('/platform-admin/payments') ||
     path.startsWith('/platform-admin/revenue')
   const opsActive =
+    path.startsWith('/platform-admin/ops') ||
     path.startsWith('/platform-admin/generation-settings') ||
     path.startsWith('/platform-admin/database') ||
     path.startsWith('/platform-admin/ops-metrics') ||
@@ -81,7 +84,7 @@ export default function AdminLayout() {
           </NavLink>
         </SidebarNavSection>
 
-        <SidebarNavSection label="Tenants" active={tenantsActive}>
+        <SidebarNavSection label="Customers" active={tenantsActive}>
           <NavLink
             to="/platform-admin/organizations"
             onClick={closeSidebar}
@@ -101,6 +104,10 @@ export default function AdminLayout() {
             <CreditCard className="w-5 h-5 flex-shrink-0 opacity-80" />
             Plans
           </NavLink>
+          <NavLink to="/platform-admin/pricing-page" onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <FileSpreadsheet className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Pricing layout
+          </NavLink>
           <NavLink to="/platform-admin/payments" onClick={closeSidebar} className={sidebarNavLinkClass}>
             <Receipt className="w-5 h-5 flex-shrink-0 opacity-80" />
             Payments
@@ -112,6 +119,10 @@ export default function AdminLayout() {
         </SidebarNavSection>
 
         <SidebarNavSection label="Ops" active={opsActive}>
+          <NavLink to="/platform-admin/ops" end onClick={closeSidebar} className={sidebarNavLinkClass}>
+            <HeartPulse className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Ops hub
+          </NavLink>
           <NavLink
             to="/platform-admin/ops-metrics"
             onClick={closeSidebar}
@@ -148,20 +159,13 @@ export default function AdminLayout() {
 
         <SidebarNavSection label="Tools" active={toolsActive}>
           <NavLink
-            to="/platform-admin/tools/clean-bank-statement"
+            to="/platform-admin/tools"
+            end
             onClick={closeSidebar}
             className={sidebarNavLinkClass}
           >
-            <Landmark className="w-5 h-5 flex-shrink-0 opacity-80" />
-            Clean bank statement
-          </NavLink>
-          <NavLink
-            to="/platform-admin/tools/clean-cash-book"
-            onClick={closeSidebar}
-            className={sidebarNavLinkClass}
-          >
-            <FileSpreadsheet className="w-5 h-5 flex-shrink-0 opacity-80" />
-            Clean cash book
+            <Wrench className="w-5 h-5 flex-shrink-0 opacity-80" />
+            Tools
           </NavLink>
         </SidebarNavSection>
       </nav>
@@ -173,7 +177,7 @@ export default function AdminLayout() {
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to workspace
+          Back to organisation
         </Link>
       </div>
     </>
@@ -190,7 +194,7 @@ export default function AdminLayout() {
       topBarEnd={
         <>
           <CommandPalette variant="admin" />
-          <AccountMenu extraItems={[{ to: '/dashboard', label: 'Back to workspace', icon: ArrowLeft }]} />
+          <AccountMenu extraItems={[{ to: '/dashboard', label: 'Back to organisation', icon: ArrowLeft }]} />
         </>
       }
     >

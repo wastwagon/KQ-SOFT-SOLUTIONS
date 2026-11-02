@@ -32,7 +32,7 @@ export default function SubscriptionRenewalPanel() {
         </Button>
       }
     >
-      Core workspace features are paused until an admin renews. Pay monthly, quarterly, or yearly
+      Core features are paused until an administrator renews the subscription. Pay monthly, quarterly, or yearly
       with Paystack under Billing — or contact support if you are on a custom plan.
     </Alert>
   )

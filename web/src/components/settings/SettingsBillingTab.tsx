@@ -7,12 +7,13 @@ import { canManageBilling } from '../../lib/permissions'
 import type { OrgRole } from '../../lib/permissions'
 import { formatYearlyDiscountLabel } from '../../lib/planPricing'
 import { publicPlanName, type BillingPeriod } from '../../lib/plans'
-import { isLowerPlan as isLowerPlanSlug, planRank } from '../../lib/planRank'
+import { isLowerPlan as isLowerPlanSlug, isSameOrHigherPlan, type PlanOrderRow } from '../../lib/planRank'
 
 /** Minimal shapes from subscription API — kept loose for forward compatibility. */
 interface BillingPlanRow {
   id: string
   name: string
+  sortOrder?: number
   monthlyGhs: number
   yearlyGhs: number
   quarterlyGhs?: number
@@ -22,8 +23,13 @@ interface BillingProps {
   role: OrgRole | string | null
   usageData:
     | {
-        organization?: { plan?: string }
-        scheduledPlan?: { plan: string; effectiveAt: string; requestedAt: string } | null
+        organization?: { plan?: string; planDisplayName?: string; contractBilling?: boolean }
+        scheduledPlan?: {
+          plan: string
+          effectiveAt: string
+          requestedAt: string
+          planDisplayName?: string
+        } | null
         prorationCreditGhs?: number
         usage?: {
           projectsDisplay?: string
@@ -63,6 +69,7 @@ interface BillingProps {
         }
         paystackConfigured?: boolean
         plans?: BillingPlanRow[]
+        planOrder?: PlanOrderRow[]
       }
     | undefined
   initializing: string | null
@@ -85,10 +92,16 @@ export default function SettingsBillingTab({
   onCancelScheduledDowngrade,
 }: BillingProps) {
   const currentPlan = usageData?.organization?.plan
+  const currentPlanLabel = publicPlanName(currentPlan, usageData?.organization?.planDisplayName)
   const scheduled = usageData?.scheduledPlan
+  const planOrder = plansData?.planOrder
   const prorationCredit = usageData?.prorationCreditGhs ?? 0
+  const contractBilling = usageData?.organization?.contractBilling === true
   const canScheduleFree =
-    canManageBilling(role) && currentPlan && planRank(currentPlan) > planRank('free') && currentPlan !== 'firm'
+    canManageBilling(role) &&
+    currentPlan &&
+    isLowerPlanSlug(currentPlan, 'free', planOrder) &&
+    !contractBilling
 
   return (
     <Card title="Billing">
@@ -105,7 +118,7 @@ export default function SettingsBillingTab({
       <p className="text-sm text-gray-600 mb-4 flex flex-wrap items-center gap-2">
         Current plan:{' '}
         <Badge tone="brand" size="sm">
-          {publicPlanName(currentPlan)}
+          {currentPlanLabel}
         </Badge>
       </p>
       {scheduled && (
@@ -122,8 +135,8 @@ export default function SettingsBillingTab({
           }
         >
           <p>
-            This workspace moves to <strong>{publicPlanName(scheduled.plan)}</strong> on{' '}
-            {new Date(scheduled.effectiveAt).toLocaleString()}. You keep {publicPlanName(currentPlan)} until then.
+            This organisation moves to <strong>{publicPlanName(scheduled.plan, scheduled.planDisplayName)}</strong> on{' '}
+            {new Date(scheduled.effectiveAt).toLocaleString()}. You keep {currentPlanLabel} until then.
           </p>
         </Alert>
       )}
@@ -258,8 +271,10 @@ export default function SettingsBillingTab({
             const firstQuarterGhs = introEligible ? Math.round(q * 0.5 * 100) / 100 : null
             const firstYearGhs = introEligible ? Math.round(p.yearlyGhs * 0.5 * 100) / 100 : null
             const isCurrentPlan = currentPlan === p.id
-            const isDowngradeTarget = isLowerPlanSlug(currentPlan, p.id)
-            const checkoutAllowed = !isDowngradeTarget && planRank(p.id) >= planRank(currentPlan ?? 'free')
+            const isDowngradeTarget = isLowerPlanSlug(currentPlan, p.id, planOrder, {
+              contractBilling,
+            })
+            const checkoutAllowed = !isDowngradeTarget && isSameOrHigherPlan(currentPlan ?? 'free', p.id, planOrder)
             return (
               <Card
                 key={p.id}

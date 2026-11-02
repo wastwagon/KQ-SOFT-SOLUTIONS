@@ -20,7 +20,7 @@ export default function ImpersonationBanner({ subscriptionNote }: { subscription
     onSuccess: (data) => {
       setAuth(data.user, data.org, data.token, data.role, data.isPlatformAdmin, false)
       queryClient.clear()
-      toast.success('Exited workspace', `Back to ${data.org.name}`)
+      toast.success('Left support mode', `Back to ${data.org.name}`)
       navigate('/platform-admin/organizations')
     },
     onError: (e) => {
@@ -34,7 +34,7 @@ export default function ImpersonationBanner({ subscriptionNote }: { subscription
     <div className="bg-amber-600 text-white px-4 py-2.5 text-sm flex flex-wrap items-center justify-between gap-3 shadow-sm">
       <div className="min-w-0">
         <p className="font-medium">
-          Support mode — viewing workspace as{' '}
+          Support mode — viewing organisation{' '}
           <span className="font-semibold underline decoration-white/40">{org?.name ?? 'subscriber'}</span>.
           Changes you make apply to this organisation.
         </p>

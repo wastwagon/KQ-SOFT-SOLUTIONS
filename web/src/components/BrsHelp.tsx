@@ -15,8 +15,8 @@ const HELP_CONTENT = {
       { term: 'Cash book payments', desc: 'Money paid out by the business (e.g. cheques issued). Match these to bank debits.' },
       { term: 'Bank credits', desc: 'Money lodged or credited to the account (bank’s record).' },
           { term: 'Bank debits', desc: 'Money withdrawn or debited from the account (e.g. cheques presented).' },
-          { term: 'Open — more (counting)', desc: 'Amount appears on both sides but more times on this side. Same as open — less on the other side — listed once. Select overlap to match the shared count; leftovers move to Only after you confirm (Unmatched scope).' },
-          { term: 'Split suggestions (many-to-1)', desc: 'Different amounts that add up, e.g. two receipts of 6,200 and 3,800 against one bank credit of 10,000. Not the same as Match by counting (Cancel/Open/Only), which only groups equal amounts. Click Split suggestions in the toolbar, or tick the rows and Confirm match at the bottom.' },
+          { term: 'Same amount, extra lines', desc: 'The same amount appears on both sides, but one side has extra lines (e.g. two deposits of the same value). Match the lines that clearly pair up; any remainder stays on one side only until the next statement or the BRS.' },
+          { term: 'Split suggestions (many-to-1)', desc: 'Several cash book lines that add up to one bank line (e.g. two receipts totalling one credit). Use Split suggestions in the toolbar, or select the rows and Confirm match at the bottom. This is different from matching duplicate amounts by count.' },
     ],
   },
   reportTerms: {

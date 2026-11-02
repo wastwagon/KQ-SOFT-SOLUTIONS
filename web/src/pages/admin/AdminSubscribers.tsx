@@ -3,19 +3,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, Download, LogIn } from 'lucide-react'
 import { api } from '../../lib/api'
-import { publicPlanName } from '../../lib/plans'
+import { usePlanDisplayNames } from '../../lib/usePlanDisplayNames'
 import { useAuth } from '../../store/auth'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import ActionMenu from '../../components/ui/ActionMenu'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import PageHeader from '../../components/layout/PageHeader'
-import Alert from '../../components/ui/Alert'
+import AdminListToolbar from '../../components/layout/AdminListToolbar'
+import PageLoadError from '../../components/ui/PageLoadError'
 import Badge from '../../components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../components/ui/Table'
 import { PageBodySkeleton } from '../../components/ui/Skeleton'
 import { useConfirm } from '../../components/ui/ConfirmDialog'
 import { useToast } from '../../components/ui/Toast'
+import { SUPPORT_OPEN_ORG } from '../../lib/userFacingTerms'
 
 type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'free'
 
@@ -51,6 +54,7 @@ export default function AdminSubscribers() {
   const [planFilter, setPlanFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [enteringSlug, setEnteringSlug] = useState<string | null>(null)
+  const { planLabel, plans: planCatalog } = usePlanDisplayNames()
   const confirm = useConfirm()
   const toast = useToast()
   const navigate = useNavigate()
@@ -86,21 +90,21 @@ export default function AdminSubscribers() {
     onSuccess: (session) => {
       setAuth(session.user, session.org, session.token, session.role, session.isPlatformAdmin, true)
       queryClient.clear()
-      toast.success('Entered workspace', `Now viewing ${session.org.name}`)
+      toast.success('Support mode opened', `Now viewing ${session.org.name}`)
       navigate('/dashboard')
     },
     onError: (e) => {
-      toast.error('Could not enter workspace', e instanceof Error ? e.message : 'Request failed')
+      toast.error('Could not open support mode', e instanceof Error ? e.message : 'Request failed')
     },
     onSettled: () => setEnteringSlug(null),
   })
 
   const handleEnterWorkspace = async (o: Org) => {
     const ok = await confirm({
-      title: `Enter workspace “${o.name}”?`,
+      title: `${SUPPORT_OPEN_ORG} — “${o.name}”?`,
       description:
-        'You will open this subscriber’s projects and Reconcile as a platform admin (support mode). An audit log entry is recorded. Sessions expire after 2 hours.',
-      confirmLabel: 'Enter workspace',
+        'You will open this customer’s projects and Reconcile as a platform admin (support mode). An audit log entry is recorded. Sessions expire after 2 hours.',
+      confirmLabel: SUPPORT_OPEN_ORG,
     })
     if (!ok) return
     setEnteringSlug(o.slug)
@@ -148,9 +152,7 @@ export default function AdminSubscribers() {
     return (
       <div className="space-y-8">
         <PageHeader eyebrow="Platform admin" title="Organizations" />
-        <Alert tone="error" title="Could not load organizations" onRetry={() => void refetch()}>
-          {error instanceof Error ? error.message : 'Something went wrong.'}
-        </Alert>
+        <PageLoadError title="Could not load organizations" error={error} onRetry={() => void refetch()} />
       </div>
     )
   }
@@ -173,52 +175,57 @@ export default function AdminSubscribers() {
         title="Organizations"
         subtitle={
           <p className="text-sm text-gray-600">
-            Subscriber workspaces. Use <strong>Enter</strong> to open a workspace in support mode, or{' '}
-            <strong>Manage</strong> for plan and billing controls.
+            Customer organisations. Open <strong>Actions</strong> on a row to manage or open support mode.
           </p>
         }
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="w-48">
-              <Select
-                value={planFilter}
-                onChange={(e) => {
-                  setPlanFilter(e.target.value)
-                  setPage(1)
-                }}
-                aria-label="Filter by plan"
-              >
-                <option value="">All plans</option>
-                <option value="basic">Solo</option>
-                <option value="standard">Team</option>
-                <option value="premium">Firm</option>
-                <option value="firm">Custom</option>
-                <option value="paid">Paid (excl. free/trial-only)</option>
-              </Select>
-            </div>
-            <div className="w-56">
-              <Input
-                type="search"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search by name…"
-                leading={<Search className="w-4 h-4" />}
-                aria-label="Search by name"
-              />
-            </div>
-            <Button type="button" variant="outline" size="sm" onClick={handleExport} isLoading={exporting}>
-              <Download className="w-4 h-4 mr-1.5" aria-hidden />
-              Export CSV
-            </Button>
+      />
+
+      <AdminListToolbar
+        activeFilterCount={planFilter ? 1 : 0}
+        drawerTitle="Organization filters"
+        search={
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Search by name…"
+            leading={<Search className="w-4 h-4" />}
+            aria-label="Search by name"
+          />
+        }
+        filters={
+          <div className="w-full md:w-48">
+            <Select
+              value={planFilter}
+              onChange={(e) => {
+                setPlanFilter(e.target.value)
+                setPage(1)
+              }}
+              aria-label="Filter by plan"
+            >
+              <option value="">All plans</option>
+              {planCatalog.map((p) => (
+                <option key={p.slug} value={p.slug}>
+                  {p.name}
+                </option>
+              ))}
+              <option value="paid">Paid (excl. free/trial-only)</option>
+            </Select>
           </div>
+        }
+        actions={
+          <Button type="button" variant="outline" size="sm" onClick={handleExport} isLoading={exporting}>
+            <Download className="w-4 h-4 mr-1.5" aria-hidden />
+            Export CSV
+          </Button>
         }
       />
 
       <Card noPadding>
-        <Table>
+        <Table compact>
           <TableHead>
             <tr>
               <TableTh>
@@ -259,45 +266,50 @@ export default function AdminSubscribers() {
                 </TableTd>
                 <TableTd>
                   {o.suspendedAt ? (
-                    <Badge tone="danger" size="sm">
+                    <Badge tone="danger" size="sm" shape="soft">
                       Suspended
                     </Badge>
                   ) : (
-                    <Badge tone="neutral" size="sm">
+                    <Badge tone="neutral" size="sm" shape="soft">
                       OK
                     </Badge>
                   )}
                 </TableTd>
                 <TableTd>
-                  <Badge tone={subscriptionTone(o.subscriptionStatus)} size="sm" className="capitalize">
+                  <Badge
+                    tone={subscriptionTone(o.subscriptionStatus)}
+                    size="sm"
+                    shape="soft"
+                    className="capitalize"
+                  >
                     {o.subscriptionStatus}
                   </Badge>
                 </TableTd>
-                <TableTd>{publicPlanName(o.plan)}</TableTd>
+                <TableTd>{planLabel(o.plan)}</TableTd>
                 <TableTd className="text-right font-medium text-gray-900">{fmt(o.totalPaid)}</TableTd>
                 <TableTd className="text-right">{o._count.members}</TableTd>
                 <TableTd className="text-right">
-                  <div className="inline-flex items-center justify-end gap-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => handleEnterWorkspace(o)}
-                      disabled={impersonateMutation.isPending}
-                      isLoading={enteringSlug === o.slug && impersonateMutation.isPending}
-                      title="Enter this subscriber workspace (support mode)"
-                      className="text-amber-800 hover:text-amber-950 hover:bg-amber-50"
-                    >
-                      <LogIn className="w-3.5 h-3.5 mr-1" aria-hidden />
-                      Enter
-                    </Button>
-                    <Link
-                      to={`/platform-admin/organizations/${o.slug}`}
-                      className="text-primary-600 hover:underline text-sm"
-                    >
-                      Manage
-                    </Link>
-                  </div>
+                  <ActionMenu
+                    label="Actions"
+                    size="xs"
+                    align="right"
+                    menuAriaLabel={`Actions for ${o.name}`}
+                    isLoading={enteringSlug === o.slug && impersonateMutation.isPending}
+                    items={[
+                      {
+                        kind: 'link',
+                        label: 'Manage organisation',
+                        to: `/platform-admin/organizations/${o.slug}`,
+                      },
+                      {
+                        kind: 'button',
+                        label: SUPPORT_OPEN_ORG,
+                        icon: LogIn,
+                        onClick: () => handleEnterWorkspace(o),
+                        disabled: impersonateMutation.isPending,
+                      },
+                    ]}
+                  />
                 </TableTd>
               </TableRow>
             ))}

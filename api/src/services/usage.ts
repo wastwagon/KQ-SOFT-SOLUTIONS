@@ -3,8 +3,23 @@ import { getPlanBySlug } from './plan.js'
 import { getLimits, isUnlimited } from '../config/subscription.js'
 import { countOrgBankAccounts, getPlanQuotaLimits } from './planLimits.js'
 import { currentPeriod, usagePeriodBounds } from './usagePeriod.js'
+import { getOrgSubscriptionStatus } from './orgSubscriptionAccess.js'
 
 export { currentPeriod, usagePeriodBounds }
+
+/**
+ * Admin complimentary trials (paid plan slug + trial end, no payment) use Free-tier
+ * project/transaction caps from the Plans CMS until the org pays or trial ends.
+ */
+export async function resolveUsageQuotaPlanSlug(
+  organizationId: string,
+  planSlug: string
+): Promise<string> {
+  if (planSlug === 'free') return 'free'
+  const status = await getOrgSubscriptionStatus(organizationId)
+  if (status === 'trial') return 'free'
+  return planSlug
+}
 
 /** Upsert monthly usage row — safe under concurrent create/increment. */
 export async function getOrCreateUsage(organizationId: string, period: string) {
@@ -26,14 +41,15 @@ export async function getOrCreateUsage(organizationId: string, period: string) {
 export async function getUsageWithLimits(organizationId: string, planSlug: string) {
   const period = currentPeriod()
   const log = await getOrCreateUsage(organizationId, period)
-  const planData = await getPlanBySlug(planSlug)
+  const quotaPlanSlug = await resolveUsageQuotaPlanSlug(organizationId, planSlug)
+  const planData = await getPlanBySlug(quotaPlanSlug)
   const quota = await getPlanQuotaLimits(planSlug)
   const limits = planData
     ? {
         projectsPerMonth: planData.projectsPerMonth,
         transactionsPerMonth: planData.transactionsPerMonth,
       }
-    : getLimits(planSlug)
+    : getLimits(quotaPlanSlug)
   const bankAccountsUsed = await countOrgBankAccounts(organizationId)
   const bankAccountsLimit = quota.bankAccounts
   const bankAccountsUnlimited = isUnlimited(bankAccountsLimit)
@@ -44,6 +60,9 @@ export async function getUsageWithLimits(organizationId: string, planSlug: strin
     period,
     periodStartsAt: startsAt.toISOString(),
     periodEndsAt: endsAt.toISOString(),
+    /** Plan slug used for monthly project/transaction caps (may be `free` during admin trial). */
+    quotaPlanSlug,
+    assignedPlanSlug: planSlug,
     projectsUsed: log.projectsCount,
     projectsLimit: limits.projectsPerMonth,
     projectsUnlimited: isUnlimited(limits.projectsPerMonth),

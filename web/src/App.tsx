@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Suspense, lazy } from 'react'
+import { lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './components/AppLayout'
 import AdminLayout from './components/AdminLayout'
@@ -7,7 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import PlatformAdminRoute from './components/PlatformAdminRoute'
 import AuthHydrator from './components/AuthHydrator'
 import ErrorFallback from './components/ErrorFallback'
-import PageLoader from './components/PageLoader'
+import { PublicRouteSuspense } from './components/layout/PublicRouteSuspense'
 import { ToastProvider } from './components/ui/Toast'
 import SubscriptionPaywallToastBridge from './components/SubscriptionPaywallToastBridge'
 import PwaLifecycle from './components/PwaLifecycle'
@@ -17,6 +17,7 @@ import { subscriptionPaywallRetry } from './lib/api'
 const Landing = lazy(() => import('./pages/Landing'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'))
+const AdminPricingPage = lazy(() => import('./pages/admin/AdminPricingPage'))
 const AdminPlans = lazy(() => import('./pages/admin/AdminPlans'))
 const AdminGenerationSettings = lazy(() => import('./pages/admin/AdminGenerationSettings'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
@@ -27,6 +28,7 @@ const AdminRevenue = lazy(() => import('./pages/admin/AdminRevenue'))
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'))
 const AdminDatabase = lazy(() => import('./pages/admin/AdminDatabase'))
 const AdminOpsMetrics = lazy(() => import('./pages/admin/AdminOpsMetrics'))
+const AdminOpsHub = lazy(() => import('./pages/admin/AdminOpsHub'))
 const AdminRetention = lazy(() => import('./pages/admin/AdminRetention'))
 const AdminLeads = lazy(() => import('./pages/admin/AdminLeads'))
 const Projects = lazy(() => import('./pages/Projects'))
@@ -36,6 +38,8 @@ const ProjectNew = lazy(() => import('./pages/ProjectNew'))
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
 const CleanBankStatement = lazy(() => import('./pages/CleanBankStatement'))
 const CleanCashBook = lazy(() => import('./pages/CleanCashBook'))
+const WorkspaceToolsHub = lazy(() => import('./pages/WorkspaceToolsHub'))
+const AdminToolsHub = lazy(() => import('./pages/admin/AdminToolsHub'))
 const Audit = lazy(() => import('./pages/Audit'))
 const Clients = lazy(() => import('./pages/Clients'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -79,16 +83,15 @@ function App() {
               when they want a smaller per-panel fallback.
             */}
             <ErrorFallback variant="page">
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  {/* Public marketing & auth pages */}
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  <Route path="/terms" element={<Terms />} />
+              <Routes>
+                  {/* Public marketing & auth — full-screen loader; app shell routes suspend in-layout */}
+                  <Route path="/" element={<PublicRouteSuspense><Landing /></PublicRouteSuspense>} />
+                  <Route path="/login" element={<PublicRouteSuspense><Login /></PublicRouteSuspense>} />
+                  <Route path="/register" element={<PublicRouteSuspense><Register /></PublicRouteSuspense>} />
+                  <Route path="/forgot-password" element={<PublicRouteSuspense><ForgotPassword /></PublicRouteSuspense>} />
+                  <Route path="/reset-password" element={<PublicRouteSuspense><ResetPassword /></PublicRouteSuspense>} />
+                  <Route path="/privacy" element={<PublicRouteSuspense><Privacy /></PublicRouteSuspense>} />
+                  <Route path="/terms" element={<PublicRouteSuspense><Terms /></PublicRouteSuspense>} />
 
                   {/* Platform admin */}
                   <Route path="/platform-admin" element={<ProtectedRoute><PlatformAdminRoute><AdminLayout /></PlatformAdminRoute></ProtectedRoute>}>
@@ -99,13 +102,16 @@ function App() {
                     <Route path="users/:id" element={<AdminUserDetail />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="plans" element={<AdminPlans />} />
+                    <Route path="pricing-page" element={<AdminPricingPage />} />
                     <Route path="payments" element={<AdminPayments />} />
                     <Route path="revenue" element={<AdminRevenue />} />
                     <Route path="generation-settings" element={<AdminGenerationSettings />} />
+                    <Route path="ops" element={<AdminOpsHub />} />
                     <Route path="ops-metrics" element={<AdminOpsMetrics />} />
                     <Route path="leads" element={<AdminLeads />} />
                     <Route path="retention" element={<AdminRetention />} />
                     <Route path="database" element={<AdminDatabase />} />
+                    <Route path="tools" element={<AdminToolsHub />} />
                     <Route path="tools/clean-bank-statement" element={<CleanBankStatement />} />
                     <Route path="tools/clean-cash-book" element={<CleanCashBook />} />
                   </Route>
@@ -117,6 +123,7 @@ function App() {
                     <Route path="/projects/new" element={<ProjectNew />} />
                     <Route path="/projects/:slug/:step" element={<ProjectDetail />} />
                     <Route path="/projects/:slug" element={<ProjectDetail />} />
+                    <Route path="/tools" element={<WorkspaceToolsHub />} />
                     <Route path="/tools/clean-bank-statement" element={<CleanBankStatement />} />
                     <Route path="/tools/clean-cash-book" element={<CleanCashBook />} />
                     <Route path="/reports" element={<Projects initialStatus="completed" />} />
@@ -129,9 +136,8 @@ function App() {
 
                   <Route path="/admin" element={<Navigate to="/platform-admin" replace />} />
                   <Route path="/admin/*" element={<Navigate to="/platform-admin" replace />} />
-                  <Route path="*" element={<NotFound />} />
+                  <Route path="*" element={<PublicRouteSuspense><NotFound /></PublicRouteSuspense>} />
                 </Routes>
-              </Suspense>
             </ErrorFallback>
           </BrowserRouter>
         </ConfirmDialogProvider>

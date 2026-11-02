@@ -35,7 +35,7 @@ Mapping and matching happen **after Upload** in every project:
 | **Upload** | Add cash book and bank statement files |
 | **Map** | Tell the system which column is Date, Amount, Description, etc. |
 | **Reconcile** | Link cash book rows to bank rows |
-| **Review** | Check exceptions and variance |
+| **Review** | Check exceptions and the difference in unmatched totals |
 | **Report** | Generate the Bank Reconciliation Statement (BRS) |
 
 ### Prepare your files
@@ -484,14 +484,14 @@ If a feature is greyed out or shows an upgrade notice, your organisation’s pla
 |------|------------|
 | **Mapping** | Assigning source file columns to system fields (Date, Amount, etc.) |
 | **Matching** | Linking a cash book transaction to a bank transaction |
-| **Canonical fields** | Standard field names the system uses internally |
+| **Canonical fields** | Standard column names the system uses after mapping (Date, Amount, etc.) |
 | **Uncredited lodgment** | Receipt recorded in cash book, not yet on bank statement |
 | **Unpresented cheque** | Payment recorded in cash book, cheque not yet debited by bank |
 | **Signed amount mode** | One column holds both positive and negative amounts |
-| **Confidence** | How likely a suggested match is correct (0–100%) |
+| **Confidence** | How likely a suggested match is correct (shown as 0–100%) |
 | **BRS** | Bank Reconciliation Statement — final report |
 | **Forget layout** | Deletes a saved organisation column map so it is not suggested for similar uploads; does not unmap the current file |
-| **Open — more** | Match-by-counting list where one side has more lines at that amount; equivalent to open — less on the other side (listed once) |
+| **Open — more** | Same amount on both sides, but **extra lines on one side** — match the lines that pair up; remainder stays on one side only (see in-app help) |
 
 ---
 

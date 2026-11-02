@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Building2, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { auth } from '../lib/api'
+import { roleLabel } from '../lib/userFacingTerms'
 import { useAuth } from '../store/auth'
 import { useToast } from './ui/Toast'
 import Button from './ui/Button'
-import Alert from './ui/Alert'
+import PageLoadError from './ui/PageLoadError'
 import Skeleton from './ui/Skeleton'
 
 type OrgSwitcherProps = {
@@ -37,11 +38,11 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
       setAuth(result.user, result.org, result.token, result.role, result.isPlatformAdmin)
       queryClient.clear()
       setOpen(false)
-      toast.success('Workspace switched', result.org.name)
+      toast.success('Organisation switched', result.org.name)
       window.location.assign('/dashboard')
     },
     onError: (err) => {
-      toast.error('Could not switch workspace', err instanceof Error ? err.message : undefined)
+      toast.error('Could not switch organisation', err instanceof Error ? err.message : undefined)
     },
   })
 
@@ -88,19 +89,18 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
         aria-label="Switch organisation"
       >
         <div className="px-3 py-2 border-b border-gray-100">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Workspaces</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Your organisations</p>
           <p className="text-xs text-gray-500 truncate mt-0.5">{user?.email}</p>
         </div>
         {isLoading ? (
-          <div className="px-3 py-3 space-y-2" aria-busy="true" aria-label="Loading workspaces">
+          <div className="px-3 py-3 space-y-2" aria-busy="true" aria-label="Loading organisations">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
           </div>
         ) : isError ? (
           <div className="px-2 py-2">
-            <Alert
-              tone="error"
-              title="Could not load workspaces"
+            <PageLoadError
+              title="Could not load organisations"
               className="!p-3"
               onRetry={() => void refetch()}
             />
@@ -126,7 +126,7 @@ export default function OrgSwitcher({ variant = 'topbar' }: OrgSwitcherProps) {
             >
               <span className="flex-1 min-w-0 text-left">
                 <span className="block font-medium truncate">{o.name}</span>
-                <span className="block text-xs text-gray-500 capitalize font-normal">{o.role}</span>
+                <span className="block text-xs text-gray-500 font-normal">{roleLabel(o.role)}</span>
               </span>
               {o.current && <Check className="w-4 h-4 shrink-0 text-primary-600" aria-hidden />}
             </Button>

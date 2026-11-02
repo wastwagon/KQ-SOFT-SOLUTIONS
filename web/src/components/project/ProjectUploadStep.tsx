@@ -12,6 +12,7 @@ import { PROJECT_UPLOAD_LIMITS_SUMMARY, PROJECT_UPLOAD_ACCEPT, validateProjectUp
 import { canUploadDocuments } from '../../lib/permissions'
 import { useToast } from '../ui/Toast'
 import Button from '../ui/Button'
+import PageLoadError from '../ui/PageLoadError'
 import Alert from '../ui/Alert'
 import Badge from '../ui/Badge'
 import Card from '../ui/Card'
@@ -216,13 +217,11 @@ export default function ProjectUploadStep({
     const err = bankAccountsQuery.error
     return (
       <div className="space-y-6">
-        <Alert
-          tone="error"
+        <PageLoadError
           title="Could not load bank accounts"
+          error={err}
           onRetry={() => queryClient.invalidateQueries({ queryKey: ['bankAccounts', projectSlug] })}
-        >
-          {err instanceof Error ? err.message : 'Something went wrong.'}
-        </Alert>
+        />
       </div>
     )
   }
@@ -236,7 +235,7 @@ export default function ProjectUploadStep({
       <WorkflowStepIntro
         eyebrow="Upload"
         title="Upload documents"
-        subtitle="Upload a cash book and a bank statement (Excel, CSV, OFX, MT940, CAMT, PDF, or image). Ghana bank PDFs often map automatically; other layouts are mapped on the next step."
+        subtitle="Upload a cash book and a bank statement (Excel, CSV, PDF, or photo). Ghana bank PDFs often map automatically; other layouts are mapped on the next step."
       />
       <p className="text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
       {!canUpload && sourceUploadsLocked && (

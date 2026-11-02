@@ -13,7 +13,7 @@ describe('workspaceAgentSearch', () => {
       [{ path: '/settings/billing', label: 'Billing', reason: 'Manage plan' }],
       new Set()
     )
-    expect(items[0]?.group).toBe('Assistant')
+    expect(items[0]?.group).toBe('Navigator')
     expect(items[0]?.to).toBe('/settings/billing')
   })
 })

@@ -4,6 +4,7 @@ import BrandLogo from '../components/BrandLogo'
 import Button, { buttonClassName } from '../components/ui/Button'
 import { useAuth } from '../store/auth'
 import DevelopmentCredit from '../components/marketing/DevelopmentCredit'
+import PublicPageSeo from '../components/marketing/PublicPageSeo'
 
 /**
  * Friendly 404.  Replaces the previous catch-all `<Navigate to="/" />` so that
@@ -20,6 +21,13 @@ export default function NotFound() {
   const homeLabel = isAuthenticated ? 'Back to dashboard' : 'Back to home'
 
   return (
+    <>
+      <PublicPageSeo
+        title="Page not found — KQ-SOFT"
+        description="This page does not exist on kqsoftwaresolutions.com."
+        path={location.pathname}
+        noIndex
+      />
     <div className="min-h-screen bg-surface flex flex-col">
       <header className="px-4 py-5 sm:px-8">
         <Link
@@ -78,5 +86,6 @@ export default function NotFound() {
         <DevelopmentCredit tone="muted" />
       </footer>
     </div>
+    </>
   )
 }

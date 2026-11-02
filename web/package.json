@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "icons": "node scripts/generate-pwa-icons.mjs",
-    "prebuild": "node scripts/generate-pwa-icons.mjs",
+    "marketing-images": "node scripts/generate-marketing-webp.mjs",
+    "sitemap": "node scripts/generate-sitemap.mjs",
+    "prerender": "node scripts/prerender-public-routes.mjs",
+    "build:seo": "npm run build && npm run prerender",
+    "prebuild": "node scripts/generate-pwa-icons.mjs && node scripts/generate-marketing-webp.mjs && node scripts/generate-sitemap.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

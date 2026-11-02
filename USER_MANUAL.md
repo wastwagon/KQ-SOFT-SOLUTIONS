@@ -1,454 +1,316 @@
-# Bank Reconciliation System — User Manual
+# KQ BRS Platform User Manual
 
-> **Canonical in-app manual:** edit and deploy [`web/public/user-manual.md`](web/public/user-manual.md) — that file is what `/manual` loads. This root copy is a planning mirror; when they diverge, **trust the public file**.
+**Product:** KQ Bank Reconciliation System (BRS)  
+**Company:** KQ SOFT SOLUTIONS  
+**Audience:** End users and operations teams  
+**Updated:** July 26, 2026
 
-**KQ SOFT SOLUTIONS** | Global product · HQ Ghana  
-**Version 1.5** | August 2026  
-**Updated:** August 11, 2026
+> Welcome to KQ BRS. This manual is your official guide for onboarding, day-to-day reconciliation, approvals, reporting, billing, and support.  
+> Share this page with all new users during kickoff and role assignment.
 
----
+## Changelog
 
-## Table of Contents
-
-1. [Introduction](#1-introduction)
-2. [Features List](#2-features-list)
-3. [Getting Started](#3-getting-started)
-4. [Account Management](#4-account-management)
-5. [Dashboard](#5-dashboard)
-6. [Projects](#6-projects)
-7. [Reconciliation Workflow (5 Steps)](#7-reconciliation-workflow-5-steps)
-8. [Clients](#8-clients)
-9. [Settings](#9-settings)
-10. [Audit Log](#10-audit-log)
-11. [Reports](#11-reports)
-12. [Subscription Plans & Limits](#12-subscription-plans--limits)
-13. [Supported Banks](#13-supported-banks)
-14. [Roles & Permissions](#14-roles--permissions)
-15. [Troubleshooting](#15-troubleshooting)
-16. [Glossary](#16-glossary)
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-07-26 | 1.4 | Jul 2026 pricing (Basic/Standard/Premium/Custom), quarterly billing, org-wide bank seats, intro offer (first 2 months), clean document tools, Connections, Prudential and expanded bank list, dashboard usage meters. |
+| 2026-06-22 | 1.3 | Added dedicated [Mapping & Matching guide](/mapping-and-matching-manual.md) with field reference, matching settings, troubleshooting, and training checklist. |
+| 2026-05-11 | 1.2 | FAQ on subscription (GHS) vs project reporting currency; Settings → Billing; New project currency hint; manual cross-references. |
+| 2026-05-07 | 1.1 | Added dedicated in-app online manual page (`/manual`), dashboard help shortcut, and live update process. |
+| 2026-05-01 | 1.0 | Initial commercial user manual release. |
 
 ---
 
-## 1. Introduction
+## Before You Start (Onboarding Checklist)
 
-The Bank Reconciliation System (BRS) is a web-based SaaS application for accounting firms and finance teams. It helps you:
+Use this checklist when onboarding a new customer team:
 
-- Upload cash books and bank statements (Excel, CSV, OFX/QFX, MT940, CAMT.053, PDF, images)
-- Map columns to the correct fields
-- Reconcile receipts vs credits and payments vs debits with intelligent matching
-- Generate professional Bank Reconciliation Statements (BRS) with your branding
-- Export reports as PDF or Excel
-
-The system ships pre-built parsers for many regional bank statement layouts (with auto-detection where supported) and offers flexible matching (1-to-1, 1-to-many, many-to-1, many-to-many).
-
----
-
-## 2. Features List
-
-### Core Features (All Plans)
-
-| Feature | Description |
-|---------|-------------|
-| **Document upload** | Upload cash book and bank statement in Excel (.xlsx), CSV, OFX/QFX, MT940, CAMT.053, PDF, or images (PNG, JPG, TIFF) |
-| **Multi-bank support** | One project can have multiple bank accounts; filter by account during reconcile and report |
-| **Column mapping** | Map your document columns to date, amount, description, reference, cheque number |
-| **1-to-1 matching** | Match a single cash book line to a single bank line |
-| **Side-by-side view** | View receipts vs credits and payments vs debits in a clear layout |
-| **Report generation** | Generate BRS with closing balance, uncredited lodgments, unpresented cheques |
-| **Export** | Export report as PDF or Excel |
-| **Clients** | Link projects to clients for organisation |
-| **Currency** | Support for GHS, USD, EUR per project |
-| **Clean tools** | Validate bank / cash-book parsers without a project: free preview + watermarked sample downloads; full Excel/PDF on monthly plan quota |
-| **Match by counting** | Diagnostic amount-frequency lists on Reconcile (never auto-clears) |
-
-### Team plan and above
-
-| Feature | Description |
-|---------|-------------|
-| **Bank rules** | Create custom rules (e.g. if description contains X → suggest match) |
-| **Bulk match** | Match up to 50 transactions at once |
-| **AI suggestions** | Suggested matches based on amount, date, and reference |
-| **Audit trail** | View action history (who did what, when) |
-| **Discrepancy report** | Identify variances and exceptions |
-| **Missing cheques report** | Track unpresented cheques |
-
-### Firm plan and above
-
-| Feature | Description |
-|---------|-------------|
-| **1-to-many / many-to-many** | Match one cash book line to multiple bank lines (or vice versa) |
-| **Roll-forward** | Carry unpresented cheques to the next period |
-| **Threshold approval** | Set an approval threshold amount (e.g. above GH₵10,000 needs reviewer) |
-| **Full branding** | Logo, primary/secondary colours, letterhead, report title, footer |
-
-### Custom plan
-
-| Feature | Description |
-|---------|-------------|
-| **API access** | Create API keys for programmatic access |
-| **Multi-client dashboard** | Manage multiple client organisations |
-| **Unlimited** | Unlimited projects and transactions |
-
-### Ghana Bank Support
-
-| Bank | Auto-detection |
-|------|----------------|
-| Ecobank Ghana | ✓ |
-| GCB Bank | ✓ |
-| Access Bank Ghana | ✓ |
-| Stanbic Bank Ghana | ✓ |
-| Fidelity Bank Ghana | ✓ |
-| UBA Ghana | ✓ |
-| Absa Ghana | ✓ |
+- [ ] Platform URL shared with all users
+- [ ] Admin account created and tested
+- [ ] Team roles assigned (**Administrator**, **Preparer**, **Checker**, **View only** — see [Plain language & roles](#plain-language--roles-ghana-facing))
+- [ ] First reconciliation period confirmed
+- [ ] Sample cash book and bank statement files validated
+- [ ] Branding configured (logo/colors/report title) if required
+- [ ] Billing/plan confirmed (Free or paid; see [Subscription Plans](#12-subscription-plans--limits))
+- [ ] Bank account seats understood (counted **across your organisation**, not per project)
 
 ---
 
-## 3. Getting Started
+## Plain language & roles (Ghana-facing)
 
-### Accessing the System
+We use words that match Ghana accounting practice and the BRS sign-off block (**Prepared By / Checked By / Approved By**):
 
-1. Open your web browser and go to the application URL (e.g. `https://app.yourdomain.com`).
-2. If you do not have an account, click **Register**.
-3. If you have an account, enter your email and password and click **Login**.
+| In the app | Who it is | BRS sign-off |
+|------------|-----------|--------------|
+| **Administrator** | Manages billing, members, branding | Often approves |
+| **Preparer** | Uploads files, maps columns, matches transactions | Prepared By |
+| **Checker** | Reviews exceptions and approves the job | Checked By |
+| **View only** | Can view projects and reports, cannot edit | — |
 
-### First-Time Setup
+**Organisation** means your company or firm account (one subscription, shared bank-account seats). We do not use “workspace” in customer-facing screens.
 
-1. **Register** — Create an account with your email, password, name, and organisation name.
-2. **Verify your email** — If required, follow the verification link sent to your email.
-3. **Sign in** — You will be taken to the Dashboard.
+**Bank reconciliation** means comparing your **cash book** (your records) with the **bank statement** and explaining every difference — the same idea taught in Ghana SHS accounting and used by GRA when they ask businesses to keep **good records**.
 
----
+For matching jargon, see **What do these terms mean?** on Reconcile and Report, and the [Mapping & Matching guide](/mapping-and-matching-manual.md) glossary.
 
-## 4. Account Management
-
-### Registration
-
-1. Go to the **Register** page.
-2. Enter:
-   - **Email** — Your email address
-   - **Password** — At least 8 characters (recommended: mix of letters, numbers, symbols)
-   - **Name** — Your full name
-   - **Organisation name** — Your company or firm name
-3. Click **Register**.
-4. You will be created as an organisation admin and can invite other members.
-
-### Login
-
-1. Go to the **Login** page.
-2. Enter your **email** and **password**.
-3. Click **Login**.
-4. You will be redirected to the Dashboard.
-
-### Forgot Password
-
-1. Click **Forgot password** on the login page.
-2. Enter your email address.
-3. Click **Send reset link**.
-4. Check your email for a reset link (ensure `RESEND_API_KEY` is configured for production).
-5. Click the link and set a new password.
-
-### Logout
-
-Click your profile/name in the top-right corner and select **Logout**.
+Full style guide for writers: `docs/GHANA_PLAIN_LANGUAGE_GUIDE.md` (repository).
 
 ---
 
-## 5. Dashboard
+## 1) Overview
 
-The Dashboard gives you an overview of your organisation.
+KQ BRS helps teams reconcile cash book entries with bank statements and generate professional Bank Reconciliation Statements.
 
-### What You See
-
-- **Usage metrics** — Projects, transactions, bank seats, and full clean exports used this month vs plan limits
-- **Recent projects** — Quick links to your latest projects
-- **Clean & export tools** — Preview parsers; sample (watermarked) or full cleaned Excel/PDF
-- **Quick actions** — Links to create a new project, view reports, or go to settings
-
-### Navigation
-
-Use the main navigation menu:
-
-- **Dashboard** — Home
-- **Projects** — List and manage projects
-- **Clean bank statement** / **Clean cash book** — Tools (preview free; sample watermarked; full on quota)
-- **Reports** — Completed projects (ready for export)
-- **Clients** — Manage clients
-- **Audit** — Action history (Team plan and above)
-- **Settings** — Branding, billing, members, API keys, bank rules
+Core capabilities:
+- Upload cash book and bank files (Excel, CSV, OFX/QFX, MT940, CAMT.053, PDF, image formats)
+- Map columns once and import transactions into the grid
+- Reconcile receipts vs credits and payments vs debits
+- Review exceptions and complete sign-off
+- Export final reports in PDF and Excel
+- Optional **Clean bank statement** / **Clean cash book** tools (preview free; sample downloads watermarked; full Excel/PDF on plan quota)
 
 ---
 
-## 6. Projects
+## 2) Navigation
 
-### Creating a Project
-
-1. Go to **Projects** → **New project**.
-2. Enter:
-   - **Name** — e.g. "Ecobank Jan 2025"
-   - **Client** (optional) — Select from your clients or leave blank
-   - **Currency** — GHS (default), USD, or EUR (reporting currency for this project’s BRS only; workspace subscription remains GHS via Paystack — see Settings → Billing)
-   - **Roll-forward from** (optional) — Select a completed project to carry unpresented cheques forward (Firm plan and above)
-3. Click **Create**.
-
-### Project List
-
-- View all projects with status: **Draft**, **Reconciling**, **In review**, **Completed**.
-- Filter by status using the filter dropdown.
-- Click a project to open it and start the reconciliation workflow.
-
-### Editing a Project
-
-1. Open the project.
-2. Click **Edit** next to the project name.
-3. Change name, client, or currency.
-4. Click **Save**.
-
-### Deleting a Project
-
-- Only **Admin** can delete a project.
-- Click **Delete** and confirm. This removes the project and all related data.
+- **Dashboard**: projects, usage meters (projects / transactions / **bank account seats**), quick actions
+- **Projects**: create and manage reconciliation jobs
+- **Clean bank statement** / **Clean cash book**: validate parsers → sample (watermarked) or full export (plan quota)
+- **Reports**: completed jobs and exports
+- **Clients**: client directory
+- **Audit log**: activity records (Team+)
+- **Settings**: branding, billing, members, bank import, API keys, bank rules (plan-based)
+- **User manual**: this documentation page
 
 ---
 
-## 7. Reconciliation Workflow (5 Steps)
+## Platform Walkthrough (Screenshots)
 
-Each project follows a 5-step workflow. Use the step tabs at the top: **Upload** → **Map** → **Reconcile** → **Review** → **Report**.
+Add your screenshots under `web/public/manual-images/` to make training easier.
 
-### Step 1: Upload
+Recommended screenshots:
+1. Dashboard home (including bank seats meter)
+2. New project form
+3. Upload step (multi-bank selector)
+4. Mapping step
+5. Reconcile screen (both views)
+6. Review exceptions
+7. Final report/export page
+8. Settings → Billing (monthly / quarterly / yearly)
 
-Upload your cash book and bank statement.
-
-#### Cash Book
-
-- **Receipts** — Money received (income)
-- **Payments** — Money paid out (expenses)
-- **Both** — If one file contains both, select "Both" and upload once
-
-**Supported formats:** Excel (.xlsx), CSV, OFX/QFX, MT940, CAMT.053, PDF, images (PNG, JPG, TIFF).
-
-#### Bank Statement
-
-- **Credits** — Money credited to your account
-- **Debits** — Money debited from your account
-- **Both** — If one file contains both, select "Both" and upload once
-
-**Multiple bank accounts:** If you have more than one account, add or select a bank account name before uploading.
-
-#### Tips
-
-- Prefer Excel, CSV, OFX, MT940, or CAMT.053 for best results. Ghana bank PDFs (Ecobank, GCB, Access, and others listed below) are auto-detected.
-- Other bank PDFs are not applied automatically — map columns on the Map step, or export Excel/CSV/OFX/MT940/CAMT from internet banking.
-- On Map, set date format (DD/MM vs MM/DD) and amount format if the file is not Ghana style.
-- Ensure dates and amounts are in clear columns.
+Template:
+- `![Dashboard](./manual-images/dashboard.png)`
+- `![Reconcile](./manual-images/reconcile.png)`
 
 ---
 
-### Step 2: Map
+## 3) Standard Workflow
 
-If any document has unmapped columns, the Map step will show them.
+Each project follows:
 
-1. For each document (cash book receipts, payments, bank credits, debits):
-   - Select which column maps to **Date**
-   - Select which column maps to **Amount Received** (amt_received) or **Amount Paid** (amt_paid) for cash book; **Credit** or **Debit** for bank
-   - Select which column maps to **Description** (or Particulars, Narrative)
-   - Optionally map **Reference** and **Cheque number**
-2. If the file is not Ghana DD/MM, set **Date format** and **Amount format** before applying.
-3. Click **Save mapping**. Similar files can reuse that column map; **Forget layout** on the Map banner stops suggesting it for future uploads (it does not unmap the current file).
-4. Proceed to **Reconcile**. If opening and closing balances on an unrecognised statement do not tie, matching stays paused until you remap or confirm the extract.
+1. **Upload**
+2. **Map**
+3. **Reconcile**
+4. **Review**
+5. **Report**
 
 ---
 
-### Step 3: Reconcile
+## Quick Start by Role
 
-Match cash book lines to bank lines.
+### Admin (first day)
+1. Open `Settings -> Members` and invite team
+2. Assign roles for maker-checker flow
+3. Configure branding and billing
+4. Review plan limits (projects, transactions, **bank accounts across your organisation**) with your team
+5. Optionally configure **Bank import** (upload path / bank-feed waitlist)
 
-#### Cash Book table columns
+### Preparer (daily operations)
+1. Create project
+2. Upload files (assign bank account when multi-bank)
+3. Map columns
+4. Reconcile and resolve major exceptions
+5. Submit for review
 
-- **Date** — Transaction date
-- **Name** — Counterparty (payer/payee)
-- **Description** — Details/particulars
-- **Chq no.** — Cheque number (for payments)
-- **Amount Received** — Money received (receipts)
-- **Amount Paid** — Money paid out (payments)
-- **Balance** — Running balance
-- **Note** — Unmatched reason (if applicable)
+### Checker (approval)
 
-The Cash Book shows both receipts and payments together by default. Use **Receipts vs Credits** or **Payments vs Debits** to match.
+Role label in Settings: **Checker** (matches “Checked By” on the BRS).
 
-#### Bank Statement table columns
-
-- **Date** — Transaction date
-- **Description** — Bank description
-- **Debit** — Amount debited
-- **Credit** — Amount credited
-- **Balance** — Running balance
-- **Note** — Unmatched reason (if applicable)
-
-#### Receipts vs Credits
-
-- **Receipts** — Money you recorded as received (cash book)
-- **Credits** — Money the bank has credited to your account
-
-Match each receipt to its corresponding bank credit (or leave unmatched if it is an uncredited lodgment).
-
-#### Payments vs Debits
-
-- **Payments** — Money you recorded as paid (e.g. cheques issued)
-- **Debits** — Money the bank has debited from your account
-
-Match each payment to its corresponding bank debit (or leave unmatched if it is an unpresented cheque).
-
-#### How to Match
-
-1. **Single match:** Select one cash book line and one bank line, then click **Match**.
-2. **Bulk / auto-match:** Select multiple pairs (up to 50) and click **Bulk match**, or use **Auto-match all (safe → patterns)** for phased high-confidence suggestions (90%+ any safe pair, then bank-pattern suggestions at 85%+). Available on the Team plan and above with bulk match.
-3. **1-to-many / many-to-many:** Select one cash book line and multiple bank lines (or vice versa), then match. Many-to-many requires both sides to sum to the same total.
-
-#### Suggestions
-
-- Suggested matches appear on all tiers (amount, date, reference/cheque, narration). Missing dates do not count as a date match. Review and accept or ignore.
-- Bank pattern layers (Ecobank, SCB, GCB, NIB, Prudential, Absa, Bank of Africa) rank ahead of generic pairs when the profile is detected.
-- Bank rules (Settings → Bank rules, Team plan and above) need amount **plus** date, ref/chq, or narration corroboration — amount alone is never enough.
-- AI ranking from previously confirmed pairs also runs when match memory is available.
-- **Match by counting:** On Reconcile, use the counting panel in order: **Cancel** → **Open** (Select overlap, then confirm) → **Only**. There is no Open — less list (more on one side is less on the other). After an Open overlap is matched, leftovers appear on Only if scope is Unmatched. Export Excel or PDF if needed. Selection is capped at 50 per side. Counts never auto-clear — confirm matches as usual.
-- **Limits:** one currency per project (no FX conversion in matching); no pro-rata partial amounts — use 1-to-many / many-to-1 when several lines sum to a full amount.
-
-For the full mapping & matching guide, see [Mapping & Matching Manual](docs/MAPPING_AND_MATCHING_MANUAL.md).
-
-#### Filters
-
-- Filter by **bank account** if you have multiple.
-- Filter by **amount** or **date** to find specific transactions.
-
-#### Unmatched Items
-
-- **Uncredited lodgments** — Receipts not yet credited by the bank. Leave unmatched; they appear on the BRS as additions.
-- **Unpresented cheques** — Cheques issued but not yet presented. Leave unmatched; they appear on the BRS as deductions.
+1. Open Review step
+2. Validate unmatched items and the **difference in unmatched totals**
+3. Approve or reopen with comments
+4. Confirm final export package
 
 ---
 
-### Step 4: Review
+## 4) Create a Project
 
-1. When reconciliation is complete, click **Submit for review** (if you have a reviewer).
-2. The project status becomes **In review**.
-3. A **Reviewer** or **Admin** can:
-   - **Approve** — Mark as completed
-   - **Send back** — Return to the preparer for changes
+Go to **Projects → New project**, then set:
+- project name
+- client (optional)
+- reconciliation date
+- currency (`GHS`, `USD`, `EUR`) — this is the **project reporting currency** for the BRS and workbook amounts
+- optional roll-forward source (Firm+)
 
----
-
-### Step 5: Report
-
-View and export the Bank Reconciliation Statement.
-
-#### Report Contents
-
-- **Closing balance per bank statement**
-- **Add: Uncredited lodgments** — Table with date, name, description, amount received, amount paid
-- **Less: Unpresented cheques** — Table with date, cheque number, name, description, amount received, amount paid
-- **Unmatched credits/debits in bank** — Tables with date, description, debit, credit, balance
-- **Balance per cash book at end of period**
-
-#### Actions
-
-- **Edit summary & notes** — Add narrative, preparer comment, reviewer comment
-- **Add supporting documents** — Attach approval scans, extra PDFs (not parsed for transactions)
-- **Export PDF** — Download the BRS as PDF (includes name, description, cheque no. for exceptions)
-- **Export Excel** — Download as Excel (full columns: Name, Description, Chq no., Debit, Credit, Balance)
-- **Print** — Print the report
-- **Approve** (Reviewer/Admin) — Mark project as completed
-- **Reopen** (Reviewer/Admin) — Return to Reconcile for changes
-- **Roll-forward** (Firm plan and above) — Create a new project with unpresented cheques carried forward
+**Billing vs project currency:** Organisation subscriptions are charged in **GHS** via Paystack. Project currency is independent and can be **GHS**, **USD**, or **EUR** per reconciliation job.
 
 ---
 
-## 8. Clients
+## 5) Upload Step
 
-Manage clients to organise projects.
+### Cash Book
+- Upload as `Receipts`, `Payments`, or `Both`
 
-### Adding a Client
+### Bank Statement
+- Upload as `Credits`, `Debits`, or `Both`
+- For multiple accounts, add or select a **bank account** name (counts toward your organisation’s bank-account limit)
 
-1. Go to **Clients**.
-2. Click **Add client**.
-3. Enter the client name (max 200 characters).
-4. Click **Save**.
+Supported formats:
+- `.xlsx`, `.xls`, `.csv`, `.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`
 
-### Using Clients
+### Clean document tools
+From the dashboard or sidebar (no project required to preview):
+- **Clean bank statement** — upload a statement, parse with the same engine, preview rows
+- **Clean cash book** — same for cash book files
+- **Sample Excel/PDF** — truncated and watermarked (`BRS DEMO — NOT FOR OPERATIONAL USE`)
+- **Full Excel/PDF** — full BRS export without watermarks; counts against your plan’s monthly clean-export quota
 
-- When creating or editing a project, select a client from the dropdown.
-- Clients help you filter and organise projects by client.
-
----
-
-## 9. Settings
-
-Access **Settings** from the main menu. Tabs: **Branding**, **Billing**, **Members**, **API keys**, **Bank rules**.
-
-### Branding (Admin only)
-
-- **Logo** — Upload your organisation logo (PNG or JPEG)
-- **Primary colour** — Main colour for buttons and accents
-- **Secondary colour** — Secondary accent
-- **Letterhead address** — Address shown on reports
-- **Report title** — Default "Bank Reconciliation Statement" or custom
-- **Footer** — Text at bottom of reports
-- **Approval threshold** (Firm plan and above) — Amount above which reviewer approval is required
-
-Click **Reset to platform default** to restore platform defaults.
-
-### Billing (Admin only)
-
-- View **current plan** and usage (projects, transactions)
-- **Upgrade** — Pay monthly, quarterly, or yearly via Paystack (GHS)
-- **Currency note:** Workspace billing is always in **GHS**. Each **project** still uses its own reporting currency (**GHS**, **USD**, or **EUR**) for the BRS — set when you create the project, not in Billing.
-
-### Members (Admin only)
-
-- **Add member** — Enter email and assign role (Admin, Reviewer, Preparer, Viewer)
-- **Change role** — Edit existing members
-- **Remove member** — Remove from organisation
-
-### API Keys (Firm plan, Admin only)
-
-- **Create API key** — Generate a key for programmatic access
-- **Revoke** — Delete a key when no longer needed
-
-### Bank Rules (Admin/Reviewer)
-
-Create rules to auto-suggest matches:
-
-1. **Condition** — e.g. "Description contains" → "SALARY"
-2. **Action** — e.g. "Suggest match" or "Flag for review"
-3. **Priority** — Higher priority rules run first
+Useful for validating a bank format before starting a full reconciliation.
 
 ---
 
-## 10. Audit Log
+## 6) Map Step
 
-(Team plan and above)
+Map source columns to canonical fields.
 
-- View **Audit** to see who did what and when.
-- Actions logged: login, project create/edit/delete, upload, match, submit, approve, reopen, etc.
-- Export audit log if your plan supports it.
+Common fields include:
+- Cash book: `date`, `name`, `details`, `doc_ref`, `chq_no`, `amt_received`, `amt_paid`
+- Bank: `transaction_date`, `description`, `credit`, `debit`
+
+Tips:
+- Always map date columns
+- Use **Apply suggested mapping to selected** for speed (tick which files to include)
+- After you apply a mapping, similar files can reuse that column map. **Forget layout** on the Map banner stops suggesting it for future uploads; it does not unmap the current file.
+
+**Detailed guide:** [Mapping & Matching Transactions](/mapping-and-matching-manual.md) — field reference, signed amount mode, Ghana bank tips, matching settings, troubleshooting, and a training checklist.
 
 ---
 
-## 11. Reports
+## 7) Reconcile Step
 
-- **Reports** in the menu shows projects with status **Completed**.
-- Click a project to open its Report step and export PDF or Excel.
+Work in:
+- **Receipts vs Credits**
+- **Payments vs Debits**
+- **Cash book (all)** for overview (switch to Receipts or Payments to match)
+
+Matching modes:
+- 1:1 (all plans)
+- 1:many / many:1 / many:many (all plans)
+
+Matching settings presets:
+- **Strict** — amount + date + reference + cheque
+- **Amount + Date**
+- **Amount only** (review carefully)
+
+Available actions:
+- manual matching (select rows → **Confirm Match**)
+- suggested matching (Team+)
+- bulk matching and auto-match (Team+)
+- split suggestions for bulk deposits (all plans)
+- unmatch
+- bank account filtering
+- **Match by counting** (diagnostic): recommended order **Cancel → Open (select overlap) → Only**. There is no Open — less list — more on one side is less on the other. After Open overlap is matched, leftovers appear on Only (Unmatched scope).
+
+See [Mapping & Matching Transactions](/mapping-and-matching-manual.md) for the full walkthrough.
 
 ---
 
-## 12. Subscription Plans & Limits
+## 8) Review Step
 
-| Plan | Projects/mo | Transactions/mo | Bank accounts (org-wide) | Full clean exports/mo | Users |
-|------|-------------|-----------------|--------------------------|------------------------|-------|
-| Free | 5 | 500 | 1 | Sample only | 1 |
-| Solo | 12 | 3,000 | 3 | 5 | 1 |
-| Team | 40 | 15,000 | 10 | 20 | 5 |
-| Firm | 100 | 40,000 | 30 | 60 | 10 |
-| Custom | Unlimited | Unlimited | Unlimited | Unlimited | Unlimited |
+Review page shows:
+- matched totals
+- unmatched cash book items
+- unmatched bank items
+- variance indicator
+
+Use it to validate exceptions before final report generation.
+
+---
+
+## 9) Report Step
+
+Generate formal BRS output with:
+- statement summary
+- uncredited lodgments
+- unpresented cheques
+- discrepancy and missing-cheque reports (plan-based)
+- supporting attachments
+
+Actions:
+- export Excel
+- export PDF
+- print
+- submit for review
+- approve/reopen (role-based)
+- roll-forward (Firm+)
+
+---
+
+## 10) Settings
+
+### Branding (Admin)
+Logo, primary/secondary colours, letterhead, report title, footer. Full branding on PDF/Excel is Team+.
+
+### Billing (Admin)
+- Current plan and subscription status (trial / active / expired)
+- Usage: projects and transactions this month
+- **Upgrade / renew** via Paystack: **monthly**, **quarterly** (~5% off), or **yearly** (~17% off)
+- Organisation billing is always **GHS**; project reporting currency is separate
+
+### Members (Admin)
+Invite by email; assign **Administrator**, **Checker**, **Preparer**, or **View only**. Seat limits follow the plan.
+
+### Bank import
+Upload cash books and statements today; join the **live bank feeds** waitlist if you want automatic imports later.
+
+### Bank Rules (Administrator / Checker, Team+)
+Conditions on description/amount/date → suggest match or flag for review.
+
+### API Keys (Custom, Admin)
+Create and revoke keys for programmatic access.
+
+---
+
+## 11) Roles
+
+Display names in Settings (API values unchanged):
+
+- **Administrator**: full control (billing, members, branding, delete project)
+- **Checker**: review and approval flows; bank rules
+- **Preparer**: upload / map / reconcile / report preparation
+- **View only**: read-only access
+
+| Action | Administrator | Checker | Preparer | View only |
+|--------|---------------|---------|----------|-----------|
+| Delete project | ✓ | | | |
+| Reopen project | ✓ | ✓ | | |
+| Edit bank rules | ✓ | ✓ | | |
+| Edit branding / billing / members | ✓ | | | |
+| Export report | ✓ | ✓ | ✓ | |
+| Create project / upload / map / reconcile | ✓ | ✓ | ✓ | |
+| Submit for review | ✓ | ✓ | ✓ | |
+| Approve | ✓ | ✓ | | |
+
+---
+
+## 12) Subscription Plans & Limits
+
+| Plan | Projects/mo | Transactions/mo | Bank accounts (organisation) | Users |
+|------|-------------|-----------------|--------------------------|-------|
+| Free | 5 | 500 | 1 | 1 |
+| Solo | 12 | 3,000 | 3 | 1 |
+| Team | 40 | 15,000 | 10 | 5 |
+| Firm | 100 | 40,000 | 30 | 10 |
+| Custom | Unlimited | Unlimited | Unlimited | Unlimited |
 
 | Plan | Monthly (GH₵) | Quarterly (GH₵) | Yearly (GH₵) |
 |------|---------------|-----------------|--------------|
@@ -458,84 +320,175 @@ Create rules to auto-suggest matches:
 | Firm | 990 | 2,822 | 9,900 |
 | Custom | From 1,800 | — | Contract |
 
-- New workspaces start on **Free**. Paid plans have no trial.
-- **Solo** is a paid tier and includes bookkeeping consultancy / advisory.
-- **Excel export** includes mapped bank lines on sheets `BANK CREDITS (MAPPED)` and `BANK DEBITS (MAPPED)`.
-- **Billing periods:** monthly, quarterly (~5% off), or yearly (~17% off vs monthly).
-- **Bank account seats** are counted across the whole organisation (not per project).
-- **Clean tools:** preview is free; sample Excel/PDF is truncated and watermarked (`BRS DEMO — NOT FOR OPERATIONAL USE`); full cleans use the monthly quota above (see Settings → Billing).
+- New organisations start on **Free**. Paid plans have no trial.
+- **Solo** includes bookkeeping consultancy / advisory messaging.
+- **Bank account seats** are counted across the **whole organisation** (all projects), not per project.
+- **Billing periods:** monthly, quarterly (~5% off), yearly (~17% off vs paying monthly).
+
+### Feature gating (summary)
+
+| Capability | From |
+|------------|------|
+| 1:1 match, BRS export, OCR | Free+ |
+| Clean tools preview + sample (watermarked) download | Free+ |
+| Full clean Excel/PDF export | Solo+ with monthly quota (Solo 5 / Team 20 / Firm 60 / Custom unlimited) |
+| Suggested matches, bulk / auto-match, AI ranking | All tiers |
+| Match by counting (diagnostic lists / cancel schedule; never auto-clears) | All tiers |
+| Bank rules, audit, discrepancy | Team+ |
+| 1:many / many:many, split suggestions | All tiers |
+| Roll-forward, threshold approval, priority support | Firm+ |
+| Multi-client organisation, public API, custom contract | Custom |
 
 ---
 
-## 13. Supported Banks
+## 13) Supported Banks
 
-The system auto-detects these bank statement formats (examples; generic CSV/Excel/PDF is also supported):
+Pre-built / auto-detected layouts (examples; generic Excel, CSV, and PDF always work):
 
-| Bank | Detection |
-|------|-----------|
-| Ecobank Ghana | Headers + description content |
-| GCB Bank | Value Date, Particulars, Credit/Debit |
-| Access Bank Ghana | Header contains "access" |
-| Stanbic Bank Ghana | Header or content contains "stanbic" |
-| Fidelity Bank Ghana | Header or content contains "fidelity" |
-| UBA Ghana | Header or content contains "uba" |
-| Absa Ghana | Header or content contains "absa" or "barclays" |
+| Bank | Notes |
+|------|--------|
+| Ecobank | Headers + description content |
+| GCB | Value Date, Particulars, Credit/Debit |
+| Access | Header contains "access" |
+| Stanbic | Header or content |
+| Fidelity | Header or content |
+| Zenith | Regional layouts |
+| CalBank | Regional layouts |
+| ADB | Regional layouts |
+| Prudential | PDF statement layouts |
+| UBA | Header or content |
+| Absa | "absa" / "barclays" |
 
-If your bank is not auto-detected, use the **Map** step to manually map columns. Unrecognised PDFs will not be applied automatically.
-
----
-
-## 14. Roles & Permissions
-
-| Action | Admin | Reviewer | Preparer | Viewer |
-|--------|-------|----------|----------|--------|
-| Delete project | ✓ | | | |
-| Reopen project | ✓ | ✓ | | |
-| Edit bank rules | ✓ | ✓ | | |
-| Edit branding | ✓ | | | |
-| Manage billing | ✓ | | | |
-| Manage members | ✓ | | | |
-| Export report | ✓ | ✓ | ✓ | |
-| Create project | ✓ | ✓ | ✓ | |
-| Upload documents | ✓ | ✓ | ✓ | |
-| Map documents | ✓ | ✓ | ✓ | |
-| Reconcile | ✓ | ✓ | ✓ | |
-| Submit for review | ✓ | ✓ | ✓ | |
-| Approve | ✓ | ✓ | | |
-| Delete attachment | ✓ | ✓ | | |
+If your bank is not auto-detected, use the **Map** step to map columns manually. Unrecognised PDFs are not applied automatically. Prefer Excel, CSV, OFX, MT940, or CAMT.053. Team+ includes parser tuning support via your account team.
 
 ---
 
-## 15. Troubleshooting
+## 14) Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Cannot log in / 401 | Check API is running; ensure `VITE_API_URL` points to the API |
-| Upload fails | Use Excel or CSV for testing; ensure file is not corrupted |
-| Parse errors | Check column headers; use Map step to correct mapping |
-| No suggested matches | Ensure you have the Team plan or above; check bank rules |
-| Export fails | For large reports (200+ transactions), wait 30–60 seconds |
-| CORS errors | Ensure frontend URL is in `CORS_ORIGIN` (production) |
-| Password reset not received | Configure `RESEND_API_KEY` and `APP_URL` in production |
+| Cannot log in | Check email/password; use Forgot password if email delivery is configured |
+| Upload fails | Prefer Excel, CSV, OFX, MT940, or CAMT.053; confirm file is not corrupted; check size limits |
+| Parse / map errors | Fix date and amount columns; use Map step; see [Mapping guide](/mapping-and-matching-manual.md) |
+| No suggested matches | Team plan or above; check mapping and matching presets |
+| Bank account limit reached | Org-wide seat limit — upgrade or archive unused accounts |
+| Export delay | Large reports (200+ lines) may take 30–60 seconds |
+| Billing unavailable | Ask an admin; Paystack may not be configured in that environment |
+| Subscription inactive | Admin: **Settings → Billing** → pay monthly, quarterly, or yearly |
 
 ---
 
-## 16. Glossary
+## Data Preparation Rules (Recommended)
 
-| Term | Meaning |
-|------|---------|
-| **Cash book** | Your organisation's record of receipts and payments |
-| **Bank statement** | The bank's record of credits and debits to your account |
-| **Receipts** | Money received (cash book) |
-| **Payments** | Money paid out (cash book) |
-| **Credits** | Money credited to your account (bank) |
-| **Debits** | Money debited from your account (bank) |
-| **Uncredited lodgments** | Receipts you recorded but not yet credited by the bank |
-| **Unpresented cheques** | Cheques you issued but not yet presented to the bank |
-| **Balance per cash book** | Reconciled balance = bank closing + lodgments − unpresented cheques |
-| **BRS** | Bank Reconciliation Statement |
-| **Roll-forward** | Carry unpresented cheques to the next period |
+- Keep one reporting period per project
+- Avoid mixed date formats inside one file
+- Ensure amounts are numeric (not text)
+- Keep cheque/reference values in dedicated columns where possible
+- Remove duplicated header rows before upload
 
 ---
 
-*End of User Manual*
+## Frequently Asked Questions (FAQ)
+
+### 1) Do I need to map columns every month?
+No. If your file structure stays consistent, mapping is usually quick and reusable. Re-map only when source column formats change.
+
+### 2) Can one statement file contain both credits and debits?
+Yes. Upload it as `Both` during the Upload step.
+
+### 3) Why do I still have unmatched items after reconciliation?
+Common reasons: date/amount/reference differences, missing transactions, wrong mapping, or post-period timing differences.
+
+### 4) Can we finalize a report with exceptions?
+Yes. You can proceed to report with exceptions noted, then approve based on your internal policy.
+
+### 5) Who can approve or reopen a project?
+Approval and reopen are role-based (typically checker or administrator).
+
+### 6) How do we keep users aligned after UI updates?
+Update this manual changelog every release and announce changes to active teams.
+
+### 7) Why is our subscription billed in GHS if we reconcile in USD or EUR?
+**Organisation billing** is processed in **GHS** through **Paystack**. Each **project's reporting currency** (`GHS`, `USD`, or `EUR`) is set when creating the project and controls BRS amounts only.
+
+### 8) Where do we upgrade, renew, or see subscription status?
+Admins: **Settings → Billing**. You will see plan, status, usage, and Paystack buttons for monthly / quarterly / yearly when billing is enabled.
+
+### 9) Are bank account limits per project or for the whole firm?
+**Org-wide.** Creating accounts across projects all count toward the same seat pool (5 / 10 / 30 / unlimited by plan).
+
+---
+
+## Training and Go-Live Plan
+
+> Customer rollout plan for your firm — not the engineering verify harness (`docs/GO_LIVE_VERIFICATION.md`).
+
+### Week 1
+- Complete onboarding checklist
+- Run one pilot reconciliation end-to-end
+- Confirm bank seat usage on the Dashboard
+- Try Clean tools: preview + sample download; note full-export quota on Billing
+
+### Week 2
+- Move live periods to platform
+- Enforce role-based review process
+
+### Week 3+
+- Track exceptions trend
+- Standardize file formats per client/bank
+
+---
+
+## Support and Escalation
+
+- **Support email:** `info@kqsoftwaresolutions.com`
+- **Website:** [kqsoftwaresolutions.com](https://kqsoftwaresolutions.com)
+- **Business hours:** Mon–Fri, 8:00–17:00 GMT (or as contracted)
+
+### Quick Support Message Template
+
+```text
+Organization:
+Project:
+User role:
+Issue started at:
+What happened:
+Expected result:
+Actual result:
+File type used:
+Browser:
+Screenshot attached: Yes/No
+```
+
+---
+
+## Commercial Use and Governance
+
+- **Data ownership:** customer retains ownership of uploaded files and generated reports
+- **Access control:** customer admins own role assignment and periodic access review
+- **Approval policy:** define who can submit, approve, and reopen
+- **Record retention:** agree retention for reports and attachments with your admin
+- **Change communication:** announce user-facing workflow changes before release
+
+Recommended:
+- monthly role/access audit
+- standardize upload templates per client/bank
+- document exception handling thresholds in team SOPs
+
+---
+
+## Keeping This Manual Updated
+
+This online page loads content from:
+
+`web/public/user-manual.md`
+
+To update user documentation:
+1. Edit `web/public/user-manual.md`
+2. Deploy the web app
+3. Users see the new version on `/manual` (sign-in required)
+
+Recommended update policy:
+- update changelog every release
+- update this manual for any user-facing workflow or pricing change
+- keep screenshots refreshed after major UI updates

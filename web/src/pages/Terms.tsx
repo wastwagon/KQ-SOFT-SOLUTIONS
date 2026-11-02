@@ -1,11 +1,18 @@
 import { Link } from 'react-router-dom'
 import LegalDocument, { LegalSection } from './LegalDocument'
+import PublicPageSeo from '../components/marketing/PublicPageSeo'
 
 /**
  * Public terms of service for KQ-SOFT BRS.
  */
 export default function Terms() {
   return (
+    <>
+      <PublicPageSeo
+        title="Terms of Service — KQ-SOFT bank reconciliation"
+        description="Terms for using KQ-SOFT bank reconciliation and BRS exports for organisations in Ghana and beyond."
+        path="/terms"
+      />
     <LegalDocument title="Terms of Service" updated="25 July 2026">
       <p>
         These Terms of Service (“Terms”) govern access to and use of the KQ-SOFT bank reconciliation
@@ -27,7 +34,7 @@ export default function Terms() {
           <li>You must provide accurate registration information and keep credentials confidential.</li>
           <li>
             Organisation admins are responsible for inviting members, assigning roles, and the data
-            uploaded under their workspace.
+            uploaded under their organisation.
           </li>
           <li>
             You must not attempt to access another organisation’s data, probe the Service for
@@ -102,7 +109,7 @@ export default function Terms() {
       <LegalSection title="10. Termination">
         <p>
           You may stop using the Service at any time. We may suspend or terminate access for breach
-          of these Terms or non-payment. Upon termination, your right to access the workspace ends;
+          of these Terms or non-payment. Upon termination, your right to access the Service for that organisation ends;
           we may delete data according to our retention practices after a reasonable wind-down
           period.
         </p>
@@ -124,5 +131,6 @@ export default function Terms() {
         </p>
       </LegalSection>
     </LegalDocument>
+    </>
   )
 }
