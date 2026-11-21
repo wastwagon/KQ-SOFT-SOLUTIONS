@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   suggestMatches,
   suggestSplitMatches,
+  uniqueAutoSplitMatches,
+  sameAmountSwapBlocked,
+  groupContainsBlockedEqualSwap,
   descriptionSimilarity,
   findSummingSubsets,
   datesWithinWindow,
@@ -111,6 +114,49 @@ describe('suggestMatches', () => {
     const result = suggestMatches(cb, bank, new Set(), new Set())
     expect(result).toHaveLength(2)
     expect(result.every((s) => s.duplicateWarning === true)).toBe(true)
+  })
+
+  it('keeps the named pairing when two equal amounts would otherwise cancel', () => {
+    const named = (
+      id: string,
+      amount: number,
+      date: string,
+      name: string | null,
+      details: string
+    ): Tx => ({
+      id,
+      amount,
+      date: new Date(date),
+      name,
+      details,
+      chqNo: null,
+    })
+    const cb = [
+      named( 'naa', 5000, '2026-06-23', 'Naa Adoley Trading', 'Premium collection receipt A'),
+      named('kojo', 5000, '2026-06-24', 'Kojo Antwi Ventures', 'Premium collection receipt B'),
+    ]
+    const bank = [
+      named('naa-bank', 5000, '2026-06-23', null, 'FUNDS TRANSFER - INWARD CUST-A7731 trf b/o 1/NAA ADOLEY TRADING iro ifo 1/HORIZON INSURANCE BROKERS'),
+      named('kojo-bank', 5000, '2026-06-24', null, 'FUNDS TRANSFER - INWARD CUST-B7732 trf b/o 1/KOJO ANTWI VENTURES iro ifo 1/HORIZON INSURANCE BROKERS'),
+    ]
+    const result = suggestMatches(cb, bank, new Set(), new Set(), { requireDateMatch: true })
+    expect(result).toHaveLength(2)
+    expect(result.every((s) => !s.duplicateWarning)).toBe(true)
+    const paired = Object.fromEntries(result.map((s) => [s.cashBookTx.id, s.bankTx.id]))
+    expect(paired).toEqual({ naa: 'naa-bank', kojo: 'kojo-bank' })
+  })
+
+  it('leaves two equal amounts for review when neither narration identifies a side', () => {
+    const cb = [
+      tx('cb1', 5000, '2026-06-23', 'Receipt batch A'),
+      tx('cb2', 5000, '2026-06-24', 'Receipt batch B'),
+    ]
+    const bank = [
+      tx('bk1', 5000, '2026-06-23', 'INWARD TRANSFER'),
+      tx('bk2', 5000, '2026-06-24', 'INWARD TRANSFER'),
+    ]
+    const result = suggestMatches(cb, bank, new Set(), new Set(), { requireDateMatch: true })
+    expect(result).toHaveLength(0)
   })
 
   it('does not flag duplicateWarning when only one bank txn matches', () => {
@@ -327,5 +373,61 @@ describe('suggestSplitMatches', () => {
     ]
     const result = suggestSplitMatches(cb, bank, new Set(['cb1']), new Set())
     expect(result).toHaveLength(0)
+  })
+})
+
+describe('uniqueAutoSplitMatches', () => {
+  it('keeps a split only when no other subset uses those lines', () => {
+    const cb = [
+      tx('phoenix', 6200, '2026-06-10', 'Commission batch A'),
+      tx('quality', 3800, '2026-06-10', 'Commission batch B'),
+      tx('alt-a', 7000, '2026-06-10', 'Other receipt A'),
+      tx('alt-b', 3000, '2026-06-10', 'Other receipt B'),
+    ]
+    const bank = [tx('batch', 10000, '2026-06-11', 'BATCH-DEP commissions')]
+    const competing = suggestSplitMatches(cb, bank, new Set(), new Set(), { includeCompetingSplits: true })
+    const unique = uniqueAutoSplitMatches(competing)
+    expect(unique).toHaveLength(0)
+    const onlyBatch = suggestSplitMatches(cb.slice(0, 2), bank, new Set(), new Set(), {
+      includeCompetingSplits: true,
+    })
+    expect(uniqueAutoSplitMatches(onlyBatch)).toHaveLength(1)
+  })
+})
+
+describe('sameAmountSwapBlocked', () => {
+  const naa = { id: 'naa', amount: 5000, name: 'Naa Adoley Trading', details: 'Premium collection receipt A' }
+  const kojo = { id: 'kojo', amount: 5000, name: 'Kojo Antwi Ventures', details: 'Premium collection receipt B' }
+  const naaBank = { id: 'naa-bank', amount: 5000, details: 'FUNDS TRANSFER INWARD NAA ADOLEY TRADING' }
+  const kojoBank = { id: 'kojo-bank', amount: 5000, details: 'FUNDS TRANSFER INWARD KOJO ANTWI VENTURES' }
+
+  it('blocks the crossed pair and allows the named pair', () => {
+    expect(sameAmountSwapBlocked(naa, kojoBank, [kojo], [naaBank])).toBe(true)
+    expect(sameAmountSwapBlocked(naa, naaBank, [kojo], [kojoBank])).toBe(false)
+  })
+
+  it('allows a unique amount', () => {
+    expect(sameAmountSwapBlocked(naa, naaBank, [], [])).toBe(false)
+  })
+})
+
+describe('groupContainsBlockedEqualSwap', () => {
+  const naa = { id: 'naa', amount: 5000, name: 'Naa Adoley Trading', details: 'Premium collection receipt A', documentType: 'cash_book_receipts' }
+  const kojo = { id: 'kojo', amount: 5000, name: 'Kojo Antwi Ventures', details: 'Premium collection receipt B', documentType: 'cash_book_receipts' }
+  const naaBank = { id: 'naa-bank', amount: 5000, details: 'FUNDS TRANSFER INWARD NAA ADOLEY TRADING', documentType: 'bank_credits' }
+  const kojoBank = { id: 'kojo-bank', amount: 5000, details: 'FUNDS TRANSFER INWARD KOJO ANTWI VENTURES', documentType: 'bank_credits' }
+  const phoenix = { id: 'phoenix', amount: 6200, name: 'Phoenix Insurance', documentType: 'cash_book_receipts' }
+  const batch = { id: 'batch', amount: 11200, details: 'BATCH-DEP', documentType: 'bank_credits' }
+
+  it('blocks a crossed equal amount buried in a larger group', () => {
+    expect(groupContainsBlockedEqualSwap([naa, phoenix], [kojoBank, batch], [kojo], [naaBank])).toBe(true)
+  })
+
+  it('blocks a group that contains both named lines but crosses them', () => {
+    expect(groupContainsBlockedEqualSwap([naa, kojo], [kojoBank, naaBank], [], [])).toBe(true)
+  })
+
+  it('allows a split whose lines do not share an equal amount', () => {
+    expect(groupContainsBlockedEqualSwap([naa, kojo], [batch], [], [])).toBe(false)
   })
 })

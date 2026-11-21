@@ -413,7 +413,7 @@ export default function CountMatchPanel({
       {open && (
         <div className="p-5 pt-4">
           {uxSignoff?.result === 'fail' && uxSignoff.notes && (
-            <Alert tone="warning" title="Preparer UX check — issues recorded" className="mb-4">
+            <Alert tone="warning" title="Check notes" className="mb-4">
               {uxSignoff.notes}
             </Alert>
           )}
@@ -490,17 +490,6 @@ export default function CountMatchPanel({
               </div>
 
               <div className="mb-2">
-                <p className="text-xs text-slate-600 mb-3 max-w-3xl leading-relaxed hidden lg:block">
-                  Suggested order:{' '}
-                  <span className="font-semibold text-slate-800">1. Cancel</span> (same amount, same
-                  number of lines on both sides) →{' '}
-                  <span className="font-semibold text-slate-800">2. Extra lines</span> (select the lines
-                  that pair up, then confirm) →{' '}
-                  <span className="font-semibold text-slate-800">3. One side only</span> (use suggestions,
-                  or leave as uncredited lodgments / unpresented cheques on the BRS). Keep{' '}
-                  <span className="font-medium text-slate-700">Unmatched</span> selected so any remainder
-                  stays on one side only after you confirm. Nothing is matched until you confirm.
-                </p>
                 <CountMatchListFilters
                   listKey={listKey}
                   onPick={setListKey}
@@ -527,12 +516,6 @@ export default function CountMatchPanel({
                         onPick={setListKey}
                         data={query.data}
                       />
-                      <p className="text-xs text-slate-500 mb-3 -mt-1 max-w-3xl">
-                        When one side has more lines at the same amount, pick the lines that clearly
-                        belong together, then confirm. Any leftover lines stay on{' '}
-                        <span className="font-medium text-slate-600">one side only</span> (Unmatched
-                        scope) for the BRS or the next statement.
-                      </p>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
                         3. One side only
                       </p>
@@ -548,15 +531,8 @@ export default function CountMatchPanel({
               </div>
 
               <p className="text-xs text-slate-500 mb-2">
-                {activeMeta.hint}. Table: <span className="font-medium text-slate-600">Amount</span>{' '}
-                = value; <span className="font-medium text-slate-600">CB count / Bank count</span> =
-                number of transactions.
-                {rows.length > 0 && (
-                  <>
-                    {' '}
-                    This list: {listCountLabel(rows)}.
-                  </>
-                )}
+                {activeMeta.hint}
+                {rows.length > 0 ? ` · ${listCountLabel(rows)}` : ''}
               </p>
 
               <div className="rounded-lg border border-border overflow-hidden">

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeBrsMetrics,
   deriveCashBookFromWorkbookSchedule,
+  scheduleFaceGapRows,
   extractCashBookClosingBalanceFromDoc,
   extractSourceClosingBalanceFromDocs,
   hasChequeOrRefLink,
@@ -86,5 +87,14 @@ describe('report helpers', () => {
       bankOnlyCreditsNotInCashBookTotal: 0,
     })
     expect(derived).toBeCloseTo(4000, 2)
+  })
+
+  it('prints the book balance under the statement only when the two differ', () => {
+    expect(scheduleFaceGapRows(373162.54, 373162.54)).toBeNull()
+    expect(scheduleFaceGapRows(null, 358287.54)).toBeNull()
+    expect(scheduleFaceGapRows(373162.54, 358287.54)).toEqual({
+      bookBalance: 373162.54,
+      difference: 14875,
+    })
   })
 })

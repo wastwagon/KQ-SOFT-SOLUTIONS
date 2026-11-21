@@ -15,8 +15,8 @@ const HELP_CONTENT = {
       { term: 'Cash book payments', desc: 'Money paid out by the business (e.g. cheques issued). Match these to bank debits.' },
       { term: 'Bank credits', desc: 'Money lodged or credited to the account (bank’s record).' },
           { term: 'Bank debits', desc: 'Money withdrawn or debited from the account (e.g. cheques presented).' },
-          { term: 'Same amount, extra lines', desc: 'The same amount appears on both sides, but one side has extra lines (e.g. two deposits of the same value). Match the lines that clearly pair up; any remainder stays on one side only until the next statement or the BRS.' },
-          { term: 'Split suggestions (many-to-1)', desc: 'Several cash book lines that add up to one bank line (e.g. two receipts totalling one credit). Use Split suggestions in the toolbar, or select the rows and Confirm match at the bottom. This is different from matching duplicate amounts by count.' },
+          { term: 'Same amount, extra lines', desc: 'The same amount is on both sides, with more lines on one side. Match the lines that belong together. The rest stay open.' },
+          { term: 'Split suggestions', desc: 'Different amounts that add up to one bank or cash-book line. This is separate from Match by counting.' },
     ],
   },
   reportTerms: {
@@ -24,7 +24,8 @@ const HELP_CONTENT = {
     items: [
       { term: 'Uncredited lodgments', desc: 'The BRS Add line: supporting-list items not yet credited by the bank (plus brought-forward lodgments). Cancelled reversals are netted off and are not the same as every unmatched receipt.' },
       { term: 'Unpresented cheques', desc: 'The BRS Less line: supporting-list items not yet presented (plus brought-forward cheques). Not the same as every unmatched payment.' },
-      { term: 'Balance per cash book', desc: 'End-of-period cash book from the workbook: bank closing + uncredited − unpresented ± bank-only items.' },
+      { term: 'Cash book balance at end of period', desc: 'The sum of the lines on the statement: bank closing + uncredited lodgments − unpresented cheques + bank-only debits − bank-only credits.' },
+      { term: 'Cash book balance per cash book', desc: 'The closing balance from the cash book. It prints under the statement only when the two figures differ.' },
     ],
   },
   dataVsAttachments: {
@@ -34,47 +35,6 @@ const HELP_CONTENT = {
       { term: 'Supporting documents', desc: 'Attachments such as approval scans or extra PDFs. They are listed on the report but not parsed for transactions.' },
     ],
   },
-  unmatchedCauses: {
-    title: 'Why are there unmatched items? Common causes & how to resolve',
-    intro: 'Unmatched items are normal. Some are timing differences (they will match next period); others need a correction or a decision to leave as an exception on the BRS.',
-    causes: [
-      {
-        name: 'Unpresented cheques',
-        short: 'You issued a cheque (in cash book) but the bank has not yet debited it.',
-        resolve: 'Do not try to match it to a bank debit yet. Leave it unmatched; the BRS will show it as a deduction from the bank balance. It will match when the cheque is presented.',
-      },
-      {
-        name: 'Uncredited lodgments',
-        short: 'You recorded a receipt and/or deposited cash/cheque but the bank has not yet credited your account.',
-        resolve: 'Leave it unmatched. The BRS adds it to the bank balance. It will match when the bank credits the account (e.g. next statement).',
-      },
-      {
-        name: 'Timing (different dates)',
-        short: 'Same transaction appears in different periods (e.g. you recorded 31st, bank processed 1st).',
-        resolve: 'Match it if you see the same amount and description on the other side in this or the next statement. Use Reconcile to link them.',
-      },
-      {
-        name: 'Bank charges, interest, fees',
-        short: 'Bank has debited charges or fees you have not yet entered in the cash book.',
-        resolve: 'Enter the charge/fee in the cash book (payment), then re-upload or re-run so you can match it. Or leave as exception and note on BRS.',
-      },
-      {
-        name: 'Direct credits / transfers in',
-        short: 'Money paid into your account that you have not yet recorded.',
-        resolve: 'Add the receipt to the cash book, then re-upload or re-run reconciliation and match it.',
-      },
-      {
-        name: 'Standing orders / direct debits',
-        short: 'Bank has debited a payment you have not recorded (or recorded differently).',
-        resolve: 'Enter the payment in the cash book, then match. Or match if it’s already there under a different description (e.g. reference number).',
-      },
-      {
-        name: 'Errors (yours or bank’s)',
-        short: 'Wrong amount, duplicate entry, or missing entry on one side.',
-        resolve: 'Correct the cash book (or raise with the bank if their error), then re-run. Match any remaining same-amount pairs.',
-      },
-    ],
-  },
 }
 
 export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 'report' | 'review' | 'full' }) {
@@ -82,7 +42,6 @@ export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 
   const showCashBook = variant === 'reconcile' || variant === 'full'
   const showReportTerms = variant === 'report' || variant === 'full'
   const showDataVsAttachments = variant === 'report' || variant === 'full'
-  const showUnmatchedHints = variant === 'reconcile' || variant === 'review' || variant === 'full'
 
   return (
     <Card noPadding className="text-sm">
@@ -93,7 +52,7 @@ export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 
         className="w-full !justify-between px-4 py-3 h-auto rounded-xl font-semibold text-gray-800"
         aria-expanded={open}
       >
-        <span className="text-primary-600">What do these terms mean?</span>
+        <span className="text-primary-600">Terms</span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
           aria-hidden
@@ -132,21 +91,6 @@ export default function BrsHelp({ variant = 'full' }: { variant?: 'reconcile' | 
                 {HELP_CONTENT.dataVsAttachments.items.map(({ term, desc }) => (
                   <li key={term}>
                     <strong className="text-gray-800">{term}:</strong> {desc}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {showUnmatchedHints && HELP_CONTENT.unmatchedCauses?.causes?.length > 0 && (
-            <section>
-              <h4 className="font-medium text-gray-800 mb-2">{HELP_CONTENT.unmatchedCauses.title}</h4>
-              <p className="text-gray-600 mb-3">{HELP_CONTENT.unmatchedCauses.intro}</p>
-              <ul className="space-y-3 text-gray-600">
-                {HELP_CONTENT.unmatchedCauses.causes.map(({ name, short, resolve }) => (
-                  <li key={name} className="pl-0">
-                    <strong className="text-gray-800">{name}</strong>
-                    <span className="block text-gray-600 mt-0.5">{short}</span>
-                    <span className="block mt-1 text-primary-700 text-sm font-medium">→ Resolve: {resolve}</span>
                   </li>
                 ))}
               </ul>

@@ -307,7 +307,7 @@ export default function ProjectReconcile({
       <WorkflowStepIntro
         eyebrow="Match"
         title="Reconcile transactions"
-        subtitle="Match cash book receipts and payments to bank credits and debits. Confirm suggestions, or select rows and match yourself."
+        subtitle="Receipts to credits, and payments to debits."
       />
 
       <BrsHelp variant="reconcile" />
@@ -316,15 +316,7 @@ export default function ProjectReconcile({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <p className="text-sm font-medium text-gray-700 min-w-0">
             <span className="tabular-nums text-primary-600">{data.existingMatches ?? 0}</span> matched
-            <span className="hidden md:inline">
-              {' '}
-              cash-book lines
-              {view === 'all'
-                ? '. Tick matching rows, then Confirm match at the bottom.'
-                : canReconcile
-                  ? '. Select a cash book row and a bank row, then confirm.'
-                  : '. View-only.'}
-            </span>
+            {!canReconcile && <span className="text-gray-500"> · view only</span>}
           </p>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto">
             {matchingAllowed && showCountMatch && (
@@ -480,13 +472,7 @@ export default function ProjectReconcile({
         </Alert>
       )}
 
-      <p className="text-sm text-gray-600" id="reconcile-tables">
-        {view === 'all'
-          ? 'Tick matching rows in the tables below — Confirm match appears when receipts pair with credits or payments with debits.'
-          : canReconcile
-            ? 'Select a cash book row and a bank row in the tables below, then confirm.'
-            : 'View-only — row selection is disabled.'}
-      </p>
+      <div id="reconcile-tables" />
 
       <ReconcileTransactionsTables
         projectSlug={projectId}

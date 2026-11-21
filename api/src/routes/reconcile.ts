@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
+import { Prisma, type DocumentType } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { resolveProjectId } from '../lib/project-resolve.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js'
@@ -12,6 +12,8 @@ import {
   suggestMatches,
   suggestSplitMatches,
   amountsWithinTolerance,
+  sameAmountSwapBlocked,
+  groupContainsBlockedEqualSwap,
   type Tx,
   type SuggestedSplitMatch,
 } from '../services/matching.js'
@@ -1321,6 +1323,58 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
       })
     }
 
+    const groupCashBook = matchItems
+      .filter((m) => m.side === 'cash_book')
+      .map((m) => txs.find((t) => t.id === m.transactionId)!)
+    const groupBank = matchItems
+      .filter((m) => m.side === 'bank')
+      .map((m) => txs.find((t) => t.id === m.transactionId)!)
+    const groupIds = new Set(matchItems.map((m) => m.transactionId))
+    const lanes = new Set<DocumentType>([
+      ...groupCashBook.map((t) => t.document.type),
+      ...groupBank.map((t) => t.document.type),
+    ])
+    const [matchedRows, openRows] = await Promise.all([
+      prisma.matchItem.findMany({
+        where: { match: { projectId } },
+        select: { transactionId: true },
+      }),
+      prisma.transaction.findMany({
+        where: { document: { projectId, type: { in: [...lanes] } } },
+        select: {
+          id: true,
+          amount: true,
+          name: true,
+          details: true,
+          chqNo: true,
+          docRef: true,
+          document: { select: { type: true } },
+        },
+      }),
+    ])
+    const matchedIds = new Set(matchedRows.map((row) => row.transactionId))
+    const asIdentity = (row: (typeof openRows)[number]) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      name: row.name,
+      details: row.details,
+      chqNo: row.chqNo,
+      docRef: row.docRef,
+      documentType: row.document.type,
+    })
+    const stillOpen = (row: (typeof openRows)[number]) => !groupIds.has(row.id) && !matchedIds.has(row.id)
+    if (
+      groupContainsBlockedEqualSwap(
+        groupCashBook.map((row) => asIdentity(row)),
+        groupBank.map((row) => asIdentity(row)),
+        openRows.filter((row) => stillOpen(row) && groupCashBook.some((cb) => cb.document.type === row.document.type)).map(asIdentity),
+        openRows.filter((row) => stillOpen(row) && groupBank.some((bk) => bk.document.type === row.document.type)).map(asIdentity),
+        multiTol
+      )
+    ) {
+      return res.status(400).json({ error: SAME_AMOUNT_SWAP_ERROR })
+    }
+
     const shouldRememberSplit =
       (type === 'one_to_many' || type === 'many_to_one') &&
       (await planHasFeature(org.plan, 'ai_suggestions'))
@@ -1406,6 +1460,112 @@ router.post('/:projectId/match/multi', async (req: AuthRequest, res) => {
   }
 })
 
+const SAME_AMOUNT_SWAP_ERROR =
+  'This amount is on more than one open line. Match the line whose name or reference agrees.'
+
+async function sameAmountSwapConflict(
+  projectId: string,
+  pairs: Array<{
+    cb: {
+      id: string
+      amount: unknown
+      name: string | null
+      details: string | null
+      chqNo: string | null
+      docRef: string | null
+      document: { type: DocumentType }
+    }
+    bank: {
+      id: string
+      amount: unknown
+      name: string | null
+      details: string | null
+      chqNo: string | null
+      docRef: string | null
+      document: { type: DocumentType }
+    }
+  }>,
+  tolerance: number
+): Promise<string | null> {
+  if (!pairs.length) return null
+  const lanes = new Set<DocumentType>()
+  for (const pair of pairs) {
+    lanes.add(pair.cb.document.type)
+    lanes.add(pair.bank.document.type)
+  }
+  const [matched, rows] = await Promise.all([
+    prisma.matchItem.findMany({
+      where: { match: { projectId } },
+      select: { transactionId: true },
+    }),
+    prisma.transaction.findMany({
+      where: { document: { projectId, type: { in: [...lanes] } } },
+      select: {
+        id: true,
+        amount: true,
+        name: true,
+        details: true,
+        chqNo: true,
+        docRef: true,
+        document: { select: { type: true } },
+      },
+    }),
+  ])
+  const matchedIds = new Set(matched.map((row) => row.transactionId))
+  const asIdentity = (row: (typeof rows)[number]) => ({
+    id: row.id,
+    amount: Number(row.amount),
+    name: row.name,
+    details: row.details,
+    chqNo: row.chqNo,
+    docRef: row.docRef,
+  })
+  for (const pair of pairs) {
+    const otherCashBook = rows
+      .filter(
+        (row) =>
+          row.document.type === pair.cb.document.type &&
+          row.id !== pair.cb.id &&
+          !matchedIds.has(row.id)
+      )
+      .map(asIdentity)
+    const otherBank = rows
+      .filter(
+        (row) =>
+          row.document.type === pair.bank.document.type &&
+          row.id !== pair.bank.id &&
+          !matchedIds.has(row.id)
+      )
+      .map(asIdentity)
+    if (
+      sameAmountSwapBlocked(
+        {
+          id: pair.cb.id,
+          amount: Number(pair.cb.amount),
+          name: pair.cb.name,
+          details: pair.cb.details,
+          chqNo: pair.cb.chqNo,
+          docRef: pair.cb.docRef,
+        },
+        {
+          id: pair.bank.id,
+          amount: Number(pair.bank.amount),
+          name: pair.bank.name,
+          details: pair.bank.details,
+          chqNo: pair.bank.chqNo,
+          docRef: pair.bank.docRef,
+        },
+        otherCashBook,
+        otherBank,
+        tolerance
+      )
+    ) {
+      return SAME_AMOUNT_SWAP_ERROR
+    }
+  }
+  return null
+}
+
 router.post('/:projectId/match', async (req: AuthRequest, res) => {
   const role = req.auth!.role
   if (!canReconcile(role)) {
@@ -1440,6 +1600,22 @@ router.post('/:projectId/match', async (req: AuthRequest, res) => {
     const alreadyMatched = await findAlreadyMatchedIds(projectId, [cbTx.id, bankTx.id])
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
+    }
+    const pairDefaults = await getPlatformDefaults()
+    const pairTol = pairDefaults.amountTolerance ?? 0.01
+    if (!amountsWithinTolerance(Number(cbTx.amount), Number(bankTx.amount), pairTol)) {
+      return res.status(400).json({
+        error: 'Cash book and bank amounts must match before this pair can be confirmed',
+        cashBookAmount: Number(cbTx.amount),
+        bankAmount: Number(bankTx.amount),
+        tolerance: pairTol,
+      })
+    }
+    const swapBlocked = await sameAmountSwapConflict(projectId, [
+      { cb: cbTx, bank: bankTx },
+    ], pairTol)
+    if (swapBlocked) {
+      return res.status(400).json({ error: swapBlocked })
     }
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
@@ -1585,19 +1761,27 @@ router.post('/:projectId/match/bulk', async (req: AuthRequest, res) => {
     if (alreadyMatched.length > 0) {
       return res.status(409).json({ error: 'One or more transactions are already matched', transactionIds: alreadyMatched })
     }
-    const remember = body.remember !== false
-    if (!remember) {
-      const platformDefaults = await getPlatformDefaults()
-      const pairTol = platformDefaults.amountTolerance ?? 0.01
-      for (const { cbTx, bankTx } of toCreate) {
-        if (!amountsWithinTolerance(Number(cbTx.amount), Number(bankTx.amount), pairTol)) {
-          return res.status(400).json({
-            error: 'Each pair must be the same amount',
-            tolerance: pairTol,
-          })
-        }
+    const platformDefaults = await getPlatformDefaults()
+    const pairTol = platformDefaults.amountTolerance ?? 0.01
+    for (const { cbTx, bankTx } of toCreate) {
+      if (!amountsWithinTolerance(Number(cbTx.amount), Number(bankTx.amount), pairTol)) {
+        return res.status(400).json({
+          error: 'Cash book and bank amounts must match before this pair can be confirmed',
+          cashBookAmount: Number(cbTx.amount),
+          bankAmount: Number(bankTx.amount),
+          tolerance: pairTol,
+        })
       }
     }
+    const swapBlocked = await sameAmountSwapConflict(
+      projectId,
+      toCreate.map(({ cbTx, bankTx }) => ({ cb: cbTx, bank: bankTx })),
+      pairTol
+    )
+    if (swapBlocked) {
+      return res.status(400).json({ error: swapBlocked })
+    }
+    const remember = body.remember !== false
     const shouldRemember = remember && (await planHasFeature(org.plan, 'ai_suggestions'))
     const created = await prisma.$transaction(async (tx) => {
       const ids: { id: string }[] = []

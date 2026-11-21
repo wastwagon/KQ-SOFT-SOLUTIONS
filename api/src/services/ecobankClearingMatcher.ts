@@ -237,6 +237,18 @@ export function isEcobankHseDepositLine(tx: ClearingTxLike): boolean {
   return /CHEQUE\s+DEPOSIT\s*-\s*HSE|HSE\s+CHEQUE(?:-EGH|-EBG)?/i.test(text)
 }
 
+/**
+ * Customer cheque lodged to the account (B/O drawer, IFO the customer).
+ * Same HSE narration as a payment clearing line, but it is a receipt, not a debit.
+ * Inward clearing ("received from Clearing") stays on the payment side.
+ */
+export function isEcobankLodgedHouseCheque(tx: ClearingTxLike): boolean {
+  const text = bankText(tx)
+  if (/CHEQUE\s+CLEARING\s*-\s*INWARD|received\s+from\s+Clearing/i.test(text)) return false
+  if (!isEcobankHseDepositLine(tx)) return false
+  return /\bB\/O\b/i.test(text) && /\bIFO\b/i.test(text)
+}
+
 /** HSE statutory deposits sometimes post to the debit column on Ecobank exports. */
 export function isEcobankHseStatutoryDepositLine(tx: ClearingTxLike): boolean {
   const text = bankText(tx)
@@ -541,6 +553,7 @@ export function isTreasuryBillReclassifiedAsDebit(credit: ClearingTxLike): boole
 }
 
 export function isCreditReclassifiedAsDebit(credit: ClearingTxLike): boolean {
+  if (isEcobankLodgedHouseCheque(credit)) return false
   const text = bankText(credit as Tx)
   return (
     isEcobankClearingCredit(credit) ||
@@ -710,6 +723,7 @@ export function creditHasCashBookCounterpart(
   amountTolerance = 0.01
 ): boolean {
   const text = bankText(credit as Tx)
+  if (isEcobankLodgedHouseCheque(credit)) return false
   if (isEcobankClearingCredit(credit)) return true
   // Withdrawal lines posted as credits stay in bank-only schedules (manual Ghana BRS).
   if (WITHDRAWAL_DEBIT_RE.test(text)) return false

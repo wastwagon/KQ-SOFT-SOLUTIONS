@@ -14,6 +14,7 @@ import {
   type ClearingTxLike,
   chequeOrRefLink,
   isEcobankClearingCredit,
+  isEcobankLodgedHouseCheque,
   isEcobankHseStatutoryDepositLine,
   paymentHasCrossChqWithdrawalCounterpart,
   paymentHasNamedWithdrawalCounterpart,
@@ -91,7 +92,7 @@ function bankScheduleLines(
 ): ClearingTxLike[] {
   return [
     ...unmatchedDebits,
-    ...unmatchedCredits.filter((c) => isEcobankClearingCredit(c)),
+    ...unmatchedCredits.filter((c) => isEcobankClearingCredit(c) && !isEcobankLodgedHouseCheque(c)),
   ]
 }
 

@@ -158,7 +158,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       <WorkflowStepIntro
         eyebrow="Review"
         title="Review & exceptions"
-        subtitle="Confirm unmatched items before you generate the BRS. Submit or approve when your firm’s process allows."
+        subtitle="Unmatched lines before the BRS."
       />
 
       {data.thresholdWarning?.message && (
@@ -245,7 +245,7 @@ export default function ProjectReview({ projectId, onGoToReconcile, onGoToReport
       {/* Exception list: unmatched transactions with optional Reviewed tick-off */}
       <Card
         title="Exception list"
-        sublabel="Tick Reviewed after you check each unmatched row. A mark next to the date means there is a suggested match — hover for details."
+        sublabel="Unmatched lines. A mark beside the date means a suggestion exists."
       >
         <div className="flex flex-col gap-6">
           <div>

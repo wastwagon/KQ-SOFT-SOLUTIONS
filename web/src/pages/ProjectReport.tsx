@@ -123,7 +123,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       const limit = u.cleanExportsLimit ?? 0
       if (limit === 0) {
         lines.push(
-          'BRS Excel/PDF from this page are your client deliverables. Dashboard → Clean statement tools offer watermarked samples on Free; upgrade for full cleaned downloads.',
+          'This page exports the BRS. Full cleaned statement downloads need a paid plan.',
         )
       } else {
         lines.push(
@@ -592,6 +592,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
     lessBankOnlyDebits: profileLabels?.lessBankOnlyDebits || 'Add: Bank-only debits not in cash book',
     lessUnpresentedCheques: profileLabels?.lessUnpresentedCheques || 'Less: Unpresented cheques',
     cashBookBalanceEnd: profileLabels?.cashBookBalanceEnd || 'Cash book balance at end of period',
+    scheduleCashBook: profileLabels?.scheduleCashBook || 'Cash book balance per cash book',
+    scheduleDifference:
+      profileLabels?.scheduleDifference || 'Difference (cash book per books minus this statement)',
     additionalInformationTitle:
       profileLabels?.additionalInformationTitle || 'Additional information (BRS terminology profile)',
     asAtReconciliationPosition: profileLabels?.asAtReconciliationPosition || 'As-at reconciliation position',
@@ -625,7 +628,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
       <WorkflowStepIntro
         eyebrow="Report"
         title="Bank reconciliation statement"
-        subtitle="Live preview of balances, narratives, and attachments. Use Export & download for Excel/PDF and attachments; adjust bank account and display currency below."
+        subtitle="Statement, notes, and sign-off."
       />
       {isReopenedForEditing && (
         <Alert tone="warning" title="Reopened for editing" className="print:hidden">
@@ -684,9 +687,9 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             <div className="inline-flex min-h-[40px] flex-col justify-center gap-0.5 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm text-gray-700">
               <label
                 className="inline-flex flex-col gap-1"
-                title="Ecobank Ghana BRS schedule: Face (√) uses Groups 2–3 netting; Working (??) uses section A + open B₁ timing with companion bank-only debits."
+                title="Standard face nets clearing groups. Working paper keeps open cheques on unpresented and moves the same amount to bank-only debits."
               >
-                <span className="text-xs text-gray-500">BRS schedule</span>
+                <span className="text-xs text-gray-500">Ecobank schedule</span>
                 <select
                   className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
                   value={
@@ -707,16 +710,16 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                     )
                   }
                 >
-                  <option value="on">Face (√ netting)</option>
-                  <option value="working">Working (??)</option>
-                  <option value="off">Off (legacy)</option>
+                  <option value="on">Standard face</option>
+                  <option value="working">Working paper</option>
+                  <option value="off">No netting</option>
                 </select>
               </label>
               {workbookNettingSourceLabel && (
                 <span className="text-xs text-gray-500">
                   {workbookNettingMode === 'inherit'
                     ? `Using ${workbookNettingSourceLabel}`
-                    : `Project override (${workbookNettingMode === 'working' ? 'working ??' : workbookNettingEnabled ? 'face √' : 'off'})`}
+                    : `This project (${workbookNettingMode === 'working' ? 'working paper' : workbookNettingEnabled ? 'standard face' : 'no netting'})`}
                   {workbookNettingMode !== 'inherit' && (
                     <>
                       {' · '}
@@ -740,7 +743,7 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
           {data?.paymentGroups && (
             <details className="max-w-xl rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 print:hidden">
               <summary className="cursor-pointer font-medium text-slate-800">
-                Why Face (√) and Working (??) differ
+                Why the standard face and the working paper differ
               </summary>
               <p className="mt-2 text-xs leading-relaxed text-slate-600">
                 {data.paymentGroups.scheduleExplanation}
@@ -870,9 +873,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                 title="Uses this report as the previous period BRS; new project will carry forward unpresented cheques"
                 className="w-fit"
               >
-                Create next period (roll forward)
+                Create next period
               </Button>
-              <p className="text-xs text-gray-500 max-w-sm">Uses this report as the <strong>previous period BRS</strong>; unpresented cheques are carried forward to the new project.</p>
             </div>
           )}
           {onReopen &&
@@ -1030,18 +1032,14 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
             ) : null}
             {data?.project?.bankStatementClosingBalance == null && (
               <Alert tone="warning" title="Bank statement closing balance not entered" className="mb-4 print:hidden">
-                The “Closing balance per bank statement” line is calculated from reconciling items until
-                you enter the figure from your statement (Notes → As per bank statement). Mapped bank
-                lines are in Export & download → Full workbook.
+                Enter the closing balance from the bank statement under Notes. Until then, that line is calculated from the reconciling items.
               </Alert>
             )}
             {data?.project?.cashBookClosingBalance == null &&
               brsStatement?.workbookScheduleTieOutVariance != null &&
               Math.abs(brsStatement.workbookScheduleTieOutVariance) > 0.02 && (
               <Alert tone="warning" title="Cash book closing balance not entered" className="mb-4 print:hidden">
-                Enter the as-per-cash-book / IBIS closing figure under Notes if your manual BRS uses a
-                declared balance (common on GT Bank EUR and similar exports). Until then, the platform
-                derives the cash book line from reconciling items.
+                The statement total is already on the face. Enter the cash book closing balance under Notes to compare it with the books.
               </Alert>
             )}
             <div className="mt-8 w-full overflow-x-auto">
@@ -1149,29 +1147,44 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <tr className="border-b border-slate-400">
                     <td className="py-2 pr-6 text-base font-bold text-slate-900">{labels.cashBookBalanceEnd}</td>
                     <td className="py-2 pl-2 text-right text-base font-bold tabular-nums text-slate-900">
-                      {fmtBaseReportAmt(brsStatement.balancePerCashBook ?? brsStatement.workbookScheduleDerivedCashBook ?? 0)}
+                      {typeof brsStatement.workbookScheduleDerivedCashBook === 'number'
+                        ? fmtBaseReportAmt(brsStatement.workbookScheduleDerivedCashBook)
+                        : '—'}
                     </td>
                   </tr>
+                  {Math.abs(brsStatement.workbookScheduleTieOutVariance ?? 0) > 0.02 && (
+                    <>
+                      <tr className="border-b border-slate-200">
+                        <td className="py-2 pr-6 text-slate-900">{labels.scheduleCashBook}</td>
+                        <td className="py-2 pl-2 text-right tabular-nums text-slate-900">
+                          {fmtBaseReportAmt(brsStatement.balancePerCashBook ?? 0)}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-slate-400">
+                        <td className="py-2 pr-6 font-bold text-slate-900">{labels.scheduleDifference}</td>
+                        <td className="py-2 pl-2 text-right font-bold tabular-nums text-slate-900">
+                          {fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
             {Math.abs(brsStatement.workbookScheduleTieOutVariance ?? 0) > 0.02 ? (
-              ecobankBrsProfile ? (
-                <div className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700 print:bg-slate-50 print:border-slate-400">
-                  Declared cash book (from file) differs from schedule arithmetic by{' '}
-                  <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
-                  The BRS uses the declared closing balance to match the manual workbook; schedule-derived cash book is{' '}
-                  <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleDerivedCashBook ?? 0)}</strong>.
-                </div>
-              ) : (
-                <div className="mt-4 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
-                  Workbook tie-out: declared cash book minus schedule =
-                  {' '}
-                  <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
-                  Large variances usually mean duplicate cash-book exposure, mismatched reconciliation date, or a missing /
-                  overstated closing balance inputs — review column mapping and imported balances.
-                </div>
-              )
+              <div className="mt-4 w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 print:bg-amber-50 print:border-amber-400">
+                This statement produces{' '}
+                <strong>
+                  {typeof brsStatement.workbookScheduleDerivedCashBook === 'number'
+                    ? fmtBaseReportAmt(brsStatement.workbookScheduleDerivedCashBook)
+                    : '—'}
+                </strong>.
+                The cash book from the books is{' '}
+                <strong>{fmtBaseReportAmt(brsStatement.balancePerCashBook ?? 0)}</strong>.
+                The difference is{' '}
+                <strong>{fmtBaseReportAmt(brsStatement.workbookScheduleTieOutVariance ?? 0)}</strong>.
+                Review the confirmed pairs before this statement is signed.
+              </div>
             ) : null}
             <p className="mt-6 w-full text-xs leading-relaxed text-slate-700">
               Note: timing items are transactions already in the cash book but not yet reflected by the bank at the
@@ -1224,8 +1237,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <Input
                     type="number"
                     step="0.01"
-                    label="As per bank statement (optional)"
-                    hint="Closing balance from the bank statement — for audit comparison"
+                    label="Closing balance per bank statement"
+                    hint="From the bank statement"
                     value={editBankStatementClosingBalance}
                     onChange={(e) => setEditBankStatementClosingBalance(e.target.value)}
                     placeholder="e.g. 83.72"
@@ -1233,8 +1246,8 @@ export default function ProjectReport({ projectId, onGoToReview, onReopen, onRol
                   <Input
                     type="number"
                     step="0.01"
-                    label="As per cash book (optional)"
-                    hint="Declared IBIS / manual BRS closing — GT Bank EUR and similar"
+                    label="Cash book balance per cash book"
+                    hint="From the cash book. Prints on the statement only when it differs from the lines."
                     value={editCashBookClosingBalance}
                     onChange={(e) => setEditCashBookClosingBalance(e.target.value)}
                     placeholder="e.g. 8977.46"

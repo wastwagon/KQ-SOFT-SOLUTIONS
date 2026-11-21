@@ -43,7 +43,7 @@ describe('ghanaBrsPaymentGroups', () => {
     expect(summary.sectionATotal).toBeCloseTo(4839.56, 2)
     expect(summary.openTimingTotal).toBeCloseTo(5950, 2)
     expect(summary.workingUnpresentedTotal).toBeCloseTo(4839.56 + 5950, 2)
-    expect(summary.scheduleExplanation).toMatch(/Working \(\?\?\)/)
+    expect(summary.scheduleExplanation).toMatch(/working paper/i)
   })
 
   it('treats security / board secretary payees as open timing without amount whitelist', () => {

@@ -15,6 +15,7 @@ import {
   ecobankClearingLineHasPaymentCounterpart,
   creditHasCashBookCounterpart,
   isCreditReclassifiedAsDebit,
+  isEcobankLodgedHouseCheque,
   isTreasuryBillReclassifiedAsDebit,
   suggestEcobankPaymentDebitMatches,
   suggestEcobankStatutoryDepositMatches,
@@ -315,6 +316,39 @@ describe('computeBankOnlyDebitsTotal', () => {
     ]
     const total = computeBankOnlyDebitsTotal(debits, [], payments, 0.01, new Set())
     expect(total).toBe(0)
+  })
+
+  it('keeps a lodged house cheque on bank-only credits', () => {
+    const lodgment = tx({
+      id: 'c-glico',
+      amount: 9875,
+      details:
+        'REF : H64LOCH260620022 CHEQUE DEPOSIT - HSE CHEQUE-EBG CHQ NO 000455 B/O GLICO GENERAL IFO HORIZON',
+    })
+    const clearing = tx({
+      id: 'c-clear',
+      amount: 2280,
+      details: 'CHEQUE DEPOSIT - HSE CHEQUE-EGH CHQ 2066',
+    })
+    expect(isEcobankLodgedHouseCheque(lodgment)).toBe(true)
+    expect(isEcobankLodgedHouseCheque(clearing)).toBe(false)
+    expect(isCreditReclassifiedAsDebit(lodgment)).toBe(false)
+    expect(isCreditReclassifiedAsDebit(clearing)).toBe(true)
+    const receipts = [
+      tx({
+        id: 'r1',
+        amount: 9875,
+        name: 'GLICO General',
+        details: 'Commissions via house cheque deposit 000455',
+      }),
+    ]
+    expect(creditHasCashBookCounterpart(lodgment, [], receipts)).toBe(false)
+    const debits = computeBankOnlyDebitsTotal([], [lodgment, clearing], [], 0.01, new Set())
+    expect(debits).toBe(2280)
+    const schedule = buildBankOnlyScheduleRows([], [lodgment], [], receipts)
+    expect(schedule.debits).toHaveLength(0)
+    expect(schedule.credits.map((c) => c.id)).toEqual(['c-glico'])
+    expect(computeBankOnlyCreditsTotal([lodgment], [], receipts, 0)).toBe(9875)
   })
 
   it('adds reclassified inward clearing and FT credits to bank-only debits', () => {

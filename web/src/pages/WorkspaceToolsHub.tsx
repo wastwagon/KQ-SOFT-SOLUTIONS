@@ -7,13 +7,13 @@ const TOOLS = [
   {
     to: '/tools/clean-bank-statement',
     label: 'Clean bank statement',
-    hint: 'Upload PDF/Excel → preview, sample, or full cleaned export',
+    hint: 'Preview, sample, or full file',
     icon: Landmark,
   },
   {
     to: '/tools/clean-cash-book',
     label: 'Clean cash book',
-    hint: 'Upload cash book → preview, sample, or full cleaned export',
+    hint: 'Preview, sample, or full file',
     icon: FileSpreadsheet,
   },
 ] as const
@@ -26,13 +26,12 @@ export default function WorkspaceToolsHub() {
         title="Tools"
         subtitle={
           <p className="text-gray-500">
-            Validate formats with the same parsers used in reconciliation. Preview is free; full exports use your
-            plan&apos;s monthly clean-export quota.
+            Clean a bank statement or a cash book.
           </p>
         }
       />
 
-      <Card title="Clean & export" sublabel="Same tools as the sidebar and ⌘K palette — deep links preserved.">
+      <Card title="Clean and export">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
           {TOOLS.map(({ to, label, hint, icon: Icon }) => (
             <Link

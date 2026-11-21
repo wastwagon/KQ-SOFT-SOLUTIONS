@@ -183,7 +183,7 @@ export default function SettingsBillingTab({
                 ? `${usageData.usage.bankAccountsUsed ?? 0} (unlimited)`
                 : `${usageData.usage.bankAccountsUsed ?? 0} / ${usageData.usage.bankAccountsLimit ?? '—'}`)
             }
-            sublabel="Org-wide seats"
+            sublabel="Accounts on this firm"
           />
           <MetricCard
             className="!p-4"

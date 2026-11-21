@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -6,7 +6,6 @@ import {
   FolderKanban,
   LayoutDashboard,
   Users,
-  X,
   ChevronRight,
   Palette,
   CreditCard,
@@ -71,8 +70,6 @@ function DashLinkCard({
   )
 }
 
-const GET_STARTED_DISMISSED_KEY = 'brs_dashboard_get_started_dismissed'
-
 function RecentProjectsHead() {
   return (
     <TableHead>
@@ -95,48 +92,6 @@ export default function Dashboard() {
   const role = useAuth((s) => s.role)
   const org = useAuth((s) => s.org)
   const isAdmin = useAuth((s) => s.isAdmin())
-  const [getStartedDismissed, setGetStartedDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(GET_STARTED_DISMISSED_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
-  const dismissGetStarted = () => {
-    try {
-      localStorage.setItem(GET_STARTED_DISMISSED_KEY, '1')
-      setGetStartedDismissed(true)
-    } catch {
-      setGetStartedDismissed(true)
-    }
-  }
-  const [latestRelease, setLatestRelease] = useState<{ date: string; version: string; changes: string } | null>(null)
-  useEffect(() => {
-    let mounted = true
-    fetch('/user-manual.md')
-      .then(async (res) => {
-        if (!res.ok) return ''
-        return res.text()
-      })
-      .then((text) => {
-        if (!mounted || !text) return
-        const changelogSectionMatch = text.match(/##\s+Changelog([\s\S]*?)(?:\n##\s+|\s*$)/i)
-        const changelogSection = changelogSectionMatch?.[1] || ''
-        const rows = changelogSection.match(/^\|\s*\d{4}-\d{2}-\d{2}\s*\|.*\|.*\|$/gm) || []
-        if (!rows.length) return
-        const firstRow = rows.at(0)
-        if (!firstRow) return
-        const first = firstRow.split('|').map((p) => p.trim()).filter(Boolean)
-        if (first.length < 3) return
-        setLatestRelease({ date: first[0], version: first[1], changes: first[2] })
-      })
-      .catch(() => {
-        // Keep dashboard usable even if manual file is temporarily unavailable.
-      })
-    return () => {
-      mounted = false
-    }
-  }, [])
   const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: () => projects.list(),
@@ -256,13 +211,7 @@ export default function Dashboard() {
                 {roleDisplay}
               </Badge>
             </div>
-            <p className="text-gray-500 mt-1.5">
-              Track client reconciliations, plan usage, and team activity in one place.{' '}
-              <span className="text-gray-400">
-                Tip: open <span className="font-medium text-gray-600">Search</span> in the header
-                <span className="hidden md:inline"> or press ⌘K / Ctrl+K</span> to jump to a project, or ask in plain English for AI suggestions.
-              </span>
-            </p>
+            <p className="text-gray-500 mt-1.5">Client reconciliations, plan usage, and team.</p>
           </>
         }
       />
@@ -279,68 +228,6 @@ export default function Dashboard() {
       {!usageLoading && usage?.usage ? (
         <PlanUsageAlerts usage={usage.usage} role={role} />
       ) : null}
-
-      {!isLoading && projectsList.length === 0 && !getStartedDismissed && !projectsPaywallBlocked && (
-        <Card
-          title="Get started"
-          sublabel="Set up your firm, then run your first bank reconciliation (cash book + bank statement)."
-          actions={
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={dismissGetStarted}
-              className="flex-shrink-0 p-1"
-              aria-label="Dismiss"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          }
-        >
-          <ol className="space-y-3 text-sm">
-            <li className="flex gap-3">
-              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">1.</span>
-              <span>
-                <Link to="/settings/branding" className="font-medium text-primary-700 hover:underline">
-                  Branding
-                </Link>
-                <span className="text-gray-600"> — logo and colours for reports</span>
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">2.</span>
-              <span>
-                <Link to="/settings/members" className="font-medium text-primary-700 hover:underline">
-                  Team
-                </Link>
-                <span className="text-gray-600"> — invite members for an audit trail</span>
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">3.</span>
-              <span>
-                <Link to="/clients" className="font-medium text-primary-700 hover:underline">
-                  Clients
-                </Link>
-                <span className="text-gray-600"> — entities you reconcile for</span>
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="w-5 shrink-0 tabular-nums font-medium text-gray-400">4.</span>
-              <span>
-                {canCreateProject(role) ? (
-                  <Link to="/projects/new" className="font-medium text-primary-700 hover:underline">
-                    New project
-                  </Link>
-                ) : (
-                  <span className="font-medium text-gray-900">Projects</span>
-                )}
-                <span className="text-gray-600"> — start your first reconciliation</span>
-              </span>
-            </li>
-          </ol>
-        </Card>
-      )}
 
       <section aria-labelledby="dashboard-metrics-heading" className="space-y-3">
         <h2 id="dashboard-metrics-heading" className="text-sm font-medium text-gray-600">
@@ -400,8 +287,8 @@ export default function Dashboard() {
               value={bankAccountsUsed}
               sublabel={
                 bankAccountsUnlimited
-                  ? 'Unlimited org seats'
-                  : `${bankAccountsUsed} of ${bankAccountsLimit} org seats`
+                  ? 'Unlimited on this firm'
+                  : `${bankAccountsUsed} of ${bankAccountsLimit} on this firm`
               }
               icon={<Building2 />}
               accent="none"
@@ -421,9 +308,7 @@ export default function Dashboard() {
 
       {features.firm_dashboard && (
         <Card title="Practice overview">
-          <p className="text-sm text-gray-600 mb-5">
-            Snapshot for this organisation — clients, open reconciliations, and reports.
-          </p>
+            <p className="sr-only">Clients, open reconciliations, and reports.</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5">
             <DashLinkCard
               to="/clients"
@@ -447,7 +332,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
+      <div>
         <Card title="Next actions">
             {nextActions.length === 0 ? (
               <p className="text-sm text-gray-500">
@@ -475,57 +360,29 @@ export default function Dashboard() {
                 ))}
               </ul>
             )}
-            {isAdmin && (
-              <Link
-                to="/settings/billing"
-                className={`${buttonClassName('outline', 'sm')} mt-4 w-full`}
-              >
-                Manage subscription
-              </Link>
-            )}
-          </Card>
-
-        <Card title="What’s new">
-            <div className="flex flex-col items-start gap-4">
-              <div>
-                {latestRelease ? (
-                  <>
-                    <p className="text-sm leading-relaxed text-gray-600">
-                      <span className="font-medium text-gray-900">Version {latestRelease.version}</span> — {latestRelease.changes}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1.5">Released {latestRelease.date}</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-600">No recent release notes on the dashboard.</p>
-                )}
-              </div>
-              <Link to="/manual" className={buttonClassName('outline', 'sm')}>
-                Open user manual
-              </Link>
-            </div>
           </Card>
       </div>
 
-      <Card title="Clean & export tools">
-        <p className="text-sm text-gray-600 mb-5">
-          Validate bank or cash-book formats with the same parsers. Preview is free; sample downloads
-          are truncated and watermarked; full Excel/PDF uses your plan’s monthly clean-export quota.{' '}
-          <Link to="/tools" className="font-medium text-primary-700 hover:underline">
+      <Card
+        title="Clean and export"
+        actions={
+          <Link to="/tools" className={buttonClassName('outline', 'sm')}>
             All tools
           </Link>
-        </p>
+        }
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5">
           <DashLinkCard
             to="/tools/clean-bank-statement"
             icon={<Landmark className="w-4 h-4" aria-hidden />}
             title="Clean bank statement"
-            description="Upload PDF/Excel → preview, sample, or full cleaned file"
+            description="Preview, sample, or full file"
           />
           <DashLinkCard
             to="/tools/clean-cash-book"
             icon={<FileSpreadsheet className="w-4 h-4" aria-hidden />}
             title="Clean cash book"
-            description="Upload cash book → preview, sample, or full cleaned file"
+            description="Preview, sample, or full file"
           />
         </div>
       </Card>
@@ -533,11 +390,6 @@ export default function Dashboard() {
       <Card
         title={isAdmin ? 'Manage app & settings' : 'Settings'}
       >
-        <p className="text-sm text-gray-600 mb-5">
-          {isAdmin
-            ? 'Control branding, billing, bank rules, API keys, and view activity.'
-            : 'Branding, billing, and team — manage your organisation.'}
-        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
           <DashLinkCard
             to="/settings/branding"
@@ -620,7 +472,7 @@ export default function Dashboard() {
             <EmptyState
               icon={<FolderKanban className="w-6 h-6" />}
               title="No projects yet"
-              description="Create your first project to start reconciling cash book and bank statement. Upload files, match transactions, then export your BRS report."
+              description="Upload the cash book and bank statement, match the lines, then export the BRS."
               action={
                 canCreateProject(role) ? (
                   <Link to="/projects/new" className={buttonClassName('primary', 'md')}>

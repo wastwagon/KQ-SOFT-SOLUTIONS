@@ -139,6 +139,24 @@ export function computeBrsMetrics(input: BrsComputationInput) {
  * Use for tie-out checks and for subsequent periods where timing uncredited and unpresented include
  * current-period items plus brought-forward slices (see brsStatement composition fields).
  */
+/** Face stays unchanged when the schedule already equals the declared cash book. */
+export const SCHEDULE_GAP_TOLERANCE = 0.02
+
+/**
+ * Extra rows under the statement cash book when the cash book from the books
+ * disagrees. The titled line is always the sum of the face. Returns null when
+ * no book balance was supplied or the two already agree.
+ */
+export function scheduleFaceGapRows(
+  bookBalance: number | null | undefined,
+  statementCashBook: number
+): { bookBalance: number; difference: number } | null {
+  if (bookBalance == null || !Number.isFinite(bookBalance) || !Number.isFinite(statementCashBook)) return null
+  const difference = Math.round((bookBalance - statementCashBook) * 100) / 100
+  if (Math.abs(difference) <= SCHEDULE_GAP_TOLERANCE) return null
+  return { bookBalance: Math.round(bookBalance * 100) / 100, difference }
+}
+
 export function deriveCashBookFromWorkbookSchedule(payload: {
   bankClosingBalance: number
   uncreditedLodgmentsTimingTotal: number
@@ -833,7 +851,6 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
         workbookBankOnlyExcludeIds,
         bankOnlyDebitsCtx
       )
-  const faceBankOnlyDebitsTotal = bankOnlyDebitsNotInCashBookTotal
   const unmatchedDebitsLinkedToCashBookTotal = unmatchedDebitsTotal - bankOnlyDebitsNotInCashBookTotal
   let asAtUncreditedTotal = unmatchedReceiptsTotal
   let asAtUnpresentedTotal = unpresentedChequesTotal
@@ -872,18 +889,9 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
     toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
     extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
   if (workingPaperDetail) {
-    // 9033: same delta on BOD. 9035: also absorb Face schedule residual so ?? ties declared cash book.
-    if (declaredCashBookBalance != null && bankStatementClosingBalanceValue != null) {
-      const identityBod =
-        declaredCashBookBalance -
-        bankStatementClosingBalanceValue +
-        unpresentedChequesTotal +
-        bankOnlyCreditsNotInCashBookTotal
-      workingPaperDetail.bankOnlyDebitsDelta = identityBod - faceBankOnlyDebitsTotal
-      bankOnlyDebitsNotInCashBookTotal = identityBod
-    } else {
-      bankOnlyDebitsNotInCashBookTotal += workingPaperDetail.bankOnlyDebitsDelta
-    }
+    // Move the same amount onto bank-only debits that was added to unpresented.
+    // Do not replace debits with the figure that forces the declared cash book to tie.
+    bankOnlyDebitsNotInCashBookTotal += workingPaperDetail.bankOnlyDebitsDelta
   }
   const canonicalTiming = resolveCanonicalTimingSchedule({
     unmatchedReceipts: unmatchedReceipts as TxLike[],
@@ -1029,6 +1037,8 @@ router.get('/:projectId', async (req: AuthRequest, res) => {
       lessBankOnlyDebits: 'Add: Bank-only debits not in cash book',
       lessUnpresentedCheques: 'Less: Unpresented cheques',
       cashBookBalanceEnd: 'Cash book balance at end of period',
+      scheduleCashBook: 'Cash book balance per cash book',
+      scheduleDifference: 'Difference (cash book per books minus this statement)',
       additionalInformationTitle: 'Additional information (BRS terminology profile)',
       asAtReconciliationPosition: 'As-at reconciliation position',
       postPeriodMovement: 'Post-period movement (carried forward)',
@@ -1629,6 +1639,8 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       lessBankOnlyDebits: 'Add: Bank-only debits not in cash book',
       lessUnpresentedCheques: 'Less: Unpresented cheques',
       cashBookBalanceEnd: 'Cash book balance at end of period',
+      scheduleCashBook: 'Cash book balance per cash book',
+      scheduleDifference: 'Difference (cash book per books minus this statement)',
       additionalInformationTitle: 'NOTES',
       asAtReconciliationPosition: 'As-at reconciliation position',
       postPeriodMovement: 'Post-period movement (carried forward)',
@@ -1858,7 +1870,6 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         workbookBankOnlyExcludeIdsExport,
         bankOnlyDebitsCtxExport
       )
-  const faceBankOnlyDebitsExport = bankOnlyDebitsNotInCashBookTotalExport
   const unmatchedDebitsLinkedToCashBookTotalExport =
     unmatchedDebitsTotalExport - bankOnlyDebitsNotInCashBookTotalExport
   const bankOnlyCreditsNotInCashBookTotalExport = gtBankCedisFaceExport
@@ -1870,18 +1881,7 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
         receipts as TxLike[],
         broughtForwardBankCreditsTotalExport
       )
-  const bankStatementClosingBalanceExportEarly =
-    toNumOrNull((project as { bankStatementClosingBalance?: unknown }).bankStatementClosingBalance) ??
-    extractSourceClosingBalanceFromDocs(creditsDocs.concat(debitsDocs).map((d) => d.filepath))
-  if (workingPaperDeltaExport && declaredCashBookBalance != null && bankStatementClosingBalanceExportEarly != null) {
-    const identityBod =
-      declaredCashBookBalance -
-      bankStatementClosingBalanceExportEarly +
-      unpresentedChequesTotal +
-      bankOnlyCreditsNotInCashBookTotalExport
-    workingPaperDeltaExport = identityBod - faceBankOnlyDebitsExport
-    bankOnlyDebitsNotInCashBookTotalExport = identityBod
-  } else if (workingPaperDeltaExport) {
+  if (workingPaperDeltaExport) {
     bankOnlyDebitsNotInCashBookTotalExport += workingPaperDeltaExport
   }
   const canonicalTimingExport = resolveCanonicalTimingSchedule({
@@ -2167,7 +2167,15 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       [exportLabels.lessUnpresentedCheques, wbAmt(unpresentedChequesTotal)],
       [exportLabels.addBankOnlyDebitsNotInCashBookLine, wbAmt(bankOnlyDebitsNotInCashBookTotalExport)],
       [exportLabels.deductBankOnlyCreditsNotInCashBookLine, wbAmt(bankOnlyCreditsNotInCashBookTotalExport)],
-      [exportLabels.cashBookBalanceEnd, wbAmt(declaredCashBookBalance ?? workbookScheduleDerivedCashBookExport)],
+      [exportLabels.cashBookBalanceEnd, wbAmt(workbookScheduleDerivedCashBookExport)],
+      ...(() => {
+        const gap = scheduleFaceGapRows(declaredCashBookBalance, workbookScheduleDerivedCashBookExport)
+        if (!gap) return []
+        return [
+          [exportLabels.scheduleCashBook, gap.bookBalance],
+          [exportLabels.scheduleDifference, gap.difference],
+        ]
+      })(),
       [],
       [
         'Note: timing items are transactions already in the cash book but not yet reflected by the bank at the reconciliation date. Bank charges, credits, and other bank-only movements are explained in the NOTES sheet and supporting schedules.',
@@ -2530,11 +2538,21 @@ router.get('/:projectId/export', async (req: AuthRequest, res) => {
       },
       {
         label: exportLabels.cashBookBalanceEnd,
-        amount: declaredCashBookBalance ?? workbookScheduleDerivedCashBookExport,
+        amount: workbookScheduleDerivedCashBookExport,
         workbookStyle: true,
         bold: true,
       },
     ]
+    const pdfScheduleGap = scheduleFaceGapRows(
+      declaredCashBookBalance,
+      workbookScheduleDerivedCashBookExport
+    )
+    if (pdfScheduleGap) {
+      pdfPrimaryBrsRows.push(
+        { label: exportLabels.scheduleCashBook, amount: pdfScheduleGap.bookBalance, workbookStyle: true },
+        { label: exportLabels.scheduleDifference, amount: pdfScheduleGap.difference, bold: true }
+      )
+    }
     drawAmountSummaryTable('Bank Reconciliation Statement', pdfPrimaryBrsRows, {
       drawTotal: false,
       hideTitle: true,

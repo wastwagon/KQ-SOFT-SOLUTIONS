@@ -7,7 +7,14 @@ import { bulkMatchLimit, hasPlanFeature } from '../config/planFeatures.js'
 import { getPlanBySlug } from './plan.js'
 import { getPlatformDefaults } from '../lib/platformDefaults.js'
 import { resolveReconcileMaxLimit } from '../config/importLimits.js'
-import { suggestMatches, type SuggestedMatch, type Tx } from './matching.js'
+import {
+  suggestMatches,
+  suggestSplitMatches,
+  uniqueAutoSplitMatches,
+  type SuggestedMatch,
+  type SuggestedSplitMatch,
+  type Tx,
+} from './matching.js'
 import { resolveMatchSides } from './sideInversion.js'
 import {
   isEcobankPatternMatchReason,
@@ -82,7 +89,7 @@ export type AutoCompleteOptions = {
 export type AutoCompleteResult = {
   created: number
   rounds: number
-  phases: { A: number; B: number; C: number; residual: number }
+  phases: { A: number; B: number; C: number; residual: number; split: number }
   /** True when this click stopped at the plan’s per-confirm pair cap. */
   capped: boolean
   limit: number
@@ -415,6 +422,44 @@ async function createBulkMatches(
   return created
 }
 
+async function createSplitMatches(projectId: string, groups: SuggestedSplitMatch[]): Promise<number> {
+  if (!groups.length) return 0
+  return prisma.$transaction(async (tx) => {
+    let count = 0
+    for (const group of groups) {
+      const cashBookIds = group.cashBookTxs.map((row) => row.id)
+      const bankIds = group.bankTxs.map((row) => row.id)
+      if (cashBookIds.length < 1 || bankIds.length < 1) continue
+      if (cashBookIds.length + bankIds.length < 3) continue
+      const type =
+        cashBookIds.length > 1 && bankIds.length === 1
+          ? 'many_to_one'
+          : bankIds.length > 1 && cashBookIds.length === 1
+            ? 'one_to_many'
+            : 'many_to_many'
+      await tx.match.create({
+        data: {
+          projectId,
+          type,
+          status: 'confirmed',
+          confidence: group.confidence,
+          matchItems: {
+            create: [
+              ...cashBookIds.map((transactionId) => ({ transactionId, side: 'cash_book' })),
+              ...bankIds.map((transactionId) => ({ transactionId, side: 'bank' })),
+            ],
+          },
+        },
+      })
+      count++
+    }
+    if (count > 0) {
+      await tx.project.update({ where: { id: projectId }, data: { status: 'reconciling' } })
+    }
+    return count
+  })
+}
+
 export async function runProjectAutoComplete(
   projectId: string,
   orgId: string,
@@ -468,7 +513,9 @@ export async function runProjectAutoComplete(
 
   let totalCreated = 0
   let rounds = 0
-  const phases = { A: 0, B: 0, C: 0, residual: 0 }
+  const phases = { A: 0, B: 0, C: 0, residual: 0, split: 0 }
+  const canAutoSplit =
+    hasPlanFeature(orgPlan, 'one_to_many') && hasPlanFeature(orgPlan, 'many_to_many')
 
   for (let round = 0; round < maxRounds; round++) {
     if (totalCreated >= bulkCap) break
@@ -583,7 +630,32 @@ export async function runProjectAutoComplete(
       }
     }
 
-    if (!roundPairs.length) break
+    if (!roundPairs.length) {
+      if (!canAutoSplit) break
+      const splitGroups = uniqueAutoSplitMatches([
+        ...suggestSplitMatches(receiptsFull, receiptBank, matchedCbIds, matchedBankIds, {
+          amountTolerance,
+          dateWindowDays,
+          includeCompetingSplits: true,
+        }),
+        ...suggestSplitMatches(paymentsFull, paymentBank, matchedCbIds, matchedBankIds, {
+          amountTolerance,
+          dateWindowDays,
+          includeCompetingSplits: true,
+        }),
+      ]).slice(0, remaining)
+      if (!splitGroups.length) break
+      const createdSplits = await createSplitMatches(projectId, splitGroups)
+      if (!createdSplits) break
+      for (const group of splitGroups) {
+        for (const row of group.cashBookTxs) matchedCbIds.add(row.id)
+        for (const row of group.bankTxs) matchedBankIds.add(row.id)
+      }
+      totalCreated += createdSplits
+      phases.split += createdSplits
+      rounds++
+      continue
+    }
 
     const created = await createBulkMatches(
       projectId,

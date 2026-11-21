@@ -86,11 +86,7 @@ export default function SuggestedMatchesPanel({
     <Card
       title="Suggested matches"
       sublabel={
-        encourageAutoMatch
-          ? canBulk
-            ? 'Click a suggestion to pre-select, or tick to bulk-select.'
-            : 'Click a suggestion to pre-select, then click Match.'
-          : 'Reference only for schedule BRS — do not bulk-match. Open Report for uncredited, unpresented, and bank-only lines.'
+        encourageAutoMatch ? undefined : 'Reference only. Confirm from Match.'
       }
       actions={
         <Button
@@ -141,70 +137,13 @@ export default function SuggestedMatchesPanel({
               Match {capLabel(bulkSelected.size)} selected
             </Button>
           )}
-          <div className="hidden md:flex flex-wrap gap-2">
-            {highConfidence.length > 0 && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() =>
-                  onBulkMatch(
-                    withinCap(highConfidence).map((s) => ({
-                      cashBookTransactionId: s.cashBookTx.id,
-                      bankTransactionId: s.bankTx.id,
-                    }))
-                  )
-                }
-                disabled={isMatching}
-                className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
-                title="Apply only suggestions with 95%+ confidence"
-              >
-                Match all high-confidence (95%+) — {capLabel(highConfidence.length)}
-              </Button>
-            )}
-            <Button
-              type="button"
-              size="sm"
-              onClick={() =>
-                onBulkMatch(
-                  withinCap(safeSuggestions).map((s) => ({
-                    cashBookTransactionId: s.cashBookTx.id,
-                    bankTransactionId: s.bankTx.id,
-                  }))
-                )
-              }
-              disabled={isMatching || safeSuggestions.length === 0}
-              title="Skips ambiguous duplicates; requires 90%+ confidence"
-            >
-              Match safe suggestions (90%+, no duplicates) — {capLabel(safeSuggestions.length)}
-            </Button>
-            {phaseBSuggestions.length > 0 && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  onBulkMatch(
-                    withinCap(phaseBSuggestions).map((s) => ({
-                      cashBookTransactionId: s.cashBookTx.id,
-                      bankTransactionId: s.bankTx.id,
-                    }))
-                  )
-                }
-                disabled={isMatching || phaseBSuggestions.length === 0}
-                title="Phase B: pattern-matched suggestions at 85%+ (Ecobank/SCB/GCB/NIB/Prudential/Absa/BOA) — skips generic amount-only guesses"
-              >
-                Match receipts + Ecobank patterns (85%+) — {capLabel(phaseBSuggestions.length)}
-              </Button>
-            )}
-          </div>
           {hasOverflowBulk && (
             <ActionMenu
-            label="More bulk"
+            label="Match a set"
             size="xs"
             variant="outline"
             align="left"
-            menuAriaLabel="Additional bulk match actions"
-            triggerClassName="md:hidden"
+            menuAriaLabel="Match a smaller set of suggestions"
             items={[
               ...(highConfidence.length > 0
                 ? [
@@ -238,7 +177,7 @@ export default function SuggestedMatchesPanel({
                 ? [
                     {
                       kind: 'button' as const,
-                      label: `Patterns (85%+) — ${capLabel(phaseBSuggestions.length)}`,
+                      label: `Bank patterns (85%+) — ${capLabel(phaseBSuggestions.length)}`,
                       onClick: () =>
                         onBulkMatch(
                           withinCap(phaseBSuggestions).map((s) => ({

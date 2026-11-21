@@ -304,6 +304,8 @@ export interface ReportResponse {
       lessBankOnlyDebits?: string
       lessUnpresentedCheques?: string
       cashBookBalanceEnd?: string
+      scheduleCashBook?: string
+      scheduleDifference?: string
       additionalInformationTitle?: string
       asAtReconciliationPosition?: string
       postPeriodMovement?: string

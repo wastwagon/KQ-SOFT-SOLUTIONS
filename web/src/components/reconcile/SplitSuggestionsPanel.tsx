@@ -39,13 +39,11 @@ export default function SplitSuggestionsPanel({
           Split suggestions — many-to-1 / 1-to-many
         </span>
       }
-      sublabel="Different amounts that add up (for example 6,200 + 3,800 = 10,000). This is not Match by counting, which only groups the same amount. Auto-match all does not apply these groups."
+      sublabel="Lines that add up to one amount. Auto-match applies a group only when no other group uses those lines."
     >
       {suggestions.length === 0 ? (
         <p className="text-sm text-gray-600">
-          No split groups suggested right now. You can still match them yourself: tick the cash-book
-          rows that add up and the one bank row, then use <strong>Confirm match</strong> at the
-          bottom of the screen (including from Cash book all, when receipts are paired with credits).
+          No split groups.
         </p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -125,7 +123,7 @@ export default function SplitSuggestionsPanel({
                     )}
                   </span>
                   <span className="text-[10px] text-primary-600 font-medium italic">
-                    Click to match group
+                    Match group
                   </span>
                 </div>
               </button>

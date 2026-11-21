@@ -45,7 +45,7 @@ export default function SettingsConnectionsTab() {
     <div className="space-y-6">
       <Card
         title="Statement import (available now)"
-        sublabel="Upload cash books and bank statements as CSV, Excel, or PDF. Ghana bank layouts (Ecobank, GCB, Absa, Stanbic, and more) are auto-detected during mapping."
+        sublabel="CSV, Excel, or PDF. Ghana bank layouts are detected when you map."
       >
         <Link to="/projects" className={buttonClassName('outline', 'sm')}>
           Go to projects
@@ -54,7 +54,7 @@ export default function SettingsConnectionsTab() {
 
       <Card
         title="Live bank feeds"
-        sublabel="Direct bank connections for Ghana are limited today. Join the waitlist and we will prioritise your institution when aggregator or bank partnerships go live."
+        sublabel="Live bank connections are not open yet. Leave your bank and email."
       >
         <form
           className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl"

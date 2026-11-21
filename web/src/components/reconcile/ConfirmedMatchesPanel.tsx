@@ -52,7 +52,7 @@ export default function ConfirmedMatchesPanel({
   return (
     <Card
       title="Confirmed matches"
-      sublabel={canReconcile ? 'Click Unmatch to undo a match.' : 'View-only. Matches cannot be changed.'}
+      sublabel={canReconcile ? undefined : 'View only.'}
       actions={
         canReconcile && matches.length > 0 && onClearAll ? (
           <Button

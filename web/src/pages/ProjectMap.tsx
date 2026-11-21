@@ -507,7 +507,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
       <WorkflowStepIntro
         eyebrow="Map"
         title="Map columns"
-        subtitle="Match each file’s date and amount columns, then apply. Unrecognised bank PDFs are not applied automatically — export Excel, CSV, OFX, MT940, or CAMT.053, or map them here. Set date and amount format if the file is not Ghana DD/MM."
+        subtitle="Date and amount for each file. Ghana dates are DD/MM."
       />
       <Alert tone="info" title="Date column is required">
         Confirm date and amount columns before applying. If one amount column mixes signs, positives are
@@ -673,7 +673,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
         <Card
           className="max-w-2xl"
           title="Bulk apply — which files?"
-          sublabel="Tick files that still need mapping. Already-mapped files are left unticked so you do not overwrite them by accident. New uploads are ticked until they have transactions."
+          sublabel="Files still to map. Mapped files stay unticked."
         >
           <div className="space-y-3">
           <div className="flex flex-wrap gap-2 text-xs font-medium">
@@ -846,7 +846,7 @@ export default function ProjectMap({ projectId, canMap = true, onProceedToReconc
                 <div className="max-w-md">
                   <Select
                     label="Worksheet (Excel)"
-                    hint="We pick the best transaction sheet automatically. You can change the tab here anytime."
+                    hint="Transaction sheet"
                     value={previewSheetIndex}
                     onChange={(e) => {
                       const n = parseInt(e.target.value, 10)

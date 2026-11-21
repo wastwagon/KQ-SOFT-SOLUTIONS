@@ -231,6 +231,8 @@ export interface SuggestMatchesOptions {
   useChequeNo?: boolean
   /** When true, enable many-to-one and one-to-many sum matching suggestions. */
   enableSplitMatching?: boolean
+  /** When true, return every summing subset, including ones that compete for the same line. */
+  includeCompetingSplits?: boolean
 }
 
 export function suggestMatches(
@@ -370,6 +372,17 @@ export function suggestMatches(
       }
       continue
     }
+    // Name or reference tie-break: keep the one candidate that shares an
+    // identifying token, and drop the crossed same-amount lines.
+    const identified = uniqueIdentityMatch(list)
+    if (identified) {
+      for (const s of list) {
+        if (s.cashBookTx.id !== identified.cashBookTx.id) {
+          excluded.add(`${s.cashBookTx.id}::${s.bankTx.id}`)
+        }
+      }
+      continue
+    }
     // Description tie-break: keep the candidate whose narration clearly
     // matches while all others clearly do not.
     const scored = list.map((s) => ({
@@ -424,7 +437,59 @@ export function suggestMatches(
       for (const s of list) s.duplicateWarning = true
     }
   }
-  return filtered.sort((a, b) => b.confidence - a.confidence)
+  const identityDrop = new Set<string>()
+  for (const list of byCbId.values()) {
+    if (list.length <= 1) continue
+    const winner = uniqueIdentityMatch(list)
+    if (!winner) continue
+    for (const s of list) {
+      if (s.bankTx.id !== winner.bankTx.id) identityDrop.add(`${s.cashBookTx.id}::${s.bankTx.id}`)
+    }
+  }
+  const resolved =
+    identityDrop.size === 0
+      ? filtered
+      : filtered.filter((s) => !identityDrop.has(`${s.cashBookTx.id}::${s.bankTx.id}`))
+  if (identityDrop.size > 0) {
+    for (const s of resolved) s.duplicateWarning = undefined
+    const seenCb = new Map<string, number>()
+    const seenBank = new Map<string, number>()
+    for (const s of resolved) {
+      seenCb.set(s.cashBookTx.id, (seenCb.get(s.cashBookTx.id) ?? 0) + 1)
+      seenBank.set(s.bankTx.id, (seenBank.get(s.bankTx.id) ?? 0) + 1)
+    }
+    for (const s of resolved) {
+      if ((seenCb.get(s.cashBookTx.id) ?? 0) > 1 || (seenBank.get(s.bankTx.id) ?? 0) > 1) {
+        s.duplicateWarning = true
+      }
+    }
+  }
+  return resolved.sort((a, b) => b.confidence - a.confidence)
+}
+
+/** Keep a same-amount suggestion only when exactly one candidate shares a name or reference. */
+function uniqueIdentityMatch(list: SuggestedMatch[]): SuggestedMatch | null {
+  const identified = list.filter((s) =>
+    sharesIdentity(
+      {
+        id: s.cashBookTx.id,
+        amount: s.cashBookTx.amount,
+        name: s.cashBookTx.name,
+        details: s.cashBookTx.details,
+        chqNo: s.cashBookTx.chqNo,
+        docRef: s.cashBookTx.docRef,
+      },
+      {
+        id: s.bankTx.id,
+        amount: s.bankTx.amount,
+        name: s.bankTx.name,
+        details: s.bankTx.details,
+        chqNo: s.bankTx.chqNo,
+        docRef: s.bankTx.docRef,
+      }
+    )
+  )
+  return identified.length === 1 ? identified[0]! : null
 }
 /** Max items in a split combination (keeps search tractable). */
 const SPLIT_MAX_SIZE = 5
@@ -606,7 +671,112 @@ export function suggestSplitMatches(
     }
   }
 
+  if (options.includeCompetingSplits) return results
   return preferNonOverlapping(results)
+}
+
+/** Splits safe to confirm automatically: no other subset uses any of the same lines. */
+export function uniqueAutoSplitMatches(suggestions: SuggestedSplitMatch[]): SuggestedSplitMatch[] {
+  const counts = new Map<string, number>()
+  for (const suggestion of suggestions) {
+    for (const tx of [...suggestion.cashBookTxs, ...suggestion.bankTxs]) {
+      counts.set(tx.id, (counts.get(tx.id) ?? 0) + 1)
+    }
+  }
+  return suggestions.filter((suggestion) =>
+    [...suggestion.cashBookTxs, ...suggestion.bankTxs].every((tx) => counts.get(tx.id) === 1)
+  )
+}
+
+export type AmountIdentityTx = {
+  id: string
+  amount: number
+  name?: string | null
+  details?: string | null
+  chqNo?: string | null
+  docRef?: string | null
+  documentType?: string | null
+}
+
+function identityText(tx: AmountIdentityTx): string {
+  return [tx.name, tx.details, tx.chqNo, tx.docRef].filter(Boolean).join(' ')
+}
+
+function sharesIdentity(left: AmountIdentityTx, right: AmountIdentityTx): boolean {
+  const rightTokens = tokenizeNarration(identityText(right))
+  for (const token of tokenizeNarration(identityText(left))) {
+    if (rightTokens.has(token)) return true
+  }
+  return false
+}
+
+/**
+ * True when this equal-amount pair is the crossed one: another open line on each
+ * side shares the amount, and a name or reference identifies the other pairing.
+ */
+export function sameAmountSwapBlocked(
+  cashBook: AmountIdentityTx,
+  bank: AmountIdentityTx,
+  otherCashBook: AmountIdentityTx[],
+  otherBank: AmountIdentityTx[],
+  tolerance = 0.01
+): boolean {
+  const siblingCashBook = otherCashBook.filter(
+    (tx) => tx.id !== cashBook.id && amountsWithinTolerance(tx.amount, cashBook.amount, tolerance)
+  )
+  const siblingBank = otherBank.filter(
+    (tx) => tx.id !== bank.id && amountsWithinTolerance(tx.amount, bank.amount, tolerance)
+  )
+  if (!siblingCashBook.length || !siblingBank.length) return false
+  if (sharesIdentity(cashBook, bank)) return false
+  for (const other of siblingCashBook) {
+    if (sharesIdentity(other, bank)) return true
+  }
+  for (const other of siblingBank) {
+    if (sharesIdentity(cashBook, other)) return true
+  }
+  return false
+}
+
+/**
+ * A multi-line group hides a crossed equal amount when one cash-book line and one
+ * bank line share an amount but not a name, and another line — inside the group
+ * or still open — is the named counterpart.
+ */
+export function groupContainsBlockedEqualSwap(
+  cashBook: AmountIdentityTx[],
+  bank: AmountIdentityTx[],
+  otherCashBook: AmountIdentityTx[],
+  otherBank: AmountIdentityTx[],
+  tolerance = 0.01
+): boolean {
+  const sameLane = (left: AmountIdentityTx, right: AmountIdentityTx) =>
+    !left.documentType || !right.documentType || left.documentType === right.documentType
+  for (const cb of cashBook) {
+    for (const bk of bank) {
+      if (!amountsWithinTolerance(cb.amount, bk.amount, tolerance)) continue
+      if (sharesIdentity(cb, bk)) continue
+      const openCashBook = otherCashBook.filter((tx) => sameLane(tx, cb))
+      const openBank = otherBank.filter((tx) => sameLane(tx, bk))
+      if (sameAmountSwapBlocked(cb, bk, openCashBook, openBank, tolerance)) return true
+      const namedCashBookInGroup = cashBook.some(
+        (other) =>
+          other.id !== cb.id &&
+          sameLane(other, cb) &&
+          amountsWithinTolerance(other.amount, bk.amount, tolerance) &&
+          sharesIdentity(other, bk)
+      )
+      const namedBankInGroup = bank.some(
+        (other) =>
+          other.id !== bk.id &&
+          sameLane(other, bk) &&
+          amountsWithinTolerance(cb.amount, other.amount, tolerance) &&
+          sharesIdentity(cb, other)
+      )
+      if (namedCashBookInGroup || namedBankInGroup) return true
+    }
+  }
+  return false
 }
 
 export interface SuggestedSplitMatch {

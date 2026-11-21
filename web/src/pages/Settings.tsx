@@ -281,10 +281,7 @@ export default function Settings() {
         subtitle={
           <>
             {org?.name ? <p className="text-gray-700 font-medium">{org.name}</p> : null}
-            <p className="text-gray-500">
-              Branding, billing, team, bank import, API keys, and bank rules — everything that applies
-              across projects.
-            </p>
+            <p className="text-gray-500">Firm settings for every project.</p>
           </>
         }
       />
@@ -332,7 +329,7 @@ export default function Settings() {
         {activeTab === 'members' && (
           <Card
             title="Team Members"
-            sublabel="Add team members by email. They must already have an account. Your plan limits how many members you can have."
+            sublabel="Invite by email. The person needs an account already."
           >
             {!canManageMembers(role) && (
               <Alert tone="info" title="View only" className="mb-4">
@@ -376,7 +373,7 @@ export default function Settings() {
         {activeTab === 'bank-rules' && (
           <Card
             title="Bank Rules"
-            sublabel='Auto-suggest or flag bank transactions that match your rules (e.g. "Bank charges" when description contains "BANK CHARGES").'
+            sublabel="Suggest or flag bank lines from a narration rule."
           >
             {!features.bank_rules && (
               <Alert tone="warning" title="Upgrade required" className="mb-4">
@@ -394,7 +391,7 @@ export default function Settings() {
 
         <Card
           title="About this platform"
-          sublabel="Product information for your team. Branding on exports uses your organisation settings."
+          sublabel="Branding on exports uses this firm’s settings."
           className="mt-10"
         >
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

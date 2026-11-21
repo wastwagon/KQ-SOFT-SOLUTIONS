@@ -37,14 +37,14 @@ export const GHANA_BRS_GROUP_MEANING: Record<
 > = {
   section_a: {
     label: 'True unpresented (A)',
-    meaning: 'Cheque not yet on the bank statement — stays outstanding on both Face and Working.',
+    meaning: 'Cheque not yet on the bank statement. It stays outstanding on the standard face and on the working paper.',
     inWorkingUnpresented: true,
     faceRole: 'Core Face unpresented; Groups 2–3 start from this floor',
   },
   timing_open: {
     label: 'Open timing (B₁)',
     meaning:
-      'Recurring operating cheques (board/security/fuel/staff loan style) still unmatched. Working (??) adds these to unpresented; Face nets them through Groups 2–3.',
+      'Recurring operating cheques still unmatched. The working paper adds these to unpresented cheques. The standard face nets them through the clearing groups.',
     inWorkingUnpresented: true,
     faceRole: 'Enter Group 2 as B₁, then offset by bank clearing/withdrawals',
   },
@@ -221,7 +221,7 @@ export function summarizeGhanaBrsPaymentGroups(
     sectionATotal,
     openTimingTotal,
     scheduleExplanation:
-      'Working (??) unpresented = true unpresented (A) + open timing (B₁). Face (√) continues Groups 2–3 netting so both unpresented and bank-only debits move together and still tie to cash book.',
+      'The working paper lists outstanding cheques and open timing items. The standard face nets clearing groups, so those two schedules show different lines. Neither schedule replaces the cash book from the books. When the lines and the books differ, the statement prints the difference.',
   }
 }
 

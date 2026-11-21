@@ -235,7 +235,7 @@ export default function ProjectUploadStep({
       <WorkflowStepIntro
         eyebrow="Upload"
         title="Upload documents"
-        subtitle="Upload a cash book and a bank statement (Excel, CSV, PDF, or photo). Ghana bank PDFs often map automatically; other layouts are mapped on the next step."
+        subtitle="Cash book and bank statement. Ghana bank PDFs usually map on their own."
       />
       <p className="text-xs text-gray-500">{PROJECT_UPLOAD_LIMITS_SUMMARY}</p>
       {!canUpload && sourceUploadsLocked && (
